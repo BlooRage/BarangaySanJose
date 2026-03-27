@@ -14,6 +14,34 @@ require_once __DIR__ . "/includes/admin_guard.php";
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
     <style>
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 96px;
+            padding: 0.32rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        .status-pill.pending {
+            color: #6c5a06;
+            background: #f4e8b7;
+            border-color: #e9db9f;
+        }
+        .status-pill.approved {
+            color: #166534;
+            background: #dcfce7;
+            border-color: #bbf7d0;
+        }
+        .status-pill.denied {
+            color: #991b1b;
+            background: #fee2e2;
+            border-color: #fecaca;
+        }
         .household-member-verification-shell #btnHouseholdMemberVerificationRefresh.is-loading i {
             animation: adminSpin 900ms linear infinite;
         }
@@ -335,7 +363,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
                 </div>
             </div>
             <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-outline-secondary" id="btnHmvReturnToReview">Return</button>
                 <button type="button" class="btn btn-primary" id="btnHmvConfirmAction">Confirm</button>
             </div>
         </div>
@@ -353,6 +381,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-03"></script>
+<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-04"></script>
 </body>
 </html>

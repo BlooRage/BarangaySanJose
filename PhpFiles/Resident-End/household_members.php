@@ -166,34 +166,20 @@ $stmt->bind_result($householdId);
 $stmt->fetch();
 $stmt->close();
 
-if (!$householdId) {
-    echo json_encode([
-        'success' => true,
-        'members' => [],
-        'has_household' => false,
-        'is_head' => $isCurrentResidentHead,
-        'resident_id' => $residentId,
-        'address' => null,
-        'minor_count' => 0,
-        'adult_count' => 0,
-        'pending_member_requests' => $pendingMemberRequests,
-        'pending_member_request_count' => count($pendingMemberRequests),
-    ]);
-    exit;
+$headResidentId = $isCurrentResidentHead ? $residentId : null;
+if ($householdId) {
+    $stmt = $conn->prepare("
+        SELECT head_resident_id
+        FROM householdtbl
+        WHERE household_id = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $householdId);
+    $stmt->execute();
+    $stmt->bind_result($headResidentId);
+    $stmt->fetch();
+    $stmt->close();
 }
-
-$headResidentId = null;
-$stmt = $conn->prepare("
-    SELECT head_resident_id
-    FROM householdtbl
-    WHERE household_id = ?
-    LIMIT 1
-");
-$stmt->bind_param("i", $householdId);
-$stmt->execute();
-$stmt->bind_result($headResidentId);
-$stmt->fetch();
-$stmt->close();
 
 $addressDisplay = null;
 if ($headResidentId) {
@@ -235,66 +221,68 @@ if ($headResidentId) {
     $stmt->close();
 }
 
-$stmt = $conn->prepare("
-    SELECT
-        r.resident_id,
-        r.firstname,
-        r.middlename,
-        r.lastname,
-        r.suffix,
-        r.birthdate,
-        r.sex,
-        r.civil_status,
-        hm.role
-    FROM householdmemberresidenttbl hm
-    INNER JOIN residentinformationtbl r
-        ON r.resident_id = hm.resident_id
-    WHERE hm.household_id = ?
-      AND hm.status_id = ?
-    ORDER BY
-        CASE WHEN hm.role = 'Head' THEN 0 ELSE 1 END,
-        r.lastname, r.firstname
-");
-$stmt->bind_param("ii", $householdId, $memberActiveStatusId);
-$stmt->execute();
-$res = $stmt->get_result();
-
 $members = [];
-$isHead = false;
+$isHead = $isCurrentResidentHead;
 $minorCount = 0;
 $adultCount = 0;
-while ($row = $res->fetch_assoc()) {
-    if ($row['role'] === 'Head' && $row['resident_id'] === $residentId) {
-        $isHead = true;
-    }
-    $age = null;
-    if (!empty($row['birthdate'])) {
-        try {
-            $dob = new DateTime($row['birthdate']);
-            $age = (new DateTime())->diff($dob)->y;
-        } catch (Exception $e) {
-            $age = null;
+if ($householdId) {
+    $stmt = $conn->prepare("
+        SELECT
+            r.resident_id,
+            r.firstname,
+            r.middlename,
+            r.lastname,
+            r.suffix,
+            r.birthdate,
+            r.sex,
+            r.civil_status,
+            hm.role
+        FROM householdmemberresidenttbl hm
+        INNER JOIN residentinformationtbl r
+            ON r.resident_id = hm.resident_id
+        WHERE hm.household_id = ?
+          AND hm.status_id = ?
+        ORDER BY
+            CASE WHEN hm.role = 'Head' THEN 0 ELSE 1 END,
+            r.lastname, r.firstname
+    ");
+    $stmt->bind_param("ii", $householdId, $memberActiveStatusId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    while ($row = $res->fetch_assoc()) {
+        if ($row['role'] === 'Head' && $row['resident_id'] === $residentId) {
+            $isHead = true;
         }
-    }
-    if ($age !== null) {
-        if ($age < 18) {
-            $minorCount++;
-        } else {
-            $adultCount++;
+        $age = null;
+        if (!empty($row['birthdate'])) {
+            try {
+                $dob = new DateTime($row['birthdate']);
+                $age = (new DateTime())->diff($dob)->y;
+            } catch (Exception $e) {
+                $age = null;
+            }
         }
+        if ($age !== null) {
+            if ($age < 18) {
+                $minorCount++;
+            } else {
+                $adultCount++;
+            }
+        }
+        $middle = trim((string)$row['middlename']);
+        $name = trim($row['firstname'] . ' ' . ($middle !== '' ? $middle[0] . '. ' : '') . $row['lastname'] . ($row['suffix'] ? ' ' . $row['suffix'] : ''));
+        $members[] = [
+            'resident_id' => $row['resident_id'],
+            'name' => $name,
+            'role' => $row['role'],
+            'age' => $age,
+            'sex' => $row['sex'],
+            'civil_status' => $row['civil_status'],
+        ];
     }
-    $middle = trim((string)$row['middlename']);
-    $name = trim($row['firstname'] . ' ' . ($middle !== '' ? $middle[0] . '. ' : '') . $row['lastname'] . ($row['suffix'] ? ' ' . $row['suffix'] : ''));
-    $members[] = [
-        'resident_id' => $row['resident_id'],
-        'name' => $name,
-        'role' => $row['role'],
-        'age' => $age,
-        'sex' => $row['sex'],
-        'civil_status' => $row['civil_status'],
-    ];
+    $stmt->close();
 }
-$stmt->close();
 
 if ($headResidentId) {
     $stmt = $conn->prepare("
@@ -347,7 +335,7 @@ if ($headResidentId) {
 echo json_encode([
     'success' => true,
     'members' => $members,
-    'has_household' => true,
+    'has_household' => ($householdId !== null && (int)$householdId > 0) || !empty($members) || $isCurrentResidentHead,
     'is_head' => $isHead,
     'can_manage_members' => (bool)($headVerification['can_manage_members'] ?? true),
     'head_verification_status' => (string)($headVerification['decision_status'] ?? 'NotApplicable'),
