@@ -14,8 +14,12 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
-$cacheKey = 'verified_profile_image_cache';
+$cacheKey = 'verified_profile_image_cache_v2';
+$legacyCacheKey = 'verified_profile_image_cache';
 $cacheTtlSeconds = 300;
+if ($legacyCacheKey !== $cacheKey && isset($_SESSION[$legacyCacheKey])) {
+    unset($_SESSION[$legacyCacheKey]);
+}
 $cachedProfile = $_SESSION[$cacheKey] ?? null;
 $defaultPlaceholderSuffix = '/Images/Profile-Placeholder.png';
 if (is_array($cachedProfile)) {
@@ -147,25 +151,17 @@ function resolveResident2x2Path(mysqli $conn, string $residentId): string {
                 (
                     uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
                     AND uf.source_id = ?
+                    AND LOWER(COALESCE(sv.status_name, '')) IN ('verified', 'approved')
                 )
                 OR
                 (
                     uf.source_type = 'ResidentEditRequest'
                     AND rer.resident_id = ?
                     AND rer.request_type = 'profile'
+                    AND LOWER(COALESCE(rs.status_name, '')) = 'approvedrequest'
                 )
               )
-        ORDER BY
-            CASE
-                WHEN uf.source_type = 'ResidentEditRequest'
-                     AND LOWER(COALESCE(rs.status_name, '')) = 'approvedrequest' THEN 0
-                WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
-                     AND LOWER(COALESCE(sv.status_name, '')) IN ('verified', 'approved') THEN 0
-                WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE') THEN 1
-                ELSE 2
-            END,
-            uf.upload_timestamp DESC,
-            uf.attachment_id DESC
+        ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
         LIMIT 1
     ";
 

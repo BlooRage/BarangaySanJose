@@ -150,6 +150,10 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     #main-display {
       min-width: 0;
     }
+    .officials-page-header,
+    #div-tableContainer {
+      min-width: 0;
+    }
     .officials-masterlist-shell {
       width: 100%;
       max-width: 100%;
@@ -337,6 +341,150 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       color: #6b5a45;
       font-size: 0.9rem;
     }
+    .officials-wide-modal,
+    .officials-profile-modal-dialog {
+      width: min(1500px, calc(100vw - 2rem));
+      max-width: none;
+    }
+    .officials-profile-modal-content {
+      width: 100%;
+    }
+    .officials-masterlist-table td:last-child {
+      white-space: normal;
+    }
+    .officials-masterlist-table td:last-child .btn,
+    .officials-masterlist-table td:last-child .dropdown,
+    .officials-masterlist-table td:last-child .dropdown-toggle {
+      max-width: 100%;
+    }
+    .officials-access-value,
+    .officials-module-summary,
+    #officialsMgmtAccessSummary,
+    #officialsMgmtAccessModulesSummary,
+    #officialsMgmtPromoteSummary,
+    #officialsMgmtDepartmentSummary,
+    #officialsMgmtDepartmentPosition,
+    #officialsMgmtPromotePath,
+    #officialsMgmtDepartmentPreview,
+    #officialsMgmtProfileSummaryName {
+      white-space: normal;
+      word-break: break-word;
+    }
+    @media (max-width: 1199.98px) {
+      .officials-masterlist-shell .officials-masterlist-table {
+        min-width: 1180px;
+      }
+      .officials-wide-modal,
+      .officials-profile-modal-dialog {
+        width: calc(100vw - 1.5rem);
+      }
+    }
+    @media (max-width: 991.98px) {
+      .officials-masterlist-shell .officials-masterlist-table {
+        min-width: 1040px;
+      }
+      #div-tableContainer {
+        padding: 1rem !important;
+        border-radius: 1rem !important;
+      }
+      .officials-access-group-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .officials-access-group-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .officials-access-search {
+        max-width: none;
+        width: 100%;
+      }
+      .officials-profile-modal-content {
+        padding: 1.25rem !important;
+      }
+      #modalOfficialsMgmtProfile .modal-body {
+        padding-top: 0.5rem;
+      }
+    }
+    @media (max-width: 767.98px) {
+      #main-display {
+        padding: 1rem !important;
+      }
+      .officials-page-header h2 {
+        font-size: clamp(1.5rem, 6vw, 2rem);
+      }
+      .officials-masterlist-shell .table-responsive {
+        margin: 0 -0.35rem;
+        padding: 0 0.35rem 0.25rem;
+      }
+      .officials-masterlist-shell .officials-masterlist-table {
+        min-width: 920px;
+      }
+      .officials-masterlist-shell .officials-masterlist-table td {
+        max-width: 180px;
+      }
+      .officials-masterlist-table td:last-child > .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        width: 100%;
+      }
+      .officials-masterlist-table td:last-child .btn,
+      .officials-masterlist-table td:last-child .dropdown,
+      .officials-masterlist-table td:last-child .dropdown-toggle {
+        width: 100%;
+      }
+      .officials-access-item.is-child {
+        margin-left: 0;
+      }
+      .officials-access-groups {
+        max-height: 42vh;
+      }
+      .officials-wide-modal,
+      .officials-profile-modal-dialog {
+        width: calc(100vw - 1rem);
+        margin: 0.5rem auto;
+      }
+      .officials-profile-modal-content {
+        padding: 1rem !important;
+      }
+      .officials-profile-avatar {
+        width: 108px;
+        height: 108px;
+      }
+      #modalOfficialsMgmtProfile .modal-footer,
+      #modalOfficialsMgmtAccess .modal-footer,
+      #modalOfficialsMgmtPromote .modal-footer,
+      #modalOfficialsMgmtDepartment .modal-footer,
+      #modalOfficialsMgmtFilter .modal-footer,
+      #modalOfficialsMgmtColumns .modal-footer {
+        flex-direction: column-reverse;
+        align-items: stretch;
+      }
+      #modalOfficialsMgmtProfile .modal-footer .btn,
+      #modalOfficialsMgmtAccess .modal-footer .btn,
+      #modalOfficialsMgmtPromote .modal-footer .btn,
+      #modalOfficialsMgmtDepartment .modal-footer .btn,
+      #modalOfficialsMgmtFilter .modal-footer .btn,
+      #modalOfficialsMgmtColumns .modal-footer .btn {
+        width: 100%;
+      }
+    }
+    @media (max-width: 575.98px) {
+      .officials-masterlist-shell .officials-masterlist-table {
+        min-width: 840px;
+      }
+      .officials-masterlist-shell .officials-masterlist-table td {
+        max-width: 150px;
+      }
+      #modalOfficialsMgmtProfile .modal-title {
+        font-size: 1rem;
+        line-height: 1.4;
+      }
+      #modalOfficialsMgmtProfile .tracker-form-section,
+      #modalOfficialsMgmtAccess .officials-access-shell {
+        padding: 0.85rem !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -344,7 +492,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     <?php include "includes/sidebar.php"; ?>
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
-      <div class="mb-4">
+      <div class="mb-4 officials-page-header">
         <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
           <?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?>
         </h2>
@@ -497,7 +645,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
   </div>
 
   <div class="modal fade" id="modalOfficialsMgmtAccess" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable officials-wide-modal">
       <div class="modal-content p-3">
         <div class="modal-header border-0">
           <h5 class="modal-title fw-bold"><?= htmlspecialchars($managementAccessTitle, ENT_QUOTES, 'UTF-8') ?></h5>
@@ -648,8 +796,8 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
 
   <?php if ($isPersonnelManagement): ?>
   <div class="modal fade" id="modalOfficialsMgmtProfile" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1500px; width: 75vw;">
-      <form class="modal-content border-0 rounded-2 p-4" id="formOfficialsMgmtProfile">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable officials-profile-modal-dialog">
+      <form class="modal-content border-0 rounded-2 p-4 officials-profile-modal-content" id="formOfficialsMgmtProfile">
         <div class="modal-header border-0">
           <h5 class="modal-title">Personnel Details: <span id="officialsMgmtProfileDisplayId" class="text-warning"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

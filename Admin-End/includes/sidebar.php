@@ -1298,10 +1298,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
            style="<?= $current == 'UserMasterlist.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-users-cog"></i>
-            <?= $sbRenderAttentionDot($sbModuleCount('user_management')) ?>
           </span>
           <span class="sidebar-button-label">User Management</span>
-          <?= $sbRenderAttentionBadge($sbCount('user_management')) ?>
         </a>
       </li>
       <?php endif; ?>
