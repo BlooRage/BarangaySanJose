@@ -194,6 +194,7 @@ if ($headResidentId) {
     $stmt->execute();
     $resAddr = $stmt->get_result();
     if ($addrRow = $resAddr->fetch_assoc()) {
+        $addrRow = pii_decrypt_resident_address_row($addrRow) ?? $addrRow;
         $unitNumber = trim((string)($addrRow['unit_number'] ?? ''));
         $houseNo = trim((string)($addrRow['street_number'] ?? ''));
         $streetName = trim((string)($addrRow['street_name'] ?? ''));
