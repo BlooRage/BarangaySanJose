@@ -276,6 +276,7 @@ function fetch_decisions(mysqli $conn): array {
     ");
     if (!$res) return $map;
     while ($row = $res->fetch_assoc()) {
+        $row = pii_decrypt_assoc($row, ['address_display']) ?? $row;
         $key = trim((string)($row['group_key'] ?? ''));
         if ($key === '') continue;
         $map[$key] = $row;
