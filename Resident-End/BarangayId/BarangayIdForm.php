@@ -18,6 +18,7 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentRequestWorkflow.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $data = getResidentProfileData($conn, $userId);
@@ -69,6 +70,59 @@ $fullAddress = implode(', ', array_filter([
     'Rodriguez',
     'Rizal'
 ], fn($part) => trim((string)$part) !== ''));
+
+$residentId = trim((string)($residentinformationtbl['resident_id'] ?? ''));
+$barangayIdState = dr_resident_barangay_id_state($conn, $userId, $residentId);
+if (!($barangayIdState['can_submit_new_request'] ?? false)) {
+    header('Location: ' . appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php?notice=request_not_allowed'));
+    exit;
+}
+
+$resolvedMode = dr_normalize_barangay_id_request_mode((string)($barangayIdState['submission_mode'] ?? 'new'));
+$requestedMode = dr_normalize_barangay_id_request_mode((string)($_GET['mode'] ?? $resolvedMode));
+if ($requestedMode !== $resolvedMode) {
+    header('Location: ' . appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php?notice=request_not_allowed'));
+    exit;
+}
+
+$sourceRequestId = $resolvedMode === 'new'
+    ? ''
+    : trim((string)($barangayIdState['latest_completed_request_id'] ?? ''));
+$validUntilDisplay = '';
+$validUntilDt = dr_parse_datetime_value((string)($barangayIdState['latest_completed_valid_until'] ?? ''), true);
+if ($validUntilDt instanceof DateTimeImmutable) {
+    $validUntilDisplay = $validUntilDt->format('F j, Y');
+}
+
+$formContext = [
+    'new' => [
+        'title' => 'New Barangay ID Application',
+        'subtitle' => 'Complete the resident details below to submit your first Barangay ID request.',
+        'purpose' => 'Barangay ID Application',
+        'submit_label' => 'SUBMIT APPLICATION',
+        'badge' => 'New Application',
+        'tone' => 'new',
+    ],
+    'renewal' => [
+        'title' => 'Renew Barangay ID',
+        'subtitle' => $validUntilDisplay !== ''
+            ? 'Your current Barangay ID is now within the renewal window. Once approved, the renewed ID will receive a fresh 2-year validity from its new issue date.'
+            : 'Your current Barangay ID is now eligible for renewal. Once approved, the renewed ID will receive a fresh 2-year validity from its new issue date.',
+        'purpose' => 'Barangay ID Renewal',
+        'submit_label' => 'SUBMIT RENEWAL',
+        'badge' => 'Renewal',
+        'tone' => 'renewal',
+    ],
+    'replacement_lost' => [
+        'title' => 'Replacement for Lost Barangay ID',
+        'subtitle' => 'Your previous Barangay ID is marked as lost. Submit this replacement request to receive a new Barangay ID with a fresh 2-year validity once released.',
+        'purpose' => 'Barangay ID Replacement (Lost)',
+        'submit_label' => 'SUBMIT REPLACEMENT',
+        'badge' => 'Lost Replacement',
+        'tone' => 'lost',
+    ],
+];
+$activeFormContext = $formContext[$resolvedMode] ?? $formContext['new'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -84,6 +138,44 @@ $fullAddress = implode(', ', array_filter([
 <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/barangayIdNav.css">
+    <style>
+        .request-context-card {
+            display: grid;
+            gap: 10px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            border-radius: 22px;
+            border: 1px solid #f1d3b4;
+            background: linear-gradient(135deg, #fffaf3 0%, #fff2e1 100%);
+            box-shadow: 0 16px 32px rgba(138, 75, 0, 0.08);
+        }
+        .request-context-card__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #ffffff;
+            border: 1px solid #f1d3b4;
+            color: #9a5603;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .request-context-card h2 {
+            margin: 0;
+            color: #432815;
+            font-size: 1.2rem;
+            line-height: 1.2;
+        }
+        .request-context-card p {
+            margin: 0;
+            color: #6d6257;
+            line-height: 1.7;
+        }
+    </style>
 </head>
 
 <body>
@@ -99,14 +191,25 @@ $fullAddress = implode(', ', array_filter([
 
                     <a href="<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdLandingPage.php')) ?>" class="back-link">&lt; Go Back</a>
 
-                    <h1 class="form-title">Application for Barangay ID</h1>
+                    <h1 class="form-title"><?= htmlspecialchars($activeFormContext['title'], ENT_QUOTES, 'UTF-8') ?></h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
+
+                    <div class="request-context-card">
+                        <span class="request-context-card__badge">
+                            <i class="fa-solid fa-id-card"></i>
+                            <?= htmlspecialchars($activeFormContext['badge'], ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                        <h2><?= htmlspecialchars($activeFormContext['title'], ENT_QUOTES, 'UTF-8') ?></h2>
+                        <p><?= htmlspecialchars($activeFormContext['subtitle'], ENT_QUOTES, 'UTF-8') ?></p>
+                    </div>
 
                     <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php">
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="Barangay ID">
-                        <input type="hidden" name="purpose" value="Barangay ID Application">
-                        <input type="hidden" name="request_purpose" value="Barangay ID Application">
+                        <input type="hidden" name="purpose" value="<?= htmlspecialchars($activeFormContext['purpose'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="request_purpose" value="<?= htmlspecialchars($activeFormContext['purpose'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="barangay_id_request_mode" value="<?= htmlspecialchars($resolvedMode, ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="barangay_id_source_request_id" value="<?= htmlspecialchars($sourceRequestId, ENT_QUOTES, 'UTF-8') ?>">
                         <input type="hidden" name="redirect" value="1">
 
                         <!-- PERSONAL INFORMATION -->
@@ -222,7 +325,7 @@ $fullAddress = implode(', ', array_filter([
                                 I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
 
-                            <button type="submit" class="submit-btn">SUBMIT</button>
+                            <button type="submit" class="submit-btn"><?= htmlspecialchars($activeFormContext['submit_label'], ENT_QUOTES, 'UTF-8') ?></button>
                         </div>
 
                     </form>
@@ -255,7 +358,6 @@ $fullAddress = implode(', ', array_filter([
 </body>
 
 </html>
-
 
 
 

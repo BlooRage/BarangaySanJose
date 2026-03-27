@@ -167,6 +167,21 @@ function dr_strip_legacy_base(string $publicPath): string {
     return $publicPath;
 }
 
+function dr_wants_html_redirect(): bool {
+    return (isset($_POST['redirect']) && $_POST['redirect'] === '1')
+        || strpos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'text/html') !== false;
+}
+
+function dr_redirect_to_barangay_id_landing(string $notice = ''): void {
+    $url = appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php');
+    if ($notice !== '') {
+        $separator = strpos($url, '?') === false ? '?' : '&';
+        $url .= $separator . 'notice=' . rawurlencode($notice);
+    }
+    header('Location: ' . $url);
+    exit;
+}
+
 function dr_allowed_extension(string $name): bool {
     $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     return in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'], true);
@@ -317,6 +332,89 @@ function dr_move_uploaded_file_to_path(string $tmp, string $targetPath): bool {
         return true;
     }
     return @rename($tmp, $targetPath);
+}
+
+if ($action === 'report_barangay_id_lost') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        dr_respond_json(405, ['success' => false, 'message' => 'Method not allowed.']);
+    }
+
+    $targetRequestId = trim((string)($_POST['request_id'] ?? ''));
+    $state = dr_resident_barangay_id_state($conn, $residentForeignId, $residentId);
+
+    if ($targetRequestId === '') {
+        if (dr_wants_html_redirect()) {
+            dr_redirect_to_barangay_id_landing('lost_error');
+        }
+        dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
+    }
+
+    $latestCompleted = is_array($state['latest_completed_request'] ?? null)
+        ? $state['latest_completed_request']
+        : null;
+    if (!$latestCompleted || trim((string)($latestCompleted['request_id'] ?? '')) !== $targetRequestId) {
+        if (dr_wants_html_redirect()) {
+            dr_redirect_to_barangay_id_landing('lost_error');
+        }
+        dr_respond_json(422, ['success' => false, 'message' => 'Only your latest completed Barangay ID can be marked as lost.']);
+    }
+
+    if (!($state['can_report_lost'] ?? false)) {
+        $message = 'This Barangay ID cannot be marked as lost right now.';
+        if (($state['block_reason'] ?? '') === 'pending_request') {
+            $message = 'You already have an active Barangay ID request in progress.';
+        } elseif (($state['latest_completed_lost'] ?? false)) {
+            $message = 'This Barangay ID was already tagged as lost.';
+        }
+        if (dr_wants_html_redirect()) {
+            dr_redirect_to_barangay_id_landing('lost_error');
+        }
+        dr_respond_json(422, ['success' => false, 'message' => $message]);
+    }
+
+    $payload = dr_decode_request_payload($latestCompleted);
+    $payload['barangay_id_lost_reported'] = true;
+    $payload['barangay_id_lost_reported_at'] = dr_now();
+    $payload['barangay_id_lost_reported_by_user_id'] = $residentForeignId;
+
+    if (!dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Request details column is unavailable.']);
+    }
+
+    $encodedPayload = dr_safe_json($payload);
+    $stmt = $conn->prepare("
+        UPDATE documentrequesttbl
+        SET request_details = ?, updated_at = ?
+        WHERE request_id = ?
+          AND resident_user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare lost-status update.']);
+    }
+
+    $now = dr_now();
+    $stmt->bind_param('ssss', $encodedPayload, $now, $targetRequestId, $residentForeignId);
+    $ok = $stmt->execute();
+    $affected = (int)$stmt->affected_rows;
+    $stmt->close();
+
+    if (!$ok || $affected < 1) {
+        if (dr_wants_html_redirect()) {
+            dr_redirect_to_barangay_id_landing('lost_error');
+        }
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to tag the Barangay ID as lost.']);
+    }
+
+    if (dr_wants_html_redirect()) {
+        dr_redirect_to_barangay_id_landing('lost_reported');
+    }
+
+    dr_respond_json(200, [
+        'success' => true,
+        'message' => 'Barangay ID tagged as lost. You may now submit a replacement request.',
+        'request_id' => $targetRequestId,
+    ]);
 }
 
 function dr_normalize_image_for_pdf(string $imagePath, string $ext): array {
@@ -1027,6 +1125,50 @@ if ($action === 'submit_request') {
     $documentTypeToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
     $isBarangayIdRequest = dr_is_barangay_id_document_type($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
     if ($isBarangayIdRequest) {
+        $barangayIdState = dr_resident_barangay_id_state($conn, $residentForeignId, $residentId);
+        if (!($barangayIdState['can_submit_new_request'] ?? false)) {
+            $message = 'You cannot submit a new Barangay ID request right now.';
+            if (($barangayIdState['block_reason'] ?? '') === 'pending_request') {
+                $message = 'You already have an active Barangay ID request in progress.';
+            } elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid') {
+                $message = 'Your current Barangay ID is still valid. You may renew it three months before expiry or request a replacement only after tagging it as lost.';
+            }
+            if (dr_wants_html_redirect()) {
+                dr_redirect_to_barangay_id_landing('request_not_allowed');
+            }
+            dr_respond_json(422, ['success' => false, 'message' => $message]);
+        }
+
+        $requestedMode = dr_normalize_barangay_id_request_mode((string)($_POST['barangay_id_request_mode'] ?? ''));
+        $expectedMode = dr_normalize_barangay_id_request_mode((string)($barangayIdState['submission_mode'] ?? 'new'));
+        if ($requestedMode !== $expectedMode) {
+            if (dr_wants_html_redirect()) {
+                dr_redirect_to_barangay_id_landing('request_not_allowed');
+            }
+            dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID request type is no longer available. Please reload the page and try again.']);
+        }
+
+        $sourceRequestId = trim((string)($_POST['barangay_id_source_request_id'] ?? ''));
+        $latestCompletedRequestId = trim((string)($barangayIdState['latest_completed_request_id'] ?? ''));
+        if ($expectedMode !== 'new') {
+            if ($latestCompletedRequestId === '') {
+                if (dr_wants_html_redirect()) {
+                    dr_redirect_to_barangay_id_landing('request_not_allowed');
+                }
+                dr_respond_json(422, ['success' => false, 'message' => 'No previous Barangay ID record was found for this request.']);
+            }
+            if ($sourceRequestId !== '' && $sourceRequestId !== $latestCompletedRequestId) {
+                if (dr_wants_html_redirect()) {
+                    dr_redirect_to_barangay_id_landing('request_not_allowed');
+                }
+                dr_respond_json(422, ['success' => false, 'message' => 'This Barangay ID request is no longer tied to the current active record.']);
+            }
+            $_POST['barangay_id_source_request_id'] = $latestCompletedRequestId;
+        } else {
+            $_POST['barangay_id_source_request_id'] = '';
+        }
+        $_POST['barangay_id_request_mode'] = $expectedMode;
+
         $residentBarangayIdSnapshot = dr_fetch_resident_barangay_id_snapshot($conn, $residentId, $residentForeignId);
         if (trim((string)($_POST['birthdate'] ?? '')) === '' && $residentBarangayIdSnapshot['birthdate'] !== '') {
             $_POST['birthdate'] = $residentBarangayIdSnapshot['birthdate'];
@@ -1086,13 +1228,9 @@ if ($action === 'submit_request') {
             }
         }
 
-        $purposeText = 'Barangay ID Application';
-        if (trim((string)($_POST['request_purpose'] ?? '')) === '') {
-            $_POST['request_purpose'] = $purposeText;
-        }
-        if (trim((string)($_POST['purpose'] ?? '')) === '') {
-            $_POST['purpose'] = $purposeText;
-        }
+        $purposeText = dr_barangay_id_purpose_for_mode($expectedMode);
+        $_POST['request_purpose'] = $purposeText;
+        $_POST['purpose'] = $purposeText;
     }
 
     $isBusinessPermitClearanceRequest = in_array($documentTypeToken, [
@@ -1924,7 +2062,7 @@ if ($action === 'submit_request') {
         dr_sync_transaction($conn, $row);
     }
 
-    if ((isset($_POST['redirect']) && $_POST['redirect'] === '1') || strpos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'text/html') !== false) {
+    if (dr_wants_html_redirect()) {
         header('Location: ' . appUrl('/Resident-End/document_requests.php?created=' . urlencode($requestId)));
         exit;
     }

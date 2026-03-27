@@ -573,6 +573,57 @@ $serializedRow = $requestRow ? [
                 min-width: 0;
             }
         }
+        @media (max-width: 1160px) {
+            #mobile-header {
+                display: block !important;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                z-index: 1030;
+                height: auto !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #mobile-header .d-flex {
+                width: 100%;
+            }
+            #div-mainDisplay {
+                margin-left: 0 !important;
+                width: 100%;
+                padding-top: 1rem !important;
+            }
+            body:not(.digital-id-embed) {
+                padding-top: 64px;
+            }
+            #div-sidebarWrapper {
+                position: fixed !important;
+                top: 0;
+                left: 0;
+                height: 100vh !important;
+                width: 280px;
+                z-index: 1060;
+                transform: translateX(-100%);
+                transition: transform 0.28s ease;
+                box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0);
+            }
+            #div-sidebarWrapper.show {
+                transform: translateX(0);
+                box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+            }
+        }
+        @media (min-width: 1161px) {
+            body:not(.digital-id-embed) {
+                padding-top: 0;
+            }
+            #mobile-header {
+                display: none !important;
+            }
+            #div-sidebarWrapper {
+                transform: none !important;
+            }
+        }
     </style>
 </head>
 <body class="<?= $embedMode ? 'digital-id-embed' : '' ?>">
@@ -590,8 +641,17 @@ $serializedRow = $requestRow ? [
         </section>
     </main>
 <?php else: ?>
-    <div class="d-flex digital-id-page">
+    <div class="d-flex min-vh-100 digital-id-page">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
+        <header id="mobile-header">
+            <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+                <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar">
+                    <i class="fa-solid fa-bars fa-lg"></i>
+                </button>
+                <img src="<?= htmlspecialchars($baseUrl) ?>/Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+                <span class="logo-name">Barangay San Jose</span>
+            </div>
+        </header>
         <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5">
             <div class="digital-id-main">
                 <section class="digital-id-card-shell p-4 p-md-5">
@@ -794,6 +854,10 @@ $serializedRow = $requestRow ? [
                 .catch(() => {});
         })();
     </script>
+<?php endif; ?>
+<?php if (!$embedMode): ?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
 <?php endif; ?>
 </body>
 </html>

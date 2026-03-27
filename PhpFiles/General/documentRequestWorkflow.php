@@ -756,6 +756,288 @@ function dr_is_barangay_id_document_type(string $documentType): bool {
         || strpos($doc, 'barangay id') !== false;
 }
 
+function dr_decode_request_payload(array $requestRow): array {
+    $raw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
+    $payload = json_decode($raw, true);
+    return is_array($payload) ? $payload : [];
+}
+
+function dr_parse_datetime_value(string $value, bool $endOfDayForDateOnly = false): ?DateTimeImmutable {
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+
+    $formats = [
+        'Y-m-d H:i:s',
+        'Y-m-d',
+        'm/d/Y',
+        'm/d/Y H:i:s',
+        'F j, Y',
+        'M j, Y',
+        DateTimeInterface::ATOM,
+    ];
+    foreach ($formats as $format) {
+        $dt = DateTimeImmutable::createFromFormat($format, $value);
+        if ($dt instanceof DateTimeImmutable) {
+            $hasOnlyDate = in_array($format, ['Y-m-d', 'm/d/Y', 'F j, Y', 'M j, Y'], true);
+            if ($hasOnlyDate && $endOfDayForDateOnly) {
+                $dt = $dt->setTime(23, 59, 59);
+            }
+            return $dt;
+        }
+    }
+
+    try {
+        $dt = new DateTimeImmutable($value);
+        if ($endOfDayForDateOnly && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            $dt = $dt->setTime(23, 59, 59);
+        }
+        return $dt;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function dr_barangay_id_lost_reported(array $requestRow): bool {
+    $payload = dr_decode_request_payload($requestRow);
+    $flagKeys = [
+        'barangay_id_lost_reported',
+        'barangay_id_lost',
+        'lost_reported',
+    ];
+    foreach ($flagKeys as $key) {
+        $value = $payload[$key] ?? null;
+        if (is_bool($value)) {
+            if ($value) {
+                return true;
+            }
+            continue;
+        }
+        $normalized = strtolower(trim((string)$value));
+        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+            return true;
+        }
+    }
+
+    return trim((string)($payload['barangay_id_lost_reported_at'] ?? '')) !== '';
+}
+
+function dr_barangay_id_lost_reported_at(array $requestRow): string {
+    $payload = dr_decode_request_payload($requestRow);
+    return trim((string)($payload['barangay_id_lost_reported_at'] ?? ''));
+}
+
+function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmutable {
+    $payload = dr_decode_request_payload($requestRow);
+    $candidates = [
+        (string)($payload['barangay_id_valid_until'] ?? ''),
+        (string)($payload['valid_until'] ?? ''),
+        (string)($requestRow['document_validity'] ?? ''),
+    ];
+    foreach ($candidates as $candidate) {
+        $resolved = dr_parse_datetime_value($candidate, true);
+        if ($resolved instanceof DateTimeImmutable) {
+            return $resolved;
+        }
+    }
+
+    foreach ([
+        (string)($requestRow['completed_at'] ?? ''),
+        (string)($requestRow['release_timestamp'] ?? ''),
+        (string)($requestRow['ready_at'] ?? ''),
+        (string)($requestRow['submitted_at'] ?? ''),
+        (string)($requestRow['request_timestamp'] ?? ''),
+    ] as $issuedCandidate) {
+        $issuedAt = dr_parse_datetime_value($issuedCandidate);
+        if ($issuedAt instanceof DateTimeImmutable) {
+            return $issuedAt->modify('+2 years')->setTime(23, 59, 59);
+        }
+    }
+
+    return null;
+}
+
+function dr_resident_barangay_id_state(mysqli $conn, string $residentUserId, string $residentId = ''): array {
+    $state = [
+        'latest_completed_request' => null,
+        'latest_completed_request_id' => '',
+        'latest_completed_lost' => false,
+        'latest_completed_lost_reported_at' => '',
+        'latest_completed_valid_until' => '',
+        'latest_completed_is_valid' => false,
+        'latest_completed_days_until_expiry' => null,
+        'renewal_eligible' => false,
+        'renewal_available_on' => '',
+        'pending_request' => null,
+        'pending_request_id' => '',
+        'pending_stage' => '',
+        'can_submit_new_request' => false,
+        'can_report_lost' => false,
+        'submission_mode' => 'new',
+        'block_reason' => '',
+    ];
+
+    if (!dr_table_exists($conn, 'documentrequesttbl') || !dr_column_exists($conn, 'documentrequesttbl', 'document_type')) {
+        $state['can_submit_new_request'] = true;
+        return $state;
+    }
+
+    $identityClauses = [];
+    $bind = [];
+    $types = '';
+    if ($residentUserId !== '' && dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
+        $identityClauses[] = 'resident_user_id = ?';
+        $bind[] = $residentUserId;
+        $types .= 's';
+    }
+    if ($residentId !== '' && dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+        $identityClauses[] = 'resident_id = ?';
+        $bind[] = $residentId;
+        $types .= 's';
+    }
+    if (!$identityClauses) {
+        $state['can_submit_new_request'] = true;
+        return $state;
+    }
+
+    $orderingCandidates = [];
+    foreach (['completed_at', 'release_timestamp', 'ready_at', 'submitted_at', 'request_timestamp'] as $column) {
+        if (dr_column_exists($conn, 'documentrequesttbl', $column)) {
+            $orderingCandidates[] = $column;
+        }
+    }
+    $orderExpr = $orderingCandidates
+        ? 'COALESCE(' . implode(', ', $orderingCandidates) . ')'
+        : 'request_id';
+
+    $sql = "
+        SELECT *
+        FROM documentrequesttbl
+        WHERE (" . implode(' OR ', $identityClauses) . ")
+          AND LOWER(TRIM(COALESCE(document_type, ''))) LIKE '%barangay id%'
+        ORDER BY {$orderExpr} DESC, request_id DESC
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        $state['can_submit_new_request'] = true;
+        return $state;
+    }
+
+    if ($bind) {
+        $refs = [];
+        foreach ($bind as $index => $value) {
+            $refs[$index] = &$bind[$index];
+        }
+        array_unshift($refs, $types);
+        call_user_func_array([$stmt, 'bind_param'], $refs);
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $closedStages = [
+        DR_STAGE_COMPLETED,
+        DR_STAGE_REJECTED,
+        DR_STAGE_CANCELLED,
+        DR_STAGE_INTERVIEW_FAILED,
+        DR_STAGE_INSPECTION_FAILED,
+    ];
+
+    while ($row = $result->fetch_assoc()) {
+        if (!is_array($row)) {
+            continue;
+        }
+        dr_sync_stage_from_status_lookup($conn, $row);
+        $stage = strtolower(trim((string)($row['stage'] ?? '')));
+
+        if ($state['pending_request'] === null && !in_array($stage, $closedStages, true)) {
+            $state['pending_request'] = $row;
+            $state['pending_request_id'] = trim((string)($row['request_id'] ?? ''));
+            $state['pending_stage'] = $stage;
+        }
+
+        if ($state['latest_completed_request'] === null && $stage === DR_STAGE_COMPLETED) {
+            $state['latest_completed_request'] = $row;
+            $state['latest_completed_request_id'] = trim((string)($row['request_id'] ?? ''));
+        }
+    }
+    $stmt->close();
+
+    if ($state['latest_completed_request'] !== null) {
+        $completedRow = $state['latest_completed_request'];
+        $expiresAt = dr_barangay_id_valid_until_datetime($completedRow);
+        $lost = dr_barangay_id_lost_reported($completedRow);
+        $lostReportedAt = dr_barangay_id_lost_reported_at($completedRow);
+        $today = new DateTimeImmutable('today');
+        $renewalCutoff = $today->modify('+3 months')->setTime(23, 59, 59);
+
+        $daysUntilExpiry = null;
+        $isValid = false;
+        $renewalEligible = false;
+        $renewalAvailableOn = '';
+
+        if ($expiresAt instanceof DateTimeImmutable) {
+            $state['latest_completed_valid_until'] = $expiresAt->format('Y-m-d H:i:s');
+            $isValid = $expiresAt >= $today;
+            $daysUntilExpiry = (int)floor(($expiresAt->getTimestamp() - $today->getTimestamp()) / 86400);
+            $renewalEligible = $expiresAt <= $renewalCutoff;
+            $renewalAvailableOn = $expiresAt->modify('-3 months')->format('Y-m-d H:i:s');
+        }
+
+        $state['latest_completed_lost'] = $lost;
+        $state['latest_completed_lost_reported_at'] = $lostReportedAt;
+        $state['latest_completed_is_valid'] = $isValid;
+        $state['latest_completed_days_until_expiry'] = $daysUntilExpiry;
+        $state['renewal_eligible'] = $renewalEligible || !$isValid;
+        $state['renewal_available_on'] = $renewalAvailableOn;
+        $state['can_report_lost'] = $isValid && !$lost && $state['pending_request'] === null;
+    }
+
+    if ($state['pending_request'] !== null) {
+        $state['block_reason'] = 'pending_request';
+        $state['can_submit_new_request'] = false;
+        return $state;
+    }
+
+    if ($state['latest_completed_request'] === null) {
+        $state['can_submit_new_request'] = true;
+        $state['submission_mode'] = 'new';
+        return $state;
+    }
+
+    if ($state['latest_completed_lost']) {
+        $state['can_submit_new_request'] = true;
+        $state['submission_mode'] = 'replacement_lost';
+        return $state;
+    }
+
+    if ($state['renewal_eligible']) {
+        $state['can_submit_new_request'] = true;
+        $state['submission_mode'] = 'renewal';
+        return $state;
+    }
+
+    $state['block_reason'] = 'active_valid';
+    return $state;
+}
+
+function dr_normalize_barangay_id_request_mode(string $value): string {
+    $value = strtolower(trim($value));
+    return match ($value) {
+        'renewal' => 'renewal',
+        'replacement_lost', 'replacement', 'lost', 'lost_replacement' => 'replacement_lost',
+        default => 'new',
+    };
+}
+
+function dr_barangay_id_purpose_for_mode(string $mode): string {
+    return match ($mode) {
+        'renewal' => 'Barangay ID Renewal',
+        'replacement_lost' => 'Barangay ID Replacement (Lost)',
+        default => 'Barangay ID Application',
+    };
+}
+
 function dr_request_application_type(array $requestRow, array $payload): string {
     $applicationType = trim((string)($requestRow['application_type'] ?? $payload['application_type'] ?? ''));
     if ($applicationType !== '') {
