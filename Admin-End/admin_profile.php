@@ -17,6 +17,7 @@ $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emerge
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emergency_contact_address VARCHAR(255) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS house_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS street_name VARCHAR(150) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS subdivision VARCHAR(150) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS address_mode VARCHAR(20) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS block_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS lot_number VARCHAR(50) NULL");
@@ -328,7 +329,6 @@ $positionDisplayLabel = ap_format_position_label(
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <style>
         .profile-page-title {
             font-family: 'Charis SIL Bold', serif;
@@ -607,6 +607,7 @@ $positionDisplayLabel = ap_format_position_label(
                     <div class="view-item"><div class="view-label">House Number</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Street Name</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <?php endif; ?>
+                    <div class="view-item"><div class="view-label">Subdivision</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['subdivision'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Barangay</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['barangay'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Municipality / City</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['municipality_city'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Province</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['province'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>

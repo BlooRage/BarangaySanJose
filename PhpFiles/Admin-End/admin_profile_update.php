@@ -21,6 +21,7 @@ $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emerge
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emergency_contact_address VARCHAR(255) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS house_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS street_name VARCHAR(150) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS subdivision VARCHAR(150) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS address_mode VARCHAR(20) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS block_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS lot_number VARCHAR(50) NULL");
@@ -194,6 +195,7 @@ if ($section === 'address') {
     }
     $house = trim((string)($data['house_number'] ?? ''));
     $street = trim((string)($data['street_name'] ?? ''));
+    $subdivision = trim((string)($data['subdivision'] ?? ''));
     $block = trim((string)($data['block_number'] ?? ''));
     $lot = trim((string)($data['lot_number'] ?? ''));
     $barangay = trim((string)($data['barangay'] ?? ''));
@@ -205,7 +207,7 @@ if ($section === 'address') {
     $missingBlockLot = ($addressMode === 'block_lot' && ($block === '' || $lot === ''));
     if ($missingCore || $missingStreet || $missingBlockLot) {
         http_response_code(422);
-        echo json_encode(['success' => false, 'message' => 'All address fields are required.']);
+        echo json_encode(['success' => false, 'message' => 'Complete the required address fields.']);
         exit;
     }
     if ($addressMode === 'street') {
@@ -226,12 +228,13 @@ if ($section === 'address') {
         'province' => $province,
     ]);
 
-    $stmt = $conn->prepare("UPDATE officialinformationtbl SET address_mode=?, house_number=?, street_name=?, block_number=?, lot_number=?, barangay=?, municipality_city=?, province=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
+    $stmt = $conn->prepare("UPDATE officialinformationtbl SET address_mode=?, house_number=?, street_name=?, subdivision=?, block_number=?, lot_number=?, barangay=?, municipality_city=?, province=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
     if (!$stmt) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Failed to prepare address update.']);
         exit;
     }
+<<<<<<< Updated upstream
     $stmt->bind_param(
         'sssssssss',
         $addressEncrypted['address_mode'],
@@ -244,6 +247,9 @@ if ($section === 'address') {
         $addressEncrypted['province'],
         $userId
     );
+=======
+    $stmt->bind_param('ssssssssss', $addressMode, $house, $street, $subdivision, $block, $lot, $barangay, $city, $province, $userId);
+>>>>>>> Stashed changes
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) {
