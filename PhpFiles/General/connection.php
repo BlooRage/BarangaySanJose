@@ -2,7 +2,6 @@
 require_once __DIR__ . '/runtimeConfig.php';
 require_once __DIR__ . '/piiCrypto.php';
 
-// Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
 if (!function_exists('db_request_expects_json')) {

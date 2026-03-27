@@ -277,6 +277,7 @@ input::placeholder {
     align-items: center;
     gap: 8px;
     flex-wrap: nowrap;
+    margin-bottom: 0.5rem;
 }
 
 .area-guide-trigger {

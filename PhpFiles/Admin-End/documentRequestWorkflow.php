@@ -7312,6 +7312,7 @@ if ($action === 'view_issued') {
 
 $actionsWithoutRequestId = [
     'list',
+    'list_general_fee_catalog',
     'list_fee_types', 'save_fee_type', 'delete_fee_type',
     'submit_fee_change_request', 'list_fee_change_requests',
     'cancel_fee_change_request', 'process_fee_change_request',
@@ -8056,6 +8057,11 @@ if ($action === 'list_fee_types') {
     dr_respond_json(200, ['success' => true, 'fee_types' => $rows]);
 }
 
+if ($action === 'list_general_fee_catalog') {
+    dr_ensure_general_fees_table($conn);
+    dr_respond_json(200, ['success' => true, 'fee_types' => dr_get_general_fee_catalog($conn)]);
+}
+
 if ($action === 'save_fee_type') {
     // Finance-only: direct save bypasses approval workflow
     dr_ensure_clearance_fee_types_table($conn);
@@ -8115,6 +8121,7 @@ if ($action === 'delete_fee_type') {
 
 if ($action === 'submit_fee_change_request') {
     dr_ensure_clearance_fee_types_table($conn);
+    dr_ensure_general_fees_table($conn);
     $requestType     = trim((string)($_POST['request_type'] ?? ''));
     $proposedFeeName = trim((string)($_POST['proposed_fee_name'] ?? ''));
     $proposedAmount  = max(0.0, (float)($_POST['proposed_amount'] ?? 0));
@@ -8134,7 +8141,6 @@ if ($action === 'submit_fee_change_request') {
             dr_respond_json(500, ['success' => false, 'message' => 'Failed to generate fee type ID.']);
         }
         $generatedFeeTypeIdInt = (int)$generatedFeeTypeId;
-        // Insert new pending row
         $stmt = $conn->prepare(
             "INSERT INTO clearancefeetypetbl
              (fee_type_id, fee_name, default_amount, proposed_amount, status, change_type, notes, requested_by_user_id)
@@ -8152,30 +8158,90 @@ if ($action === 'submit_fee_change_request') {
         dr_respond_json(200, ['success' => true]);
     }
 
-    // edit_price: mark the existing approved row as pending with proposed amount
-    $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
-    if ($feeTypeId <= 0) {
+    $documentTypeId = (int)($_POST['fee_type_id'] ?? 0);
+    if ($documentTypeId <= 0) {
         dr_respond_json(400, ['success' => false, 'message' => 'Fee type ID is required for price edit.']);
     }
-    $stmt = $conn->prepare(
-        "UPDATE clearancefeetypetbl
-         SET proposed_amount=?, status='pending', change_type='price_edit',
-             notes=?, requested_by_user_id=?, reviewed_by_user_id=NULL,
-             reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
-         WHERE fee_type_id=? AND status='approved'"
-    );
-    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-    $stmt->bind_param('dssi', $proposedAmount, $notes, $userId, $feeTypeId);
-    $stmt->execute();
-    $affected = $stmt->affected_rows;
-    $stmt->close();
-    if ($affected === 0) {
-        dr_respond_json(409, ['success' => false, 'message' => 'Fee type not found or already has a pending change.']);
+
+    $catalogStmt = $conn->prepare("
+        SELECT
+            gf.document_type_id,
+            gf.amount,
+            dt.document_type_name
+        FROM generalfeestbl gf
+        LEFT JOIN documenttypelookuptbl dt
+            ON dt.document_type_id = gf.document_type_id
+        WHERE gf.document_type_id = ?
+        LIMIT 1
+    ");
+    if (!$catalogStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $catalogStmt->bind_param('i', $documentTypeId);
+    $catalogStmt->execute();
+    $catalogRow = $catalogStmt->get_result()->fetch_assoc();
+    $catalogStmt->close();
+    if (!$catalogRow) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Fee catalog entry not found.']);
     }
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, '₱' . number_format($proposedAmount, 2), $notes); } catch (Throwable $__e) {}
+
+    $feeName = trim((string)($catalogRow['document_type_name'] ?? $proposedFeeName));
+    $currentAmount = (float)($catalogRow['amount'] ?? 0);
+
+    $existingStmt = $conn->prepare("
+        SELECT fee_type_id, status
+        FROM clearancefeetypetbl
+        WHERE document_type_id = ?
+        LIMIT 1
+    ");
+    if (!$existingStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $existingStmt->bind_param('i', $documentTypeId);
+    $existingStmt->execute();
+    $existingRow = $existingStmt->get_result()->fetch_assoc();
+    $existingStmt->close();
+
+    if ($existingRow && strtolower((string)($existingRow['status'] ?? '')) === 'pending') {
+        dr_respond_json(409, ['success' => false, 'message' => 'This fee already has a pending change request.']);
+    }
+
+    if ($existingRow) {
+        $requestRowId = (int)($existingRow['fee_type_id'] ?? 0);
+        $stmt = $conn->prepare(
+            "UPDATE clearancefeetypetbl
+             SET fee_name=?, default_amount=?, proposed_amount=?, status='pending', change_type='price_edit',
+                 notes=?, requested_by_user_id=?, reviewed_by_user_id=NULL,
+                 reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
+             WHERE fee_type_id=?"
+        );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('sddssi', $feeName, $currentAmount, $proposedAmount, $notes, $userId, $requestRowId);
+        $stmt->execute();
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        if ($affected === 0) {
+            dr_respond_json(409, ['success' => false, 'message' => 'Failed to save the pending change request.']);
+        }
+    } else {
+        $generatedFeeTypeId = GenerateClearanceFeeTypeID($conn);
+        if ($generatedFeeTypeId === false) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to generate fee type ID.']);
+        }
+        $requestRowId = (int)$generatedFeeTypeId;
+        $stmt = $conn->prepare(
+            "INSERT INTO clearancefeetypetbl
+             (fee_type_id, fee_name, default_amount, proposed_amount, status, change_type, notes, requested_by_user_id, document_type_id)
+             VALUES (?, ?, ?, ?, 'pending', 'price_edit', ?, ?, ?)"
+        );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('isddssi', $requestRowId, $feeName, $currentAmount, $proposedAmount, $notes, $userId, $documentTypeId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            dr_respond_json(409, ['success' => false, 'message' => 'Failed to create the fee change request.']);
+        }
+        $stmt->close();
+    }
+
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$requestRowId, 'Request Price Edit', 'proposed_amount', null, '₱' . number_format($proposedAmount, 2), $notes); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true]);
 }
-
 if ($action === 'list_fee_change_requests') {
     dr_ensure_clearance_fee_types_table($conn);
     $scope  = trim((string)($_GET['scope'] ?? ''));
@@ -8207,15 +8273,15 @@ if ($action === 'list_fee_change_requests') {
 
 if ($action === 'cancel_fee_change_request') {
     dr_ensure_clearance_fee_types_table($conn);
+    dr_ensure_general_fees_table($conn);
     $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
     $userId    = trim((string)($_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? ''));
     if ($feeTypeId <= 0) {
         dr_respond_json(400, ['success' => false, 'message' => 'Invalid ID.']);
     }
 
-    // Fetch pending row to know the change_type and fee_name for audit
     $stmt = $conn->prepare(
-        "SELECT change_type, fee_name FROM clearancefeetypetbl
+        "SELECT change_type, fee_name, document_type_id FROM clearancefeetypetbl
          WHERE fee_type_id=? AND requested_by_user_id=? AND status='pending' LIMIT 1"
     );
     if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
@@ -8228,22 +8294,32 @@ if ($action === 'cancel_fee_change_request') {
     }
 
     if ($fcr['change_type'] === 'new_type') {
-        // Pending new type — mark as rejected (removes from catalog)
         $stmt = $conn->prepare(
             "UPDATE clearancefeetypetbl SET status='rejected', review_notes='Cancelled by requester', updated_at=NOW()
              WHERE fee_type_id=?"
         );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('i', $feeTypeId);
     } else {
-        // price_edit — clear pending state, restore approved status
+        $currentAmount = 0.0;
+        $documentTypeId = (int)($fcr['document_type_id'] ?? 0);
+        $amountStmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
+        if ($amountStmt) {
+            $amountStmt->bind_param('i', $documentTypeId);
+            $amountStmt->execute();
+            $amountRow = $amountStmt->get_result()->fetch_assoc();
+            $currentAmount = (float)($amountRow['amount'] ?? 0);
+            $amountStmt->close();
+        }
         $stmt = $conn->prepare(
             "UPDATE clearancefeetypetbl
-             SET proposed_amount=NULL, change_type=NULL, status='approved',
+             SET default_amount=?, proposed_amount=NULL, change_type=NULL, status='approved',
                  notes=NULL, requested_by_user_id=NULL, review_notes=NULL, updated_at=NOW()
              WHERE fee_type_id=?"
         );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('di', $currentAmount, $feeTypeId);
     }
-    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-    $stmt->bind_param('i', $feeTypeId);
     $stmt->execute();
     $stmt->close();
     try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Cancel Fee Change Request', 'change_type', $fcr['change_type'], null, (string)($fcr['fee_name'] ?? '')); } catch (Throwable $__e) {}
@@ -8252,6 +8328,7 @@ if ($action === 'cancel_fee_change_request') {
 
 if ($action === 'process_fee_change_request') {
     dr_ensure_clearance_fee_types_table($conn);
+    dr_ensure_general_fees_table($conn);
     $feeTypeId   = (int)($_POST['fee_type_id'] ?? 0);
     $decision    = trim((string)($_POST['decision'] ?? ''));
     $reviewNotes = trim((string)($_POST['review_notes'] ?? ''));
@@ -8261,7 +8338,6 @@ if ($action === 'process_fee_change_request') {
         dr_respond_json(400, ['success' => false, 'message' => 'Invalid parameters.']);
     }
 
-    // Fetch the pending row
     $stmt = $conn->prepare(
         "SELECT * FROM clearancefeetypetbl WHERE fee_type_id=? AND status='pending' LIMIT 1"
     );
@@ -8276,7 +8352,6 @@ if ($action === 'process_fee_change_request') {
 
     if ($decision === 'approved') {
         if ($fcr['change_type'] === 'new_type') {
-            // Approve new fee type — activate it
             $stmt = $conn->prepare(
                 "UPDATE clearancefeetypetbl
                  SET status='approved', change_type=NULL, proposed_amount=NULL,
@@ -8286,7 +8361,32 @@ if ($action === 'process_fee_change_request') {
             if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
             $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
         } else {
-            // Approve price edit — promote proposed_amount to default_amount
+            $documentTypeId = (int)($fcr['document_type_id'] ?? 0);
+            if ($documentTypeId <= 0) {
+                dr_respond_json(409, ['success' => false, 'message' => 'Missing document type for fee update.']);
+            }
+            $proposedAmount = (float)($fcr['proposed_amount'] ?? 0);
+            $catalogUpdateStmt = $conn->prepare(
+                "UPDATE generalfeestbl
+                 SET amount=?, updated_at=NOW()
+                 WHERE document_type_id=?
+                 LIMIT 1"
+            );
+            if (!$catalogUpdateStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $catalogUpdateStmt->bind_param('di', $proposedAmount, $documentTypeId);
+            $catalogUpdateStmt->execute();
+            $catalogAffected = $catalogUpdateStmt->affected_rows;
+            $catalogUpdateStmt->close();
+            if ($catalogAffected === 0) {
+                $catalogInsertStmt = $conn->prepare("INSERT INTO generalfeestbl (document_type_id, amount) VALUES (?, ?)");
+                if (!$catalogInsertStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+                $catalogInsertStmt->bind_param('id', $documentTypeId, $proposedAmount);
+                if (!$catalogInsertStmt->execute()) {
+                    $catalogInsertStmt->close();
+                    dr_respond_json(500, ['success' => false, 'message' => 'Failed to apply fee change to the catalog.']);
+                }
+                $catalogInsertStmt->close();
+            }
             $stmt = $conn->prepare(
                 "UPDATE clearancefeetypetbl
                  SET default_amount=proposed_amount, proposed_amount=NULL, change_type=NULL,
@@ -8298,36 +8398,42 @@ if ($action === 'process_fee_change_request') {
             $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
         }
     } else {
-        // Rejected
         if ($fcr['change_type'] === 'new_type') {
-            // Reject new type — mark as rejected
             $stmt = $conn->prepare(
                 "UPDATE clearancefeetypetbl
                  SET status='rejected', change_type=NULL, proposed_amount=NULL,
                      reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
                  WHERE fee_type_id=?"
             );
+            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
         } else {
-            // Reject price edit — clear pending, restore approved
+            $currentAmount = 0.0;
+            $documentTypeId = (int)($fcr['document_type_id'] ?? 0);
+            $amountStmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
+            if ($amountStmt) {
+                $amountStmt->bind_param('i', $documentTypeId);
+                $amountStmt->execute();
+                $amountRow = $amountStmt->get_result()->fetch_assoc();
+                $currentAmount = (float)($amountRow['amount'] ?? 0);
+                $amountStmt->close();
+            }
             $stmt = $conn->prepare(
                 "UPDATE clearancefeetypetbl
-                 SET proposed_amount=NULL, change_type=NULL, status='approved',
+                 SET default_amount=?, proposed_amount=NULL, change_type=NULL, status='approved',
                      notes=NULL, requested_by_user_id=NULL,
                      reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
                  WHERE fee_type_id=?"
             );
+            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $stmt->bind_param('dssi', $currentAmount, $reviewerId, $reviewNotes, $feeTypeId);
         }
-        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-        $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
     }
     $stmt->execute();
     $stmt->close();
     try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, ucfirst($decision) . ' Fee Change Request', 'change_type', $fcr['change_type'], $decision, ($reviewNotes ?: (string)($fcr['fee_name'] ?? ''))); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true]);
 }
-
-// ── Tag Clearance Fees ───────────────────────────────────────────────────────
-
 if ($action === 'tag_clearance_fees') {
     $feesRaw = trim((string)($_POST['fees'] ?? ''));
     $fees = json_decode($feesRaw, true);
@@ -8410,3 +8516,6 @@ if ($action === 'get_clearance_fees') {
 }
 
 dr_respond_json(404, ['success' => false, 'message' => 'Unknown action.']);
+
+
+

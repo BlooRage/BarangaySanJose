@@ -9197,7 +9197,7 @@
       if (!tbody) return;
       tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
       try {
-        const res  = await fetch(`${API}?action=list_fee_types`);
+        const res  = await fetch(`${API}?action=list_general_fee_catalog`);
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Failed to load.');
         renderEditCatalog(data.fee_types || []);

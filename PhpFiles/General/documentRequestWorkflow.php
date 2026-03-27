@@ -2948,10 +2948,12 @@ function dr_ensure_clearance_fee_types_table(mysqli $conn): void {
     $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS reviewed_by_user_id VARCHAR(64) DEFAULT NULL");
     $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS reviewed_at DATETIME DEFAULT NULL");
     $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS review_notes TEXT DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS document_type_id BIGINT(20) UNSIGNED DEFAULT NULL");
     // Migrate is_active=0 rows to rejected (silently ignored if is_active column doesn't exist)
     @$conn->query("UPDATE clearancefeetypetbl SET status='rejected' WHERE is_active=0");
     // Add status index if missing
     $conn->query("ALTER TABLE clearancefeetypetbl ADD KEY IF NOT EXISTS idx_clearancefeetypes_status (status)");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD KEY IF NOT EXISTS idx_clearancefeetypes_document_type (document_type_id)");
     $countRes = $conn->query("SELECT COUNT(*) AS c FROM clearancefeetypetbl");
     $existingCount = 0;
     if ($countRes instanceof mysqli_result) {
@@ -2984,6 +2986,49 @@ function dr_ensure_clearance_fee_types_table(mysqli $conn): void {
             $stmt->close();
         }
     }
+}
+
+function dr_get_general_fee_catalog(mysqli $conn): array {
+    if (!dr_table_exists($conn, 'documenttypelookuptbl') || !dr_table_exists($conn, 'generalfeestbl')) {
+        return [];
+    }
+
+    $sql = "
+        SELECT
+            gf.fee_id,
+            gf.document_type_id,
+            gf.amount,
+            gf.updated_at,
+            dt.document_type_name,
+            dt.document_category
+        FROM generalfeestbl gf
+        LEFT JOIN documenttypelookuptbl dt
+            ON dt.document_type_id = gf.document_type_id
+        WHERE dt.document_type_id IS NOT NULL
+        ORDER BY COALESCE(dt.document_type_name, CONCAT('Document Type #', gf.document_type_id)) ASC
+    ";
+    $res = $conn->query($sql);
+    if (!($res instanceof mysqli_result)) {
+        return [];
+    }
+
+    $rows = [];
+    while ($row = $res->fetch_assoc()) {
+        $documentTypeId = (int)($row['document_type_id'] ?? 0);
+        $rows[] = [
+            'fee_type_id' => $documentTypeId,
+            'document_type_id' => $documentTypeId,
+            'fee_id' => (int)($row['fee_id'] ?? 0),
+            'fee_name' => trim((string)($row['document_type_name'] ?? ('Document Type #' . $documentTypeId))),
+            'default_amount' => (float)($row['amount'] ?? 0),
+            'status' => 'approved',
+            'updated_at' => $row['updated_at'] ?? null,
+            'document_category' => $row['document_category'] ?? null,
+        ];
+    }
+    $res->close();
+
+    return $rows;
 }
 
 function dr_get_clearance_fees_for_request(mysqli $conn, string $requestId): array {
