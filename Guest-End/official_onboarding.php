@@ -37,6 +37,7 @@ function oi_ensure_official_info_columns(mysqli $conn): void
         "emergency_contact_address VARCHAR(255) NULL",
         "house_number VARCHAR(50) NULL",
         "street_name VARCHAR(150) NULL",
+        "subdivision VARCHAR(150) NULL",
         "address_mode VARCHAR(20) NULL",
         "block_number VARCHAR(50) NULL",
         "lot_number VARCHAR(50) NULL",
@@ -941,6 +942,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $houseNumber = trim((string)($_POST['house_number'] ?? ''));
                 $streetName = trim((string)($_POST['street_name'] ?? ''));
+                $subdivision = trim((string)($_POST['subdivision'] ?? ''));
                 $blockNumber = trim((string)($_POST['block_number'] ?? ''));
                 $lotNumber = trim((string)($_POST['lot_number'] ?? ''));
                 $barangay = trim((string)($_POST['barangay'] ?? ''));
@@ -953,7 +955,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $missingStreet = ($addressMode === 'street' && ($houseNumber === '' || $streetName === ''));
                 $missingBlockLot = ($addressMode === 'block_lot' && ($blockNumber === '' || $lotNumber === ''));
                 if ($missingCore || $missingStreet || $missingBlockLot) {
-                    throw new RuntimeException('All address fields are required.');
+                    throw new RuntimeException('Complete the required address fields.');
                 }
                 if (!oi_valid_address_text($barangay, 150) || !oi_valid_address_text($municipalityCity, 150) || !oi_valid_address_text($province, 150)) {
                     throw new RuntimeException('Barangay, city/municipality, and province must contain valid text.');
@@ -965,6 +967,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!oi_valid_address_text($streetName, 150)) {
                         throw new RuntimeException('Street name is invalid.');
                     }
+                }
+                if ($subdivision !== '' && !oi_valid_address_text($subdivision, 150)) {
+                    throw new RuntimeException('Subdivision is invalid.');
                 }
                 if ($addressMode === 'block_lot') {
                     if (!oi_valid_short_address_part($lotNumber, 50)) {
@@ -997,6 +1002,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     SET address_mode = ?,
                         house_number = ?,
                         street_name = ?,
+                        subdivision = ?,
                         block_number = ?,
                         lot_number = ?,
                         barangay = ?,
@@ -1010,6 +1016,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Failed to save address.');
                 }
                 $stmt->bind_param(
+<<<<<<< Updated upstream
                     "sssssssss",
                     $addressEncrypted['address_mode'],
                     $addressEncrypted['house_number'],
@@ -1019,6 +1026,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $addressEncrypted['barangay'],
                     $addressEncrypted['municipality_city'],
                     $addressEncrypted['province'],
+=======
+                    "ssssssssss",
+                    $addressMode,
+                    $houseNumber,
+                    $streetName,
+                    $subdivision,
+                    $blockNumber,
+                    $lotNumber,
+                    $barangay,
+                    $municipalityCity,
+                    $province,
+>>>>>>> Stashed changes
                     $loggedUserId
                 );
                 if (!$stmt->execute()) {
@@ -1780,17 +1799,21 @@ if ($mode === 'password') {
                                     </div>
                                 </div>
 
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label class="form-label">Subdivision <span class="text-muted">(Optional)</span></label>
+                                    <input class="form-control" name="subdivision" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['subdivision'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                                <div class="col-md-3">
                                     <label class="form-label">Barangay</label>
                                     <input class="form-control readonly-highlight" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>" readonly>
                                     <input type="hidden" name="barangay" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label class="form-label">Municipality / City</label>
                                     <input class="form-control readonly-highlight" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez'), ENT_QUOTES, 'UTF-8') ?>" readonly>
                                     <input type="hidden" name="municipality_city" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label class="form-label">Province</label>
                                     <input class="form-control readonly-highlight" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" readonly>
                                     <input type="hidden" name="province" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>">
