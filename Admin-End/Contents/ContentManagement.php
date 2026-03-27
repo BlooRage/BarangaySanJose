@@ -1285,6 +1285,24 @@ $previewCssAssets = [
     </div>
   </div>
 
+  <div class="modal fade" id="appDialogModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title" id="appDialogTitle">Notice</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <p class="mb-0" id="appDialogMessage"></p>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary" id="appDialogCancelBtn" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="appDialogConfirmBtn">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="d-none">
     <template id="cms-preview-template-announcements">
       <main class="cms-preview-doc">
@@ -1531,6 +1549,15 @@ $previewCssAssets = [
       const cropRatioLabelEl = document.getElementById("cmsCropRatioLabel");
       const cropSaveBtn = document.getElementById("cmsCropSaveBtn");
       const cropModal = cropModalEl ? new bootstrap.Modal(cropModalEl) : null;
+      const appDialogModalEl = document.getElementById("appDialogModal");
+      const appDialogTitle = document.getElementById("appDialogTitle");
+      const appDialogMessage = document.getElementById("appDialogMessage");
+      const appDialogConfirmBtn = document.getElementById("appDialogConfirmBtn");
+      const appDialogCancelBtn = document.getElementById("appDialogCancelBtn");
+      const appDialogModal = appDialogModalEl ? bootstrap.Modal.getOrCreateInstance(appDialogModalEl, {
+        backdrop: "static",
+        keyboard: false
+      }) : null;
       const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
       let previewTimer = null;
       let cropTargetPicker = null;
@@ -1548,6 +1575,8 @@ $previewCssAssets = [
         dragOriginX: 0,
         dragOriginY: 0
       };
+      let appDialogResolver = null;
+      let appDialogResult = false;
 
       function escapeHtml(value) {
         return String(value == null ? "" : value)
@@ -1556,6 +1585,86 @@ $previewCssAssets = [
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#039;");
+      }
+
+      function settleAppDialog(result) {
+        appDialogResult = result;
+        if (appDialogModal) {
+          appDialogModal.hide();
+          return;
+        }
+        if (appDialogResolver) {
+          const resolve = appDialogResolver;
+          appDialogResolver = null;
+          resolve(result);
+        }
+      }
+
+      if (appDialogModalEl) {
+        appDialogModalEl.addEventListener("hidden.bs.modal", function () {
+          if (!appDialogResolver) {
+            return;
+          }
+          const resolve = appDialogResolver;
+          const result = appDialogResult;
+          appDialogResolver = null;
+          appDialogResult = false;
+          resolve(result);
+        });
+      }
+
+      if (appDialogConfirmBtn) {
+        appDialogConfirmBtn.addEventListener("click", function () {
+          settleAppDialog(true);
+        });
+      }
+
+      if (appDialogCancelBtn) {
+        appDialogCancelBtn.addEventListener("click", function () {
+          settleAppDialog(false);
+        });
+      }
+
+      function showAppDialog(options) {
+        const config = options || {};
+        if (!appDialogModal || !appDialogTitle || !appDialogMessage || !appDialogConfirmBtn || !appDialogCancelBtn) {
+          if (config.cancelText) {
+            return Promise.resolve(window.confirm(config.message || ""));
+          }
+          window.alert(config.message || "");
+          return Promise.resolve(true);
+        }
+
+        appDialogTitle.textContent = config.title || "Notice";
+        appDialogMessage.textContent = config.message || "";
+        appDialogConfirmBtn.textContent = config.confirmText || "OK";
+        appDialogConfirmBtn.className = "btn " + (config.confirmClass || "btn-primary");
+        appDialogCancelBtn.textContent = config.cancelText || "Cancel";
+        appDialogCancelBtn.classList.toggle("d-none", !config.cancelText);
+        appDialogResult = false;
+
+        return new Promise(function (resolve) {
+          appDialogResolver = resolve;
+          appDialogModal.show();
+        });
+      }
+
+      function showAppAlert(message, title) {
+        return showAppDialog({
+          title: title || "Notice",
+          message: message,
+          confirmText: "OK"
+        });
+      }
+
+      function showAppConfirm(message, title, confirmText, confirmClass) {
+        return showAppDialog({
+          title: title || "Confirm Action",
+          message: message,
+          confirmText: confirmText || "Confirm",
+          cancelText: "Cancel",
+          confirmClass: confirmClass || "btn-primary"
+        });
       }
 
       function joinPreviewAssetPath(path) {
@@ -1836,18 +1945,18 @@ $previewCssAssets = [
           return item.question !== "" || item.answer !== "";
         });
         if (faqItems.length === 0) {
-          window.alert("Add at least one FAQ question and answer before saving.");
+          showAppAlert("Add at least one FAQ question and answer before saving.");
           return false;
         }
         if (faqItems.length > faqMaxItems) {
-          window.alert("You can only save up to 20 FAQ questions in one content item.");
+          showAppAlert("You can only save up to 20 FAQ questions in one content item.");
           return false;
         }
         const hasIncomplete = faqItems.some(function (item) {
           return item.question === "" || item.answer === "";
         });
         if (hasIncomplete) {
-          window.alert("Complete both the question and answer for every FAQ entry before saving.");
+          showAppAlert("Complete both the question and answer for every FAQ entry before saving.");
           return false;
         }
         return true;
@@ -1991,14 +2100,14 @@ $previewCssAssets = [
                   continue;
                 }
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  window.alert("Image must be 50MB or less.");
+                  showAppAlert("Image must be 50MB or less.");
                   continue;
                 }
                 try {
                   const imageUrl = await uploadEditorImage(file);
                   editorInstance.summernote("insertImage", imageUrl);
                 } catch (error) {
-                  window.alert(error.message || "Unable to upload image.");
+                  showAppAlert(error.message || "Unable to upload image.");
                 }
               }
               hiddenInput.value = editorInstance.summernote("code");
@@ -2096,7 +2205,7 @@ $previewCssAssets = [
           return;
         }
         if (file.size > MAX_IMAGE_SIZE_BYTES) {
-          window.alert("Image must be 50MB or less.");
+          showAppAlert("Image must be 50MB or less.");
           return;
         }
 
@@ -2104,7 +2213,7 @@ $previewCssAssets = [
         reader.onload = function (event) {
           const result = String(event.target && event.target.result ? event.target.result : "");
           if (!result) {
-            window.alert("Unable to read the selected image.");
+            showAppAlert("Unable to read the selected image.");
             return;
           }
 
@@ -2218,7 +2327,7 @@ $previewCssAssets = [
         cropSaveBtn.addEventListener("click", function () {
           const canvas = buildCropCanvas();
           if (!canvas || !cropTargetPicker) {
-            window.alert("Unable to save the cropped image.");
+            showAppAlert("Unable to save the cropped image.");
             return;
           }
 
@@ -2240,7 +2349,7 @@ $previewCssAssets = [
         fileInput.value = "";
       });
 
-      document.addEventListener("click", function (event) {
+      document.addEventListener("click", async function (event) {
         const imageButton = event.target.closest("[data-cms-image-select]");
         if (imageButton) {
           const picker = imageButton.closest("[data-cms-image-picker]");
@@ -2279,7 +2388,7 @@ $previewCssAssets = [
             return;
           }
           if (container.querySelectorAll("[data-cms-repeater-item]").length <= 1) {
-            window.alert("At least one item needs to stay in this section.");
+            showAppAlert("At least one item needs to stay in this section.");
             return;
           }
           item.remove();
@@ -2293,7 +2402,7 @@ $previewCssAssets = [
             return;
           }
           const confirmMessage = submitButton.dataset.confirm || "Continue with this action?";
-          if (!window.confirm(confirmMessage)) {
+          if (!await showAppConfirm(confirmMessage, "Confirm Action", "Continue", "btn-primary")) {
             return;
           }
           actionInput.value = submitButton.dataset.submitAction || "save_draft";
@@ -2308,7 +2417,7 @@ $previewCssAssets = [
         if (faqAddButton && cmsFaqItemsContainer) {
           event.preventDefault();
           if (cmsFaqItemsContainer.querySelectorAll("[data-cms-faq-item]").length >= faqMaxItems) {
-            window.alert("You can only save up to 20 FAQ questions in one content item.");
+            showAppAlert("You can only save up to 20 FAQ questions in one content item.");
             return;
           }
           const template = document.getElementById("cms-template-cmsFaqItemsContainer");
@@ -2330,7 +2439,7 @@ $previewCssAssets = [
         if (faqRemoveButton && cmsFaqItemsContainer) {
           event.preventDefault();
           if (cmsFaqItemsContainer.querySelectorAll("[data-cms-faq-item]").length <= 1) {
-            window.alert("At least one FAQ item is required.");
+            showAppAlert("At least one FAQ item is required.");
             return;
           }
           const item = faqRemoveButton.closest("[data-cms-faq-item]");
@@ -2357,9 +2466,9 @@ $previewCssAssets = [
       }
 
       document.querySelectorAll("form[data-confirm]").forEach(function (form) {
-        form.addEventListener("submit", function (event) {
+        form.addEventListener("submit", async function (event) {
           const confirmMessage = form.dataset.confirm || "Continue with this action?";
-          if (!window.confirm(confirmMessage)) {
+          if (!await showAppConfirm(confirmMessage, "Confirm Action", "Confirm", "btn-primary")) {
             event.preventDefault();
           }
         });
