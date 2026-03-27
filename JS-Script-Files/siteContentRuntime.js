@@ -249,6 +249,61 @@
     setImage(root, '[data-cms-faq="banner-image"]', payload.banner_image, "FAQ Banner");
     setInlineHtml(root, '[data-cms-faq="banner-title"]', payload.banner_title_html || "");
     setInlineHtml(root, '[data-cms-faq="banner-message"]', payload.banner_message_html || "");
+
+    var leftContainer = query(root, '[data-cms-faq-list="left"]');
+    var rightContainer = query(root, '[data-cms-faq-list="right"]');
+    if (!leftContainer || !rightContainer) {
+      return;
+    }
+
+    var items = Array.isArray(payload.faq_items) ? payload.faq_items.filter(function (item) {
+      return stripHtml(item.question || "") !== "" || stripHtml(item.answer || "") !== "";
+    }) : [];
+
+    function buildFaqMarkup(item, index, sideId, isOpen) {
+      var collapseId = "cmsFaqPreviewCollapse" + index;
+      return [
+        '<div class="accordionItemGroup">',
+        '  <h2 class="accordionHeader">',
+        '    <button class="accordionButton' + (isOpen ? "" : " collapsed") + '" type="button" data-bs-toggle="collapse" data-bs-target="#' + escapeHtml(collapseId) + '" aria-expanded="' + (isOpen ? "true" : "false") + '" aria-controls="' + escapeHtml(collapseId) + '">',
+        '      <span class="iconWrapper"><i class="fa-solid fa-caret-down"></i></span>',
+        '      <h5 class="questionTitle">' + escapeHtml(item.question || "") + "</h5>",
+        "    </button>",
+        "  </h2>",
+        '  <div id="' + escapeHtml(collapseId) + '" class="accordionCollapse collapse' + (isOpen ? " show" : "") + '" data-bs-parent="#' + escapeHtml(sideId) + '">',
+        '    <div class="accordionBody">' + String(item.answer || "<p>No answer available.</p>") + "</div>",
+        "  </div>",
+        "</div>"
+      ].join("");
+    }
+
+    if (items.length === 0) {
+      leftContainer.innerHTML = [
+        '<div class="accordionItemGroup">',
+        '  <div class="accordionBody">',
+        "    <p>No FAQ items available yet.</p>",
+        "  </div>",
+        "</div>"
+      ].join("");
+      rightContainer.innerHTML = "";
+      return;
+    }
+
+    leftContainer.id = leftContainer.id || "cmsFaqPreviewLeft";
+    rightContainer.id = rightContainer.id || "cmsFaqPreviewRight";
+    var leftHtml = "";
+    var rightHtml = "";
+    items.forEach(function (item, index) {
+      var sideId = index % 2 === 0 ? leftContainer.id : rightContainer.id;
+      var markup = buildFaqMarkup(item, index + 1, sideId, index === 0);
+      if (index % 2 === 0) {
+        leftHtml += markup;
+      } else {
+        rightHtml += markup;
+      }
+    });
+    leftContainer.innerHTML = leftHtml;
+    rightContainer.innerHTML = rightHtml;
   }
 
   function renderContact(root, payload) {

@@ -1167,7 +1167,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($sbCan('announcements_faq') ? appUrl('Admin-End/Contents/CreateContent.php') . '?type=faq' : appUrl('Admin-End/Contents/ContentManagement.php') . '?module=faq') ?>"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=faq"
                  class="link-dark rounded sidebar-subnav-link <?= (($current === 'ContentManagement.php' && $contentManagementModule === 'faq') || $isContentFaqCreateActive) ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">FAQ</span>
               </a>

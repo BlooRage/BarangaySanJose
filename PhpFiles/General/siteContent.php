@@ -184,6 +184,9 @@ if (!function_exists('cms_content_default_payloads')) {
                 'banner_image' => 'Images/FAQ_Banner.png',
                 'banner_title_html' => 'Frequently Asked Questions',
                 'banner_message_html' => 'Find straightforward answers about barangay certificates, ID applications, appointments, and other services. We keep responses short so you can quickly move on to filing requests or reaching out to the office.',
+                'faq_items' => [
+                    ['question' => '', 'answer' => ''],
+                ],
             ],
             'contact' => [
                 'banner_image' => 'Images/Contact_Banner.jpg',
@@ -370,6 +373,10 @@ if (!function_exists('cms_content_normalize_payload')) {
                     'banner_image' => trim((string)($payload['banner_image'] ?? $defaults['banner_image'] ?? '')),
                     'banner_title_html' => cms_content_clean_html((string)($payload['banner_title_html'] ?? $defaults['banner_title_html'] ?? '')),
                     'banner_message_html' => cms_content_clean_html((string)($payload['banner_message_html'] ?? $defaults['banner_message_html'] ?? '')),
+                    'faq_items' => cms_content_normalize_rows((array)($payload['faq_items'] ?? $defaults['faq_items'] ?? []), [
+                        'question' => 'text',
+                        'answer' => 'html',
+                    ], 1),
                 ];
 
             case 'contact':

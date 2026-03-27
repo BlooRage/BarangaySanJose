@@ -35,7 +35,6 @@ $canReviewContent = cms_content_can_review($conn, $currentUserId, $currentRole);
 
 $contentToolsUrl = appUrl('Admin-End/Contents/Contents.php') . '?tool=tracker#tracker-card';
 $createAnnouncementUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=page';
-$faqToolUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=faq';
 $reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_issuance';
 
 $contentModules = [
@@ -72,7 +71,7 @@ $contentModules = [
         'title' => 'FAQ Page',
         'icon' => 'fa-circle-question',
         'status' => 'Live Editor',
-        'summary' => 'Edit the FAQ page banner and manage the public FAQ entries from Content Management.',
+        'summary' => 'Edit the FAQ page banner and manage the public FAQ questions and answers in one page.',
     ],
     'contact' => [
         'label' => 'Contact',
@@ -138,12 +137,11 @@ $editorMeta = [
         ],
     ],
     'faq' => [
-        'subtitle' => 'Banner changes are handled here, and FAQ questions are created through the FAQ Entries tool in Content Management.',
+        'subtitle' => 'Update the FAQ banner and the public question-and-answer list from this page editor.',
         'notes' => [
-            'Use FAQ Entries to add or update the live public questions and answers.',
+            'Add, remove, and edit FAQ entries here before saving, submitting, or publishing.',
         ],
         'quick_links' => [
-            ['label' => 'Open FAQ Entries', 'href' => $canManageAnnouncements ? $faqToolUrl : ''],
             ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
@@ -659,6 +657,46 @@ function cms_render_contact_tile_item(array $item): string
     return (string)ob_get_clean();
 }
 
+function cms_render_faq_item(array $item, int $index = 0): string
+{
+    $question = (string)($item['question'] ?? '');
+    $answer = (string)($item['answer'] ?? '');
+    $placeholders = [
+        'How do I request a barangay certificate or clearance?',
+        'How do I apply for a Barangay ID?',
+        'How do I schedule an appointment with the barangay office?',
+        'How do I file a complaint with the barangay?',
+        'How long does barangay document processing take?',
+        'What documents are required for barangay services?',
+    ];
+    $placeholder = (string)($placeholders[$index % count($placeholders)] ?? 'Enter FAQ question');
+    ob_start();
+    ?>
+    <article class="cms-repeater-item" data-cms-repeater-item data-cms-faq-item>
+      <div class="cms-repeater-item-head">
+        <h5 class="cms-repeater-title mb-0" data-cms-faq-title>Question <?= (int)$index + 1 ?></h5>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-cms-faq-add>
+            <i class="fa-solid fa-plus me-1"></i>Add
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" data-cms-faq-remove>
+            <i class="fa-solid fa-trash-can me-1"></i>Remove
+          </button>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-12">
+          <?= cms_render_text_field('question', 'Question', $question, $placeholder, '', true) ?>
+        </div>
+        <div class="col-12">
+          <?= cms_render_richtext_field('answer', 'Answer', $answer, 'Write the answer here...', '', true, '180') ?>
+        </div>
+      </div>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
 function cms_render_request_table(array $requests, string $emptyMessage, string $currentUserId, bool $canReviewContent, array $requestVersionMeta = []): string
 {
     ob_start();
@@ -1077,10 +1115,35 @@ $previewCssAssets = [
                       <?= cms_render_richtext_field('banner_message_html', 'Banner Message', (string)($editorPayload['banner_message_html'] ?? ''), 'Write the FAQ banner message here...', '', false, '170') ?>
                     </div>
                     <div class="col-12">
-                      <article class="cms-editor-card">
-                        <h5 class="cms-editor-card-title mb-2">FAQ Entries</h5>
-                        <p class="cms-field-help mb-0">Use the FAQ Entries tool under Content Management when you need to create or update the public questions and answers. This editor updates the FAQ page banner content.</p>
-                      </article>
+                      <section class="announcement-section-card announcement-faq-shell">
+                        <div class="announcement-faq-header">
+                          <div>
+                            <h5 class="announcement-section-title mb-1">FAQ Entries</h5>
+                            <p class="announcement-editor-helper mb-0">Create one FAQ content item with up to 20 questions and answers. These will be saved together and tracked as one FAQ page entry.</p>
+                          </div>
+                          <div class="announcement-faq-controls">
+                            <label for="cmsFaqQuestionTarget" class="form-label mb-0 fw-semibold">Questions</label>
+                            <select id="cmsFaqQuestionTarget" class="form-select form-select-sm announcement-faq-target-select" aria-label="FAQ question count">
+                              <?php for ($i = 1; $i <= 20; $i++): ?>
+                                <option value="<?= $i ?>"><?= $i ?></option>
+                              <?php endfor; ?>
+                            </select>
+                            <span id="cmsFaqItemCount" class="announcement-faq-count">0 / 20 Questions</span>
+                          </div>
+                        </div>
+                        <div id="cmsFaqItemsContainer" class="announcement-faq-list cms-repeater-stack" data-cms-repeater="faq_items">
+                          <?php
+                          $faqItems = (array)($editorPayload['faq_items'] ?? []);
+                          if (!$faqItems) {
+                              $faqItems = [['question' => '', 'answer' => '']];
+                          }
+                          foreach ($faqItems as $index => $faqItem):
+                          ?>
+                            <?= cms_render_faq_item((array)$faqItem, (int)$index) ?>
+                          <?php endforeach; ?>
+                        </div>
+                        <template id="cms-template-cmsFaqItemsContainer"><?= cms_render_faq_item(['question' => '', 'answer' => ''], 0) ?></template>
+                      </section>
                     </div>
                   </div>
                 <?php elseif ($selectedModuleKey === 'contact'): ?>
@@ -1399,24 +1462,10 @@ $previewCssAssets = [
           <div class="container faqGridGroup py-5">
             <div class="row g-4">
               <div class="col-md-6">
-                <div class="accordionItemGroup">
-                  <h2 class="accordionHeader">
-                    <button class="accordionButton" type="button">
-                      <span class="iconWrapper"><i class="fa-solid fa-caret-down"></i></span>
-                      <h5 class="questionTitle">Sample FAQ Preview</h5>
-                    </button>
-                  </h2>
-                  <div class="accordionBody">
-                    <p>The current FAQ items continue to use the existing working flow. This preview focuses on the banner section you are editing here.</p>
-                  </div>
-                </div>
+                <div class="accordionGroup" data-cms-faq-list="left"></div>
               </div>
               <div class="col-md-6">
-                <div class="accordionItemGroup">
-                  <div class="accordionBody">
-                    <p>Once approved, the updated banner appears above the live FAQ list.</p>
-                  </div>
-                </div>
+                <div class="accordionGroup" data-cms-faq-list="right"></div>
               </div>
             </div>
           </div>
@@ -1482,10 +1531,14 @@ $previewCssAssets = [
       const previewAssetBase = <?= json_encode($previewAssetBase) ?>;
       const previewRuntimeJs = <?= json_encode($previewRuntimeJs) ?>;
       const previewCssAssets = <?= json_encode($previewCssAssets) ?>;
+      const faqMaxItems = 20;
       const previewFrame = document.getElementById("cmsPreviewFrame");
       const editorForm = document.getElementById("cmsEditorForm");
       const payloadInput = document.getElementById("cmsPayloadInput");
       const actionInput = document.getElementById("cmsActionInput");
+      const cmsFaqItemsContainer = document.getElementById("cmsFaqItemsContainer");
+      const cmsFaqQuestionTarget = document.getElementById("cmsFaqQuestionTarget");
+      const cmsFaqItemCount = document.getElementById("cmsFaqItemCount");
       const cropModalEl = document.getElementById("cmsImageCropModal");
       const cropFrameEl = document.getElementById("cmsCropFrame");
       const cropImageEl = document.getElementById("cmsCropImage");
@@ -1733,6 +1786,86 @@ $previewCssAssets = [
           });
           return row;
         });
+      }
+
+      function getFaqItems() {
+        if (!cmsFaqItemsContainer) {
+          return [];
+        }
+        return collectRepeaterItems(cmsFaqItemsContainer).map(function (item) {
+          return {
+            question: String(item.question || "").trim(),
+            answer: String(item.answer || "").trim()
+          };
+        });
+      }
+
+      function updateFaqEditorState() {
+        if (!cmsFaqItemsContainer) {
+          return;
+        }
+        const items = Array.from(cmsFaqItemsContainer.querySelectorAll("[data-cms-faq-item]"));
+        items.forEach(function (item, index) {
+          const title = item.querySelector("[data-cms-faq-title]");
+          if (title) {
+            title.textContent = "Question " + (index + 1);
+          }
+        });
+        if (cmsFaqItemCount) {
+          cmsFaqItemCount.textContent = items.length + " / " + faqMaxItems + " Questions";
+        }
+        if (cmsFaqQuestionTarget) {
+          cmsFaqQuestionTarget.value = String(Math.max(1, Math.min(faqMaxItems, items.length || 1)));
+        }
+      }
+
+      function syncFaqTargetCount(targetCount) {
+        if (!cmsFaqItemsContainer) {
+          return;
+        }
+        const desiredCount = Math.max(1, Math.min(faqMaxItems, Number(targetCount) || 1));
+        let currentCount = cmsFaqItemsContainer.querySelectorAll("[data-cms-faq-item]").length;
+        const template = document.getElementById("cms-template-cmsFaqItemsContainer");
+        while (currentCount < desiredCount && template) {
+          cmsFaqItemsContainer.insertAdjacentHTML("beforeend", template.innerHTML);
+          initEditors(cmsFaqItemsContainer);
+          currentCount += 1;
+        }
+        while (currentCount > desiredCount) {
+          const lastItem = cmsFaqItemsContainer.querySelector("[data-cms-faq-item]:last-child");
+          if (!lastItem) {
+            break;
+          }
+          lastItem.remove();
+          currentCount -= 1;
+        }
+        updateFaqEditorState();
+        schedulePreviewUpdate();
+      }
+
+      function validateFaqEditor() {
+        if (selectedPageKey !== "faq" || !cmsFaqItemsContainer) {
+          return true;
+        }
+        const faqItems = getFaqItems().filter(function (item) {
+          return item.question !== "" || item.answer !== "";
+        });
+        if (faqItems.length === 0) {
+          window.alert("Add at least one FAQ question and answer before saving.");
+          return false;
+        }
+        if (faqItems.length > faqMaxItems) {
+          window.alert("You can only save up to 20 FAQ questions in one content item.");
+          return false;
+        }
+        const hasIncomplete = faqItems.some(function (item) {
+          return item.question === "" || item.answer === "";
+        });
+        if (hasIncomplete) {
+          window.alert("Complete both the question and answer for every FAQ entry before saving.");
+          return false;
+        }
+        return true;
       }
 
       function serializePayload() {
@@ -2171,6 +2304,9 @@ $previewCssAssets = [
 
         const submitButton = event.target.closest("[data-submit-action]");
         if (submitButton && editorForm && actionInput) {
+          if (!validateFaqEditor()) {
+            return;
+          }
           const confirmMessage = submitButton.dataset.confirm || "Continue with this action?";
           if (!window.confirm(confirmMessage)) {
             return;
@@ -2182,13 +2318,58 @@ $previewCssAssets = [
           editorForm.submit();
           return;
         }
+
+        const faqAddButton = event.target.closest("[data-cms-faq-add]");
+        if (faqAddButton && cmsFaqItemsContainer) {
+          event.preventDefault();
+          if (cmsFaqItemsContainer.querySelectorAll("[data-cms-faq-item]").length >= faqMaxItems) {
+            window.alert("You can only save up to 20 FAQ questions in one content item.");
+            return;
+          }
+          const template = document.getElementById("cms-template-cmsFaqItemsContainer");
+          if (template) {
+            const currentItem = faqAddButton.closest("[data-cms-faq-item]");
+            if (currentItem) {
+              currentItem.insertAdjacentHTML("afterend", template.innerHTML);
+            } else {
+              cmsFaqItemsContainer.insertAdjacentHTML("beforeend", template.innerHTML);
+            }
+            initEditors(cmsFaqItemsContainer);
+            updateFaqEditorState();
+            schedulePreviewUpdate();
+          }
+          return;
+        }
+
+        const faqRemoveButton = event.target.closest("[data-cms-faq-remove]");
+        if (faqRemoveButton && cmsFaqItemsContainer) {
+          event.preventDefault();
+          if (cmsFaqItemsContainer.querySelectorAll("[data-cms-faq-item]").length <= 1) {
+            window.alert("At least one FAQ item is required.");
+            return;
+          }
+          const item = faqRemoveButton.closest("[data-cms-faq-item]");
+          if (item) {
+            item.remove();
+            updateFaqEditorState();
+            schedulePreviewUpdate();
+          }
+          return;
+        }
       });
 
       document.addEventListener("input", function (event) {
         if (event.target.matches("[data-cms-field], [data-cms-item-field]")) {
+          updateFaqEditorState();
           schedulePreviewUpdate();
         }
       });
+
+      if (cmsFaqQuestionTarget) {
+        cmsFaqQuestionTarget.addEventListener("change", function () {
+          syncFaqTargetCount(cmsFaqQuestionTarget.value);
+        });
+      }
 
       document.querySelectorAll("form[data-confirm]").forEach(function (form) {
         form.addEventListener("submit", function (event) {
@@ -2200,6 +2381,7 @@ $previewCssAssets = [
       });
 
       initEditors(document);
+      updateFaqEditorState();
       schedulePreviewUpdate();
     })();
   </script>
