@@ -270,6 +270,23 @@ $sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
     return amp_permission_keys_have_any($sbAllowedPermissions, $keys);
 };
 
+$sbSidebarUserId = trim((string)($_SESSION['user_id'] ?? ''));
+$sbSidebarRole = trim((string)($_SESSION['role'] ?? ''));
+$sbCanReviewContent = false;
+if (isset($conn) && $conn instanceof mysqli && function_exists('cms_content_can_review')) {
+    $sbCanReviewContent = cms_content_can_review($conn, $sbSidebarUserId, $sbSidebarRole);
+} elseif (strtolower($sbSidebarRole) === 'superadmin') {
+    $sbCanReviewContent = true;
+}
+$sbCanAccessContentNavigator = $sbCan('announcements_tracker');
+$sbCanAccessContentFaqEditor = $sbCan('announcements_faq');
+$sbContentFaqHref = $sbCanAccessContentNavigator
+    ? appUrl('Admin-End/Contents/ContentManagement.php?module=faq')
+    : appUrl('Admin-End/Contents/CreateContent.php?type=faq');
+$sbContentFaqActive = $sbCanAccessContentNavigator
+    ? (($current === 'ContentManagement.php' && $contentManagementModule === 'faq') || $isContentFaqCreateActive)
+    : $isContentFaqCreateActive;
+
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
 if (isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
     $sbAttentionCounts = sbatt_get_counts($conn, 45);
@@ -378,7 +395,7 @@ $sbModuleAttentionCounts = [
         + ($sbCan('finance_fee_management') ? $sbCount('finance_fee_management') : 0),
     'blotter_tools' => $sbCan('blotter_review_queue') ? $sbCount('blotter_review_queue') : 0,
     'complaint_tools' => $sbCan('complaint_tracker') ? $sbCount('complaint_tracker') : 0,
-    'content_management' => $sbCanReviewContent ? $sbCount('content_change_request') : 0,
+    'content_management' => ($sbCanAccessContentNavigator && $sbCanReviewContent) ? $sbCount('content_change_request') : 0,
     'user_management' => ($sbCan('user_masterlist') || $sbCan('user_archive')) ? $sbCount('user_management') : 0,
 ];
 $sbModuleCount = static function (string $key) use (&$sbModuleAttentionCounts): int {
@@ -679,9 +696,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('appointments')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Office of the Barangay</li>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#appointments-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#appointments-collapse"
+                aria-controls="appointments-collapse"
                 aria-expanded="<?= $isAppointmentActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-calendar-check"></i>
@@ -713,9 +732,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Resident Management</li>
       <?php if ($sbHasAny($sbResidentProfilingKeys)): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#resident-mgmt-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#resident-mgmt-collapse"
+                aria-controls="resident-mgmt-collapse"
                 aria-expanded="<?= $isResidentMgmtActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-user-group"></i>
@@ -772,9 +793,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbHasAny($sbHouseholdProfilingKeys)): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#household-profiling-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#household-profiling-collapse"
+                aria-controls="household-profiling-collapse"
                 aria-expanded="<?= $isHouseholdProfilingActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-house"></i>
@@ -817,9 +840,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <?php if ($sbHasAny($sbAreaStatisticsKeys)): ?>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#area-management-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#area-management-collapse"
+                aria-controls="area-management-collapse"
                 aria-expanded="<?= $isAreaManagementActive ? 'true' : 'false' ?>">
           <i class="fas fa-map-location-dot"></i> Area Statistics
         </button>
@@ -913,9 +938,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbHasAny($sbIdIssuanceKeys)): ?>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#id-issuance-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#id-issuance-collapse"
+                aria-controls="id-issuance-collapse"
                 aria-expanded="<?= $isIdIssuanceActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-id-card"></i>
@@ -979,9 +1006,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbHasAny($sbFinanceKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Treasury</li>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#finance-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#finance-collapse"
+                aria-controls="finance-collapse"
                 aria-expanded="<?= $isFinanceActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-money-check-alt"></i>
@@ -1035,9 +1064,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbCan('blotter_tracker') || $sbCan('blotter_review_queue')): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#blotter-tools-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#blotter-tools-collapse"
+                aria-controls="blotter-tools-collapse"
                 aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-toolbox"></i>
@@ -1084,9 +1115,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbCan('complaint_tracker')): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#complaint-tools-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#complaint-tools-collapse"
+                aria-controls="complaint-tools-collapse"
                 aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-comments"></i>
@@ -1110,12 +1143,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php endif; ?>
 
-      <?php if ($sbCan('announcements_tracker') || $sbCan('announcements_faq')): ?>
+      <?php if ($sbCanAccessContentNavigator || $sbCanAccessContentFaqEditor): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentNavigatorActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#content-management-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentNavigatorActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#content-management-collapse"
+                aria-controls="content-management-collapse"
                 aria-expanded="<?= $isContentNavigatorActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-sitemap"></i>
@@ -1125,6 +1160,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isContentNavigatorActive ? 'show' : '' ?>" id="content-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCanAccessContentNavigator): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=my_requests"
                  class="link-dark rounded sidebar-subnav-link <?= $isContentChangeRequestActive ? 'active' : '' ?>">
@@ -1166,20 +1202,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 <span class="sidebar-subnav-text">Services</span>
               </a>
             </li>
+            <?php endif; ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=faq"
-                 class="link-dark rounded sidebar-subnav-link <?= (($current === 'ContentManagement.php' && $contentManagementModule === 'faq') || $isContentFaqCreateActive) ? 'active' : '' ?>">
+              <a href="<?= htmlspecialchars($sbContentFaqHref) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $sbContentFaqActive ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">FAQ</span>
               </a>
             </li>
-            <?php if ($sbCan('announcements_faq')): ?>
-            <!-- <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
-                 class="link-dark rounded sidebar-subnav-link <?= $isContentFaqCreateActive ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">FAQ Entries</span>
-              </a>
-            </li> -->
-            <?php endif; ?>
+            <?php if ($sbCanAccessContentNavigator): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=contact"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'contact') ? 'active' : '' ?>">
@@ -1192,6 +1222,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 <span class="sidebar-subnav-text">Login</span>
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
@@ -1200,9 +1231,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
       <?php if ($sbHasAny($sbAnnouncementKeys)): ?>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#announcements-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentMgmtActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#announcements-collapse"
+                aria-controls="announcements-collapse"
                 aria-expanded="<?= $isContentMgmtActive ? 'true' : 'false' ?>">
           <i class="fas fa-bullhorn"></i> Announcements
         </button>
@@ -1238,9 +1271,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbHasAny($sbReportKeys)): ?>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isReportActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#reports-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isReportActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#reports-collapse"
+                aria-controls="reports-collapse"
                 aria-expanded="<?= $isReportActive ? 'true' : 'false' ?>">
           <i class="fas fa-chart-bar"></i> Reports
         </button>
@@ -1304,9 +1339,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
       <?php if ($sbCan('user_masterlist') || $sbCan('user_archive')): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? 'active' : '' ?> <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#usermanagement-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? 'active' : '' ?> <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#usermanagement-collapse"
+                aria-controls="usermanagement-collapse"
                 aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
           <i class="fas fa-users-cog"></i> User Management
         </button>
@@ -1334,9 +1371,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($isSuperAdminSidebar): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelMgmtActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#personnelmanagement-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelMgmtActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#personnelmanagement-collapse"
+                aria-controls="personnelmanagement-collapse"
                 aria-expanded="<?= $isPersonnelMgmtActive ? 'true' : 'false' ?>">
           <i class="fas fa-user-tie"></i> Personnel Management
         </button>
@@ -1386,9 +1425,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbCan('official_transition')): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#officialtransition-collapse"
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#officialtransition-collapse"
+                aria-controls="officialtransition-collapse"
                 aria-expanded="<?= $isOfficialTransitionActive ? 'true' : 'false' ?>">
           <i class="fas fa-right-left"></i> Official Transition
         </button>
@@ -1453,8 +1494,35 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     const burgerBtn = document.getElementById("btn-admin-burger");
     const sidebar = document.getElementById("dashboard-sidebar");
     if (!burgerBtn || !sidebar) return;
+    const collapseButtons = Array.from(sidebar.querySelectorAll('[data-sidebar-toggle="collapse"]'));
 
     const portraitMq = window.matchMedia("(orientation: portrait) and (max-width: 1024px)");
+
+    const bindSidebarCollapse = (button) => {
+      const targetSelector = String(button.getAttribute("data-sidebar-target") || "").trim();
+      if (!targetSelector) {
+        return;
+      }
+
+      const target = sidebar.querySelector(targetSelector);
+      if (!target) {
+        return;
+      }
+
+      const syncState = () => {
+        const expanded = target.classList.contains("show");
+        button.classList.toggle("collapsed", !expanded);
+        button.setAttribute("aria-expanded", expanded ? "true" : "false");
+      };
+
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        target.classList.toggle("show");
+        syncState();
+      });
+
+      syncState();
+    };
 
     const syncMode = () => {
       if (!portraitMq.matches) {
@@ -1483,6 +1551,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       portraitMq.addListener(syncMode);
     }
 
+    collapseButtons.forEach(bindSidebarCollapse);
     syncMode();
   })();
 </script>

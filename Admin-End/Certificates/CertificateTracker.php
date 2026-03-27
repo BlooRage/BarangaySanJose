@@ -6,10 +6,13 @@ $certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')))
 $certificateLaunchStage = strtolower(trim((string)($_GET['stage'] ?? '')));
 $certificateLaunchEntry = strtolower(trim((string)($_GET['entry'] ?? '')));
 $certificateLaunchFilterDocument = strtolower(trim((string)($_GET['filter_document'] ?? '')));
-$isIdIssuanceTrackerView = $certificateLaunchEntry === 'id_issuance';
-$certificateTrackerHeading = $certificateLaunchFilterDocument === '__clearances__'
-  ? 'Clearance Issuance'
-  : 'Certificate Issuance';
+$isBarangayIdManualLaunch = $certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barangay_id';
+$isIdIssuanceTrackerView = $certificateLaunchEntry === 'id_issuance' || $isBarangayIdManualLaunch;
+$certificateTrackerHeading = $isIdIssuanceTrackerView
+  ? 'Barangay ID Issuance'
+  : ($certificateLaunchFilterDocument === '__clearances__'
+      ? 'Clearance Issuance'
+      : 'Certificate Issuance');
 $barangayIdAdminNavActive = 'applications';
 
 if ($certificateLaunchStage === 'release') {

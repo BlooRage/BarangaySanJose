@@ -479,7 +479,7 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
             '' AS department_handle
         FROM documentrequesttbl d
         INNER JOIN financetransactiontbl ft ON ft.request_id = d.request_id" . $residentJoin . "
-        WHERE LOWER(COALESCE(d.stage, '')) IN ('payment_verified', 'ready_for_claim', 'completed')
+        WHERE LOWER(COALESCE(d.stage, '')) NOT IN ('rejected', 'cancelled', 'interview_failed', 'inspection_failed', 'payment_rejected')
           AND COALESCE(ft.transaction_amount, 0) > 0
           AND DATE({$financeDateExpr}) BETWEEN '{$df}' AND '{$dt}'
         ORDER BY {$financeDateExpr} ASC, d.request_id ASC
@@ -1291,7 +1291,7 @@ $reportFilterAreas = rp_parse_query_list($rawFilterAreaParam);
 $reportFilterSectors = rp_parse_query_list($rawFilterSectorParam, 'rp_normalize_sector_label');
 $reportFilterStatuses = rp_parse_query_list($rawFilterStatusParam, static fn(string $value): string => strtolower(trim($value)));
 $issuanceModuleConfig = rp_issuance_module_config($module);
-$defaultReportStatusSelection = $issuanceModuleConfig !== null ? ['completed'] : [];
+$defaultReportStatusSelection = [];
 $officialReportAreaOptions = rp_official_area_options();
 $officialReportSectorOptions = rp_official_sector_options();
 if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialReportAreaOptions)) {

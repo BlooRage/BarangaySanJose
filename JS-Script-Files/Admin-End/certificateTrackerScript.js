@@ -15,7 +15,8 @@
   const launchEntry = String(launchParams.get('entry') || '').toLowerCase();
   const rawLaunchStage = String(launchParams.get('stage') || '').toLowerCase();
   const rawLaunchFilterDocument = String(launchParams.get('filter_document') || '').trim();
-  const isIdIssuanceTrackerView = launchEntry === 'id_issuance';
+  const isBarangayIdManualLaunch = launchTab === 'manual' && launchManualDocument === 'barangay_id';
+  const isIdIssuanceTrackerView = launchEntry === 'id_issuance' || isBarangayIdManualLaunch;
   const isLegacyBarangayIdTrackerLaunch =
     rawLaunchStage === 'barangay_id' &&
     rawLaunchFilterDocument.toLowerCase() === 'barangay id';
@@ -7538,6 +7539,9 @@
       { id: 'business_clearance', group: 'Clearances', label: 'Barangay Clearance for Business Permit', documentType: 'Barangay Clearance for Business Permit', kind: 'business_clearance', clearance: true },
       { id: 'tricycle_clearance', group: 'Clearances', label: 'Barangay Clearance for Tricycle Permit', documentType: 'Barangay Clearance for Tricycle Permit', kind: 'tricycle_clearance', clearance: true }
     ];
+    const manualContextFilter = isIdIssuanceTrackerView
+      ? '__barangay_id__'
+      : canonicalDocumentFilterValue(launchFilterDocument);
 
     let manualResidentSearchResults = [];
     let manualSelectedResident = null;
@@ -7600,6 +7604,87 @@
     function manualCurrentConfig() {
       const key = String(manualDocumentType?.value || '').trim();
       return manualDocumentConfigs.find((config) => config.id === key) || null;
+    }
+
+    function manualConfigMatchesContext(config, contextFilter = manualContextFilter) {
+      const activeFilter = String(contextFilter || '').trim().toLowerCase();
+      if (!activeFilter) {
+        return true;
+      }
+      if (activeFilter === '__barangay_id__') {
+        return config.kind === 'barangay_id';
+      }
+      if (activeFilter === '__certificates__') {
+        return !config.clearance && config.kind !== 'barangay_id';
+      }
+      if (activeFilter === '__clearances__') {
+        return !!config.clearance;
+      }
+      if (activeFilter === '__business__' || activeFilter === '__clr_business_permit__') {
+        return config.id === 'business_clearance';
+      }
+      if (activeFilter === '__clr_tricycle_permit__') {
+        return config.id === 'tricycle_clearance';
+      }
+      if (activeFilter === '__clr_electric_permit__') {
+        return config.id === 'electrical_clearance';
+      }
+      if (activeFilter === '__clr_water_permit__') {
+        return config.id === 'water_clearance';
+      }
+      if (activeFilter === '__clr_residential_permit__') {
+        return config.id === 'residential_clearance';
+      }
+      if (activeFilter === '__clr_commercial_permit__') {
+        return config.id === 'commercial_clearance';
+      }
+      if (activeFilter === '__cert_cohabitation__') {
+        return config.id === 'cohabitation';
+      }
+      if (activeFilter === '__cert_good_moral__') {
+        return config.id === 'good_moral';
+      }
+      if (activeFilter === '__cert_jail_visit__') {
+        return config.id === 'jail_visit';
+      }
+      if (activeFilter === '__cert_first_time_job_seeker__') {
+        return config.id === 'first_time_job_seeker';
+      }
+      if (activeFilter === '__cert_residency__') {
+        return config.id === 'residency';
+      }
+      if (activeFilter === '__cert_indigency__') {
+        return config.id === 'indigency';
+      }
+      return true;
+    }
+
+    function manualAvailableDocumentConfigs() {
+      return manualDocumentConfigs.filter((config) => manualConfigMatchesContext(config));
+    }
+
+    function manualPreferredDocumentId(configs = manualAvailableDocumentConfigs()) {
+      const preferredLaunchId = String(launchManualDocument || '').trim().toLowerCase();
+      if (preferredLaunchId && configs.some((config) => config.id === preferredLaunchId)) {
+        return preferredLaunchId;
+      }
+      if (configs.length === 1) {
+        return configs[0].id;
+      }
+      if (manualContextFilter === '__barangay_id__' && configs.some((config) => config.id === 'barangay_id')) {
+        return 'barangay_id';
+      }
+      return '';
+    }
+
+    function manualApplyContextDocumentSelection() {
+      if (!manualDocumentType) return;
+      const preferredId = manualPreferredDocumentId();
+      const hasPreferredOption = preferredId && Array.from(manualDocumentType.options).some(
+        (option) => String(option.value || '').trim().toLowerCase() === preferredId
+      );
+      manualDocumentType.value = hasPreferredOption ? preferredId : '';
+      manualRenderDynamicFields();
     }
 
     function manualEscapeAttr(value) {
@@ -8478,7 +8563,12 @@
 
     function manualRenderDocumentOptions() {
       if (!manualDocumentType) return;
-      const grouped = manualDocumentConfigs.reduce((map, config) => {
+      const scopedConfigs = manualAvailableDocumentConfigs();
+      if (!scopedConfigs.length) {
+        manualDocumentType.innerHTML = '<option value="">No manual issuance forms available in this section</option>';
+        return;
+      }
+      const grouped = scopedConfigs.reduce((map, config) => {
         if (!map.has(config.group)) map.set(config.group, []);
         map.get(config.group).push(config);
         return map;
@@ -8903,11 +8993,11 @@
         manualSubmitBtn.disabled = true;
       }
       manualRenderDocumentOptions();
-      manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">Select a certificate or clearance type to load its matching manual encoding fields.</div></div>';
       manualFeeWrap?.classList.add('d-none');
       manualFeeList.innerHTML = '';
       manualFeeTotal.textContent = 'PHP 0.00';
       manualPurpose.dataset.auto = '1';
+      manualApplyContextDocumentSelection();
       manualSetAlert('', 'warning');
       manualToggleResidentLookup();
       manualUpdateSummary();
@@ -8915,6 +9005,9 @@
 
     function manualApplyLaunchSelection() {
       if (launchTab !== 'manual' || !launchManualDocument || !manualDocumentType) {
+        return;
+      }
+      if (String(manualDocumentType.value || '').trim().toLowerCase() === launchManualDocument) {
         return;
       }
       const hasOption = Array.from(manualDocumentType.options).some(
