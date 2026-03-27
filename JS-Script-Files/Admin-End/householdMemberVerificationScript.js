@@ -11,12 +11,22 @@
   const btnResetFilter = el("btnHmvResetFilter");
   const modalEl = el("modal-householdMemberVerification");
   const modal = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+  const confirmModalEl = el("hmvActionConfirmModal");
+  const confirmModal = confirmModalEl ? bootstrap.Modal.getOrCreateInstance(confirmModalEl) : null;
+  const confirmTitleEl = el("hmvActionConfirmTitle");
+  const confirmMessageEl = el("hmvActionConfirmMessage");
+  const confirmRemarksWrapEl = el("hmvActionConfirmRemarksWrap");
+  const confirmRemarksEl = el("hmvActionConfirmRemarks");
+  const confirmActionBtn = el("btnHmvConfirmAction");
+
+  if (!bodyEl) return;
 
   const state = {
     rows: [],
     filter: "ALL",
     search: "",
     active: null,
+    pendingAction: "",
     modalFilters: {
       dateFrom: "",
       dateTo: "",
@@ -32,21 +42,6 @@
     return "PendingReview";
   };
 
-  const statusPillHtml = (status) => {
-    const normalized = fmtStatus(status);
-    const classMap = {
-      PendingReview: "status-pill pending",
-      Approved: "status-pill approved",
-      Rejected: "status-pill denied",
-    };
-    const labelMap = {
-      PendingReview: "Pending Review",
-      Approved: "Approved",
-      Rejected: "Rejected",
-    };
-    return `<span class="${classMap[normalized] || classMap.PendingReview}">${labelMap[normalized] || normalized}</span>`;
-  };
-
   const escapeHtml = (value) =>
     String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -55,9 +50,24 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
 
+  const statusPillHtml = (status) => {
+    const normalized = fmtStatus(status);
+    const classMap = {
+      PendingReview: "status-pill pending",
+      Approved: "status-pill approved",
+      Rejected: "status-pill denied",
+    };
+    const labelMap = {
+      PendingReview: "Pending",
+      Approved: "Approved",
+      Rejected: "Rejected",
+    };
+    return `<span class="${classMap[normalized] || classMap.PendingReview}">${labelMap[normalized] || "Pending"}</span>`;
+  };
+
   const formatDate = (value) => {
     const raw = String(value || "").trim();
-    if (!raw) return "—";
+    if (!raw) return "-";
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return raw;
     return date.toLocaleString("en-PH", {
@@ -71,7 +81,7 @@
 
   const formatBirthdate = (value) => {
     const raw = String(value || "").trim();
-    if (!raw) return "—";
+    if (!raw) return "-";
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return raw;
     return date.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
@@ -132,7 +142,6 @@
       const haystack = [
         row.request_id,
         row.head_full_name,
-        row.fam_head_id,
         row.member_full_name,
         row.birthdate,
       ].join(" ").toLowerCase();
@@ -148,7 +157,6 @@
   };
 
   const renderTable = () => {
-    if (!bodyEl) return;
     const rows = filteredRows();
     emptyEl?.classList.toggle("d-none", rows.length > 0);
 
@@ -160,8 +168,8 @@
     bodyEl.innerHTML = rows.map((row) => `
       <tr>
         <td>${escapeHtml(row.request_id)}</td>
-        <td>${escapeHtml(row.head_full_name || "—")}<div class="small text-muted">${escapeHtml(row.fam_head_id || "")}</div></td>
-        <td>${escapeHtml(row.member_full_name || "—")}</td>
+        <td>${escapeHtml(row.head_full_name || "-")}</td>
+        <td>${escapeHtml(row.member_full_name || "-")}</td>
         <td>${escapeHtml(formatBirthdate(row.birthdate))}</td>
         <td>${statusPillHtml(row.status)}</td>
         <td>${escapeHtml(formatDate(row.submitted_at))}</td>
@@ -172,16 +180,15 @@
 
   const openModal = (row) => {
     state.active = row;
-    el("hmvModalSubtitle").textContent = `Request ID ${row.request_id}`;
-    el("hmvModalHeadName").textContent = row.head_full_name || "—";
-    el("hmvModalHeadResidentId").textContent = row.fam_head_id || "—";
-    el("hmvModalLastName").textContent = row.last_name || "—";
-    el("hmvModalFirstName").textContent = row.first_name || "—";
-    el("hmvModalMiddleName").textContent = row.middle_name || "—";
-    el("hmvModalSuffix").textContent = row.suffix || "—";
-    el("hmvModalBirthdate").textContent = formatBirthdate(row.birthdate);
-    el("hmvModalStatus").innerHTML = statusPillHtml(row.status);
-    el("hmvReviewRemarks").value = row.review_remarks || "";
+    if (el("hmvModalSubtitle")) el("hmvModalSubtitle").textContent = `Request ID ${row.request_id}`;
+    if (el("hmvModalHeadName")) el("hmvModalHeadName").textContent = row.head_full_name || "-";
+    if (el("hmvModalHeadResidentId")) el("hmvModalHeadResidentId").textContent = row.fam_head_id || "-";
+    if (el("hmvModalLastName")) el("hmvModalLastName").textContent = row.last_name || "-";
+    if (el("hmvModalFirstName")) el("hmvModalFirstName").textContent = row.first_name || "-";
+    if (el("hmvModalMiddleName")) el("hmvModalMiddleName").textContent = row.middle_name || "-";
+    if (el("hmvModalSuffix")) el("hmvModalSuffix").textContent = row.suffix || "-";
+    if (el("hmvModalBirthdate")) el("hmvModalBirthdate").textContent = formatBirthdate(row.birthdate);
+    if (el("hmvModalStatus")) el("hmvModalStatus").innerHTML = statusPillHtml(row.status);
     renderDocumentPreview(row);
 
     const isPending = fmtStatus(row.status) === "PendingReview";
@@ -191,9 +198,7 @@
 
   const fetchRows = async () => {
     if (refreshBtn) refreshBtn.classList.add("is-loading");
-    if (bodyEl) {
-      bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>`;
-    }
+    bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>`;
     emptyEl?.classList.add("d-none");
     try {
       const res = await fetch("../PhpFiles/Admin-End/householdMemberVerification.php?fetch_member_requests=1", {
@@ -205,9 +210,7 @@
       updatePendingBadge();
       renderTable();
     } catch (error) {
-      if (bodyEl) {
-        bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(error?.message || "Failed to load requests.")}</td></tr>`;
-      }
+      bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(error?.message || "Failed to load requests.")}</td></tr>`;
       emptyEl?.classList.add("d-none");
     } finally {
       if (refreshBtn) refreshBtn.classList.remove("is-loading");
@@ -217,8 +220,18 @@
   const submitReview = async (action) => {
     const row = state.active;
     if (!row) return;
-    const reviewRemarks = String(el("hmvReviewRemarks")?.value || "").trim();
+    let reviewRemarks = "";
+    if (action === "reject_member_request") {
+      reviewRemarks = String(confirmRemarksEl?.value || "").trim();
+      if (!reviewRemarks) {
+        window.alert("Rejection remarks are required.");
+        confirmRemarksEl?.focus();
+        return;
+      }
+    }
+
     try {
+      if (confirmActionBtn) confirmActionBtn.disabled = true;
       const res = await fetch("../PhpFiles/Admin-End/householdMemberVerification.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -231,10 +244,41 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || "Failed to review request.");
+      confirmModal?.hide();
       modal?.hide();
       await fetchRows();
     } catch (error) {
       window.alert(error?.message || "Failed to review request.");
+    } finally {
+      if (confirmActionBtn) confirmActionBtn.disabled = false;
+    }
+  };
+
+  const openActionConfirm = (action) => {
+    const row = state.active;
+    if (!row) return;
+    state.pendingAction = action;
+    const isReject = action === "reject_member_request";
+    if (confirmTitleEl) {
+      confirmTitleEl.textContent = isReject ? "Confirm Rejection" : "Confirm Approval";
+    }
+    if (confirmMessageEl) {
+      confirmMessageEl.textContent = isReject
+        ? `Reject household member verification request ${row.request_id}?`
+        : `Approve household member verification request ${row.request_id}?`;
+    }
+    confirmRemarksWrapEl?.classList.toggle("d-none", !isReject);
+    if (confirmRemarksEl) {
+      confirmRemarksEl.value = isReject ? String(row.review_remarks || "") : "";
+    }
+    if (confirmActionBtn) {
+      confirmActionBtn.textContent = isReject ? "Reject" : "Approve";
+      confirmActionBtn.classList.remove("btn-primary", "btn-danger", "btn-success");
+      confirmActionBtn.classList.add(isReject ? "btn-danger" : "btn-success");
+    }
+    confirmModal?.show();
+    if (isReject) {
+      window.setTimeout(() => confirmRemarksEl?.focus(), 150);
     }
   };
 
@@ -253,12 +297,14 @@
   });
 
   refreshBtn?.addEventListener("click", fetchRows);
+
   btnApplyFilter?.addEventListener("click", () => {
     state.modalFilters.dateFrom = String(filterDateFromEl?.value || "").trim();
     state.modalFilters.dateTo = String(filterDateToEl?.value || "").trim();
     bootstrap.Modal.getOrCreateInstance(el("modalHouseholdMemberVerificationFilter"))?.hide();
     renderTable();
   });
+
   btnResetFilter?.addEventListener("click", () => {
     state.modalFilters.dateFrom = "";
     state.modalFilters.dateTo = "";
@@ -267,16 +313,19 @@
     renderTable();
   });
 
-  bodyEl?.addEventListener("click", (event) => {
-    const button = event.target instanceof HTMLElement ? event.target.closest("button[data-request-id]") : null;
+  bodyEl.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest("button[data-request-id]");
     if (!button) return;
     const requestId = Number.parseInt(String(button.getAttribute("data-request-id") || "0"), 10);
     const row = state.rows.find((item) => Number(item.request_id) === requestId);
     if (row) openModal(row);
   });
 
-  el("btnHmvApprove")?.addEventListener("click", () => submitReview("approve_member_request"));
-  el("btnHmvReject")?.addEventListener("click", () => submitReview("reject_member_request"));
+  el("btnHmvApprove")?.addEventListener("click", () => openActionConfirm("approve_member_request"));
+  el("btnHmvReject")?.addEventListener("click", () => openActionConfirm("reject_member_request"));
+  confirmActionBtn?.addEventListener("click", () => submitReview(state.pendingAction));
 
   fetchRows();
 })();

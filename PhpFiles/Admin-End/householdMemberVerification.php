@@ -46,11 +46,11 @@ function hmv_find_existing_member_id(mysqli $conn, string $headResidentId, strin
     $stmt = $conn->prepare("
         SELECT household_member_id
         FROM householdmemberinfotbl
-        WHERE fam_head_id = ?
-          AND last_name = ?
-          AND first_name = ?
-          AND (middle_name <=> ?)
-          AND (suffix <=> ?)
+        WHERE fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
+          AND last_name COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
+          AND first_name COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
+          AND (middle_name COLLATE utf8mb4_general_ci <=> ? COLLATE utf8mb4_general_ci)
+          AND (suffix COLLATE utf8mb4_general_ci <=> ? COLLATE utf8mb4_general_ci)
           AND (birthdate <=> ?)
         LIMIT 1
     ");
@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
                 s.status_name AS document_verify_status
             FROM householdmemberverificationtbl req
             LEFT JOIN residentinformationtbl head
-                ON head.resident_id = req.fam_head_id
+                ON head.resident_id COLLATE utf8mb4_general_ci = req.fam_head_id COLLATE utf8mb4_general_ci
             {$requestStatusJoin}
             LEFT JOIN unifiedfileattachmenttbl uf
                 ON uf.attachment_id = req.attachment_id

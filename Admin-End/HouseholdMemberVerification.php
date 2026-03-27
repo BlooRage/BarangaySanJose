@@ -17,6 +17,126 @@ require_once __DIR__ . "/includes/admin_guard.php";
         .household-member-verification-shell #btnHouseholdMemberVerificationRefresh.is-loading i {
             animation: adminSpin 900ms linear infinite;
         }
+        #modal-householdMemberVerification .modal-content {
+            border: 1px solid #e9ecef;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #fff;
+        }
+        #modal-householdMemberVerification .modal-header,
+        #modal-householdMemberVerification .modal-body,
+        #modal-householdMemberVerification .modal-footer {
+            padding: 1rem 1.25rem;
+        }
+        #modal-householdMemberVerification .modal-body {
+            background: #fff;
+        }
+        #modal-householdMemberVerification .tracker-profile-view {
+            display: grid;
+            gap: 16px;
+        }
+        #modal-householdMemberVerification .tracker-form-section {
+            display: grid;
+            gap: 12px;
+            border: 1px solid #e78924;
+            border-radius: 16px;
+            background: #fff;
+            padding: 16px;
+        }
+        #modal-householdMemberVerification .tracker-form-section-title {
+            margin: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #e5e7eb;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        #modal-householdMemberVerification .tracker-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px 16px;
+        }
+        #modal-householdMemberVerification .tracker-form-grid.cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        #modal-householdMemberVerification .tracker-form-grid.cols-1 {
+            grid-template-columns: 1fr;
+        }
+        #modal-householdMemberVerification .tracker-form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+        }
+        #modal-householdMemberVerification .tracker-form-field--wide {
+            grid-column: 1 / -1;
+        }
+        #modal-householdMemberVerification .tracker-form-label {
+            margin: 0;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748b;
+            line-height: 1.2;
+        }
+        #modal-householdMemberVerification .tracker-form-value {
+            min-height: 46px;
+            border: 1px solid #d7dee7;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #0f172a;
+            line-height: 1.45;
+            word-break: break-word;
+            display: flex;
+            align-items: center;
+        }
+        #modal-householdMemberVerification #hmvModalDocumentWrap {
+            border: 1px solid #d7dee7 !important;
+            border-radius: 12px !important;
+            background: #f8fafc !important;
+            padding: 12px !important;
+        }
+        #modal-householdMemberVerification #hmvReviewRemarks {
+            border-radius: 12px;
+            min-height: 116px;
+            resize: vertical;
+        }
+        #modal-householdMemberVerification .hmv-modal-footer-start,
+        #modal-householdMemberVerification .hmv-modal-footer-end {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #modal-householdMemberVerification .hmv-modal-footer-end {
+            justify-content: flex-end;
+        }
+        #modal-householdMemberVerification .modal-footer .btn {
+            min-width: 108px;
+        }
+        #hmvActionConfirmModal .modal-content {
+            border-radius: 16px;
+        }
+        #hmvActionConfirmModal .modal-footer {
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        #hmvActionConfirmModal .modal-footer .btn {
+            min-width: 108px;
+        }
+        #hmvActionConfirmRemarksWrap textarea {
+            border-radius: 12px;
+            min-height: 120px;
+            resize: vertical;
+        }
+        @media (max-width: 991.98px) {
+            #modal-householdMemberVerification .tracker-form-grid,
+            #modal-householdMemberVerification .tracker-form-grid.cols-3 {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -31,11 +151,11 @@ require_once __DIR__ . "/includes/admin_guard.php";
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
                     <button class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold hmv-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
                     <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif hmv-filter-btn" data-filter="PendingReview">
                         &nbsp;&nbsp;Pending <span id="pendingHouseholdMemberBadge" class="pending-count-badge d-none">0</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
                 </div>
 
                 <div class="admin-list-actions">
@@ -130,7 +250,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
 
 <div class="modal fade" id="modal-householdMemberVerification" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content p-3">
+        <div class="modal-content">
             <div class="modal-header border-0">
                 <div>
                     <h5 class="modal-title mb-0">Household Member Verification</h5>
@@ -139,57 +259,84 @@ require_once __DIR__ . "/includes/admin_guard.php";
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <div class="text-muted small">Head of Family</div>
-                        <div class="fw-semibold" id="hmvModalHeadName">-</div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="text-muted small">Head Resident ID</div>
-                        <div class="fw-semibold" id="hmvModalHeadResidentId">-</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">Member Last Name</div>
-                        <div class="fw-semibold" id="hmvModalLastName">-</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">Member First Name</div>
-                        <div class="fw-semibold" id="hmvModalFirstName">-</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">Member Birthdate</div>
-                        <div class="fw-semibold" id="hmvModalBirthdate">-</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">Middle Name</div>
-                        <div class="fw-semibold" id="hmvModalMiddleName">-</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">Suffix</div>
-                        <div class="fw-semibold" id="hmvModalSuffix">-</div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">Status</div>
-                        <div class="fw-semibold" id="hmvModalStatus">-</div>
-                    </div>
-                </div>
+                <div class="tracker-profile-view">
+                    <section class="tracker-form-section">
+                        <h6 class="tracker-form-section-title">Verification Summary</h6>
+                        <div class="tracker-form-grid">
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Head of Family</label>
+                                <div class="tracker-form-value" id="hmvModalHeadName">-</div>
+                            </div>
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Head Resident ID</label>
+                                <div class="tracker-form-value" id="hmvModalHeadResidentId">-</div>
+                            </div>
+                        </div>
+                        <div class="tracker-form-grid cols-3">
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Member Last Name</label>
+                                <div class="tracker-form-value" id="hmvModalLastName">-</div>
+                            </div>
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Member First Name</label>
+                                <div class="tracker-form-value" id="hmvModalFirstName">-</div>
+                            </div>
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Member Birthdate</label>
+                                <div class="tracker-form-value" id="hmvModalBirthdate">-</div>
+                            </div>
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Middle Name</label>
+                                <div class="tracker-form-value" id="hmvModalMiddleName">-</div>
+                            </div>
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Suffix</label>
+                                <div class="tracker-form-value" id="hmvModalSuffix">-</div>
+                            </div>
+                            <div class="tracker-form-field">
+                                <label class="tracker-form-label">Status</label>
+                                <div class="tracker-form-value" id="hmvModalStatus">-</div>
+                            </div>
+                        </div>
+                    </section>
 
-                <div class="mb-3">
-                    <div class="text-muted small mb-2">Birth Certificate</div>
-                    <div id="hmvModalDocumentWrap" class="border rounded p-2 bg-light"></div>
-                </div>
+                    <section class="tracker-form-section">
+                        <h6 class="tracker-form-section-title">Birth Certificate</h6>
+                        <div id="hmvModalDocumentWrap"></div>
+                    </section>
 
-                <div>
-                    <label for="hmvReviewRemarks" class="form-label small text-muted">Review Remarks</label>
-                    <textarea class="form-control" id="hmvReviewRemarks" rows="3" placeholder="Optional remarks for approval or rejection"></textarea>
                 </div>
             </div>
             <div class="modal-footer border-0 d-flex justify-content-between">
-                <div class="d-flex gap-2" id="hmvModalActions">
+                <div class="hmv-modal-footer-start">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+                <div class="hmv-modal-footer-end" id="hmvModalActions">
                     <button type="button" class="btn btn-danger" id="btnHmvReject">Reject</button>
                     <button type="button" class="btn btn-success" id="btnHmvApprove">Approve</button>
                 </div>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="hmvActionConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title" id="hmvActionConfirmTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0" id="hmvActionConfirmMessage">Are you sure you want to continue?</p>
+                <div id="hmvActionConfirmRemarksWrap" class="mt-3 d-none">
+                    <label for="hmvActionConfirmRemarks" class="form-label small text-muted">Rejection Remarks</label>
+                    <textarea class="form-control" id="hmvActionConfirmRemarks" rows="4" placeholder="Enter rejection remarks"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnHmvConfirmAction">Confirm</button>
             </div>
         </div>
     </div>
@@ -206,6 +353,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js"></script>
+<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-03"></script>
 </body>
 </html>

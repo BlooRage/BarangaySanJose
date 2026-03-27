@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const addressEl = document.getElementById("householdAddress");
     const minorEl = document.getElementById("householdMinorCount");
     const adultEl = document.getElementById("householdAdultCount");
+    const pendingWrapEl = document.getElementById("householdPendingRequestsWrap");
+    const pendingCountEl = document.getElementById("householdPendingRequestCount");
+    const pendingListEl = document.getElementById("householdPendingRequestsList");
     const householdManageNoticeEl = document.getElementById("householdHeadVerificationNotice");
     const householdManageAlertEl = document.getElementById("householdManageAlert");
     const openManageModalBtn = document.querySelector('[data-bs-target="#householdInviteModal"]');
@@ -55,6 +58,49 @@ document.addEventListener("DOMContentLoaded", () => {
         if (adultEl) {
             adultEl.textContent = typeof adultCount === "number" ? String(adultCount) : "0";
         }
+    };
+
+    const formatDate = (value) => {
+        const raw = String(value || "").trim();
+        if (!raw) return "-";
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return raw;
+        return date.toLocaleString("en-PH", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    };
+
+    const formatBirthdate = (value) => {
+        const raw = String(value || "").trim();
+        if (!raw) return "-";
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return raw;
+        return date.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+    };
+
+    const renderPendingRequests = (requests) => {
+        if (!pendingWrapEl || !pendingListEl) return;
+        const rows = Array.isArray(requests) ? requests : [];
+        if (pendingCountEl) {
+            pendingCountEl.textContent = String(rows.length);
+        }
+        pendingWrapEl.classList.toggle("d-none", rows.length === 0);
+        if (!rows.length) {
+            pendingListEl.innerHTML = "";
+            return;
+        }
+
+        pendingListEl.innerHTML = rows.map((row, index) => `
+            <div class="px-3 py-2 ${index < rows.length - 1 ? "border-bottom" : ""}">
+                <div class="fw-semibold">${String(row.member_name || "Pending member")}</div>
+                <div class="small text-muted">Birthdate: ${formatBirthdate(row.birthdate)}</div>
+                <div class="small text-muted">Request ID ${String(row.request_id || "-")} | Submitted ${formatDate(row.submitted_at)}</div>
+            </div>
+        `).join("");
     };
 
     const renderMembers = (members, isHead, currentResidentId) => {
@@ -127,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 setJoinButtonState(false);
                 updateLeaveButtonState(false);
                 renderHouseholdInfo(null, 0, 0);
+                renderPendingRequests([]);
                 renderMembers([]);
                 return;
             }
@@ -137,11 +184,13 @@ document.addEventListener("DOMContentLoaded", () => {
             window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE = String(data.head_verification_message || window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "");
             syncHouseholdManageUi();
             renderHouseholdInfo(data.address || null, data.minor_count ?? 0, data.adult_count ?? 0);
+            renderPendingRequests(data.pending_member_requests || []);
             renderMembers(data.members || [], !!data.is_head, data.resident_id || "");
         } catch (e) {
             setJoinButtonState(false);
             updateLeaveButtonState(false);
             renderHouseholdInfo(null, 0, 0);
+            renderPendingRequests([]);
             renderMembers([]);
         }
     };
