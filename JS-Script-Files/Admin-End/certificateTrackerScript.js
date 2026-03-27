@@ -6563,7 +6563,14 @@
                <div class="tracker-form-field">
                  <p class="tracker-form-label">Proof of Residency File</p>
                  <div class="tracker-form-value d-flex justify-content-end">
-                   <button type="button" class="btn btn-sm btn-primary" data-support-doc-url="${esc(proofResidencyUrl)}" data-support-doc-title="${esc(proofResidencyTitle)}">View</button>
+                   <button
+                     type="button"
+                     class="btn btn-sm btn-primary"
+                     data-support-doc-url="${esc(proofResidencyUrl)}"
+                     data-support-doc-title="${esc(proofResidencyTitle)}"
+                     data-support-doc-name="${esc(proofResidencyName || 'Proof of Residency')}"
+                     data-support-doc-inline="0"
+                   >View</button>
                  </div>
                </div>
              </div>`
@@ -6775,8 +6782,9 @@
             const docUrl = String(docBtn.getAttribute('data-support-doc-url') || '').trim();
             const docTitle = String(docBtn.getAttribute('data-support-doc-title') || 'Submitted Attachment Viewer').trim();
             const docName = String(docBtn.getAttribute('data-support-doc-name') || '').trim();
+            const allowInline = String(docBtn.getAttribute('data-support-doc-inline') || '1').trim() !== '0';
             if (!docUrl) return;
-            if (openInlineSubmittedPreview(docUrl, docName || docTitle)) {
+            if (allowInline && openInlineSubmittedPreview(docUrl, docName || docTitle)) {
               return;
             }
             if (!submittedFileModal || !submittedFileWrap || !submittedFileOpenNew) return;
