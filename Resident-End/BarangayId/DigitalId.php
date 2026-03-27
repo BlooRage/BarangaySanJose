@@ -398,22 +398,52 @@ $serializedRow = $requestRow ? [
             margin: 0;
             border-radius: 30px;
             box-shadow: 0 26px 64px rgba(28, 56, 112, 0.14);
+            --bid-body-size: clamp(11.7px, 0.4rem + 0.88vw, 16.1px);
+            --bid-label-size: var(--bid-body-size);
+            --bid-field-size: var(--bid-body-size);
+            --bid-name-size: clamp(15.6px, 0.62rem + 1.34vw, 24.2px);
+            --bid-address-size: var(--bid-body-size);
+            --bid-meta-size: var(--bid-body-size);
+            --bid-cardno-size: clamp(11.4px, 0.4rem + 1vw, 17.4px);
+            --bid-cardno-back-size: clamp(11.9px, 0.42rem + 1.08vw, 18.5px);
+            --bid-emergency-size: var(--bid-body-size);
+            --bid-note-size: clamp(8.8px, 0.32rem + 0.62vw, 11.9px);
         }
         .digital-id-viewer__card-stage .barangay-id-card__label,
-        .digital-id-viewer__card-stage .barangay-id-card__field--name,
-        .digital-id-viewer__card-stage .barangay-id-card__field--address,
-        .digital-id-viewer__card-stage .barangay-id-card__field--birthplace,
-        .digital-id-viewer__card-stage .barangay-id-card__field--meta,
-        .digital-id-viewer__card-stage .barangay-id-card__field--emergency {
-            font-size: clamp(10.8px, 0.34rem + 0.58vw, 14.4px);
+        .digital-id-viewer__card-stage .barangay-id-card__field,
+        .digital-id-viewer__card-stage .barangay-id-card__note {
             line-height: 1.08;
         }
         .digital-id-viewer__card-stage .barangay-id-card__note {
-            font-size: clamp(9.2px, 0.3rem + 0.46vw, 11.6px);
             line-height: 1.18;
         }
-        .digital-id-viewer__card-stage .barangay-id-card__field--cardno {
-            font-size: clamp(11.6px, 0.38rem + 0.76vw, 16.2px);
+        @container barangay-id-card (max-width: 500px) {
+            .digital-id-viewer__card-stage .barangay-id-card {
+                --bid-body-size: clamp(10.2px, 2.78cqw, 13.9px);
+                --bid-label-size: var(--bid-body-size);
+                --bid-field-size: var(--bid-body-size);
+                --bid-name-size: clamp(13.5px, 3.78cqw, 19.2px);
+                --bid-address-size: var(--bid-body-size);
+                --bid-meta-size: var(--bid-body-size);
+                --bid-cardno-size: clamp(9.8px, 2.84cqw, 14.1px);
+                --bid-cardno-back-size: clamp(10.3px, 3.02cqw, 15px);
+                --bid-emergency-size: var(--bid-body-size);
+                --bid-note-size: clamp(8.4px, 2.3cqw, 10.6px);
+            }
+        }
+        @container barangay-id-card (min-width: 760px) {
+            .digital-id-viewer__card-stage .barangay-id-card {
+                --bid-body-size: clamp(12.1px, 0.44rem + 0.86vw, 16.5px);
+                --bid-label-size: var(--bid-body-size);
+                --bid-field-size: var(--bid-body-size);
+                --bid-name-size: clamp(16.8px, 0.66rem + 1.18vw, 24.7px);
+                --bid-address-size: var(--bid-body-size);
+                --bid-meta-size: var(--bid-body-size);
+                --bid-cardno-size: clamp(11.9px, 0.44rem + 0.84vw, 17.7px);
+                --bid-cardno-back-size: clamp(12.4px, 0.46rem + 0.9vw, 18.8px);
+                --bid-emergency-size: var(--bid-body-size);
+                --bid-note-size: clamp(9px, 0.34rem + 0.54vw, 12.1px);
+            }
         }
         .digital-id-viewer__card-stage .barangay-id-card__bg {
             border-radius: 30px;
