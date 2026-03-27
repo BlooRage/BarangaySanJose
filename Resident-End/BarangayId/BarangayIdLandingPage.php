@@ -1,6 +1,7 @@
 ﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentRequestWorkflow.php";
 
 $frontTemplateRelative = 'Resident-End/Certificates/BarangayID/FRONT_EMPTY.png';
 $backTemplateRelative = 'Resident-End/Certificates/BarangayID/BACK_EMPTY.png';
@@ -8,31 +9,132 @@ $frontTemplateDiskPath = realpath(__DIR__ . '/../Certificates/BarangayID/FRONT_E
 $backTemplateDiskPath = realpath(__DIR__ . '/../Certificates/BarangayID/BACK_EMPTY.png');
 $frontTemplateUrl = appUrl($frontTemplateRelative) . '?v=' . (string)(($frontTemplateDiskPath && is_file($frontTemplateDiskPath)) ? @filemtime($frontTemplateDiskPath) : time());
 $backTemplateUrl = appUrl($backTemplateRelative) . '?v=' . (string)(($backTemplateDiskPath && is_file($backTemplateDiskPath)) ? @filemtime($backTemplateDiskPath) : time());
-$latestDigitalIdRequestId = '';
-if (isset($conn) && $conn instanceof mysqli && isset($userId)) {
-    $sql = "
-        SELECT request_id
-        FROM documentrequesttbl
-        WHERE resident_user_id = ?
-          AND LOWER(TRIM(COALESCE(document_type, ''))) = 'barangay id'
-          AND LOWER(TRIM(COALESCE(stage, ''))) = 'completed'
-        ORDER BY COALESCE(release_timestamp, completed_at, ready_at, submitted_at, request_timestamp) DESC, request_id DESC
-        LIMIT 1
-    ";
-    $stmtDigitalId = $conn->prepare($sql);
-    if ($stmtDigitalId) {
-        $stmtDigitalId->bind_param('s', $userId);
-        $stmtDigitalId->execute();
-        $stmtDigitalId->bind_result($resolvedRequestId);
-        if ($stmtDigitalId->fetch() && is_string($resolvedRequestId)) {
-            $latestDigitalIdRequestId = trim($resolvedRequestId);
-        }
-        $stmtDigitalId->close();
-    }
-}
+$userId = (string)($_SESSION['user_id'] ?? '');
+$residentId = (isset($conn) && $conn instanceof mysqli && $userId !== '')
+    ? (string)(dr_get_resident_id($conn, $userId) ?? '')
+    : '';
+$barangayIdState = (isset($conn) && $conn instanceof mysqli)
+    ? dr_resident_barangay_id_state($conn, $userId, $residentId)
+    : [
+        'latest_completed_request_id' => '',
+        'latest_completed_valid_until' => '',
+        'latest_completed_days_until_expiry' => null,
+        'latest_completed_lost' => false,
+        'latest_completed_lost_reported_at' => '',
+        'pending_request_id' => '',
+        'pending_stage' => '',
+        'can_submit_new_request' => true,
+        'can_report_lost' => false,
+        'submission_mode' => 'new',
+        'renewal_eligible' => false,
+        'renewal_available_on' => '',
+        'block_reason' => '',
+    ];
+$latestDigitalIdRequestId = trim((string)($barangayIdState['latest_completed_request_id'] ?? ''));
 $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
     ? appUrl('Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($latestDigitalIdRequestId))
     : '';
+$documentRequestsUrl = appUrl('/Resident-End/document_requests.php');
+$submissionMode = dr_normalize_barangay_id_request_mode((string)($barangayIdState['submission_mode'] ?? 'new'));
+$requestFormUrl = appUrl('Resident-End/BarangayId/BarangayIdForm.php');
+if ($submissionMode !== 'new' || $latestDigitalIdRequestId !== '') {
+    $query = ['mode' => $submissionMode];
+    if ($latestDigitalIdRequestId !== '') {
+        $query['source_request_id'] = $latestDigitalIdRequestId;
+    }
+    $requestFormUrl .= '?' . http_build_query($query);
+}
+$validUntilDt = dr_parse_datetime_value((string)($barangayIdState['latest_completed_valid_until'] ?? ''), true);
+$validUntilLabel = $validUntilDt instanceof DateTimeImmutable ? $validUntilDt->format('F j, Y') : '';
+$renewalAvailableDt = dr_parse_datetime_value((string)($barangayIdState['renewal_available_on'] ?? ''));
+$renewalAvailableLabel = $renewalAvailableDt instanceof DateTimeImmutable ? $renewalAvailableDt->format('F j, Y') : '';
+$pendingRequestId = trim((string)($barangayIdState['pending_request_id'] ?? ''));
+$pendingStage = trim((string)($barangayIdState['pending_stage'] ?? ''));
+$pendingStageLabel = $pendingStage !== '' ? dr_stage_label($pendingStage) : '';
+$daysUntilExpiry = isset($barangayIdState['latest_completed_days_until_expiry']) && $barangayIdState['latest_completed_days_until_expiry'] !== null
+    ? (int)$barangayIdState['latest_completed_days_until_expiry']
+    : null;
+$hasActiveValidId = ($barangayIdState['latest_completed_is_valid'] ?? false) && !($barangayIdState['latest_completed_lost'] ?? false);
+$notice = trim((string)($_GET['notice'] ?? ''));
+$flash = null;
+if ($notice === 'lost_reported') {
+    $flash = [
+        'tone' => 'success',
+        'icon' => 'fa-solid fa-circle-check',
+        'title' => 'Barangay ID tagged as lost',
+        'body' => 'You can now submit a replacement Barangay ID request. The replacement will receive a fresh 2-year validity once released.',
+    ];
+} elseif ($notice === 'lost_error') {
+    $flash = [
+        'tone' => 'error',
+        'icon' => 'fa-solid fa-circle-exclamation',
+        'title' => 'Unable to tag the Barangay ID as lost',
+        'body' => 'Please refresh the page and try again. If the problem continues, check whether you already have an active replacement request in progress.',
+    ];
+} elseif ($notice === 'request_not_allowed') {
+    $flash = [
+        'tone' => 'warning',
+        'icon' => 'fa-solid fa-hourglass-half',
+        'title' => 'A new Barangay ID request is not available yet',
+        'body' => 'Residents can only renew within the 3-month renewal window, or request a replacement after tagging the current ID as lost.',
+    ];
+}
+
+$heroBadgeText = 'Application ready';
+$heroBadgeIcon = 'fa-solid fa-circle-check';
+$heroAsideTitle = 'Preview the official design, then continue with your request.';
+$heroAsideCopy = 'Use the preview as your guide before filing a new request. Your digital copy will appear here once your latest request is completed.';
+$actionTitle = 'Apply for a new ID or open your digital copy';
+$actionBody = 'Start a new Barangay ID request any time. If your latest request is already completed, you can open the digital version immediately from here.';
+$actionMeta = [];
+
+if ($pendingRequestId !== '') {
+    $heroBadgeText = 'Request in progress';
+    $heroBadgeIcon = 'fa-solid fa-spinner';
+    $heroAsideTitle = 'You already have an active Barangay ID request.';
+    $heroAsideCopy = 'Track the request first before creating another one. Once this request is completed, rejected, or cancelled, the next available action will appear here automatically.';
+    $actionTitle = 'Your current Barangay ID request is already being processed';
+    $actionBody = 'Open your request list to monitor the status instead of submitting another application.';
+    $actionMeta[] = '<i class="fa-solid fa-hashtag"></i>Request ID: ' . htmlspecialchars($pendingRequestId, ENT_QUOTES, 'UTF-8');
+    if ($pendingStageLabel !== '') {
+        $actionMeta[] = '<i class="fa-solid fa-list-check"></i>Status: ' . htmlspecialchars($pendingStageLabel, ENT_QUOTES, 'UTF-8');
+    }
+} elseif ($submissionMode === 'replacement_lost') {
+    $heroBadgeText = 'Lost ID reported';
+    $heroBadgeIcon = 'fa-solid fa-triangle-exclamation';
+    $heroAsideTitle = 'Your Barangay ID is marked as lost.';
+    $heroAsideCopy = 'You can now submit a replacement request. Once released, the replacement ID will carry a fresh 2-year validity based on the new issue date.';
+    $actionTitle = 'Request a replacement Barangay ID';
+    $actionBody = 'Your last released Barangay ID has already been tagged as lost, so the replacement form is now available again.';
+} elseif ($submissionMode === 'renewal') {
+    $heroBadgeText = 'Renewal window open';
+    $heroBadgeIcon = 'fa-solid fa-arrows-rotate';
+    $heroAsideTitle = 'Your Barangay ID can now be renewed.';
+    $heroAsideCopy = $validUntilLabel !== ''
+        ? 'Your current Barangay ID is valid until ' . $validUntilLabel . '. Because it is already within the 3-month renewal window, the renewal form is available again.'
+        : 'Your current Barangay ID is already within the renewal window, so the renewal form is available again.';
+    $actionTitle = 'Renew your Barangay ID';
+    $actionBody = 'Submit the renewal form to request a newly issued card with a fresh 2-year validity.';
+} elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid') {
+    $heroBadgeText = 'Currently active';
+    $heroBadgeIcon = 'fa-solid fa-shield-halved';
+    $heroAsideTitle = 'Your current Barangay ID is still active.';
+    $heroAsideCopy = $renewalAvailableLabel !== ''
+        ? 'Renewal opens on ' . $renewalAvailableLabel . '. If this active ID is lost before then, tag it as lost first to unlock the replacement form.'
+        : 'Renewal becomes available again three months before expiry. If this active ID is lost before then, tag it as lost first to unlock the replacement form.';
+    $actionTitle = 'Your Barangay ID is still valid';
+    $actionBody = 'You cannot file a new request yet while the current ID is still active, unless you first tag the current Barangay ID as lost.';
+}
+
+if ($validUntilLabel !== '') {
+    $actionMeta[] = '<i class="fa-solid fa-calendar-check"></i>Valid until: ' . htmlspecialchars($validUntilLabel, ENT_QUOTES, 'UTF-8');
+}
+if ($daysUntilExpiry !== null && $daysUntilExpiry >= 0 && $pendingRequestId === '') {
+    $actionMeta[] = '<i class="fa-solid fa-hourglass-half"></i>' . htmlspecialchars((string)$daysUntilExpiry, ENT_QUOTES, 'UTF-8') . ' day' . ($daysUntilExpiry === 1 ? '' : 's') . ' until expiry';
+}
+if ($pendingRequestId === '') {
+    $actionMeta[] = '<i class="fa-solid fa-calendar-plus"></i>Approved Barangay IDs receive a fresh 2-year validity.';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -74,6 +176,47 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             margin: 0 auto;
             display: grid;
             gap: 28px;
+        }
+        .page-flash {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 14px;
+            align-items: start;
+            padding: 18px 20px;
+            border-radius: 22px;
+            border: 1px solid rgba(241, 212, 181, 0.92);
+            background: rgba(255, 251, 246, 0.96);
+            box-shadow: 0 18px 36px rgba(145, 87, 24, 0.07);
+        }
+        .page-flash__icon {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            background: #fff;
+            border: 1px solid rgba(241, 212, 181, 0.92);
+            color: var(--bid-page-accent-strong);
+        }
+        .page-flash__title {
+            margin: 0 0 4px;
+            font-size: 1.06rem;
+            font-weight: 800;
+            color: var(--bid-page-ink);
+        }
+        .page-flash__body {
+            margin: 0;
+            color: var(--bid-page-muted);
+            line-height: 1.65;
+        }
+        .page-flash--success .page-flash__icon {
+            color: #1f8c49;
+        }
+        .page-flash--error .page-flash__icon {
+            color: #c23f2e;
+        }
+        .page-flash--warning .page-flash__icon {
+            color: #b85a00;
         }
         .barangay-id-hero {
             display: grid;
@@ -445,6 +588,12 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             display: grid;
             gap: 12px;
         }
+        .apply-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
         .apply-actions .btn {
             display: inline-flex;
             align-items: center;
@@ -479,6 +628,18 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             background: #fc8d3d;
             border-color: #fc8d3d;
             color: #fff;
+        }
+        .lost-report-btn {
+            min-width: 210px;
+            background: #ffffff;
+            color: #8a4b00;
+            border: 1px dashed #e3a768;
+            box-shadow: 0 14px 28px rgba(138, 75, 0, 0.08);
+        }
+        .lost-report-btn:hover {
+            background: #fff6eb;
+            border-color: #de710c;
+            color: #8a4b00;
         }
         .apply-note {
             margin: 0;
@@ -545,6 +706,17 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
 
         <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5">
             <div class="page-shell">
+                <?php if (is_array($flash)): ?>
+                    <section class="page-flash page-flash--<?= htmlspecialchars((string)($flash['tone'] ?? 'warning'), ENT_QUOTES, 'UTF-8') ?>">
+                        <div class="page-flash__icon">
+                            <i class="<?= htmlspecialchars((string)($flash['icon'] ?? 'fa-solid fa-circle-info'), ENT_QUOTES, 'UTF-8') ?>"></i>
+                        </div>
+                        <div>
+                            <h2 class="page-flash__title"><?= htmlspecialchars((string)($flash['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></h2>
+                            <p class="page-flash__body"><?= htmlspecialchars((string)($flash['body'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
+                    </section>
+                <?php endif; ?>
                 <section class="barangay-id-hero">
                     <div class="barangay-id-hero__copy">
                         <span class="barangay-id-eyebrow">
@@ -565,21 +737,19 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
                         <div class="barangay-id-chip-row">
                             <span class="barangay-id-chip"><i class="fa-solid fa-building-columns"></i>Official barangay-issued ID</span>
                             <span class="barangay-id-chip"><i class="fa-solid fa-mobile-screen-button"></i>Digital ID ready after completion</span>
-                            <span class="barangay-id-chip"><i class="fa-solid fa-arrows-rotate"></i>Free renewal every 2 years</span>
+                            <span class="barangay-id-chip"><i class="fa-solid fa-arrows-rotate"></i>Renewal opens 3 months before expiry</span>
                         </div>
                     </div>
                     <aside class="barangay-id-hero__aside">
                         <span class="barangay-id-hero__aside-badge">
-                            <i class="fa-solid fa-circle-check"></i>
-                            <?= $digitalIdViewUrl !== '' ? 'Digital copy available' : 'Application ready' ?>
+                            <i class="<?= htmlspecialchars($heroBadgeIcon, ENT_QUOTES, 'UTF-8') ?>"></i>
+                            <?= htmlspecialchars($heroBadgeText, ENT_QUOTES, 'UTF-8') ?>
                         </span>
                         <h2 class="barangay-id-hero__aside-title">
-                            <?= $digitalIdViewUrl !== '' ? 'Your latest completed Barangay ID can already be viewed online.' : 'Preview the official design, then continue with your request.' ?>
+                            <?= htmlspecialchars($heroAsideTitle, ENT_QUOTES, 'UTF-8') ?>
                         </h2>
                         <p class="barangay-id-hero__aside-copy">
-                            <?= $digitalIdViewUrl !== ''
-                                ? 'You can open the digital copy instantly or submit another request if you need a renewal or replacement.'
-                                : 'Use the preview as your guide before filing a new request. Your digital copy will appear here once your latest request is completed.' ?>
+                            <?= htmlspecialchars($heroAsideCopy, ENT_QUOTES, 'UTF-8') ?>
                         </p>
                     </aside>
                 </section>
@@ -658,35 +828,57 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
                             <i class="fa-solid fa-bolt"></i>
                             Next Step
                         </span>
-                        <h2 class="action-panel__title">Apply for a new ID or open your digital copy</h2>
-                        <p class="action-panel__body">
-                            Start a new Barangay ID request any time. If your latest request is already completed, you can open the digital version immediately from here.
-                        </p>
+                        <h2 class="action-panel__title"><?= htmlspecialchars($actionTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                        <p class="action-panel__body"><?= htmlspecialchars($actionBody, ENT_QUOTES, 'UTF-8') ?></p>
                         <div class="action-meta">
-                            <?php if ($digitalIdViewUrl !== ''): ?>
-                                <span class="action-meta__item"><i class="fa-solid fa-circle-check"></i>Your latest released Barangay ID is already available online.</span>
-                            <?php endif; ?>
-                            <span class="action-meta__item"><i class="fa-solid fa-arrows-rotate"></i>Renewal is free every 2 years.</span>
-                            <span class="action-meta__item"><i class="fa-solid fa-triangle-exclamation"></i>Lost Barangay ID renewal costs Php50.00.</span>
+                            <?php foreach ($actionMeta as $metaItem): ?>
+                                <span class="action-meta__item"><?= $metaItem ?></span>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                     <div class="apply-section">
                         <div class="apply-actions">
-                        <button class="btn apply-btn" type="button" data-apply-href="<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php'), ENT_QUOTES, 'UTF-8') ?>">Apply Now</button>
-                        <?php if ($digitalIdViewUrl !== ''): ?>
-                            <button class="btn digital-id-btn" type="button" onclick="location.href='<?= htmlspecialchars($digitalIdViewUrl) ?>'">View Digital ID</button>
-                        <?php endif; ?>
+                            <?php if ($pendingRequestId !== ''): ?>
+                                <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars($documentRequestsUrl, ENT_QUOTES, 'UTF-8') ?>'">View My Requests</button>
+                            <?php elseif ($barangayIdState['can_submit_new_request'] ?? false): ?>
+                                <button class="btn apply-btn" type="button" data-apply-href="<?= htmlspecialchars($requestFormUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars(match ($submissionMode) {
+                                        'renewal' => 'Renew Barangay ID',
+                                        'replacement_lost' => 'Request Replacement',
+                                        default => 'Apply Now',
+                                    }, ENT_QUOTES, 'UTF-8') ?>
+                                </button>
+                            <?php endif; ?>
+                            <?php if ($digitalIdViewUrl !== ''): ?>
+                                <button class="btn digital-id-btn" type="button" onclick="location.href='<?= htmlspecialchars($digitalIdViewUrl, ENT_QUOTES, 'UTF-8') ?>'">View Digital ID</button>
+                            <?php endif; ?>
+                            <?php if ($barangayIdState['can_report_lost'] ?? false): ?>
+                                <button class="btn lost-report-btn" type="button" data-report-lost data-request-id="<?= htmlspecialchars($latestDigitalIdRequestId, ENT_QUOTES, 'UTF-8') ?>">Tag ID as Lost</button>
+                            <?php endif; ?>
                         </div>
-                        <?php if ($digitalIdViewUrl !== ''): ?>
-                            <p class="digital-id-note">Your digital copy is ready for viewing.</p>
+                        <?php if ($submissionMode === 'replacement_lost' && $pendingRequestId === ''): ?>
+                            <p class="digital-id-note">Lost status recorded. The replacement form is open again.</p>
+                        <?php elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid' && $renewalAvailableLabel !== ''): ?>
+                            <p class="digital-id-note">Renewal becomes available on <?= htmlspecialchars($renewalAvailableLabel, ENT_QUOTES, 'UTF-8') ?> unless the active ID is tagged as lost first.</p>
+                        <?php elseif ($digitalIdViewUrl !== ''): ?>
+                            <p class="digital-id-note">Your latest completed Barangay ID can be opened online here.</p>
                         <?php endif; ?>
-                        <p class="apply-note">Review the preview first if you want to confirm the official card layout before submitting your request.</p>
+                        <p class="apply-note">
+                            <?= htmlspecialchars($pendingRequestId !== ''
+                                ? 'Monitor the active request first. Once it is completed, rejected, or cancelled, the next available Barangay ID action will appear here automatically.'
+                                : 'Review the preview first if you want to confirm the official card layout before submitting your request.', ENT_QUOTES, 'UTF-8') ?>
+                        </p>
                     </div>
                 </section>
             </div>
         </main>
     </div>
     <?php include __DIR__ . '/../includes/document_issuance_verification_modal.php'; ?>
+    <form id="barangayIdLostForm" method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Resident-End/documentRequestWorkflow.php'), ENT_QUOTES, 'UTF-8') ?>" class="d-none">
+        <input type="hidden" name="action" value="report_barangay_id_lost">
+        <input type="hidden" name="request_id" value="">
+        <input type="hidden" name="redirect" value="1">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -730,6 +922,25 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
         previewButtons.forEach((button) => {
             button.addEventListener('click', () => {
                 setPreviewSide(button.getAttribute('data-preview-target') || 'front');
+            });
+        });
+
+        const lostForm = document.getElementById('barangayIdLostForm');
+        document.querySelectorAll('[data-report-lost]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const targetRequestId = String(button.getAttribute('data-request-id') || '').trim();
+                if (!targetRequestId || !lostForm) {
+                    return;
+                }
+                const confirmed = window.confirm('Tag this Barangay ID as lost and unlock the replacement form?');
+                if (!confirmed) {
+                    return;
+                }
+                const requestInput = lostForm.querySelector('input[name="request_id"]');
+                if (requestInput) {
+                    requestInput.value = targetRequestId;
+                }
+                lostForm.submit();
             });
         });
     </script>

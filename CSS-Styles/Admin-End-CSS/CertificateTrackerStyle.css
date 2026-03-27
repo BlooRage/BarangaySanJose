@@ -2230,14 +2230,27 @@
       gap: 8px;
       margin-top: 14px;
     }
+    .manual-photo-controls--camera {
+      margin-top: 0;
+      margin-bottom: 14px;
+    }
     .manual-photo-controls label {
       font-size: .82rem;
       font-weight: 700;
       color: #334155;
       margin: 0;
     }
+    .manual-photo-controls .form-select {
+      max-width: 360px;
+    }
     .manual-photo-controls input[type="range"] {
       width: 100%;
+    }
+    .manual-photo-control-hint {
+      margin: 0;
+      color: #64748b;
+      font-size: .79rem;
+      line-height: 1.45;
     }
     .manual-photo-footer-copy {
       color: #64748b;

@@ -7477,6 +7477,7 @@
     const manualBarangayIdCameraVideo = document.getElementById('manualBarangayIdCameraVideo');
     const manualBarangayIdCameraEmpty = document.getElementById('manualBarangayIdCameraEmpty');
     const manualBarangayIdCameraWorkspace = document.getElementById('manualBarangayIdCameraWorkspace');
+    const manualBarangayIdCameraSelect = document.getElementById('manualBarangayIdCameraSelect');
     const manualBarangayIdCropWorkspace = document.getElementById('manualBarangayIdCropWorkspace');
     const manualBarangayIdCropImage = document.getElementById('manualBarangayIdCropImage');
     const manualBarangayIdCropFrame = document.getElementById('manualBarangayIdCropFrame');
@@ -7516,6 +7517,8 @@
     let manualBarangayIdPhotoResidentUrl = '';
     let manualBarangayIdPhotoResidentPath = '';
     let manualBarangayIdPhotoStream = null;
+    let manualBarangayIdCameraDevices = [];
+    let manualBarangayIdSelectedCameraId = '';
     let manualBarangayIdCropSourceUrl = '';
     let manualBarangayIdCropState = {
       x: 0,
@@ -7633,6 +7636,101 @@
       manualBarangayIdPhotoStatus.classList.add(className);
       manualBarangayIdPhotoStatus.textContent = String(message);
       manualBarangayIdPhotoStatus.classList.remove('d-none');
+    }
+
+    function manualCurrentBarangayIdCameraDeviceId() {
+      const track = manualBarangayIdPhotoStream && typeof manualBarangayIdPhotoStream.getVideoTracks === 'function'
+        ? manualBarangayIdPhotoStream.getVideoTracks()[0]
+        : null;
+      const settings = track && typeof track.getSettings === 'function'
+        ? track.getSettings()
+        : null;
+      return String(settings?.deviceId || '').trim();
+    }
+
+    function manualRenderBarangayIdCameraOptions(devices = [], selectedDeviceId = '') {
+      if (!manualBarangayIdCameraSelect) return;
+      const list = Array.isArray(devices) ? devices : [];
+      manualBarangayIdCameraSelect.innerHTML = '';
+
+      if (!list.length) {
+        manualBarangayIdCameraSelect.innerHTML = '<option value="">No camera detected</option>';
+        manualBarangayIdCameraSelect.disabled = true;
+        manualBarangayIdSelectedCameraId = '';
+        return;
+      }
+
+      const selectableDeviceIds = [];
+      list.forEach((device, index) => {
+        const option = document.createElement('option');
+        const deviceId = String(device?.deviceId || '').trim();
+        option.value = deviceId;
+        option.textContent = String(device?.label || `Camera ${index + 1}`);
+        if (!deviceId) {
+          option.disabled = true;
+        } else {
+          selectableDeviceIds.push(deviceId);
+        }
+        manualBarangayIdCameraSelect.appendChild(option);
+      });
+
+      const preferredDeviceId = String(
+        selectedDeviceId
+        || manualCurrentBarangayIdCameraDeviceId()
+        || manualBarangayIdSelectedCameraId
+        || ''
+      ).trim();
+      const fallbackDeviceId = selectableDeviceIds[0] || '';
+
+      if (preferredDeviceId && selectableDeviceIds.includes(preferredDeviceId)) {
+        manualBarangayIdCameraSelect.value = preferredDeviceId;
+        manualBarangayIdSelectedCameraId = preferredDeviceId;
+      } else {
+        manualBarangayIdCameraSelect.value = fallbackDeviceId;
+        manualBarangayIdSelectedCameraId = fallbackDeviceId;
+      }
+
+      manualBarangayIdCameraSelect.disabled = selectableDeviceIds.length < 2;
+    }
+
+    async function manualRefreshBarangayIdCameraOptions(selectedDeviceId = '') {
+      if (!manualBarangayIdCameraSelect) return;
+
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        manualBarangayIdCameraDevices = [];
+        manualBarangayIdCameraSelect.innerHTML = '<option value="">Camera list unavailable on this browser</option>';
+        manualBarangayIdCameraSelect.disabled = true;
+        return;
+      }
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        manualBarangayIdCameraDevices = devices.filter((device) => device.kind === 'videoinput');
+      } catch (_) {
+        manualBarangayIdCameraDevices = [];
+      }
+
+      manualRenderBarangayIdCameraOptions(manualBarangayIdCameraDevices, selectedDeviceId);
+    }
+
+    function manualDescribeBarangayIdCameraError(error) {
+      const name = String(error?.name || '').trim();
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        return 'Camera access was denied. Allow the camera in your browser, then try again.';
+      }
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        return 'No camera was found on this device. Connect one, then try again.';
+      }
+      if (name === 'NotReadableError' || name === 'TrackStartError') {
+        return 'The selected camera is busy or unavailable. Close other apps using it, then try again.';
+      }
+      if (name === 'OverconstrainedError') {
+        return 'The selected camera could not be started. Choose another camera from the dropdown, then try again.';
+      }
+      if (name === 'SecurityError') {
+        return 'Camera access is blocked by the current browser or page security settings.';
+      }
+      return error?.message || 'Camera access was blocked. Allow camera access, then try again.';
     }
 
     function manualStopBarangayIdCamera() {
@@ -7777,24 +7875,38 @@
       if (manualBarangayIdPhotoFooterCopy) {
         manualBarangayIdPhotoFooterCopy.textContent = isCrop
           ? 'Drag the image behind the square guide and use the zoom slider until the face is framed well, then save the crop.'
-          : 'Allow camera access when prompted. Captured photos stay inside the Barangay ID request flow and will be cropped to a square before saving.';
+          : 'Allow camera access when prompted. If more than one webcam is connected, choose the camera you want from the dropdown before capturing.';
       }
     }
 
-    async function manualStartBarangayIdCamera() {
+    async function manualStartBarangayIdCamera(cameraDeviceId = '') {
       if (!navigator.mediaDevices?.getUserMedia) {
         manualSetBarangayIdPhotoStatus('This browser does not support camera access for manual Barangay ID capture.', 'danger');
         return;
       }
+      if (!window.isSecureContext) {
+        manualSetBarangayIdPhotoStatus('Camera access requires HTTPS or localhost in this browser.', 'danger');
+        return;
+      }
+
+      const requestedDeviceId = String(cameraDeviceId || manualBarangayIdSelectedCameraId || '').trim();
       manualStopBarangayIdCamera();
       manualSwitchBarangayIdPhotoStage('camera');
+
       try {
+        const videoConstraints = requestedDeviceId
+          ? {
+              deviceId: { exact: requestedDeviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            }
+          : {
+              facingMode: 'user',
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            };
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: videoConstraints,
           audio: false,
         });
         manualBarangayIdPhotoStream = stream;
@@ -7802,6 +7914,8 @@
           manualBarangayIdCameraVideo.srcObject = stream;
           await manualBarangayIdCameraVideo.play();
         }
+        manualBarangayIdSelectedCameraId = manualCurrentBarangayIdCameraDeviceId() || requestedDeviceId;
+        await manualRefreshBarangayIdCameraOptions(manualBarangayIdSelectedCameraId);
         manualBarangayIdCameraEmpty?.classList.add('d-none');
         if (manualBarangayIdCapturePhotoBtn) {
           manualBarangayIdCapturePhotoBtn.disabled = false;
@@ -7809,8 +7923,9 @@
         manualSetBarangayIdPhotoStatus('Camera ready. Position the resident inside the square guide, then capture the photo.', 'info');
       } catch (error) {
         manualStopBarangayIdCamera();
+        await manualRefreshBarangayIdCameraOptions(manualBarangayIdSelectedCameraId);
         manualBarangayIdCameraEmpty?.classList.remove('d-none');
-        manualSetBarangayIdPhotoStatus(error?.message || 'Camera access was blocked. Allow camera access, then try again.', 'danger');
+        manualSetBarangayIdPhotoStatus(manualDescribeBarangayIdCameraError(error), 'danger');
       }
     }
 
@@ -7926,6 +8041,7 @@
       }
       manualBarangayIdPhotoModal.show();
       manualSwitchBarangayIdPhotoStage('camera');
+      void manualRefreshBarangayIdCameraOptions(manualCurrentBarangayIdCameraDeviceId() || manualBarangayIdSelectedCameraId);
       manualStartBarangayIdCamera();
     }
 
@@ -8919,6 +9035,15 @@
       manualStartBarangayIdCamera();
     });
 
+    manualBarangayIdCameraSelect?.addEventListener('change', () => {
+      const nextCameraId = String(manualBarangayIdCameraSelect.value || '').trim();
+      manualBarangayIdSelectedCameraId = nextCameraId;
+      if (!nextCameraId) {
+        return;
+      }
+      manualStartBarangayIdCamera(nextCameraId);
+    });
+
     manualBarangayIdCapturePhotoBtn?.addEventListener('click', () => {
       manualCaptureBarangayIdPhoto();
     });
@@ -9039,6 +9164,10 @@
       manualStopBarangayIdCamera();
       manualSetBarangayIdPhotoStatus('', 'info');
       manualEndBarangayIdCropDrag();
+    });
+
+    navigator.mediaDevices?.addEventListener?.('devicechange', () => {
+      void manualRefreshBarangayIdCameraOptions(manualCurrentBarangayIdCameraDeviceId() || manualBarangayIdSelectedCameraId);
     });
 
     manualPreviewBtn?.addEventListener('click', () => {

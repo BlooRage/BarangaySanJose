@@ -2258,14 +2258,27 @@ if ($certificateLaunchStage === 'release') {
       gap: 8px;
       margin-top: 14px;
     }
+    .manual-photo-controls--camera {
+      margin-top: 0;
+      margin-bottom: 14px;
+    }
     .manual-photo-controls label {
       font-size: .82rem;
       font-weight: 700;
       color: #334155;
       margin: 0;
     }
+    .manual-photo-controls .form-select {
+      max-width: 360px;
+    }
     .manual-photo-controls input[type="range"] {
       width: 100%;
+    }
+    .manual-photo-control-hint {
+      margin: 0;
+      color: #64748b;
+      font-size: .79rem;
+      line-height: 1.45;
     }
     .manual-photo-footer-copy {
       color: #64748b;
@@ -2828,12 +2841,19 @@ if ($certificateLaunchStage === 'release') {
 
         <div id="manualBarangayIdCameraStage">
           <p class="manual-photo-stage-copy">
-            Position the resident inside the square frame. The saved Barangay ID photo will use the centered square crop only.
+            Position the resident inside the square frame. If more than one camera is available, choose the correct one from the dropdown before capturing.
           </p>
+          <div class="manual-photo-controls manual-photo-controls--camera">
+            <label for="manualBarangayIdCameraSelect">Camera source</label>
+            <select id="manualBarangayIdCameraSelect" class="form-select">
+              <option value="">Detecting available cameras…</option>
+            </select>
+            <p class="manual-photo-control-hint">The camera list becomes selectable after the browser allows camera access.</p>
+          </div>
           <div class="manual-photo-workspace" id="manualBarangayIdCameraWorkspace">
             <video id="manualBarangayIdCameraVideo" playsinline autoplay muted></video>
             <div id="manualBarangayIdCameraEmpty" class="manual-photo-empty-state">
-              Start the camera to capture the resident photo. If a linked resident photo already exists, you can also load and adjust that photo here.
+              Start the camera to capture the resident photo. If you have multiple cameras, use the dropdown above to switch sources after access is allowed.
             </div>
             <div class="manual-photo-frame"></div>
           </div>
@@ -2858,7 +2878,7 @@ if ($certificateLaunchStage === 'release') {
       </div>
       <div class="modal-footer d-flex flex-wrap gap-2">
         <div class="manual-photo-footer-copy" id="manualBarangayIdPhotoFooterCopy">
-          Allow camera access when prompted. Captured photos stay inside the Barangay ID request flow and will be cropped to a square before saving.
+          Allow camera access when prompted. If more than one webcam is connected, you can switch cameras from the dropdown before capturing.
         </div>
         <button type="button" class="btn btn-outline-secondary" id="manualBarangayIdUseLinkedPhotoBtn">Use Linked Photo</button>
         <button type="button" class="btn btn-outline-secondary" id="manualBarangayIdStartCameraBtn">Start Camera</button>

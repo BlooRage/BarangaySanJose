@@ -972,7 +972,7 @@ function dr_resident_barangay_id_state(mysqli $conn, string $residentUserId, str
         $renewalCutoff = $today->modify('+3 months')->setTime(23, 59, 59);
 
         $daysUntilExpiry = null;
-        $isValid = false;
+        $isValid = true;
         $renewalEligible = false;
         $renewalAvailableOn = '';
 
@@ -988,7 +988,7 @@ function dr_resident_barangay_id_state(mysqli $conn, string $residentUserId, str
         $state['latest_completed_lost_reported_at'] = $lostReportedAt;
         $state['latest_completed_is_valid'] = $isValid;
         $state['latest_completed_days_until_expiry'] = $daysUntilExpiry;
-        $state['renewal_eligible'] = $renewalEligible || !$isValid;
+        $state['renewal_eligible'] = ($expiresAt instanceof DateTimeImmutable) ? ($renewalEligible || !$isValid) : false;
         $state['renewal_available_on'] = $renewalAvailableOn;
         $state['can_report_lost'] = $isValid && !$lost && $state['pending_request'] === null;
     }

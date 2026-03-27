@@ -382,19 +382,35 @@ if ($action === 'report_barangay_id_lost') {
     }
 
     $encodedPayload = dr_safe_json($payload);
-    $stmt = $conn->prepare("
+    $updateSets = ['request_details = ?'];
+    $types = 's';
+    $params = [$encodedPayload];
+    if (dr_column_exists($conn, 'documentrequesttbl', 'updated_at')) {
+        $updateSets[] = 'updated_at = ?';
+        $types .= 's';
+        $params[] = dr_now();
+    }
+    $sql = "
         UPDATE documentrequesttbl
-        SET request_details = ?, updated_at = ?
+        SET " . implode(', ', $updateSets) . "
         WHERE request_id = ?
           AND resident_user_id = ?
         LIMIT 1
-    ");
+    ";
+    $stmt = $conn->prepare($sql);
     if (!$stmt) {
         dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare lost-status update.']);
     }
 
-    $now = dr_now();
-    $stmt->bind_param('ssss', $encodedPayload, $now, $targetRequestId, $residentForeignId);
+    $types .= 'ss';
+    $params[] = $targetRequestId;
+    $params[] = $residentForeignId;
+    $refs = [];
+    foreach ($params as $index => $value) {
+        $refs[$index] = &$params[$index];
+    }
+    array_unshift($refs, $types);
+    call_user_func_array([$stmt, 'bind_param'], $refs);
     $ok = $stmt->execute();
     $affected = (int)$stmt->affected_rows;
     $stmt->close();
