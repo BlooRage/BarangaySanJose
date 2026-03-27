@@ -24,7 +24,6 @@ $canViewReports = amp_permission_keys_have_any($allowedPermissions, [
     'reports_clearance_issuance',
     'reports_financial',
     'reports_residents',
-    'reports_appointments',
     'reports_blotter',
     'reports_complaints',
 ]);

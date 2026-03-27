@@ -296,11 +296,6 @@ if (!function_exists('amp_get_permission_catalog')) {
                                 'path' => 'Admin-End/Reports/Reports.php?module=residents',
                             ],
                             [
-                                'key' => 'reports_appointments',
-                                'label' => 'Appointments',
-                                'path' => 'Admin-End/Reports/Reports.php?module=appointments',
-                            ],
-                            [
                                 'key' => 'reports_blotter',
                                 'label' => 'Blotter',
                                 'path' => 'Admin-End/Reports/Reports.php?module=blotter',
@@ -1468,7 +1463,6 @@ if (!function_exists('amp_resolve_request_permission_key')) {
                 'clearance_issuance' => 'reports_clearance_issuance',
                 'financial', 'document_requests' => 'reports_financial',
                 'residents' => 'reports_residents',
-                'appointments' => 'reports_appointments',
                 'blotter' => 'reports_blotter',
                 'complaints' => 'reports_complaints',
                 default => 'reports_certificate_issuance',

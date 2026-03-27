@@ -313,7 +313,6 @@ $sbReportKeys = [
     'reports_clearance_issuance',
     'reports_financial',
     'reports_residents',
-    'reports_appointments',
     'reports_blotter',
     'reports_complaints',
 ];
@@ -1060,14 +1059,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=residents"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'residents') ? 'active' : '' ?>">
                 Residents
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('reports_appointments')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=appointments"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'appointments') ? 'active' : '' ?>">
-                Appointments
               </a>
             </li>
             <?php endif; ?>
