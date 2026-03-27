@@ -1117,8 +1117,8 @@ if (submitNewPasswordBtn) {
     if (newPasswordInput) newPasswordInput.style.border = "";
     if (confirmNewPasswordInput) confirmNewPasswordInput.style.border = "";
 
-    const password = (newPasswordInput?.value || "").trim();
-    const confirm = (confirmNewPasswordInput?.value || "").trim();
+    const password = newPasswordInput?.value || "";
+    const confirm = confirmNewPasswordInput?.value || "";
 
     if (!verifiedResetEmail || !verifiedResetPhone) {
       showResetPasswordError("Session expired. Please request OTP again.");
@@ -1188,7 +1188,7 @@ if (loginForm) {
     setLoginButtonLoading(false);
 
     const username = (loginUserField?.value || "").trim();
-    const password = (loginPasswordField?.value || "").trim();
+    const password = loginPasswordField?.value || "";
 
     if (!username) {
       return showError("Please enter your phone or email.", "login", loginUserField);

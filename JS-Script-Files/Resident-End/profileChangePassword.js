@@ -132,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            current_password: (currentPwEl?.value || "").trim(),
+            current_password: currentPwEl?.value || "",
           }),
         });
         const data = await readJsonResponse(res);
@@ -239,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          current_password: (currentPwEl?.value || "").trim(),
+          current_password: currentPwEl?.value || "",
           new_password: newPwEl?.value || "",
         }),
       });

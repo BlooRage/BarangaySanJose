@@ -8,6 +8,10 @@ require_once __DIR__ . "/../PhpFiles/General/security.php";
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../PhpFiles/Login/redirectDestination.php";
 
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 $appRoot = appRootPath();
 $guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
 
@@ -50,7 +54,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260320-inactive-modal1" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260327-password-fix1" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260320-01" defer></script>
   </head>
 
@@ -93,10 +97,10 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
             <p class="text-center fs-6 text-muted intro-message">Please enter your credentials.</p>
             <h4 class="mb-3 fs-4 text-center"><strong>Login</strong></h4>
 
-            <input type="text" name="user" id="userAccount" class="fs-6 form-control mb-3" placeholder="Email / Phone" required />
+            <input type="text" name="user" id="userAccount" class="fs-6 form-control mb-3" placeholder="Email / Phone" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required />
 
             <div class="input-group mb-3">
-              <input type="password" name="loginPassword" id="loginPassword" class="form-control" placeholder="Password" required />
+              <input type="password" name="loginPassword" id="loginPassword" class="form-control" placeholder="Password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required />
               <span class="input-group-text" style="cursor: pointer" onclick="togglePassword('loginPassword','eye2')">
                 <i id="eye2" class="bi bi-eye"></i>
               </span>
