@@ -895,8 +895,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <hr class="my-3">
                     <div>
                         <p class="text small mb-2">
-                            Add member without an account.
+                            Submit a non-registered household member for verification.
                         </p>
+                        <div class="alert alert-info small mb-3">
+                            A birth certificate is required. The member will only be added to the household after admin verification.
+                        </div>
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
                                 <label class="form-label small text-muted">Last Name <span class="text-danger">*</span></label>
@@ -915,8 +918,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <input type="text" class="form-control" id="hmSuffix" placeholder="Suffix (e.g. Jr.)">
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted">Birthdate</label>
+                                <label class="form-label small text-muted">Birthdate <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" id="hmBirthdate">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small text-muted">Birth Certificate <span class="text-danger">*</span></label>
+                                <input type="file" class="form-control" id="hmBirthCertificate" accept=".pdf,.jpg,.jpeg,.png">
+                                <div class="form-text">Accepted file types: PDF, JPG, JPEG, PNG.</div>
                             </div>
                         </div>
                         <div id="householdMemberAddResult" class="small mt-2"></div>
@@ -924,7 +932,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Add Member</button>
+                    <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Submit Verification Request</button>
                     <button class="btn btn-success" id="btnSendHouseholdInvite" data-verified="<?= $isResidentVerified ? '1' : '0' ?>" <?= $canSendHouseholdInvite ? '' : 'disabled' ?>>Send Invites</button>
                 </div>
             </div>

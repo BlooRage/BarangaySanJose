@@ -152,6 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("hmSuffix"),
         ].filter(Boolean);
         const birthdateField = document.getElementById("hmBirthdate");
+        const birthCertificateField = document.getElementById("hmBirthCertificate");
         const namePattern = /^[A-Za-z\s]+$/;
 
         const touched = new Set();
@@ -188,6 +189,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (isOptionalInvalid) valid = false;
             });
 
+            const birthdateValue = String(birthdateField?.value || "").trim();
+            if (birthdateField) {
+                const birthdateValid = birthdateValue !== "";
+                if (showErrors) {
+                    birthdateField.classList.toggle("is-invalid", !birthdateValid);
+                } else if (birthdateValue === "") {
+                    birthdateField.classList.remove("is-invalid");
+                }
+                if (!birthdateValid) valid = false;
+            }
+
+            if (birthCertificateField) {
+                const hasFile = Boolean(birthCertificateField.files && birthCertificateField.files.length > 0);
+                if (showErrors) {
+                    birthCertificateField.classList.toggle("is-invalid", !hasFile);
+                } else if (!hasFile) {
+                    birthCertificateField.classList.remove("is-invalid");
+                }
+                if (!hasFile) valid = false;
+            }
+
             addMemberBtn.disabled = !valid;
             return valid;
         };
@@ -204,6 +226,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (birthdateField) {
             birthdateField.addEventListener("input", () => validateNames(true));
+        }
+        if (birthCertificateField) {
+            birthCertificateField.addEventListener("change", () => validateNames(true));
         }
         validateNames(false);
 
@@ -222,31 +247,34 @@ document.addEventListener("DOMContentLoaded", () => {
             const middleName = document.getElementById("hmMiddleName")?.value.trim() || "";
             const suffix = document.getElementById("hmSuffix")?.value.trim() || "";
             const birthdate = document.getElementById("hmBirthdate")?.value || "";
+            const birthCertificate = birthCertificateField?.files?.[0] || null;
 
             if (!validateNames(true)) {
                 if (result) {
                     result.className = "small mt-2 text-danger";
-                    result.textContent = "Please provide valid names (letters and spaces only).";
+                    result.textContent = "Please complete the required details and attach a birth certificate.";
                 }
                 return;
             }
 
             if (result) {
                 result.className = "small mt-2 text-muted";
-                result.textContent = "Adding member...";
+                result.textContent = "Submitting verification request...";
             }
             addMemberBtn.disabled = true;
             try {
+                const formData = new FormData();
+                formData.append("last_name", lastName);
+                formData.append("first_name", firstName);
+                formData.append("middle_name", middleName);
+                formData.append("suffix", suffix);
+                formData.append("birthdate", birthdate);
+                if (birthCertificate) {
+                    formData.append("birth_certificate", birthCertificate);
+                }
                 const res = await fetch("../PhpFiles/Resident-End/household_member_add.php", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        last_name: lastName,
-                        first_name: firstName,
-                        middle_name: middleName,
-                        suffix,
-                        birthdate,
-                    }),
+                    body: formData,
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data.success) {
@@ -254,17 +282,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 if (result) {
                     result.className = "small mt-2 text-success";
-                    result.textContent = "Member added successfully.";
+                    result.textContent = data.message || "Household member verification request submitted.";
                 }
-                const fields = ["hmLastName", "hmFirstName", "hmMiddleName", "hmSuffix", "hmBirthdate"];
+                const fields = ["hmLastName", "hmFirstName", "hmMiddleName", "hmSuffix", "hmBirthdate", "hmBirthCertificate"];
                 fields.forEach((id) => {
                     const el = document.getElementById(id);
                     if (el) el.value = "";
                 });
                 touched.clear();
                 validateNames(false);
-                addMemberBtn.disabled = true;
-                window.dispatchEvent(new Event("household:updated"));
             } catch (err) {
                 if (result) {
                     result.className = "small mt-2 text-danger";

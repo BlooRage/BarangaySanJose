@@ -12,6 +12,7 @@ if (!function_exists('sbatt_default_counts')) {
             'sector_membership_verification' => 0,
             'resident_profiling' => 0,
             'head_of_family_verification' => 0,
+            'household_member_verification' => 0,
             'household_profiling' => 0,
             'certificate_issuance' => 0,
             'clearance_issuance' => 0,
@@ -589,6 +590,21 @@ if (!function_exists('sbatt_count_pending_head_of_family')) {
     }
 }
 
+if (!function_exists('sbatt_count_pending_household_member_verification')) {
+    function sbatt_count_pending_household_member_verification(mysqli $conn): int
+    {
+        if (!sbatt_table_exists($conn, 'householdmemberverificationtbl') || !sbatt_column_exists($conn, 'householdmemberverificationtbl', 'status')) {
+            return 0;
+        }
+
+        return sbatt_scalar_count($conn, "
+            SELECT COUNT(*) AS total
+            FROM householdmemberverificationtbl
+            WHERE status = 'PendingReview'
+        ");
+    }
+}
+
 if (!function_exists('sbatt_document_workflow_counts')) {
     function sbatt_document_workflow_counts(mysqli $conn): array
     {
@@ -816,6 +832,7 @@ if (!function_exists('sbatt_build_counts')) {
         $counts['edit_requests'] = sbatt_count_pending_edit_requests($conn);
         $counts['sector_membership_verification'] = sbatt_count_pending_sector_membership($conn);
         $counts['head_of_family_verification'] = sbatt_count_pending_head_of_family($conn);
+        $counts['household_member_verification'] = sbatt_count_pending_household_member_verification($conn);
 
         $documentCounts = sbatt_document_workflow_counts($conn);
         foreach ($documentCounts as $key => $value) {
@@ -830,7 +847,7 @@ if (!function_exists('sbatt_build_counts')) {
 
         $counts['appointments'] = $counts['appointments_tracker'];
         $counts['resident_profiling'] = $counts['resident_tracker'] + $counts['edit_requests'] + $counts['sector_membership_verification'];
-        $counts['household_profiling'] = $counts['head_of_family_verification'];
+        $counts['household_profiling'] = $counts['head_of_family_verification'] + $counts['household_member_verification'];
         $counts['id_issuance'] = $counts['id_issuance_tracker'];
         $counts['finance_transactions'] = $counts['finance_payment_tracker'] + $counts['finance_fee_management'];
         $counts['blotter_tools'] = $counts['blotter_review_queue'];

@@ -418,6 +418,11 @@ function GenerateHouseholdHeadVerificationID(mysqli $conn) {
     return GenerateYearMonthSequenceID($conn, 'householdheadverificationtbl', 'verification_id', 4, 'HHV');
 }
 
+function GenerateHouseholdMemberVerificationRequestID(mysqli $conn) {
+    idg_ensure_numeric_generated_key($conn, 'householdmemberverificationtbl', 'request_id', 'BIGINT(20) UNSIGNED NOT NULL');
+    return GenerateShortYearMonthSequenceID($conn, 'householdmemberverificationtbl', 'request_id', 6, 'HMV');
+}
+
 function GenerateTenDigitMetaID(mysqli $conn, string $tableName, string $columnName) {
     idg_ensure_numeric_generated_key($conn, $tableName, $columnName, 'INT NOT NULL');
     return GenerateYearMonthSequenceID($conn, $tableName, $columnName, 4, 'META');

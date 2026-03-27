@@ -3,7 +3,7 @@ $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
 $residentMgmtPages = ['ResidentTracker.php', 'ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'AddResident.php'];
-$householdProfilingPages = ['HouseholdProfiling.php', 'HeadOfTheFamilyVerification.php'];
+$householdProfilingPages = ['HouseholdProfiling.php', 'HeadOfTheFamilyVerification.php', 'HouseholdMemberVerification.php'];
 $appointmentPages = ['AppointmentTracker.php', 'AppointmentRequestVerification.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
@@ -308,6 +308,7 @@ $sbResidentProfilingKeys = [
 $sbHouseholdProfilingKeys = [
     'household_profiling_main',
     'head_of_family_verification',
+    'household_member_verification',
 ];
 $sbAreaStatisticsKeys = [
     'area_statistics_summary',
@@ -365,7 +366,9 @@ $sbModuleAttentionCounts = [
         ($sbCan('resident_masterlist') ? $sbCount('resident_tracker') : 0)
         + ($sbCan('resident_edit_requests') ? $sbCount('edit_requests') : 0)
         + ($sbCan('resident_sector_membership_verification') ? $sbCount('sector_membership_verification') : 0),
-    'household_profiling' => $sbCan('head_of_family_verification') ? $sbCount('head_of_family_verification') : 0,
+    'household_profiling' =>
+        ($sbCan('head_of_family_verification') ? $sbCount('head_of_family_verification') : 0)
+        + ($sbCan('household_member_verification') ? $sbCount('household_member_verification') : 0),
     'certificate_issuance' => $sbCan('certificate_issuance') ? $sbCount('certificate_issuance') : 0,
     'id_issuance' => $sbCan('id_issuance_tracker') ? $sbCount('id_issuance_tracker') : 0,
     'clearance_issuance' => $sbCan('clearance_issuance') ? $sbCount('clearance_issuance') : 0,
@@ -530,6 +533,22 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   #dashboard-sidebar .sidebar-button-label,
   #dashboard-sidebar .sidebar-subnav-text {
     min-width: 0;
+  }
+
+  #dashboard-sidebar .sidebar-button-label--certificate {
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  #dashboard-sidebar .sidebar-direct-link--certificate {
+    gap: 0.35rem;
+  }
+
+  #dashboard-sidebar .sidebar-direct-link--certificate .sidebar-attention-badge {
+    min-width: 1.3rem;
+    height: 1.3rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
   }
 
   #dashboard-sidebar .sidebar-icon-wrap {
@@ -781,6 +800,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
             <?php endif; ?>
+            <?php if ($sbCan('household_member_verification')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/HouseholdMemberVerification.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'HouseholdMemberVerification.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Household Member Verification</span>
+                <?= $sbRenderAttentionBadge($sbCount('household_member_verification')) ?>
+              </a>
+            </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
@@ -871,13 +899,13 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('certificate_issuance')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link sidebar-direct-link--certificate rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
            style="<?= $isCertificateIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-file-circle-check"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('certificate_issuance')) ?>
           </span>
-          <span class="sidebar-button-label">Certificate Issuance</span>
+          <span class="sidebar-button-label sidebar-button-label--certificate">Certificate Issuance</span>
           <?= $sbRenderAttentionBadge($sbCount('certificate_issuance')) ?>
         </a>
       </li>
