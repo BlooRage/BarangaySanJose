@@ -3015,11 +3015,15 @@ function dr_get_general_fee_catalog(mysqli $conn): array {
     $rows = [];
     while ($row = $res->fetch_assoc()) {
         $documentTypeId = (int)($row['document_type_id'] ?? 0);
+        $feeName = trim((string)($row['document_type_name'] ?? ('Document Type #' . $documentTypeId)));
+        if (strcasecmp($feeName, 'CertificateOfIndigency') === 0) {
+            $feeName = 'Certificate of Indigency';
+        }
         $rows[] = [
             'fee_type_id' => $documentTypeId,
             'document_type_id' => $documentTypeId,
             'fee_id' => (int)($row['fee_id'] ?? 0),
-            'fee_name' => trim((string)($row['document_type_name'] ?? ('Document Type #' . $documentTypeId))),
+            'fee_name' => $feeName,
             'default_amount' => (float)($row['amount'] ?? 0),
             'status' => 'approved',
             'updated_at' => $row['updated_at'] ?? null,

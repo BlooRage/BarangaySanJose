@@ -6493,7 +6493,10 @@
         const personalMap = new Map(personalFields.map((f) => [f.label, f.value]));
         const nameGrid = renderFieldGrid(personalFields.filter((f) => ['Last Name', 'First Name', 'Middle Name', 'Suffix'].includes(f.label)), 4);
         const profileGrid = renderFieldGrid(personalFields.filter((f) => ['Birthdate', 'Age', 'Sex', 'Civil Status'].includes(f.label)), 4);
-        const contactGrid = renderFieldGrid(personalFields.filter((f) => ['Contact Number', 'Full Address'].includes(f.label)), 2);
+        const contactFields = personalFields.filter((f) => ['Contact Number', 'Full Address'].includes(f.label));
+        const contactGrid = contactFields.length
+          ? `<div class="tracker-form-grid contact-address-grid">${contactFields.map((f) => formField(f.label, f.value, !!f.raw, !!f.wide)).join('')}</div>`
+          : '';
         const extraGrid = renderFieldGrid(personalFields.filter((f) => ['Religion', 'Occupation'].includes(f.label)), 2);
         const proofResidencyPath = firstNonEmpty([
           residentProfile.proof_residency_path
@@ -9121,6 +9124,13 @@
       if (activeSubTab === 'list') loadFcrList();
     }
 
+    function getFeeCatalogSource() {
+      const activeDocumentFilter = isIdIssuanceTrackerView && !isFinancePaymentsPage
+        ? 'Barangay ID'
+        : currentDocumentTypeFilter;
+      return activeDocumentFilter === '__certificates__' ? 'general' : 'clearance';
+    }
+
     // ── Add New Fee Type ────────────────────────────────────────────────────
     function setFeeRequestAlert(elementId, message = '', tone = 'danger') {
       const el = document.getElementById(elementId);
@@ -9195,7 +9205,8 @@
       if (!tbody) return;
       tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
       try {
-        const res  = await fetch(`${API}?action=list_general_fee_catalog`);
+        const action = getFeeCatalogSource() === 'general' ? 'list_general_fee_catalog' : 'list_fee_types';
+        const res  = await fetch(`${API}?action=${encodeURIComponent(action)}`);
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Failed to load.');
         renderEditCatalog(data.fee_types || []);
@@ -9282,6 +9293,7 @@
         const fd = new FormData();
         fd.append('action', 'submit_fee_change_request');
         fd.append('request_type', 'edit_price');
+        fd.append('fee_catalog_source', getFeeCatalogSource());
         fd.append('fee_type_id', id);
         fd.append('proposed_fee_name', name);
         fd.append('current_amount', current);
@@ -9456,3 +9468,6 @@
     document.getElementById('fcrListRefreshBtn').addEventListener('click', loadFcrList);
   })();
 })();
+
+
+
