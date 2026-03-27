@@ -83,6 +83,11 @@ if (!function_exists('amp_get_permission_catalog')) {
                                 'label' => 'Head of the Family Verification',
                                 'path' => 'Admin-End/HeadOfTheFamilyVerification.php',
                             ],
+                            [
+                                'key' => 'household_member_verification',
+                                'label' => 'Household Member Verification',
+                                'path' => 'Admin-End/HouseholdMemberVerification.php',
+                            ],
                         ],
                     ],
                     [
@@ -1451,6 +1456,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'SectorMembershipVerification.php' => 'resident_sector_membership_verification',
             'HouseholdProfiling.php' => 'household_profiling_main',
             'HeadOfTheFamilyVerification.php' => 'head_of_family_verification',
+            'HouseholdMemberVerification.php' => 'household_member_verification',
             'AreaStatistics.php' => 'area_statistics_summary',
             'AreaProfile.php' => amp_area_value_to_key((string)($_GET['area'] ?? '')),
             'BusinessMonitoring.php' => 'business_monitoring',
