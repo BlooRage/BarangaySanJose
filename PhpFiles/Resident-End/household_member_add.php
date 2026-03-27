@@ -106,9 +106,9 @@ if ($tmpName === '' || !is_uploaded_file($tmpName)) {
 
 $originalName = trim((string)($birthCertificate['name'] ?? ''));
 $extension = strtolower((string)pathinfo($originalName, PATHINFO_EXTENSION));
-$allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+$allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
 if (!in_array($extension, $allowedExtensions, true)) {
-    echo json_encode(['success' => false, 'message' => 'Birth certificate must be a PDF, JPG, JPEG, PNG, or WEBP file.']);
+    echo json_encode(['success' => false, 'message' => 'Birth certificate must be a PDF, JPG, JPEG, or PNG file.']);
     exit;
 }
 

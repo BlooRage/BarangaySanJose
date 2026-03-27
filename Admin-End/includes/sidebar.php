@@ -536,8 +536,19 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   }
 
   #dashboard-sidebar .sidebar-button-label--certificate {
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     white-space: nowrap;
+  }
+
+  #dashboard-sidebar .sidebar-direct-link--certificate {
+    gap: 0.35rem;
+  }
+
+  #dashboard-sidebar .sidebar-direct-link--certificate .sidebar-attention-badge {
+    min-width: 1.3rem;
+    height: 1.3rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
   }
 
   #dashboard-sidebar .sidebar-icon-wrap {
@@ -888,7 +899,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('certificate_issuance')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link sidebar-direct-link--certificate rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
            style="<?= $isCertificateIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-file-circle-check"></i>

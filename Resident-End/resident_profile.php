@@ -923,8 +923,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             </div>
                             <div class="col-12">
                                 <label class="form-label small text-muted">Birth Certificate <span class="text-danger">*</span></label>
-                                <input type="file" class="form-control" id="hmBirthCertificate" accept=".pdf,.jpg,.jpeg,.png,.webp">
-                                <div class="form-text">Accepted file types: PDF, JPG, JPEG, PNG, WEBP.</div>
+                                <input type="file" class="form-control" id="hmBirthCertificate" accept=".pdf,.jpg,.jpeg,.png">
+                                <div class="form-text">Accepted file types: PDF, JPG, JPEG, PNG.</div>
                             </div>
                         </div>
                         <div id="householdMemberAddResult" class="small mt-2"></div>

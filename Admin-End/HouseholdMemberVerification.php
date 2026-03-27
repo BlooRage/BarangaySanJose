@@ -22,15 +22,15 @@ require_once __DIR__ . "/includes/admin_guard.php";
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Household Member Verification</h2>
         <hr><br>
 
-        <div class="bg-white p-4 rounded-4 shadow-sm border">
+        <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <button class="btn btn-outline-primary btn-sm hmv-filter-btn active" data-filter="ALL">All</button>
-                    <button class="btn btn-outline-secondary btn-sm hmv-filter-btn has-notif" data-filter="PendingReview">
-                        Pending <span id="pendingHouseholdMemberBadge" class="pending-count-badge d-none">0</span>
+                    <button class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold hmv-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif hmv-filter-btn" data-filter="PendingReview">
+                        &nbsp;&nbsp;Pending <span id="pendingHouseholdMemberBadge" class="pending-count-badge d-none">0</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm hmv-filter-btn" data-filter="Approved">Approved</button>
-                    <button class="btn btn-outline-secondary btn-sm hmv-filter-btn" data-filter="Rejected">Rejected</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
                 </div>
 
                 <div class="admin-list-actions">

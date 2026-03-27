@@ -213,11 +213,9 @@
 
   document.querySelectorAll(".hmv-filter-btn").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".hmv-filter-btn").forEach((btn) => btn.classList.remove("active", "btn-outline-primary"));
-      document.querySelectorAll(".hmv-filter-btn").forEach((btn) => btn.classList.add("btn-outline-secondary"));
-      button.classList.add("active", "btn-outline-primary");
-      button.classList.remove("btn-outline-secondary");
+      document.querySelectorAll(".hmv-filter-btn").forEach((btn) => btn.classList.remove("active"));
       state.filter = String(button.dataset.filter || "ALL");
+      button.classList.add("active");
       renderTable();
     });
   });
