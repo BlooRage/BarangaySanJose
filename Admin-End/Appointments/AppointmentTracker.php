@@ -551,9 +551,9 @@ foreach ($appointmentRows as $row) {
         }
 
         .appointment-settings-card {
-            border: 1px solid #e5e7eb;
+            border: 1px solid #e78924;
             border-radius: 18px;
-            background: #fffdfb;
+            background: #ffffff;
             padding: 1.15rem 1.2rem;
             display: grid;
             gap: 10px;
@@ -579,7 +579,7 @@ foreach ($appointmentRows as $row) {
 
         .appointment-settings-divider {
             margin: 0;
-            border-color: #ece7df;
+            border-color: #e9ecef;
             opacity: 1;
         }
 
