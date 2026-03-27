@@ -70,6 +70,7 @@ let otpRecipient = ""; // 11-digit recipient used for SMS sending: 0XXXXXXXXXX
 let otpVerifying = false;
 const signupEscalatedFields = new Set();
 let authSuccessModalInstance = null;
+const AUTH_SUCCESS_FALLBACK_DELAY_MS = 700;
 
 const tryAutoVerifyOtp = () => {
   if (otpVerifying) return;
@@ -104,49 +105,74 @@ const toggleActiveForm = (show, hide) => {
 };
 
 const openAuthSuccessModal = ({ title = "Success", message = "", buttonLabel = "Continue", onContinue = null } = {}) => {
-  if (accountVerifiedModalEl && window.bootstrap?.Modal) {
-    if (accountVerifiedModalTitle) accountVerifiedModalTitle.textContent = title;
-    if (accountVerifiedModalBody) accountVerifiedModalBody.textContent = message;
-    if (verifiedContinueBtn) {
-      verifiedContinueBtn.textContent = buttonLabel;
-      verifiedContinueBtn.onclick = (event) => {
-        event.preventDefault();
-        authSuccessModalInstance?.hide();
-        if (typeof onContinue === "function") {
-          onContinue();
-        }
-      };
-    }
+  const continueOnce = (() => {
+    let handled = false;
+    return () => {
+      if (handled) return;
+      handled = true;
+      if (typeof onContinue === "function") {
+        onContinue();
+      }
+    };
+  })();
 
-    authSuccessModalInstance = bootstrap.Modal.getOrCreateInstance(accountVerifiedModalEl);
-    authSuccessModalInstance.show();
-    return;
+  const scheduleContinueFallback = () => {
+    if (typeof onContinue !== "function") return;
+    window.setTimeout(() => {
+      const bootstrapModalVisible = !!accountVerifiedModalEl?.classList?.contains("show");
+      const universalModalVisible = !!document.getElementById("universalModal")?.classList?.contains("show");
+      if (!bootstrapModalVisible && !universalModalVisible) {
+        continueOnce();
+      }
+    }, AUTH_SUCCESS_FALLBACK_DELAY_MS);
+  };
+
+  if (accountVerifiedModalEl && window.bootstrap?.Modal) {
+    try {
+      if (accountVerifiedModalTitle) accountVerifiedModalTitle.textContent = title;
+      if (accountVerifiedModalBody) accountVerifiedModalBody.textContent = message;
+      if (verifiedContinueBtn) {
+        verifiedContinueBtn.textContent = buttonLabel;
+        verifiedContinueBtn.onclick = (event) => {
+          event.preventDefault();
+          authSuccessModalInstance?.hide();
+          continueOnce();
+        };
+      }
+
+      accountVerifiedModalEl.addEventListener("hidden.bs.modal", continueOnce, { once: true });
+      authSuccessModalInstance = bootstrap.Modal.getOrCreateInstance(accountVerifiedModalEl);
+      authSuccessModalInstance.show();
+      scheduleContinueFallback();
+      return;
+    } catch (error) {
+      console.error("Unable to show Bootstrap auth success modal.", error);
+    }
   }
 
   if (window.UniversalModal?.open) {
-    window.UniversalModal.open({
-      tone: "success",
-      title,
-      message,
-      buttons: [
-        {
-          label: buttonLabel,
-          class: "btn btn-primary w-100",
-          onClick: () => {
-            if (typeof onContinue === "function") {
-              onContinue();
-            }
+    try {
+      window.UniversalModal.open({
+        tone: "success",
+        title,
+        message,
+        buttons: [
+          {
+            label: buttonLabel,
+            class: "btn btn-primary w-100",
+            onClick: continueOnce,
           },
-        },
-      ],
-    });
-    return;
+        ],
+      });
+      scheduleContinueFallback();
+      return;
+    } catch (error) {
+      console.error("Unable to show Universal auth success modal.", error);
+    }
   }
 
   window.alert(message || title);
-  if (typeof onContinue === "function") {
-    onContinue();
-  }
+  continueOnce();
 };
 
 // ===== Password Requirements (Signup Real-Time) =====
@@ -1097,9 +1123,15 @@ if (verifyOTPBtn) {
           body: signupData,
         });
 
-        const signupResult = await signupRes.json();
+        const signupRaw = await signupRes.text();
+        let signupResult = null;
+        try {
+          signupResult = JSON.parse(signupRaw);
+        } catch (error) {
+          signupResult = null;
+        }
 
-        if (signupResult.success) {
+        if (signupRes.ok && signupResult?.success) {
           otpVerifying = false;
           openAuthSuccessModal({
             title: "Account Created!",
@@ -1107,7 +1139,13 @@ if (verifyOTPBtn) {
             onContinue: () => (window.location.href = signupResult.redirect),
           });
         } else {
-          showError(signupResult.error || "Unable to create account.", "signup");
+          const signupError =
+            signupResult?.error ||
+            signupResult?.message ||
+            (signupRes.ok
+              ? "Account creation may have completed, but the confirmation could not be read. Try logging in again to continue your resident profiling."
+              : "Unable to create account.");
+          showError(signupError, "signup");
           switchToSignup();
           otpVerifying = false;
         }
