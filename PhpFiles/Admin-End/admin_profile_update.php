@@ -234,12 +234,12 @@ if ($section === 'address') {
         echo json_encode(['success' => false, 'message' => 'Failed to prepare address update.']);
         exit;
     }
-<<<<<<< Updated upstream
     $stmt->bind_param(
-        'sssssssss',
+        'ssssssssss',
         $addressEncrypted['address_mode'],
         $addressEncrypted['house_number'],
         $addressEncrypted['street_name'],
+        $subdivision,
         $addressEncrypted['block_number'],
         $addressEncrypted['lot_number'],
         $addressEncrypted['barangay'],
@@ -247,9 +247,6 @@ if ($section === 'address') {
         $addressEncrypted['province'],
         $userId
     );
-=======
-    $stmt->bind_param('ssssssssss', $addressMode, $house, $street, $subdivision, $block, $lot, $barangay, $city, $province, $userId);
->>>>>>> Stashed changes
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) {

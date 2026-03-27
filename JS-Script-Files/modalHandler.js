@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260328-04";
+  const MODAL_VERSION = "20260328-05";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -15,38 +15,18 @@
   const toneMeta = {
     info: {
       title: "Information",
-      iconSvg: `
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16Zm.93-11.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l1-4.705c.07-.34-.029-.533-.304-.533-.194 0-.487.07-.686.246l.088-.416c.287-.346.92-.598 1.465-.598.703 0 1.002.422.808 1.319ZM8 3.5a1 1 0 1 1 0 2a1 1 0 0 1 0-2Z"/>
-        </svg>
-      `,
       buttonClass: "btn btn-primary modalBtn",
     },
     success: {
       title: "Success",
-      iconSvg: `
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0ZM6.97 11.03a.75.75 0 0 0 1.08.022l3.992-4.99a.75.75 0 1 0-1.172-.938L7.4 9.46 5.383 7.444a.75.75 0 1 0-1.06 1.06l2.647 2.647Z"/>
-        </svg>
-      `,
       buttonClass: "btn btn-success modalBtn",
     },
     warning: {
       title: "Warning",
-      iconSvg: `
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.71c.889 0 1.438-.99.98-1.767L8.982 1.566ZM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5Zm.002 6a1 1 0 1 1 0 2a1 1 0 0 1 0-2Z"/>
-        </svg>
-      `,
       buttonClass: "btn btn-warning modalBtn",
     },
     danger: {
       title: "Attention",
-      iconSvg: `
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0ZM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646Z"/>
-        </svg>
-      `,
       buttonClass: "btn btn-danger modalBtn",
     },
   };
@@ -56,33 +36,37 @@
 
     if (normalizedTone === "success") {
       return `
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M6 12.5 10 16.5 18 8.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+        <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--success" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <circle class="uniform-modal__icon-ring" cx="12" cy="12" r="8.5"></circle>
+          <path class="uniform-modal__icon-stroke" d="M8.2 12.4 10.65 14.85 15.85 9.65"></path>
         </svg>
       `;
     }
 
     if (normalizedTone === "warning") {
       return `
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M12 6.75v6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"></path>
-          <circle cx="12" cy="16.9" r="1.4" fill="currentColor"></circle>
+        <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--warning" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path class="uniform-modal__icon-stroke" d="M12 5.1 19 18.1H5L12 5.1Z"></path>
+          <path class="uniform-modal__icon-stroke" d="M12 9.45v4.35"></path>
+          <circle class="uniform-modal__icon-fill" cx="12" cy="16.55" r="1.15"></circle>
         </svg>
       `;
     }
 
     if (normalizedTone === "danger") {
       return `
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M8 8 16 16M16 8l-8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+        <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--danger" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <circle class="uniform-modal__icon-ring" cx="12" cy="12" r="8.5"></circle>
+          <path class="uniform-modal__icon-stroke" d="M9.25 9.25 14.75 14.75M14.75 9.25l-5.5 5.5"></path>
         </svg>
       `;
     }
 
     return `
-      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-        <path d="M12 10.1v6.15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"></path>
-        <circle cx="12" cy="7.15" r="1.35" fill="currentColor"></circle>
+      <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--info" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <circle class="uniform-modal__icon-ring" cx="12" cy="12" r="8.5"></circle>
+        <path class="uniform-modal__icon-stroke" d="M12 10.25v5.15"></path>
+        <circle class="uniform-modal__icon-fill" cx="12" cy="7.55" r="1.15"></circle>
       </svg>
     `;
   }
@@ -290,7 +274,7 @@
     }
 
     contentEl.setAttribute("data-tone", tone);
-    iconEl.innerHTML = toneMeta[tone]?.iconSvg || toneMeta.info.iconSvg;
+    iconEl.innerHTML = iconMarkupForTone(tone);
 
     buildButtons(actionsEl, request.buttons, tone);
     activeRequest = request;

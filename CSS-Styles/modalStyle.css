@@ -79,6 +79,8 @@
 }
 
 .uniform-modal__icon {
+    --um-icon-bg: #eef4ff;
+    --um-icon-color: #175cd3;
     width: 74px;
     height: 74px;
     margin: 0 auto 18px;
@@ -86,17 +88,19 @@
     display: grid;
     place-items: center;
     font-size: 1.9rem;
-    background: #eef4ff;
-    color: #175cd3;
+    background: var(--um-icon-bg);
+    color: var(--um-icon-color);
     box-shadow: inset 0 0 0 1px rgba(23, 92, 211, 0.1);
 }
 
 .uniform-modal__icon-art,
 .uniform-modal__icon-glyph {
-    width: 38px;
-    height: 38px;
-    display: block;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
     line-height: 0;
+    color: inherit;
 }
 
 .uniform-modal__icon-art svg,
@@ -104,8 +108,27 @@
     width: 100%;
     height: 100%;
     display: block;
-    fill: currentColor;
     overflow: visible;
+}
+
+.uniform-modal__icon-glyph .uniform-modal__icon-ring {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    opacity: 0.35;
+}
+
+.uniform-modal__icon-glyph .uniform-modal__icon-stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.uniform-modal__icon-glyph .uniform-modal__icon-fill {
+    fill: currentColor;
+    stroke: none;
 }
 
 .uniform-modal__copy {
@@ -117,26 +140,34 @@
 }
 
 #umContent[data-tone="success"] .uniform-modal__icon {
-    background: #ecfdf3;
-    color: #027a48;
+    --um-icon-bg: #dcfae6;
+    --um-icon-color: #05603a;
+    background: var(--um-icon-bg);
+    color: var(--um-icon-color);
     box-shadow: inset 0 0 0 1px rgba(2, 122, 72, 0.12);
 }
 
 #umContent[data-tone="warning"] .uniform-modal__icon {
-    background: #fff7e8;
-    color: #de710c;
+    --um-icon-bg: #fff1d6;
+    --um-icon-color: #b54708;
+    background: var(--um-icon-bg);
+    color: var(--um-icon-color);
     box-shadow: inset 0 0 0 1px rgba(222, 113, 12, 0.14);
 }
 
 #umContent[data-tone="danger"] .uniform-modal__icon {
-    background: #fef3f2;
-    color: #d92d20;
+    --um-icon-bg: #fee4e2;
+    --um-icon-color: #b42318;
+    background: var(--um-icon-bg);
+    color: var(--um-icon-color);
     box-shadow: inset 0 0 0 1px rgba(217, 45, 32, 0.12);
 }
 
 #umContent[data-tone="info"] .uniform-modal__icon {
-    background: #eef4ff;
-    color: #175cd3;
+    --um-icon-bg: #dfeafe;
+    --um-icon-color: #1849a9;
+    background: var(--um-icon-bg);
+    color: var(--um-icon-color);
     box-shadow: inset 0 0 0 1px rgba(23, 92, 211, 0.1);
 }
 

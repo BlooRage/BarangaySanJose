@@ -8439,8 +8439,6 @@
             { name: 'emergency_suffix', label: 'Emergency Suffix', type: 'text', col: 'col-md-3' },
             { name: 'emergency_contact', label: 'Emergency Contact Number', type: 'text', required: true, col: 'col-md-6' },
             { name: 'emergency_address', label: 'Emergency Address', type: 'textarea', required: true, col: 'col-md-6', rows: 2 },
-            { name: 'barangay_id_number', label: 'Barangay ID Number', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' },
-            { name: 'barangay_id_valid_until', label: 'Valid Until', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' },
             { name: 'barangay_id_photo_capture', label: 'Barangay ID Photo', type: 'photo_capture', required: true, col: 'col-12' }
           ];
         case 'residency':

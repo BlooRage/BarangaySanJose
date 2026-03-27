@@ -77,6 +77,17 @@ function as_month_labels(string $dateFrom, string $dateTo): array
     return $labels;
 }
 
+function as_first_existing_column(mysqli $conn, string $table, array $columns): ?string
+{
+    foreach ($columns as $column) {
+        if (as_column_exists($conn, $table, $column)) {
+            return $column;
+        }
+    }
+
+    return null;
+}
+
 function as_count_age_bands(array $rows): array
 {
     $bands = [
@@ -99,20 +110,36 @@ function as_count_age_bands(array $rows): array
 function as_status_bucket(string $rawStatus, string $module): string
 {
     $status = strtolower(trim($rawStatus));
+    $normalized = str_replace(['_', '-'], ' ', $status);
     if ($status === '') {
         return 'active';
     }
 
-    $resolvedKeywords = ['resolved', 'closed', 'settled', 'completed', 'released', 'verified', 'approved', 'confirmed', 'ready for claim', 'ready_for_claim'];
+    $resolvedKeywords = [
+        'resolved',
+        'closed',
+        'settled',
+        'completed',
+        'released',
+        'verified',
+        'approved',
+        'confirmed',
+        'ready for claim',
+        'rejected',
+        'denied',
+        'declined',
+        'cancelled',
+        'canceled',
+    ];
     foreach ($resolvedKeywords as $keyword) {
-        if (str_contains($status, $keyword)) {
+        if (str_contains($normalized, $keyword) || str_contains($status, $keyword)) {
             return 'resolved';
         }
     }
 
     $pendingKeywords = ['pending', 'active', 'open', 'ongoing', 'submitted', 'for payment', 'for inspection', 'for interview', 'scheduled'];
     foreach ($pendingKeywords as $keyword) {
-        if (str_contains($status, $keyword)) {
+        if (str_contains($normalized, $keyword) || str_contains($status, $keyword)) {
             return 'pending';
         }
     }
@@ -215,6 +242,11 @@ if (as_table_exists($conn, 'residentinformationtbl') && as_table_exists($conn, '
 
 if (as_table_exists($conn, 'documentrequesttbl') && as_table_exists($conn, 'residentinformationtbl') && as_table_exists($conn, 'residentaddresstbl')) {
     $hasStage = as_column_exists($conn, 'documentrequesttbl', 'stage');
+    $documentDateColumn = as_first_existing_column($conn, 'documentrequesttbl', ['submitted_at', 'request_timestamp', 'created_at']);
+    $documentDateExpr = $documentDateColumn ? "d.{$documentDateColumn}" : 'NULL';
+    $documentStatusColumn = as_first_existing_column($conn, 'documentrequesttbl', ['status_id_request', 'status_id']);
+    $documentStatusJoin = $documentStatusColumn ? "LEFT JOIN statuslookuptbl sl ON sl.status_id = d.{$documentStatusColumn}" : '';
+    $documentStatusSelect = $documentStatusColumn ? "COALESCE(sl.status_name, '') AS status_name" : "'' AS status_name";
     $documentScopeWhere = $scope === 'barangay'
         ? "1=1"
         : "COALESCE(NULLIF(TRIM(ra.area_number), ''), 'Unspecified Area') = '{$scopeEsc}'";
@@ -224,22 +256,23 @@ if (as_table_exists($conn, 'documentrequesttbl') && as_table_exists($conn, 'resi
         SELECT
             d.request_id,
             COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified') AS document_type,
-            COALESCE(d.request_timestamp, d.submitted_at, d.created_at) AS activity_date,
+            {$documentDateExpr} AS activity_date,
             {$stageSelect}
-            COALESCE(sl.status_name, '') AS status_name
+            {$documentStatusSelect}
         FROM documentrequesttbl d
-        LEFT JOIN residentinformationtbl r ON r.user_id = d.resident_user_id
+        LEFT JOIN residentinformationtbl ru ON ru.user_id = d.resident_user_id
+        LEFT JOIN residentinformationtbl rr ON rr.resident_id = d.resident_id
         LEFT JOIN residentaddresstbl ra
           ON ra.address_id = (
             SELECT ra2.address_id
             FROM residentaddresstbl ra2
-            WHERE ra2.resident_id = r.resident_id
+            WHERE ra2.resident_id = COALESCE(ru.resident_id, rr.resident_id)
             ORDER BY ra2.address_id DESC
             LIMIT 1
           )
-        LEFT JOIN statuslookuptbl sl ON sl.status_id = d.status_id
+        {$documentStatusJoin}
         WHERE {$documentScopeWhere}
-          AND DATE(COALESCE(d.request_timestamp, d.submitted_at, d.created_at)) BETWEEN '{$fromEsc}' AND '{$toEsc}'
+          AND DATE({$documentDateExpr}) BETWEEN '{$fromEsc}' AND '{$toEsc}'
     ";
 
     if ($result = $conn->query($documentSql)) {
@@ -256,6 +289,13 @@ if (as_table_exists($conn, 'documentrequesttbl') && as_table_exists($conn, 'resi
 }
 
 if (as_table_exists($conn, 'casereportstbl') && as_table_exists($conn, 'caseparticipantstbl')) {
+    $caseTimestampColumn = as_first_existing_column($conn, 'casereportstbl', ['report_timestamp', 'created_at']);
+    $caseActivityExpr = $caseTimestampColumn
+        ? "c.{$caseTimestampColumn}"
+        : (as_column_exists($conn, 'casereportstbl', 'incident_date') ? "CONCAT(c.incident_date, ' 00:00:00')" : 'NULL');
+    $caseDateFilterExpr = $caseTimestampColumn
+        ? "DATE(c.{$caseTimestampColumn})"
+        : (as_column_exists($conn, 'casereportstbl', 'incident_date') ? 'c.incident_date' : 'NULL');
     $caseAreaExpr = as_area_expr($conn, 'cp');
     $caseScopeWhere = $scope === 'barangay'
         ? "1=1"
@@ -265,7 +305,7 @@ if (as_table_exists($conn, 'casereportstbl') && as_table_exists($conn, 'casepart
         SELECT
             c.case_id,
             c.report_type,
-            COALESCE(c.created_at, CONCAT(c.incident_date, ' 00:00:00')) AS activity_date,
+            {$caseActivityExpr} AS activity_date,
             COALESCE(c.complaint_type, 'Not specified') AS complaint_type,
             COALESCE(sl.status_name, '') AS status_name
         FROM casereportstbl c
@@ -274,7 +314,7 @@ if (as_table_exists($conn, 'casereportstbl') && as_table_exists($conn, 'casepart
          AND cp.participant_role = 'Complainant'
         LEFT JOIN statuslookuptbl sl ON sl.status_id = c.case_status_id
         WHERE {$caseScopeWhere}
-          AND DATE(COALESCE(c.created_at, c.incident_date)) BETWEEN '{$fromEsc}' AND '{$toEsc}'
+          AND {$caseDateFilterExpr} BETWEEN '{$fromEsc}' AND '{$toEsc}'
     ";
 
     if ($result = $conn->query($caseSql)) {
@@ -296,6 +336,8 @@ if (as_table_exists($conn, 'casereportstbl') && as_table_exists($conn, 'casepart
 }
 
 if (as_table_exists($conn, 'appointmentstbl') && as_table_exists($conn, 'residentinformationtbl') && as_table_exists($conn, 'residentaddresstbl')) {
+    $appointmentDateColumn = as_first_existing_column($conn, 'appointmentstbl', ['request_timestamp', 'preferred_schedule_timestamp', 'last_update_timestamp']);
+    $appointmentDateExpr = $appointmentDateColumn ? "a.{$appointmentDateColumn}" : 'NULL';
     $appointmentScopeWhere = $scope === 'barangay'
         ? "1=1"
         : "COALESCE(NULLIF(TRIM(ra.area_number), ''), 'Unspecified Area') = '{$scopeEsc}'";
@@ -304,7 +346,7 @@ if (as_table_exists($conn, 'appointmentstbl') && as_table_exists($conn, 'residen
         SELECT
             a.appointment_id,
             a.subject,
-            a.request_timestamp AS activity_date,
+            {$appointmentDateExpr} AS activity_date,
             COALESCE(sl.status_name, '') AS status_name
         FROM appointmentstbl a
         LEFT JOIN residentinformationtbl r ON r.user_id = a.user_id_resident
@@ -318,7 +360,7 @@ if (as_table_exists($conn, 'appointmentstbl') && as_table_exists($conn, 'residen
           )
         LEFT JOIN statuslookuptbl sl ON sl.status_id = a.appointment_status_id
         WHERE {$appointmentScopeWhere}
-          AND DATE(a.request_timestamp) BETWEEN '{$fromEsc}' AND '{$toEsc}'
+          AND DATE({$appointmentDateExpr}) BETWEEN '{$fromEsc}' AND '{$toEsc}'
     ";
 
     if ($result = $conn->query($appointmentSql)) {

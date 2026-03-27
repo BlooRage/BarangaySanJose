@@ -1016,28 +1016,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Failed to save address.');
                 }
                 $stmt->bind_param(
-<<<<<<< Updated upstream
-                    "sssssssss",
+                    "ssssssssss",
                     $addressEncrypted['address_mode'],
                     $addressEncrypted['house_number'],
                     $addressEncrypted['street_name'],
+                    $subdivision,
                     $addressEncrypted['block_number'],
                     $addressEncrypted['lot_number'],
                     $addressEncrypted['barangay'],
                     $addressEncrypted['municipality_city'],
                     $addressEncrypted['province'],
-=======
-                    "ssssssssss",
-                    $addressMode,
-                    $houseNumber,
-                    $streetName,
-                    $subdivision,
-                    $blockNumber,
-                    $lotNumber,
-                    $barangay,
-                    $municipalityCity,
-                    $province,
->>>>>>> Stashed changes
                     $loggedUserId
                 );
                 if (!$stmt->execute()) {

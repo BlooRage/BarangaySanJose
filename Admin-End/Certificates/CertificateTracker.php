@@ -3294,7 +3294,6 @@ if ($certificateLaunchStage === 'release') {
         <span class="text-muted small">Check the fees that apply, adjust amounts as needed, then confirm.</span>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-outline-secondary d-none" id="feeTaggingReturnBtn">Return</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-primary" id="feeTaggingSubmitBtn">Confirm Fees &amp; Send to Payment</button>
         </div>
       </div>
