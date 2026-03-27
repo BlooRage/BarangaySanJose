@@ -3,8 +3,8 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/redirectDestination.php";
 
 header('Content-Type: application/json');
-require '../General/connection.php';
-require '../General/uniqueIDGenerate.php';
+require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
