@@ -264,16 +264,16 @@
         border: 1px solid rgba(122, 97, 70, 0.18);
         container-type: inline-size;
         container-name: barangay-id-card;
-        --bid-body-size: clamp(11px, 0.38rem + 0.8vw, 15.1px);
+        --bid-body-size: clamp(10.6px, 0.36rem + 0.76vw, 14.6px);
         --bid-label-size: var(--bid-body-size);
         --bid-field-size: var(--bid-body-size);
-        --bid-name-size: clamp(12.4px, 0.48rem + 1.06vw, 19.1px);
+        --bid-name-size: clamp(12px, 0.46rem + 1.02vw, 18.6px);
         --bid-address-size: var(--bid-body-size);
         --bid-meta-size: var(--bid-body-size);
-        --bid-cardno-size: clamp(10.8px, 0.38rem + 0.92vw, 16.2px);
-        --bid-cardno-back-size: clamp(11.2px, 0.4rem + 1vw, 17.2px);
+        --bid-cardno-size: clamp(10.4px, 0.36rem + 0.88vw, 15.8px);
+        --bid-cardno-back-size: clamp(10.8px, 0.38rem + 0.96vw, 16.8px);
         --bid-emergency-size: var(--bid-body-size);
-        --bid-note-size: clamp(8.3px, 0.3rem + 0.56vw, 11.2px);
+        --bid-note-size: clamp(8px, 0.28rem + 0.52vw, 10.8px);
         --bid-photo-bleed: 4%;
       }
       .barangay-id-card__bg {
@@ -431,30 +431,30 @@
       }
       @container barangay-id-card (max-width: 500px) {
         .barangay-id-card {
-          --bid-body-size: clamp(9.6px, 2.62cqw, 13px);
+          --bid-body-size: clamp(9.3px, 2.5cqw, 12.6px);
           --bid-label-size: var(--bid-body-size);
           --bid-field-size: var(--bid-body-size);
-          --bid-name-size: clamp(10.7px, 3.02cqw, 15.2px);
+          --bid-name-size: clamp(10.4px, 2.92cqw, 14.8px);
           --bid-address-size: var(--bid-body-size);
           --bid-meta-size: var(--bid-body-size);
-          --bid-cardno-size: clamp(9.2px, 2.58cqw, 13.2px);
-          --bid-cardno-back-size: clamp(9.7px, 2.74cqw, 14px);
+          --bid-cardno-size: clamp(8.9px, 2.46cqw, 12.8px);
+          --bid-cardno-back-size: clamp(9.4px, 2.62cqw, 13.6px);
           --bid-emergency-size: var(--bid-body-size);
-          --bid-note-size: clamp(7.9px, 2.08cqw, 10px);
+          --bid-note-size: clamp(7.6px, 1.96cqw, 9.6px);
         }
       }
       @container barangay-id-card (min-width: 760px) {
         .barangay-id-card {
-          --bid-body-size: clamp(11.4px, 0.42rem + 0.78vw, 15.5px);
+          --bid-body-size: clamp(11px, 0.4rem + 0.74vw, 15px);
           --bid-label-size: var(--bid-body-size);
           --bid-field-size: var(--bid-body-size);
-          --bid-name-size: clamp(13.3px, 0.5rem + 0.94vw, 19.5px);
+          --bid-name-size: clamp(12.9px, 0.48rem + 0.9vw, 19px);
           --bid-address-size: var(--bid-body-size);
           --bid-meta-size: var(--bid-body-size);
-          --bid-cardno-size: clamp(11.1px, 0.42rem + 0.76vw, 16.5px);
-          --bid-cardno-back-size: clamp(11.6px, 0.44rem + 0.82vw, 17.5px);
+          --bid-cardno-size: clamp(10.8px, 0.4rem + 0.72vw, 16.1px);
+          --bid-cardno-back-size: clamp(11.3px, 0.42rem + 0.78vw, 17.1px);
           --bid-emergency-size: var(--bid-body-size);
-          --bid-note-size: clamp(8.5px, 0.32rem + 0.48vw, 11.4px);
+          --bid-note-size: clamp(8.2px, 0.3rem + 0.44vw, 11px);
         }
       }
       .barangay-id-digital__actions {
