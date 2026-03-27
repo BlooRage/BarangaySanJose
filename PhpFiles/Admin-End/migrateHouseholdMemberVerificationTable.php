@@ -65,6 +65,7 @@ try {
         'middle_name',
         'suffix',
         'birthdate',
+        'status_id',
         'status',
         'attachment_id',
         'approved_household_member_id',
@@ -89,10 +90,19 @@ try {
 
     hmv_ensure_request_table($conn);
 
+    $trackedStatuses = [
+        'PendingReview' => hmv_get_household_member_status_id($conn, 'PendingReview'),
+        'Active' => hmv_get_household_member_status_id($conn, 'Active'),
+        'Rejected' => hmv_get_household_member_status_id($conn, 'Rejected'),
+        'Removed' => hmv_get_household_member_status_id($conn, 'Removed'),
+    ];
+
     $after = [
         'table_exists' => false,
         'columns' => [],
         'indexes' => [],
+        'request_status_mode' => hmv_request_uses_status_lookup($conn) ? 'status_id' : 'legacy_status',
+        'status_lookup' => $trackedStatuses,
     ];
     $tableCheckAfter = $conn->query("SHOW TABLES LIKE 'householdmemberverificationtbl'");
     $after['table_exists'] = $tableCheckAfter instanceof mysqli_result && $tableCheckAfter->num_rows > 0;

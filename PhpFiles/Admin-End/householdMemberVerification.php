@@ -17,7 +17,9 @@ function hmv_fetch_request_row(mysqli $conn, int $requestId): ?array
 {
     $usesStatusLookup = hmv_request_uses_status_lookup($conn);
     $statusSelect = $usesStatusLookup
-        ? "req.status_id, req.status AS legacy_status, reqs.status_name AS request_status"
+        ? (hmv_has_request_column($conn, 'status')
+            ? "req.status_id, req.status AS legacy_status, reqs.status_name AS request_status"
+            : "req.status_id, '' AS legacy_status, reqs.status_name AS request_status")
         : "NULL AS status_id, req.status AS legacy_status, req.status AS request_status";
     $statusJoin = $usesStatusLookup
         ? "LEFT JOIN statuslookuptbl reqs ON reqs.status_id = req.status_id"
@@ -66,6 +68,12 @@ function hmv_find_existing_member_id(mysqli $conn, string $headResidentId, strin
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests'])) {
     try {
         $usesStatusLookup = hmv_request_uses_status_lookup($conn);
+        $hasSubmittedByUserId = hmv_has_request_column($conn, 'submitted_by_user_id');
+        $hasReviewRemarks = hmv_has_request_column($conn, 'review_remarks');
+        $hasSubmittedAt = hmv_has_request_column($conn, 'submitted_at');
+        $hasReviewedAt = hmv_has_request_column($conn, 'reviewed_at');
+        $hasReviewedByUserId = hmv_has_request_column($conn, 'reviewed_by_user_id');
+        $hasApprovedHouseholdMemberId = hmv_has_request_column($conn, 'approved_household_member_id');
         $requestStatusSelect = $usesStatusLookup
             ? "req.status_id, reqs.status_name AS request_status"
             : "NULL AS status_id, req.status AS request_status";
@@ -77,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
             SELECT
                 req.request_id,
                 req.fam_head_id,
-                req.submitted_by_user_id,
+                " . ($hasSubmittedByUserId ? "req.submitted_by_user_id" : "''") . " AS submitted_by_user_id,
                 req.last_name,
                 req.first_name,
                 req.middle_name,
@@ -85,11 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
                 req.birthdate,
                 {$requestStatusSelect},
                 req.attachment_id,
-                req.review_remarks,
-                req.submitted_at,
-                req.reviewed_at,
-                req.reviewed_by_user_id,
-                req.approved_household_member_id,
+                " . ($hasReviewRemarks ? "req.review_remarks" : "NULL") . " AS review_remarks,
+                " . ($hasSubmittedAt ? "req.submitted_at" : "NULL") . " AS submitted_at,
+                " . ($hasReviewedAt ? "req.reviewed_at" : "NULL") . " AS reviewed_at,
+                " . ($hasReviewedByUserId ? "req.reviewed_by_user_id" : "NULL") . " AS reviewed_by_user_id,
+                " . ($hasApprovedHouseholdMemberId ? "req.approved_household_member_id" : "NULL") . " AS approved_household_member_id,
                 head.firstname AS head_firstname,
                 head.middlename AS head_middlename,
                 head.lastname AS head_lastname,
@@ -113,12 +121,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
                     WHEN 'Active' THEN 2
                     ELSE 2
                 END,
-                req.submitted_at DESC,
+                submitted_at DESC,
                 req.request_id DESC
         ";
         $res = $conn->query($sql);
         if (!($res instanceof mysqli_result)) {
-            throw new RuntimeException('Failed to load household member verification requests.');
+            $dbError = trim((string)$conn->error);
+            throw new RuntimeException(
+                $dbError !== ''
+                    ? 'Failed to load household member verification requests. ' . $dbError
+                    : 'Failed to load household member verification requests.'
+            );
         }
 
         $rows = [];

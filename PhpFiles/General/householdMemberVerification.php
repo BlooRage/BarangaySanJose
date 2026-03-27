@@ -33,7 +33,7 @@ if (!function_exists('hmv_ensure_request_table')) {
         idg_ensure_numeric_generated_key($conn, 'householdmemberverificationtbl', 'request_id', 'BIGINT(20) UNSIGNED NOT NULL');
 
         $columnDefinitions = [
-            'submitted_by_user_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN submitted_by_user_id VARCHAR(100) NOT NULL AFTER fam_head_id",
+            'submitted_by_user_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN submitted_by_user_id VARCHAR(100) DEFAULT NULL AFTER fam_head_id",
             'middle_name' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN middle_name VARCHAR(255) DEFAULT NULL AFTER first_name",
             'suffix' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN suffix VARCHAR(255) DEFAULT NULL AFTER middle_name",
             'status_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN status_id INT(11) DEFAULT NULL AFTER birthdate",
@@ -56,6 +56,18 @@ if (!function_exists('hmv_ensure_request_table')) {
             if (!$exists) {
                 $conn->query($alterSql);
             }
+        }
+
+        if (hmv_has_request_column($conn, 'submitted_by_user_id')) {
+            $conn->query("
+                UPDATE householdmemberverificationtbl
+                SET submitted_by_user_id = fam_head_id
+                WHERE submitted_by_user_id IS NULL OR submitted_by_user_id = ''
+            ");
+            $conn->query("
+                ALTER TABLE householdmemberverificationtbl
+                MODIFY COLUMN submitted_by_user_id VARCHAR(100) NOT NULL
+            ");
         }
 
         $indexDefinitions = [
