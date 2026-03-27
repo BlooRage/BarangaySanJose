@@ -72,7 +72,7 @@ $contentModules = [
         'title' => 'FAQ Page',
         'icon' => 'fa-circle-question',
         'status' => 'Live Editor',
-        'summary' => 'Edit the FAQ page banner while keeping the current FAQ item flow intact.',
+        'summary' => 'Edit the FAQ page banner and manage the public FAQ entries from Content Management.',
     ],
     'contact' => [
         'label' => 'Contact',
@@ -138,12 +138,12 @@ $editorMeta = [
         ],
     ],
     'faq' => [
-        'subtitle' => 'Banner changes are handled here. The public FAQ entries still come from the existing FAQ flow.',
+        'subtitle' => 'Banner changes are handled here, and FAQ questions are created through the FAQ Entries tool in Content Management.',
         'notes' => [
-            'Use the FAQ tool when you need to add or update the actual questions and answers.',
+            'Use FAQ Entries to add or update the live public questions and answers.',
         ],
         'quick_links' => [
-            ['label' => 'Open FAQ Tool', 'href' => $canManageAnnouncements ? $faqToolUrl : ''],
+            ['label' => 'Open FAQ Entries', 'href' => $canManageAnnouncements ? $faqToolUrl : ''],
             ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
@@ -1078,8 +1078,8 @@ $previewCssAssets = [
                     </div>
                     <div class="col-12">
                       <article class="cms-editor-card">
-                        <h5 class="cms-editor-card-title mb-2">Existing FAQ Flow</h5>
-                        <p class="cms-field-help mb-0">FAQ questions and answers continue to use the existing working flow in the Announcements tools. This editor only updates the FAQ page banner content.</p>
+                        <h5 class="cms-editor-card-title mb-2">FAQ Entries</h5>
+                        <p class="cms-field-help mb-0">Use the FAQ Entries tool under Content Management when you need to create or update the public questions and answers. This editor updates the FAQ page banner content.</p>
                       </article>
                     </div>
                   </div>

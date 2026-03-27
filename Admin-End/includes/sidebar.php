@@ -246,7 +246,8 @@ if (!in_array($contentRequestsView, ['my_requests', 'review_queue', 'archived_re
 }
 $isContentCreateSectionActive = $current === 'CreateContent.php';
 $isContentToolsSectionActive = $current === 'Contents.php';
-$isContentNavigatorActive = $current === 'ContentManagement.php';
+$isContentFaqCreateActive = $current === 'CreateContent.php' && $contentCreateType === 'faq';
+$isContentNavigatorActive = $current === 'ContentManagement.php' || $isContentFaqCreateActive;
 $isContentChangeRequestActive = $current === 'ContentManagement.php'
     && $contentManagementModule === 'requests';
 
@@ -1109,7 +1110,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php endif; ?>
 
-      <?php if ($sbCan('announcements_tracker')): ?>
+      <?php if ($sbCan('announcements_tracker') || $sbCan('announcements_faq')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentNavigatorActive ? '' : 'collapsed' ?>"
@@ -1130,41 +1131,29 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 <span class="sidebar-subnav-text">Content Change Request</span>
               </a>
             </li>
-            <li class="mt-1">
-              <button class="btn btn-toggle sidebar-subtoggle d-flex align-items-center rounded <?= $isCmsToolsActive ? '' : 'collapsed' ?>"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#cms-tools-collapse"
-                      aria-expanded="<?= $isCmsToolsActive ? 'true' : 'false' ?>">
-                <span>CMS Tools</span>
-              </button>
-              <div class="collapse <?= $isCmsToolsActive ? 'show' : '' ?>" id="cms-tools-collapse">
-                <ul class="btn-toggle-nav btn-toggle-nav-sub list-unstyled fw-normal pb-1 small">
-                  <?php if ($sbCanReviewContent): ?>
-                  <li>
-                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=review_queue"
-                       class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'review_queue') ? 'active' : '' ?>">
-                      <span class="sidebar-subnav-text">Review Queue</span>
-                      <?= $sbRenderAttentionBadge($sbCount('content_change_request')) ?>
-                    </a>
-                  </li>
-                  <?php endif; ?>
-                  <li>
-                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=archived_requests"
-                       class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'archived_requests') ? 'active' : '' ?>">
-                      <span class="sidebar-subnav-text">Archived Requests</span>
-                    </a>
-                  </li>
-                  <?php if ($sbCanReviewContent): ?>
-                  <li>
-                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=approved_history"
-                       class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'approved_history') ? 'active' : '' ?>">
-                      <span class="sidebar-subnav-text">Approved Version History</span>
-                    </a>
-                  </li>
-                  <?php endif; ?>
-                </ul>
-              </div>
+            <?php if ($sbCanReviewContent): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=review_queue"
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'review_queue') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Review Queue</span>
+                <?= $sbRenderAttentionBadge($sbCount('content_change_request')) ?>
+              </a>
             </li>
+            <?php endif; ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=archived_requests"
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'archived_requests') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Archived Requests</span>
+              </a>
+            </li>
+            <?php if ($sbCanReviewContent): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=approved_history"
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'approved_history') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Approved Version History</span>
+              </a>
+            </li>
+            <?php endif; ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
@@ -1189,6 +1178,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 <span class="sidebar-subnav-text">FAQ</span>
               </a>
             </li>
+            <?php if ($sbCan('announcements_faq')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
+                 class="link-dark rounded sidebar-subnav-link <?= $isContentFaqCreateActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">FAQ Entries</span>
+              </a>
+            </li>
+            <?php endif; ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=contact"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'contact') ? 'active' : '' ?>">
@@ -1230,14 +1227,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=delivery"
                  class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'delivery') ? 'active' : '' ?>">
                 SMS and Email
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('announcements_faq')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
-                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'faq') ? 'active' : '' ?>">
-                FAQs
               </a>
             </li>
             <?php endif; ?>
