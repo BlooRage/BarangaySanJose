@@ -40,23 +40,20 @@ if (
     exit;
 }
 
-$stmt = $conn->prepare("
-    SELECT user_id, password_hash
-    FROM useraccountstbl
-    WHERE email_lookup_hash = ? AND phone_lookup_hash = ?
-");
-$emailHash = pii_lookup_hash($email, 'useraccount.email');
-$phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
-$stmt->bind_param("ss", $emailHash, $phoneHash);
-$stmt->execute();
-$stmt->bind_result($userId, $currentHash);
+$userAccount = pii_select_first_useraccount_by_contact_hashes(
+    $conn,
+    pii_lookup_hash_candidates($email, 'useraccount.email'),
+    pii_lookup_hash_candidates($phone, 'useraccount.phone'),
+    ['user_id', 'password_hash']
+);
 
-if (!$stmt->fetch()) {
+if (!$userAccount) {
     $response['error'] = 'User not found.';
     echo json_encode($response);
     exit;
 }
-$stmt->close();
+$userId = (string)($userAccount['user_id'] ?? '');
+$currentHash = (string)($userAccount['password_hash'] ?? '');
 
 $userIdFromSession = (string)($verified['user_id'] ?? '');
 if ($userIdFromSession !== '' && (string)$userId !== $userIdFromSession) {

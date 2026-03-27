@@ -3,8 +3,8 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/redirectDestination.php";
 
 header('Content-Type: application/json');
-require '../General/connection.php';
-require '../General/uniqueIDGenerate.php';
+require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -144,23 +144,18 @@ try {
 
     // ===== Check Existing Phone/Email =====
     $lookup = pii_prepare_useraccount_contacts($Email, $PhoneNumber);
-    $stmt = $conn->prepare("
-        SELECT phone_lookup_hash, email_lookup_hash
-        FROM useraccountstbl
-        WHERE phone_lookup_hash = ? OR email_lookup_hash = ?
-    ");
-    if (!$stmt) throw new Exception("Database error: " . $conn->error);
-    $stmt->bind_param("ss", $lookup['phone_lookup_hash'], $lookup['email_lookup_hash']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    $existingPhone = false;
-    $existingEmail = false;
-    while ($row = $result->fetch_assoc()) {
-        if ((string)($row['phone_lookup_hash'] ?? '') === (string)$lookup['phone_lookup_hash']) $existingPhone = true;
-        if ((string)($row['email_lookup_hash'] ?? '') === (string)$lookup['email_lookup_hash']) $existingEmail = true;
-    }
-    $stmt->close();
+    $existingPhone = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'phone_lookup_hash',
+        pii_lookup_hash_candidates($PhoneNumber, 'useraccount.phone'),
+        ['user_id']
+    ) !== null;
+    $existingEmail = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'email_lookup_hash',
+        pii_lookup_hash_candidates($Email, 'useraccount.email'),
+        ['user_id']
+    ) !== null;
 
     if ($existingPhone || $existingEmail) {
         $msg = [];

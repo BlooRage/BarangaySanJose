@@ -47,63 +47,39 @@ if (filter_var($userInput, FILTER_VALIDATE_EMAIL)) {
 
 /* =============================
    FETCH USER
-   (Added phone_number + email for masking/flows)
+   (Supports legacy / mismatched lookup hashes)
 ============================= */
+$loginColumns = [
+    'user_id',
+    'email',
+    'phone_number',
+    'password_hash',
+    'failed_logins',
+    'status_id_account',
+    'lock_start',
+    'lock_until',
+    'lock_type',
+    'lock_reason',
+    'locked_by_user_id',
+    'role_access',
+];
+
 if ($email) {
-    $emailHash = pii_lookup_hash($email, 'useraccount.email');
-    $stmt = $conn->prepare("
-        SELECT
-            user_id,
-            email,
-            phone_number,
-            password_hash,
-            failed_logins,
-            status_id_account,
-            lock_start,
-            lock_until,
-            lock_type,
-            lock_reason,
-            locked_by_user_id,
-            role_access
-        FROM useraccountstbl
-        WHERE email_lookup_hash = ?
-        LIMIT 1
-    ");
-    if (!$stmt) {
-        echo json_encode(['success' => false, 'error' => 'Unable to process login right now.']);
-        exit;
-    }
-    $stmt->bind_param('s', $emailHash);
+    $userData = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'email_lookup_hash',
+        pii_lookup_hash_candidates($email, 'useraccount.email'),
+        $loginColumns
+    );
 } else {
-    $phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
-    $stmt = $conn->prepare("
-        SELECT
-            user_id,
-            email,
-            phone_number,
-            password_hash,
-            failed_logins,
-            status_id_account,
-            lock_start,
-            lock_until,
-            lock_type,
-            lock_reason,
-            locked_by_user_id,
-            role_access
-        FROM useraccountstbl
-        WHERE phone_lookup_hash = ?
-        LIMIT 1
-    ");
-    if (!$stmt) {
-        echo json_encode(['success' => false, 'error' => 'Unable to process login right now.']);
-        exit;
-    }
-    $stmt->bind_param('s', $phoneHash);
+    $userData = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'phone_lookup_hash',
+        pii_lookup_hash_candidates($phone, 'useraccount.phone'),
+        $loginColumns
+    );
 }
 
-$stmt->execute();
-$result   = $stmt->get_result();
-$userData = $result->fetch_assoc();
 $userData = $userData ? pii_decrypt_useraccount_row($userData) : null;
 
 if (!$userData) {

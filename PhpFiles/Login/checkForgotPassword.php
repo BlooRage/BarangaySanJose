@@ -34,29 +34,20 @@ if (!preg_match('/^[0-9]{10}$/', $phone)) {
     exit;
 }
 
+$userAccount = pii_select_first_useraccount_by_contact_hashes(
+    $conn,
+    pii_lookup_hash_candidates($email, 'useraccount.email'),
+    pii_lookup_hash_candidates($phone, 'useraccount.phone'),
+    ['user_id']
+);
 
-$stmt = $conn->prepare("
-    SELECT user_id 
-    FROM useraccountstbl 
-    WHERE email_lookup_hash = ? AND phone_lookup_hash = ?
-    LIMIT 1
-");
-$emailHash = pii_lookup_hash($email, 'useraccount.email');
-$phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
-$stmt->bind_param("ss", $emailHash, $phoneHash);
-$stmt->execute();
-$stmt->store_result();
-
-if ($stmt->num_rows === 0) {
+if (!$userAccount) {
     echo json_encode([
         'success' => false,
         'error' => 'No account found matching the provided email and phone number.'
     ]);
     exit;
 }
-
-$stmt->close();
-
 
 echo json_encode([
     'success' => true

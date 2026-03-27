@@ -80,6 +80,43 @@ if (!function_exists('pii_lookup_key')) {
     }
 }
 
+if (!function_exists('pii_lookup_key_from_secret')) {
+    function pii_lookup_key_from_secret(string $secret): string
+    {
+        $secret = pii_decode_secret($secret);
+        if ($secret === '') {
+            return '';
+        }
+
+        return hash('sha256', $secret, true);
+    }
+}
+
+if (!function_exists('pii_lookup_key_candidates')) {
+    function pii_lookup_key_candidates(): array
+    {
+        $defaults = pii_default_secret_map();
+        $candidates = [];
+
+        $active = pii_lookup_key();
+        if ($active !== '') {
+            $candidates[] = $active;
+        }
+
+        $configKey = pii_lookup_key_from_secret((string)runtime_config('security.pii_hash_key', $defaults['security.pii_hash_key'] ?? ''));
+        if ($configKey !== '') {
+            $candidates[] = $configKey;
+        }
+
+        $defaultKey = pii_lookup_key_from_secret((string)($defaults['security.pii_hash_key'] ?? ''));
+        if ($defaultKey !== '') {
+            $candidates[] = $defaultKey;
+        }
+
+        return array_values(array_unique($candidates));
+    }
+}
+
 if (!function_exists('pii_is_enabled')) {
     function pii_is_enabled(): bool
     {
@@ -221,6 +258,134 @@ if (!function_exists('pii_lookup_hash')) {
         }
 
         return hash_hmac('sha256', $purpose . ':' . $value, pii_lookup_key());
+    }
+}
+
+if (!function_exists('pii_lookup_hash_candidates')) {
+    function pii_lookup_hash_candidates(string $value, string $purpose = 'generic'): array
+    {
+        if ($value === '') {
+            return [];
+        }
+
+        $hashes = [];
+        foreach (pii_lookup_key_candidates() as $lookupKey) {
+            if ($lookupKey === '') {
+                continue;
+            }
+            $hashes[] = hash_hmac('sha256', $purpose . ':' . $value, $lookupKey);
+        }
+
+        $activeHash = pii_lookup_hash($value, $purpose);
+        if ($activeHash !== '') {
+            $hashes[] = $activeHash;
+        }
+
+        return array_values(array_unique(array_filter($hashes, static fn($hash): bool => $hash !== '')));
+    }
+}
+
+if (!function_exists('pii_select_first_useraccount_by_lookup_hashes')) {
+    function pii_select_first_useraccount_by_lookup_hashes(mysqli $conn, string $lookupColumn, array $hashes, array $columns = ['user_id']): ?array
+    {
+        if (!in_array($lookupColumn, ['email_lookup_hash', 'phone_lookup_hash'], true)) {
+            return null;
+        }
+
+        $hashes = array_values(array_unique(array_filter(array_map(
+            static fn($value): string => trim((string)$value),
+            $hashes
+        ), static fn(string $value): bool => $value !== '')));
+        if ($hashes === []) {
+            return null;
+        }
+
+        $columns = array_values(array_unique(array_filter(array_merge($columns, ['user_id']), static function ($column): bool {
+            return is_string($column) && preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $column) === 1;
+        })));
+        if ($columns === []) {
+            $columns = ['user_id'];
+        }
+
+        $select = implode(', ', array_map(static fn(string $column): string => "`{$column}`", $columns));
+        $stmt = $conn->prepare("SELECT {$select} FROM useraccountstbl WHERE {$lookupColumn} = ? LIMIT 1");
+        if (!$stmt) {
+            return null;
+        }
+
+        foreach ($hashes as $hash) {
+            $stmt->bind_param('s', $hash);
+            if (!$stmt->execute()) {
+                continue;
+            }
+            $result = $stmt->get_result();
+            if ($result instanceof mysqli_result) {
+                $row = $result->fetch_assoc();
+                if (is_array($row)) {
+                    $stmt->close();
+                    return $row;
+                }
+            }
+        }
+
+        $stmt->close();
+        return null;
+    }
+}
+
+if (!function_exists('pii_select_first_useraccount_by_contact_hashes')) {
+    function pii_select_first_useraccount_by_contact_hashes(mysqli $conn, array $emailHashes, array $phoneHashes, array $columns = ['user_id']): ?array
+    {
+        $emailHashes = array_values(array_unique(array_filter(array_map(
+            static fn($value): string => trim((string)$value),
+            $emailHashes
+        ), static fn(string $value): bool => $value !== '')));
+        $phoneHashes = array_values(array_unique(array_filter(array_map(
+            static fn($value): string => trim((string)$value),
+            $phoneHashes
+        ), static fn(string $value): bool => $value !== '')));
+
+        if ($emailHashes === [] || $phoneHashes === []) {
+            return null;
+        }
+
+        $columns = array_values(array_unique(array_filter(array_merge($columns, ['user_id']), static function ($column): bool {
+            return is_string($column) && preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $column) === 1;
+        })));
+        if ($columns === []) {
+            $columns = ['user_id'];
+        }
+
+        $select = implode(', ', array_map(static fn(string $column): string => "`{$column}`", $columns));
+        $stmt = $conn->prepare("
+            SELECT {$select}
+            FROM useraccountstbl
+            WHERE email_lookup_hash = ? AND phone_lookup_hash = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return null;
+        }
+
+        foreach ($emailHashes as $emailHash) {
+            foreach ($phoneHashes as $phoneHash) {
+                $stmt->bind_param('ss', $emailHash, $phoneHash);
+                if (!$stmt->execute()) {
+                    continue;
+                }
+                $result = $stmt->get_result();
+                if ($result instanceof mysqli_result) {
+                    $row = $result->fetch_assoc();
+                    if (is_array($row)) {
+                        $stmt->close();
+                        return $row;
+                    }
+                }
+            }
+        }
+
+        $stmt->close();
+        return null;
     }
 }
 

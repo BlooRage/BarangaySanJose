@@ -28,32 +28,22 @@ $response = [
 
 if ($phone) {
     $phone = pii_normalize_phone10($phone);
-    $phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
-    $stmt = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_lookup_hash = ?");
-    if (!$stmt) {
-        echo json_encode(['success' => false, 'error' => 'Query failed']);
-        exit;
-    }
-    $stmt->bind_param("s", $phoneHash);
-    $stmt->execute();
-    $stmt->store_result();
-    $response['phoneExists'] = $stmt->num_rows > 0;
-    $stmt->close();
+    $response['phoneExists'] = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'phone_lookup_hash',
+        pii_lookup_hash_candidates($phone, 'useraccount.phone'),
+        ['user_id']
+    ) !== null;
 }
 
 if ($email) {
     $email = pii_normalize_email($email);
-    $emailHash = pii_lookup_hash($email, 'useraccount.email');
-    $stmt = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email_lookup_hash = ?");
-    if (!$stmt) {
-        echo json_encode(['success' => false, 'error' => 'Query failed']);
-        exit;
-    }
-    $stmt->bind_param("s", $emailHash);
-    $stmt->execute();
-    $stmt->store_result();
-    $response['emailExists'] = $stmt->num_rows > 0;
-    $stmt->close();
+    $response['emailExists'] = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'email_lookup_hash',
+        pii_lookup_hash_candidates($email, 'useraccount.email'),
+        ['user_id']
+    ) !== null;
 }
 
 echo json_encode($response);
