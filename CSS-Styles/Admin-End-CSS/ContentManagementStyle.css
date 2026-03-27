@@ -535,6 +535,11 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  padding: 1.05rem 1.1rem 1.2rem;
+  border: 1px solid #f0dfcb;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+  box-shadow: 0 10px 28px rgba(166, 94, 10, 0.05);
 }
 
 .announcement-faq-header {
@@ -542,31 +547,67 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  padding-bottom: 0.95rem;
-  border-bottom: 1px dashed #e9ecef;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px dashed #efdfcd;
+}
+
+.announcement-faq-header > div:first-child {
+  flex: 1 1 520px;
+}
+
+.announcement-faq-header .announcement-section-title {
+  margin-bottom: 0.2rem !important;
+  font-size: 1.05rem;
+  font-family: 'Charis SIL Bold', serif;
+  color: #7f4300;
+}
+
+.announcement-faq-header .announcement-editor-helper {
+  max-width: 980px;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: #6f6256;
 }
 
 .announcement-faq-controls {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+  min-width: 170px;
+}
+
+.announcement-faq-controls .form-label {
+  margin: 0;
+  align-self: flex-start;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8c6b45;
 }
 
 .announcement-faq-target-select {
-  width: 88px;
+  width: 150px;
+  min-height: 40px;
+  border-radius: 14px;
+  border-color: #e8ddd1;
+  font-weight: 600;
+  box-shadow: none;
+  background-color: #fff;
 }
 
 .announcement-faq-count {
   display: inline-flex;
   align-items: center;
-  padding: 0.35rem 0.75rem;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.3rem 0.85rem;
   border-radius: 999px;
-  background: #fff6e8;
-  border: 1px solid #f3d2a6;
-  color: #8a5308;
-  font-size: 0.88rem;
+  background: #efe9df;
+  border: 1px solid #efe9df;
+  color: #7d5220;
+  font-size: 0.84rem;
   font-weight: 700;
 }
 
@@ -575,32 +616,82 @@
   gap: 1rem;
 }
 
-.announcement-faq-item {
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] {
   padding: 1rem 1rem 1.1rem;
-  border: 1px solid #f3d2a6;
-  border-radius: 16px;
-  background: #fffdfa;
+  border: 1px solid #f0dfcb;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+  box-shadow: none;
 }
 
-.announcement-faq-item-head {
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.85rem;
+  align-items: flex-start;
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px dashed #e9ecef;
+  border-bottom: 1px dashed #efdfcd;
 }
 
-.announcement-faq-item-actions {
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-title {
+  font-size: 0.98rem;
+  font-family: 'Charis SIL Bold', serif;
+  color: #8c4d0b;
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head > div:last-child {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.65rem;
-  margin-top: 0.9rem;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
 }
 
-.announcement-faq-item .note-editor.note-frame {
-  margin-top: 0.25rem;
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .btn {
+  min-width: 92px;
+  padding: 0.42rem 0.72rem;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .form-label {
+  margin-bottom: 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #2b3138;
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .form-control {
+  min-height: 52px;
+  border-radius: 16px;
+  border-color: #eadfd3;
+  box-shadow: none;
+  font-size: 1rem;
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .form-control:focus,
+.announcement-faq-target-select:focus {
+  border-color: #de710c;
+  box-shadow: 0 0 0 0.18rem rgba(222, 113, 12, 0.12);
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .note-editor.note-frame {
+  margin-top: 0.15rem;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .note-toolbar {
+  background: #fdf9f3;
+  border-bottom-color: #eadfd3;
+}
+
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] .note-editing-area .note-editable {
+  min-height: 210px;
+  padding: 0.95rem 1rem;
+  background: #fff;
 }
 
 #dualPlacementFields .announcement-editor-panel-head {
@@ -2478,12 +2569,45 @@ body .dropdown-menu.note-check {
 }
 
 
-.announcement-faq-item-head .announcement-card-title {
-  color: #b55a00;
-}
-
-
 .announcement-delivery-grid > .announcement-channel-item + .announcement-channel-item {
   margin-top: 0;
+}
+
+@media (max-width: 991.98px) {
+  .announcement-faq-controls {
+    width: 100%;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .announcement-faq-shell {
+    padding: 1rem;
+  }
+
+  .announcement-faq-header .announcement-section-title {
+    font-size: 1rem;
+  }
+
+  .announcement-faq-controls {
+    width: 100%;
+  }
+
+  .announcement-faq-target-select {
+    width: 100%;
+  }
+
+  .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head {
+    flex-direction: column;
+  }
+
+  .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head > div:last-child {
+    width: 100%;
+  }
+
+  .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
