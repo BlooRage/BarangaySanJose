@@ -609,25 +609,23 @@ function GenerateUnifiedAuditLogID(mysqli $conn, ?string $userId, string $roleAc
     );
 }
 
-function GenerateOfficialPersonnelID(mysqli $conn, string $userId = '') {
-    idg_ensure_string_generated_key($conn, 'officialinformationtbl', 'official_id', 10);
+function idg_is_generated_official_personnel_id(string $officialId): bool {
+    return preg_match('/^\d{10}$/', trim($officialId)) === 1;
+}
 
-    $userId = trim($userId);
-    if ($userId !== '' && idg_table_exists($conn, 'officialinformationtbl')) {
-        $stmt = $conn->prepare("SELECT official_id FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
-        if ($stmt) {
-            $stmt->bind_param('s', $userId);
-            $stmt->execute();
-            $row = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-            $existing = trim((string)($row['official_id'] ?? ''));
-            if ($existing !== '') {
-                return $existing;
-            }
+function idg_official_personnel_prefix_for_date(?string $dateValue = null): string {
+    $normalized = trim((string)$dateValue);
+    if ($normalized !== '') {
+        $timestamp = strtotime($normalized);
+        if ($timestamp !== false) {
+            return date('mY', $timestamp);
         }
     }
 
-    $prefix = date('mY');
+    return date('mY');
+}
+
+function idg_next_official_personnel_id(mysqli $conn, string $prefix) {
     return idg_next_prefixed_sequence_id(
         $conn,
         'officialinformationtbl',
@@ -636,6 +634,105 @@ function GenerateOfficialPersonnelID(mysqli $conn, string $userId = '') {
         $prefix,
         4
     );
+}
+
+function idg_update_official_id_reference(mysqli $conn, string $table, string $column, string $legacyOfficialId, string $newOfficialId): void {
+    $legacyOfficialId = trim($legacyOfficialId);
+    $newOfficialId = trim($newOfficialId);
+
+    if ($legacyOfficialId === '' || $newOfficialId === '' || $legacyOfficialId === $newOfficialId) {
+        return;
+    }
+    if (!idg_table_exists($conn, $table) || !idg_get_column_info($conn, $table, $column)) {
+        return;
+    }
+
+    $stmt = $conn->prepare("UPDATE {$table} SET {$column} = ? WHERE {$column} = ?");
+    if (!$stmt) {
+        error_log("idg_update_official_id_reference prepare failed for {$table}.{$column}: " . $conn->error);
+        return;
+    }
+
+    $stmt->bind_param('ss', $newOfficialId, $legacyOfficialId);
+    if (!$stmt->execute()) {
+        error_log("idg_update_official_id_reference execute failed for {$table}.{$column}: " . $stmt->error);
+    }
+    $stmt->close();
+}
+
+function idg_migrate_legacy_official_personnel_id(mysqli $conn, string $legacyOfficialId, ?string $preferredDate = null): string {
+    $legacyOfficialId = trim($legacyOfficialId);
+    if ($legacyOfficialId === '' || idg_is_generated_official_personnel_id($legacyOfficialId)) {
+        return $legacyOfficialId;
+    }
+
+    $prefix = idg_official_personnel_prefix_for_date($preferredDate);
+    $newOfficialId = idg_next_official_personnel_id($conn, $prefix);
+    if ($newOfficialId === false) {
+        error_log("idg_migrate_legacy_official_personnel_id failed to generate replacement for legacy ID {$legacyOfficialId}");
+        return $legacyOfficialId;
+    }
+
+    $newOfficialId = trim((string)$newOfficialId);
+    if ($newOfficialId === '' || $newOfficialId === $legacyOfficialId) {
+        return $legacyOfficialId;
+    }
+
+    $referenceMap = [
+        ['officialinformationtbl', 'official_id'],
+        ['officialaccessprofiletbl', 'official_id'],
+        ['officialmodulepermissionstbl', 'official_id'],
+        ['officialinformationtbl', 'acting_for_id'],
+        ['barangaycounciltbl', 'current_official_id'],
+        ['officialtransitionstbl', 'incoming_official_id'],
+        ['officialtransitionstbl', 'outgoing_official_id'],
+        ['upcomingofficialstbl', 'linked_official_id'],
+    ];
+
+    try {
+        $conn->begin_transaction();
+
+        foreach ($referenceMap as [$table, $column]) {
+            idg_update_official_id_reference($conn, $table, $column, $legacyOfficialId, $newOfficialId);
+        }
+
+        $conn->commit();
+        return $newOfficialId;
+    } catch (Throwable $throwable) {
+        $conn->rollback();
+        error_log('idg_migrate_legacy_official_personnel_id failed: ' . $throwable->getMessage());
+        return $legacyOfficialId;
+    }
+}
+
+function GenerateOfficialPersonnelID(mysqli $conn, string $userId = '') {
+    idg_ensure_string_generated_key($conn, 'officialinformationtbl', 'official_id', 10);
+
+    $userId = trim($userId);
+    if ($userId !== '' && idg_table_exists($conn, 'officialinformationtbl')) {
+        $stmt = $conn->prepare("SELECT official_id, date_hired FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('s', $userId);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            $existing = trim((string)($row['official_id'] ?? ''));
+            if ($existing !== '') {
+                if (idg_is_generated_official_personnel_id($existing)) {
+                    return $existing;
+                }
+
+                return idg_migrate_legacy_official_personnel_id(
+                    $conn,
+                    $existing,
+                    (string)($row['date_hired'] ?? '')
+                );
+            }
+        }
+    }
+
+    $prefix = date('mY');
+    return idg_next_official_personnel_id($conn, $prefix);
 }
 
 function insertUnifiedFileAttachment(mysqli $conn, array $payload, string $errorContext = 'attachment'): int {

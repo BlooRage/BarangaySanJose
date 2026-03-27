@@ -380,6 +380,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     const links = document.querySelectorAll(".logout-link");
     if (!links.length) return;
 
+    const sidebarEl = document.getElementById("div-sidebarWrapper");
     const modalEl = document.getElementById("logoutConfirmModal");
     const msgEl = document.getElementById("logoutConfirmMessage");
     const btnEl = document.getElementById("logoutConfirmBtn");
@@ -389,6 +390,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     links.forEach((link) => {
       link.addEventListener("click", (e) => {
         e.preventDefault();
+        sidebarEl?.classList.remove("show");
         msgEl.textContent = link.dataset.logoutMessage || "Are you sure you want to logout?";
         btnEl.href = link.href;
         modal.show();

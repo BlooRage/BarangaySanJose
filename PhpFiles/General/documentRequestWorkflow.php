@@ -1078,9 +1078,15 @@ function dr_requires_clearance_inspection(string $documentType): bool {
         'barangayclearanceforwaterpermit',
         'clearanceforwaterpermit',
         'waterpermit',
+        'barangayclearanceforresidentialpermit',
+        'clearanceforresidentialpermit',
+        'residentialpermit',
         'barangayclearanceforresidentialbuildingpermit',
         'clearanceforresidentialbuildingpermit',
         'residentialbuildingpermit',
+        'barangayclearanceforcommercialpermit',
+        'clearanceforcommercialpermit',
+        'commercialpermit',
         'barangayclearanceforcommercialbuildingpermit',
         'clearanceforcommercialbuildingpermit',
         'commercialbuildingpermit',
@@ -1390,7 +1396,10 @@ function dr_map_stage_to_transaction_status_id(mysqli $conn, string $stage): int
         ?? dr_find_status_id($conn, 'Rejected', [])
         ?? $pending;
 
-    if (in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_INTERVIEW_FAILED, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_INSPECTION_FAILED, DR_STAGE_CANCELLED], true)) {
+    if (in_array($stage, [DR_STAGE_INSPECTION_FAILED, DR_STAGE_CANCELLED], true) && $cancelledPayment !== null) {
+        return $cancelledPayment;
+    }
+    if (in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_INTERVIEW_FAILED, DR_STAGE_PAYMENT_REJECTED], true)) {
         return $rejected;
     }
     if ($stage === DR_STAGE_COMPLETED) {

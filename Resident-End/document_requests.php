@@ -985,7 +985,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   function filterBucket(row) {
     const stage = String(row?.stage || '').toLowerCase();
     if (stage === 'completed') return 'completed';
-    if (stage === 'cancelled') return 'cancelled';
+    if (stage === 'cancelled' || stage === 'rejected' || stage === 'interview_failed') return 'cancelled';
     return 'pending';
   }
 
