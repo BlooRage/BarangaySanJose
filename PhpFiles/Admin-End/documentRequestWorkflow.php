@@ -191,13 +191,22 @@ function dra_is_finance_user(mysqli $conn, string $userId): bool {
 }
 
 function dra_resolve_official_display_name(mysqli $conn, string $userId): string {
+    static $cache = [];
     $userId = trim($userId);
-    if ($userId === '' || !dr_table_exists($conn, 'officialinformationtbl')) {
+    if ($userId === '') {
+        return '';
+    }
+    if (array_key_exists($userId, $cache)) {
+        return $cache[$userId];
+    }
+    if (!dr_table_exists($conn, 'officialinformationtbl')) {
+        $cache[$userId] = $userId;
         return $userId;
     }
 
     $stmt = $conn->prepare("SELECT firstname, middlename, lastname, suffix FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
     if (!$stmt) {
+        $cache[$userId] = $userId;
         return $userId;
     }
 
@@ -213,7 +222,59 @@ function dra_resolve_official_display_name(mysqli $conn, string $userId): string
         (string)($row['lastname'] ?? ''),
         (string)($row['suffix'] ?? ''),
     ], static fn($value) => trim((string)$value) !== ''))));
-    return $fullName !== '' ? $fullName : $userId;
+    $cache[$userId] = $fullName !== '' ? $fullName : $userId;
+    return $cache[$userId];
+}
+
+function dra_resolve_resident_display_name(mysqli $conn, string $residentUserId, string $residentId): string {
+    static $cache = [];
+
+    $residentUserId = trim($residentUserId);
+    $residentId = trim($residentId);
+    $cacheKey = $residentUserId . '|' . $residentId;
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+    if (!dr_table_exists($conn, 'residentinformationtbl')) {
+        $cache[$cacheKey] = '';
+        return '';
+    }
+
+    $sql = null;
+    $params = [];
+    $types = '';
+    if ($residentUserId !== '') {
+        $sql = "SELECT firstname, middlename, lastname, suffix FROM residentinformationtbl WHERE user_id = ? LIMIT 1";
+        $params[] = $residentUserId;
+        $types = 's';
+    } elseif ($residentId !== '') {
+        $sql = "SELECT firstname, middlename, lastname, suffix FROM residentinformationtbl WHERE resident_id = ? LIMIT 1";
+        $params[] = $residentId;
+        $types = 's';
+    } else {
+        $cache[$cacheKey] = '';
+        return '';
+    }
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        $cache[$cacheKey] = '';
+        return '';
+    }
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    $row = $row ? (pii_decrypt_resident_row($row) ?? $row) : null;
+
+    $fullName = trim(implode(' ', array_values(array_filter([
+        (string)($row['firstname'] ?? ''),
+        (string)($row['middlename'] ?? ''),
+        (string)($row['lastname'] ?? ''),
+        (string)($row['suffix'] ?? ''),
+    ], static fn($value) => trim((string)$value) !== ''))));
+    $cache[$cacheKey] = $fullName;
+    return $cache[$cacheKey];
 }
 
 function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string $inspectorUserId, string $remarks): void {
@@ -970,10 +1031,10 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
         $row['submitted_at'] = (string)$row['request_timestamp'];
     }
 
-    $row['reviewed_by'] = trim((string)($row['_reviewed_by_name'] ?? ''));
-    $row['released_by'] = trim((string)($row['_released_by_name'] ?? ''));
-    $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
-    $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
+    $row['reviewed_by'] = dra_resolve_official_display_name($conn, (string)($row['user_id_official_reviewed_by'] ?? ''));
+    $row['released_by'] = dra_resolve_official_display_name($conn, (string)($row['user_id_official_released_by'] ?? ''));
+    $row['personnel_name'] = dra_resolve_official_display_name($conn, (string)($row['personnel_user_id'] ?? ''));
+    $row['finance_user_name'] = dra_resolve_official_display_name($conn, (string)($row['finance_user_id'] ?? ''));
     $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
     if ($isBarangayIdDocument) {
         $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
@@ -1026,6 +1087,17 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
         $payloadResidentName = trim((string)($payload['resident_name'] ?? ''));
         if ($payloadResidentName !== '') {
             $row['resident_name'] = $payloadResidentName;
+        }
+    }
+    if (trim((string)($row['resident_name'] ?? '')) === '') {
+        $resolvedResidentName = dra_resolve_resident_display_name(
+            $conn,
+            (string)($row['resident_user_id'] ?? ''),
+            (string)($row['resident_id'] ?? '')
+        );
+        if ($resolvedResidentName !== '') {
+            $row['resident_name'] = $resolvedResidentName;
+            $row['full_name'] = $resolvedResidentName;
         }
     }
 
@@ -6794,10 +6866,10 @@ if ($action === 'list') {
         if (trim((string)($row['submitted_at'] ?? '')) === '' && trim((string)($row['request_timestamp'] ?? '')) !== '') {
             $row['submitted_at'] = (string)$row['request_timestamp'];
         }
-        $row['reviewed_by'] = trim((string)($row['_reviewed_by_name'] ?? ''));
-        $row['released_by'] = trim((string)($row['_released_by_name'] ?? ''));
-        $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
-        $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
+        $row['reviewed_by'] = dra_resolve_official_display_name($conn, (string)($row['user_id_official_reviewed_by'] ?? ''));
+        $row['released_by'] = dra_resolve_official_display_name($conn, (string)($row['user_id_official_released_by'] ?? ''));
+        $row['personnel_name'] = dra_resolve_official_display_name($conn, (string)($row['personnel_user_id'] ?? ''));
+        $row['finance_user_name'] = dra_resolve_official_display_name($conn, (string)($row['finance_user_id'] ?? ''));
         $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
         if ($isBarangayIdDocument) {
             $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
@@ -6838,10 +6910,11 @@ if ($action === 'list') {
         }
 
         if (!$isFinanceList && trim((string)($row['resident_name'] ?? '')) === '') {
-            $resolvedResidentName = trim((string)($row['_resident_name_by_user'] ?? ''));
-            if ($resolvedResidentName === '') {
-                $resolvedResidentName = trim((string)($row['_resident_name_by_resident'] ?? ''));
-            }
+            $resolvedResidentName = dra_resolve_resident_display_name(
+                $conn,
+                (string)($row['resident_user_id'] ?? ''),
+                (string)($row['resident_id'] ?? '')
+            );
             if ($resolvedResidentName !== '') {
                 $row['resident_name'] = $resolvedResidentName;
                 $row['full_name'] = $resolvedResidentName;

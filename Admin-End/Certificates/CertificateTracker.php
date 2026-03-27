@@ -5,7 +5,11 @@ $certificateLaunchTab = strtolower(trim((string)($_GET['tab'] ?? '')));
 $certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')));
 $certificateLaunchStage = strtolower(trim((string)($_GET['stage'] ?? '')));
 $certificateLaunchEntry = strtolower(trim((string)($_GET['entry'] ?? '')));
+$certificateLaunchFilterDocument = strtolower(trim((string)($_GET['filter_document'] ?? '')));
 $isIdIssuanceTrackerView = $certificateLaunchEntry === 'id_issuance';
+$certificateTrackerHeading = $certificateLaunchFilterDocument === '__clearances__'
+  ? 'Clearance Issuance'
+  : 'Certificate Issuance';
 $barangayIdAdminNavActive = 'applications';
 
 if ($certificateLaunchStage === 'release') {
@@ -2332,7 +2336,7 @@ if ($certificateLaunchStage === 'release') {
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
-    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Certificate Issuance</h2>
+    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
     <hr class="mb-4">
 
     <!-- Page-level navigation -->
