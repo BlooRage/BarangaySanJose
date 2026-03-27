@@ -91,6 +91,14 @@
     box-shadow: inset 0 0 0 1px rgba(23, 92, 211, 0.1);
 }
 
+.uniform-modal__icon-glyph,
+.uniform-modal__icon-glyph svg {
+    display: block;
+    width: 34px;
+    height: 34px;
+    fill: currentColor;
+}
+
 .uniform-modal__copy {
     color: var(--um-text);
 }

@@ -150,6 +150,10 @@ try {
             continue;
         }
 
+        $row = pii_decrypt_resident_row($row) ?? $row;
+        $row = pii_decrypt_resident_address_row($row) ?? $row;
+        $row = pii_decrypt_assoc($row, ['house_number']) ?? $row;
+
         $marker = extractMarkerFromRemarks($row['remarks'] ?? '');
         $markerLower = strtolower($marker);
         if ($markerLower === '' || strpos($markerLower, 'sector:') !== 0) {

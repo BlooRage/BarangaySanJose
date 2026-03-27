@@ -225,6 +225,30 @@ function fetch_head_rows(mysqli $conn): array {
     $res = $stmt->get_result();
     $rows = [];
     while ($row = $res->fetch_assoc()) {
+        $row = pii_decrypt_resident_row($row) ?? $row;
+        $row = pii_decrypt_resident_address_row($row) ?? $row;
+        $row = pii_decrypt_assoc($row, [
+            'firstname',
+            'middlename',
+            'lastname',
+            'suffix',
+            'birthdate',
+            'birthplace',
+            'baranagayresidency',
+            'civil_status',
+            'family_role',
+            'occupation_detail',
+            'religion',
+            'sector_membership',
+            'house_number',
+            'street_name',
+            'phase_number',
+            'subdivision',
+            'house_type',
+            'house_ownership',
+            'residency_duration',
+        ]) ?? $row;
+
         $row['group_key'] = implode('|', [
             normalize_simple($row['house_number'] ?? ''),
             normalize_street($row['street_name'] ?? ''),
