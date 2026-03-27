@@ -91,27 +91,21 @@
     box-shadow: inset 0 0 0 1px rgba(23, 92, 211, 0.1);
 }
 
-<<<<<<< HEAD
-.uniform-modal__icon-art {
+.uniform-modal__icon-art,
+.uniform-modal__icon-glyph {
     width: 38px;
     height: 38px;
     display: block;
     line-height: 0;
 }
 
-.uniform-modal__icon-art svg {
+.uniform-modal__icon-art svg,
+.uniform-modal__icon-glyph svg {
     width: 100%;
     height: 100%;
     display: block;
-    overflow: visible;
-=======
-.uniform-modal__icon-glyph,
-.uniform-modal__icon-glyph svg {
-    display: block;
-    width: 34px;
-    height: 34px;
     fill: currentColor;
->>>>>>> a69a1e600515a50a0a666c7c14ff1b4b943068b4
+    overflow: visible;
 }
 
 .uniform-modal__copy {

@@ -5831,6 +5831,92 @@ function dra_save_upload(array $file, string $folder): array {
     return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name, 'error' => null];
 }
 
+function dra_decode_manual_barangay_id_photo_data_url(?string $value): array {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return ['binary' => null, 'extension' => '', 'error' => null];
+    }
+
+    if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+\/=\r\n]+)$/i', $value, $matches)) {
+        return ['binary' => null, 'extension' => '', 'error' => 'Invalid Barangay ID photo format.'];
+    }
+
+    $binary = base64_decode((string)$matches[2], true);
+    if ($binary === false || $binary === '') {
+        return ['binary' => null, 'extension' => '', 'error' => 'Invalid Barangay ID photo data.'];
+    }
+
+    $extension = strtolower((string)$matches[1]);
+    if ($extension === 'jpg') {
+        $extension = 'jpeg';
+    }
+
+    if (function_exists('getimagesizefromstring')) {
+        $imageInfo = @getimagesizefromstring($binary);
+        $imageType = (int)($imageInfo[2] ?? 0);
+        if ($imageType === IMAGETYPE_PNG) {
+            $extension = 'png';
+        } elseif ($imageType === IMAGETYPE_JPEG) {
+            $extension = 'jpeg';
+        } else {
+            return ['binary' => null, 'extension' => '', 'error' => 'Barangay ID photo must be a PNG or JPEG image.'];
+        }
+    }
+
+    return ['binary' => $binary, 'extension' => $extension, 'error' => null];
+}
+
+function dra_save_manual_barangay_id_photo(string $requestId, ?string $dataUrl): array {
+    $requestId = trim($requestId);
+    if ($requestId === '') {
+        return ['path' => null, 'url' => '', 'error' => 'Unable to save the Barangay ID photo because the request ID is missing.'];
+    }
+
+    $decoded = dra_decode_manual_barangay_id_photo_data_url($dataUrl);
+    if (!empty($decoded['error'])) {
+        return ['path' => null, 'url' => '', 'error' => (string)$decoded['error']];
+    }
+
+    $binary = $decoded['binary'] ?? null;
+    $extension = trim((string)($decoded['extension'] ?? ''));
+    if (!is_string($binary) || $binary === '' || $extension === '') {
+        return ['path' => null, 'url' => '', 'error' => 'Barangay ID photo data is empty.'];
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        $baseDir = dirname(__DIR__, 2);
+    }
+    $baseDir = rtrim(str_replace('\\', '/', (string)$baseDir), '/');
+    if ($baseDir === '') {
+        return ['path' => null, 'url' => '', 'error' => 'Server path resolution failed while saving the Barangay ID photo.'];
+    }
+
+    $folder = '/UnifiedFileAttachment/IssuedDocuments/ManualBarangayIdPhotos';
+    $targetDir = $baseDir . $folder;
+    if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+        return ['path' => null, 'url' => '', 'error' => 'Unable to prepare the Barangay ID photo directory.'];
+    }
+
+    $safeRequestId = preg_replace('/[^A-Za-z0-9_-]/', '', $requestId);
+    if ($safeRequestId === '') {
+        $safeRequestId = 'walkin';
+    }
+
+    $fileName = 'barangay_id_' . $safeRequestId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
+    $publicPath = $folder . '/' . $fileName;
+    $diskPath = $targetDir . '/' . $fileName;
+    if (@file_put_contents($diskPath, $binary) === false) {
+        return ['path' => null, 'url' => '', 'error' => 'Unable to save the Barangay ID photo.'];
+    }
+
+    return [
+        'path' => $publicPath,
+        'url' => dra_public_asset_path($publicPath),
+        'error' => null,
+    ];
+}
+
 function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, string $residentId): array {
     static $cache = [];
 
@@ -6582,6 +6668,32 @@ if ($action === 'create_manual_request') {
             ?? dr_find_status_id($conn, 'PendingReview', ['DocumentVerification'])
             ?? dr_find_status_id($conn, 'PendingVerification')
             ?? dr_find_status_id($conn, 'PendingReview');
+    }
+
+    $manualPhotoDataUrl = trim((string)($_POST['id_picture_data_url'] ?? ''));
+    if (dr_is_barangay_id_document_type($documentType) && $manualPhotoDataUrl !== '') {
+        $savedPhoto = dra_save_manual_barangay_id_photo($requestId, $manualPhotoDataUrl);
+        if (!empty($savedPhoto['error'])) {
+            dr_respond_json(422, ['success' => false, 'message' => (string)$savedPhoto['error']]);
+        }
+        $savedPhotoPath = trim((string)($savedPhoto['path'] ?? ''));
+        $savedPhotoUrl = trim((string)($savedPhoto['url'] ?? ''));
+        if ($savedPhotoPath !== '') {
+            $payload['id_picture_path'] = $savedPhotoPath;
+        }
+        if ($savedPhotoUrl !== '') {
+            $payload['id_picture_url'] = $savedPhotoUrl;
+        }
+    }
+
+    if (
+        dr_is_barangay_id_document_type($documentType)
+        && trim((string)dra_manual_first_non_empty([
+            $payload['id_picture_path'] ?? null,
+            $payload['id_picture_url'] ?? null,
+        ])) === ''
+    ) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID photo is required. Capture and save the photo before submitting the manual request.']);
     }
 
     $payloadJson = dr_safe_json($payload);
