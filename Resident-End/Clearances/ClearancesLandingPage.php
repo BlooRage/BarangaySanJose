@@ -1,9 +1,9 @@
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
-$lockedClearanceAttrs = !$isResidentVerified
-    ? 'disabled aria-disabled="true" title="Verify your resident account first to unlock this clearance."'
-    : '';
+$clearanceApplyTriggerAttrs = $isResidentVerified
+    ? 'data-bs-toggle="modal" data-bs-target="#requirementsModal"'
+    : 'data-verify-required="1"';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,7 +58,7 @@ $lockedClearanceAttrs = !$isResidentVerified
 
             <?php if (!$isResidentVerified): ?>
                 <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
-                    Business Clearance is available for your current account status. The other clearance types will unlock after resident verification.
+                    Verify your resident account first to request clearances online. If needed, you can still walk in at the barangay to request a document in person.
                 </div>
             <?php endif; ?>
 
@@ -75,8 +75,7 @@ $lockedClearanceAttrs = !$isResidentVerified
                         <button
                             class="btn apply-btn"
                             type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#requirementsModal"
+                            <?= $clearanceApplyTriggerAttrs ?>
                             data-title="Business Clearance Requirements"
                             data-apply-href="BusinessClearanceForm"
                             data-body="
@@ -150,8 +149,7 @@ $lockedClearanceAttrs = !$isResidentVerified
                         <button
                             class="btn apply-btn"
                             type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#requirementsModal"
+                            <?= $clearanceApplyTriggerAttrs ?>
                             data-title="Tricycle Permit Requirements"
                             data-apply-href="TricycleForm"
                             data-body="
@@ -178,7 +176,6 @@ $lockedClearanceAttrs = !$isResidentVerified
                                 </ul>
                                 <p class='mt-2 mb-0 text-muted small'>If the vehicle is not named after the owner, upload a notarized deed of sale.</p>
                             "
-                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -193,8 +190,7 @@ $lockedClearanceAttrs = !$isResidentVerified
                         <button
                             class="btn apply-btn"
                             type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#requirementsModal"
+                            <?= $clearanceApplyTriggerAttrs ?>
                             data-title="Barangay Clearance for Electrical Permit Requirements"
                             data-apply-href="ElectricalForm"
                             data-body="
@@ -225,7 +221,6 @@ $lockedClearanceAttrs = !$isResidentVerified
                                     </li>
                                 </ul>
                             "
-                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -240,8 +235,7 @@ $lockedClearanceAttrs = !$isResidentVerified
                         <button
                             class="btn apply-btn"
                             type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#requirementsModal"
+                            <?= $clearanceApplyTriggerAttrs ?>
                             data-title="Barangay Clearance for Water Permit Requirements"
                             data-apply-href="WaterForm"
                             data-body="
@@ -272,7 +266,6 @@ $lockedClearanceAttrs = !$isResidentVerified
                                     </li>
                                 </ul>
                             "
-                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -287,8 +280,7 @@ $lockedClearanceAttrs = !$isResidentVerified
                         <button
                             class="btn apply-btn"
                             type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#requirementsModal"
+                            <?= $clearanceApplyTriggerAttrs ?>
                             data-title="Barangay Clearance for Residential Permit Requirements"
                             data-apply-href="ResidentialForm"
                             data-body="
@@ -319,7 +311,6 @@ $lockedClearanceAttrs = !$isResidentVerified
                                     </li>
                                 </ul>
                             "
-                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -334,8 +325,7 @@ $lockedClearanceAttrs = !$isResidentVerified
                         <button
                             class="btn apply-btn"
                             type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#requirementsModal"
+                            <?= $clearanceApplyTriggerAttrs ?>
                             data-title="Barangay Clearance for Commercial Permit Requirements"
                             data-apply-href="CommercialForm"
                             data-body="
@@ -367,7 +357,6 @@ $lockedClearanceAttrs = !$isResidentVerified
                                     </li>
                                 </ul>
                             "
-                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -401,24 +390,39 @@ $lockedClearanceAttrs = !$isResidentVerified
             </div>
         </div>
     </div>
+    <?php include __DIR__ . '/../includes/document_issuance_verification_modal.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const requirementsModal = document.getElementById('requirementsModal');
+        const verificationRequiredModalEl = document.getElementById('residentVerificationRequiredModal');
 
-        requirementsModal.addEventListener('show.bs.modal', (event) => {
-            const button = event.relatedTarget;
-            const title = button?.getAttribute('data-title') || 'Requirements';
-            const body = button?.getAttribute('data-body') || '';
-            const applyHref = button?.getAttribute('data-apply-href') || '#';
-            const modalTitle = requirementsModal.querySelector('.modal-title');
-            const modalBody = requirementsModal.querySelector('#requirementsModalBody');
-            const proceedBtn = requirementsModal.querySelector('#requirementsProceedBtn');
+        if (requirementsModal) {
+            requirementsModal.addEventListener('show.bs.modal', (event) => {
+                const button = event.relatedTarget;
+                const title = button?.getAttribute('data-title') || 'Requirements';
+                const body = button?.getAttribute('data-body') || '';
+                const applyHref = button?.getAttribute('data-apply-href') || '#';
+                const modalTitle = requirementsModal.querySelector('.modal-title');
+                const modalBody = requirementsModal.querySelector('#requirementsModalBody');
+                const proceedBtn = requirementsModal.querySelector('#requirementsProceedBtn');
 
-            modalTitle.textContent = title;
-            modalBody.innerHTML = body;
-            proceedBtn.setAttribute('href', applyHref);
-        });
+                modalTitle.textContent = title;
+                modalBody.innerHTML = body;
+                proceedBtn.setAttribute('href', applyHref);
+            });
+        }
+
+        if (verificationRequiredModalEl && window.bootstrap?.Modal) {
+            const verificationRequiredModal = bootstrap.Modal.getOrCreateInstance(verificationRequiredModalEl);
+            document.querySelectorAll('[data-verify-required="1"]').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    verificationRequiredModal.show();
+                });
+            });
+        }
     </script>
 </body>
 

@@ -64,7 +64,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Official proof of common-law partnership for legal or insurance claims.
                         </p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='CohabitationForm'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="CohabitationForm">Apply Now</button>
                         <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
@@ -76,7 +76,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a certificate of relationship for jail visitation requirements.
                         </p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='CohabitationForm?variant=relationship_jail_visit'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="CohabitationForm?variant=relationship_jail_visit">Apply Now</button>
                         <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
@@ -88,7 +88,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Required for residents seeking financial, medical, or legal assistance.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='IndigencyForm'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="IndigencyForm">Apply Now</button>
                         <p class="fee-note">Free</p>
                     </div>
                 </div>
@@ -100,7 +100,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Avail fee waivers for government documents under Republic Act 11261.
                         </p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='FirstTimeJobSeekerForm'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="FirstTimeJobSeekerForm">Apply Now</button>
                         <p class="fee-note">Free</p>
                     </div>
                 </div>
@@ -112,7 +112,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a good moral certificate for school, employment, or other requirements.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='GoodMoralForm'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="GoodMoralForm">Apply Now</button>
                         <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
@@ -124,7 +124,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a residency certificate as proof of address and community residence.
                         </p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='ResidencyForm'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="ResidencyForm">Apply Now</button>
                         <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
@@ -133,8 +133,32 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
             </div>
         </main>
     </div>
+    <?php include __DIR__ . '/../includes/document_issuance_verification_modal.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const isResidentVerified = <?= $isResidentVerified ? 'true' : 'false' ?>;
+        const verificationRequiredModalEl = document.getElementById('residentVerificationRequiredModal');
+        const verificationRequiredModal = (!isResidentVerified && verificationRequiredModalEl && window.bootstrap?.Modal)
+            ? bootstrap.Modal.getOrCreateInstance(verificationRequiredModalEl)
+            : null;
+
+        document.querySelectorAll('[data-apply-href]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const applyHref = button.getAttribute('data-apply-href') || '';
+                if (applyHref === '') {
+                    return;
+                }
+
+                if (!isResidentVerified) {
+                    verificationRequiredModal?.show();
+                    return;
+                }
+
+                window.location.href = applyHref;
+            });
+        });
+    </script>
 </body>
 
 </html>

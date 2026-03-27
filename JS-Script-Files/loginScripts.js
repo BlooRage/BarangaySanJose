@@ -48,6 +48,10 @@ const forgotFormErrors = document.getElementById("forgotFormErrors");
 
 const resendOTPBtn = document.getElementById("resendOTP");
 const resendTimer = document.getElementById("resendTimer");
+const accountVerifiedModalEl = document.getElementById("accountVerifiedModal");
+const accountVerifiedModalTitle = document.getElementById("accountVerifiedModalTitle");
+const accountVerifiedModalBody = document.getElementById("accountVerifiedModalBody");
+const verifiedContinueBtn = document.getElementById("verifiedContinueBtn");
 
 // Back link (new preferred) + fallback (old)
 const otpBackLink = document.getElementById("otpBackLink") || document.getElementById("returnToSignup");
@@ -65,6 +69,7 @@ let otpFrom = ""; // 'signup' | 'forgot' | 'inactive'
 let otpRecipient = ""; // 11-digit recipient used for SMS sending: 0XXXXXXXXXX
 let otpVerifying = false;
 const signupEscalatedFields = new Set();
+let authSuccessModalInstance = null;
 
 const tryAutoVerifyOtp = () => {
   if (otpVerifying) return;
@@ -96,6 +101,52 @@ const inactiveWarningMessage = "You’ve been inactive for a long time. The syst
 const toggleActiveForm = (show, hide) => {
   if (show) show.classList.add("active");
   if (hide) hide.classList.remove("active");
+};
+
+const openAuthSuccessModal = ({ title = "Success", message = "", buttonLabel = "Continue", onContinue = null } = {}) => {
+  if (accountVerifiedModalEl && window.bootstrap?.Modal) {
+    if (accountVerifiedModalTitle) accountVerifiedModalTitle.textContent = title;
+    if (accountVerifiedModalBody) accountVerifiedModalBody.textContent = message;
+    if (verifiedContinueBtn) {
+      verifiedContinueBtn.textContent = buttonLabel;
+      verifiedContinueBtn.onclick = (event) => {
+        event.preventDefault();
+        authSuccessModalInstance?.hide();
+        if (typeof onContinue === "function") {
+          onContinue();
+        }
+      };
+    }
+
+    authSuccessModalInstance = bootstrap.Modal.getOrCreateInstance(accountVerifiedModalEl);
+    authSuccessModalInstance.show();
+    return;
+  }
+
+  if (window.UniversalModal?.open) {
+    window.UniversalModal.open({
+      tone: "success",
+      title,
+      message,
+      buttons: [
+        {
+          label: buttonLabel,
+          class: "btn btn-primary w-100",
+          onClick: () => {
+            if (typeof onContinue === "function") {
+              onContinue();
+            }
+          },
+        },
+      ],
+    });
+    return;
+  }
+
+  window.alert(message || title);
+  if (typeof onContinue === "function") {
+    onContinue();
+  }
 };
 
 // ===== Password Requirements (Signup Real-Time) =====
@@ -1021,17 +1072,12 @@ if (verifyOTPBtn) {
         }
 
         inactiveSession.redirect = vData.redirect || inactiveSession.redirect;
+        otpVerifying = false;
 
-        UniversalModal.open({
+        openAuthSuccessModal({
           title: "Account Verified",
           message: "Account verification successful.",
-          buttons: [
-            {
-              label: "Continue",
-              class: "btn btn-success w-100",
-              onClick: () => (window.location.href = inactiveSession.redirect),
-            },
-          ],
+          onContinue: () => (window.location.href = inactiveSession.redirect),
         });
 
         return;
@@ -1054,16 +1100,11 @@ if (verifyOTPBtn) {
         const signupResult = await signupRes.json();
 
         if (signupResult.success) {
-          UniversalModal.open({
+          otpVerifying = false;
+          openAuthSuccessModal({
             title: "Account Created!",
             message: "Your account has been successfully created.",
-            buttons: [
-              {
-                label: "Continue",
-                class: "btn btn-primary w-100",
-                onClick: () => (window.location.href = signupResult.redirect),
-              },
-            ],
+            onContinue: () => (window.location.href = signupResult.redirect),
           });
         } else {
           showError(signupResult.error || "Unable to create account.", "signup");
@@ -1163,16 +1204,11 @@ if (submitNewPasswordBtn) {
       if (newPasswordInput) newPasswordInput.value = "";
       if (confirmNewPasswordInput) confirmNewPasswordInput.value = "";
 
-      UniversalModal.open({
+      openAuthSuccessModal({
         title: "Password Reset",
         message: "Your password has been successfully reset. You can now log in.",
-        buttons: [
-          {
-            label: "Login",
-            class: "btn btn-primary w-100",
-            onClick: backToLogin,
-          },
-        ],
+        buttonLabel: "Login",
+        onContinue: backToLogin,
       });
     } catch (err) {
       showResetPasswordError("Unable to reset password. Please try again later.");

@@ -95,7 +95,7 @@ if ($areaResult instanceof mysqli_result) {
 sort($officialsMgmtAreaOptions);
 
 $basePositionsByRole = [
-  'SuperAdmin' => ['IT Administrator', 'Barangay Chairman'],
+  'SuperAdmin' => ['IT Administrator'],
   'Official' => ['Barangay Official', 'Barangay Secretary'],
   'Personnel' => [
     'Department Public Assistance Desk',

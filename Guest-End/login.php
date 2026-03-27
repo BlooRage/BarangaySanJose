@@ -54,7 +54,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260327-password-fix1" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260327-auth-success-modal1" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260320-01" defer></script>
   </head>
 
@@ -313,10 +313,10 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Account Verified</h5>
+            <h5 class="modal-title" id="accountVerifiedModalTitle">Account Verified</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body">Account verification successful.</div>
+          <div class="modal-body" id="accountVerifiedModalBody">Account verification successful.</div>
           <div class="modal-footer">
             <button type="button" id="verifiedContinueBtn" class="btn btn-success w-100">Continue</button>
           </div>

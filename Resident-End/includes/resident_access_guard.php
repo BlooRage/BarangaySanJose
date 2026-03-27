@@ -35,16 +35,54 @@ if (!function_exists('resident_guard_normalize_public_path')) {
     }
 }
 
-$userId = $_SESSION['user_id'];
+if (!function_exists('resident_guard_normalize_status_key')) {
+    function resident_guard_normalize_status_key(?string $statusName): string
+    {
+        $statusName = strtolower(trim((string)$statusName));
+        return preg_replace('/[\s_-]+/', '', $statusName) ?? '';
+    }
+}
+
+if (!function_exists('resident_guard_is_verified_status')) {
+    function resident_guard_is_verified_status(?string $statusName): bool
+    {
+        $statusKey = resident_guard_normalize_status_key($statusName);
+        if ($statusKey === '' || $statusKey === 'notverified') {
+            return false;
+        }
+
+        return in_array($statusKey, ['verifiedresident', 'verified', 'approved', 'completed'], true)
+            || strpos($statusKey, 'verified') !== false
+            || strpos($statusKey, 'approved') !== false
+            || strpos($statusKey, 'complete') !== false;
+    }
+}
+
+$userId = (string)($_SESSION['user_id'] ?? '');
 $hasResidentProfile = false;
+$residentStatusName = '';
+$residentStatusKey = '';
+$isResidentVerified = false;
+$isResidentNotVerified = false;
 
 if (isset($conn) && $conn instanceof mysqli) {
-    $stmt = $conn->prepare("SELECT resident_id FROM residentinformationtbl WHERE user_id = ? LIMIT 1");
+    $stmt = $conn->prepare("
+        SELECT r.resident_id, COALESCE(s.status_name, '') AS status_name
+        FROM residentinformationtbl r
+        LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
+        WHERE r.user_id = ?
+        LIMIT 1
+    ");
     if ($stmt) {
         $stmt->bind_param("s", $userId);
         $stmt->execute();
-        $stmt->store_result();
-        $hasResidentProfile = $stmt->num_rows > 0;
+        $stmt->bind_result($residentId, $residentStatusName);
+        if ($stmt->fetch()) {
+            $hasResidentProfile = trim((string)$residentId) !== '';
+            $residentStatusKey = resident_guard_normalize_status_key($residentStatusName);
+            $isResidentVerified = resident_guard_is_verified_status($residentStatusName);
+            $isResidentNotVerified = ($residentStatusKey === 'notverified');
+        }
         $stmt->close();
     }
 }
@@ -72,8 +110,9 @@ if (!$isResidentVerified) {
         '/Resident-End/resident_dashboard.php',
         '/Resident-End/resident_profile.php',
         '/Resident-End/DocumentUpload.php',
+        '/Resident-End/Certificates/CertificatesLandingPage.php',
         '/Resident-End/Clearances/ClearancesLandingPage.php',
-        '/Resident-End/Clearances/BusinessClearanceForm.php',
+        '/Resident-End/BarangayId/BarangayIdLandingPage.php',
         '/Resident-End/document_requests.php',
         '/Resident-End/Announcements/AnnouncementsLandingPage.php',
         '/Resident-End/Appointments/AppointmentsLandingPage.php',

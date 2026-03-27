@@ -206,7 +206,7 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
 
                 <div class="text-center apply-section mt-4">
                     <div class="apply-actions">
-                        <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php')) ?>'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" data-apply-href="<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php'), ENT_QUOTES, 'UTF-8') ?>">Apply Now</button>
                         <?php if ($digitalIdViewUrl !== ''): ?>
                             <button class="btn digital-id-btn" type="button" onclick="location.href='<?= htmlspecialchars($digitalIdViewUrl) ?>'">View Digital ID</button>
                         <?php endif; ?>
@@ -219,8 +219,32 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             </div>
         </main>
     </div>
+    <?php include __DIR__ . '/../includes/document_issuance_verification_modal.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const isResidentVerified = <?= $isResidentVerified ? 'true' : 'false' ?>;
+        const verificationRequiredModalEl = document.getElementById('residentVerificationRequiredModal');
+        const verificationRequiredModal = (!isResidentVerified && verificationRequiredModalEl && window.bootstrap?.Modal)
+            ? bootstrap.Modal.getOrCreateInstance(verificationRequiredModalEl)
+            : null;
+
+        document.querySelectorAll('[data-apply-href]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const applyHref = button.getAttribute('data-apply-href') || '';
+                if (applyHref === '') {
+                    return;
+                }
+
+                if (!isResidentVerified) {
+                    verificationRequiredModal?.show();
+                    return;
+                }
+
+                window.location.href = applyHref;
+            });
+        });
+    </script>
 </body>
 
 </html>

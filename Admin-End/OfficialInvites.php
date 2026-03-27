@@ -31,7 +31,6 @@ $departmentOptions = [
 ];
 $positionAccessOptions = [
     'IT Administrator',
-    'Barangay Chairman',
     'Barangay Official',
     'Barangay Secretary',
     'Department Public Assistance Desk',
@@ -43,7 +42,7 @@ $positionAccessOptions = [
     'Barangay Treasurer',
 ];
 $positionsByRole = [
-    'SuperAdmin' => ['IT Administrator', 'Barangay Chairman'],
+    'SuperAdmin' => ['IT Administrator'],
     'Official' => ['Barangay Official', 'Barangay Secretary'],
     'Personnel' => [
         'Department Public Assistance Desk',
