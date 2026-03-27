@@ -17,17 +17,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
         .household-member-verification-shell #btnHouseholdMemberVerificationRefresh.is-loading i {
             animation: adminSpin 900ms linear infinite;
         }
-        .household-member-verification-shell .status-filter-btn.has-notif {
-            display: inline-flex;
-            align-items: center;
-            padding-right: 38px;
-        }
-        .household-member-verification-shell .status-filter-btn.has-notif .pending-count-badge {
-            top: 50%;
-            right: 10px;
-            margin-left: 0;
-            transform: translateY(-50%);
-        }
         #modal-householdMemberVerification .modal-content {
             border: 1px solid #e9ecef;
             border-radius: 16px;
@@ -162,11 +151,11 @@ require_once __DIR__ . "/includes/admin_guard.php";
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
                     <button class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold hmv-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
                     <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif hmv-filter-btn" data-filter="PendingReview">
                         &nbsp;&nbsp;Pending <span id="pendingHouseholdMemberBadge" class="pending-count-badge d-none">0</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold hmv-filter-btn" data-filter="Rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
                 </div>
 
                 <div class="admin-list-actions">
@@ -364,6 +353,38 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js"></script>
+<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-03"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const tbody = document.getElementById("householdMemberVerificationBody");
+    if (!tbody) return;
+
+    const normalizeHouseholdMemberVerificationTable = () => {
+      Array.from(tbody.querySelectorAll("tr")).forEach((row) => {
+        const headCell = row.children[1];
+        if (headCell) {
+          const primaryText = Array.from(headCell.childNodes)
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent || "")
+            .join(" ")
+            .trim();
+          headCell.textContent = primaryText || headCell.textContent.trim() || "-";
+        }
+
+        const statusPill = row.children[4]?.querySelector(".status-pill");
+        if (statusPill) {
+          const currentLabel = (statusPill.textContent || "").trim().toLowerCase().replace(/\s+/g, " ");
+          if (currentLabel === "pending review") {
+            statusPill.textContent = "Pending";
+          }
+        }
+      });
+    };
+
+    normalizeHouseholdMemberVerificationTable();
+    const observer = new MutationObserver(() => normalizeHouseholdMemberVerificationTable());
+    observer.observe(tbody, { childList: true, subtree: true });
+  });
+</script>
 </body>
 </html>

@@ -52,7 +52,7 @@
       Approved: "Approved",
       Rejected: "Rejected",
     };
-    return `<span class="${classMap[normalized] || classMap.PendingReview}">${labelMap[normalized] || normalized}</span>`;
+    return `<span class="${classMap[normalized] || classMap.PendingReview}">${labelMap[normalized] || "Pending"}</span>`;
   };
 
   const escapeHtml = (value) =>
@@ -327,7 +327,9 @@
   });
 
   bodyEl?.addEventListener("click", (event) => {
-    const button = event.target instanceof HTMLElement ? event.target.closest("button[data-request-id]") : null;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest("button[data-request-id]");
     if (!button) return;
     const requestId = Number.parseInt(String(button.getAttribute("data-request-id") || "0"), 10);
     const row = state.rows.find((item) => Number(item.request_id) === requestId);
