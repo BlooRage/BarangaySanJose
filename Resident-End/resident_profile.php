@@ -361,7 +361,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js?v=20260328-1" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js?v=20260328-3" defer></script>
   <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
@@ -939,6 +939,23 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
     </div>
     <?php endif; ?>
+
+    <div class="modal fade" id="householdMemberSubmitSuccessModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-3">
+                <div class="modal-header justify-content-center border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-center w-100">Verification Request Submitted</h5>
+                </div>
+                <hr>
+                <div class="modal-body text-center">
+                    <p class="mb-0" id="householdMemberSubmitSuccessMessage">Household member verification request submitted. Please wait for admin review.</p>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-primary w-100" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="editProfileModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">

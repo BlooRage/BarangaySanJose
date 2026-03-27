@@ -16,7 +16,7 @@ if (!function_exists('hmv_ensure_request_table')) {
                 middle_name VARCHAR(255) DEFAULT NULL,
                 suffix VARCHAR(255) DEFAULT NULL,
                 birthdate DATE NOT NULL,
-                status ENUM('PendingReview', 'Approved', 'Rejected') NOT NULL DEFAULT 'PendingReview',
+                status_id INT(11) DEFAULT NULL,
                 attachment_id BIGINT(20) UNSIGNED DEFAULT NULL,
                 approved_household_member_id BIGINT(20) UNSIGNED DEFAULT NULL,
                 reviewed_by_user_id VARCHAR(100) DEFAULT NULL,
@@ -24,13 +24,97 @@ if (!function_exists('hmv_ensure_request_table')) {
                 submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 reviewed_at DATETIME DEFAULT NULL,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                KEY idx_hmv_head_status (fam_head_id, status),
-                KEY idx_hmv_status_submitted (status, submitted_at),
+                KEY idx_hmv_head_status (fam_head_id, status_id),
+                KEY idx_hmv_status_submitted (status_id, submitted_at),
                 KEY idx_hmv_submitted_by (submitted_by_user_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ";
         $conn->query($sql);
         idg_ensure_numeric_generated_key($conn, 'householdmemberverificationtbl', 'request_id', 'BIGINT(20) UNSIGNED NOT NULL');
+
+        $columnDefinitions = [
+            'submitted_by_user_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN submitted_by_user_id VARCHAR(100) NOT NULL AFTER fam_head_id",
+            'middle_name' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN middle_name VARCHAR(255) DEFAULT NULL AFTER first_name",
+            'suffix' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN suffix VARCHAR(255) DEFAULT NULL AFTER middle_name",
+            'status_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN status_id INT(11) DEFAULT NULL AFTER birthdate",
+            'attachment_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN attachment_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER status_id",
+            'approved_household_member_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN approved_household_member_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER attachment_id",
+            'reviewed_by_user_id' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN reviewed_by_user_id VARCHAR(100) DEFAULT NULL AFTER approved_household_member_id",
+            'review_remarks' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN review_remarks TEXT DEFAULT NULL AFTER reviewed_by_user_id",
+            'submitted_at' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER review_remarks",
+            'reviewed_at' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN reviewed_at DATETIME DEFAULT NULL AFTER submitted_at",
+            'updated_at' => "ALTER TABLE householdmemberverificationtbl ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER reviewed_at",
+        ];
+
+        foreach ($columnDefinitions as $columnName => $alterSql) {
+            $safeColumn = $conn->real_escape_string($columnName);
+            $res = $conn->query("SHOW COLUMNS FROM householdmemberverificationtbl LIKE '{$safeColumn}'");
+            $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+            if ($res instanceof mysqli_result) {
+                $res->free();
+            }
+            if (!$exists) {
+                $conn->query($alterSql);
+            }
+        }
+
+        $indexDefinitions = [
+            'idx_hmv_head_status' => "ALTER TABLE householdmemberverificationtbl ADD KEY idx_hmv_head_status (fam_head_id, status_id)",
+            'idx_hmv_status_submitted' => "ALTER TABLE householdmemberverificationtbl ADD KEY idx_hmv_status_submitted (status_id, submitted_at)",
+            'idx_hmv_submitted_by' => "ALTER TABLE householdmemberverificationtbl ADD KEY idx_hmv_submitted_by (submitted_by_user_id)",
+        ];
+
+        foreach ($indexDefinitions as $indexName => $alterSql) {
+            $safeIndex = $conn->real_escape_string($indexName);
+            $res = $conn->query("SHOW INDEX FROM householdmemberverificationtbl WHERE Key_name = '{$safeIndex}'");
+            $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+            if ($res instanceof mysqli_result) {
+                $res->free();
+            }
+            if (!$exists) {
+                $conn->query($alterSql);
+            }
+        }
+
+        $legacyStatusExists = false;
+        $legacyStatusRes = $conn->query("SHOW COLUMNS FROM householdmemberverificationtbl LIKE 'status'");
+        if ($legacyStatusRes instanceof mysqli_result) {
+            $legacyStatusExists = $legacyStatusRes->num_rows > 0;
+            $legacyStatusRes->free();
+        }
+
+        $pendingStatusId = hmv_ensure_household_member_status_id($conn, 'PendingReview');
+        $activeStatusId = hmv_ensure_household_member_status_id($conn, 'Active');
+        $rejectedStatusId = hmv_ensure_household_member_status_id($conn, 'Rejected');
+
+        if ($legacyStatusExists && $pendingStatusId !== null && $activeStatusId !== null && $rejectedStatusId !== null) {
+            $stmt = $conn->prepare("
+                UPDATE householdmemberverificationtbl
+                SET status_id = CASE status
+                    WHEN 'Approved' THEN ?
+                    WHEN 'Rejected' THEN ?
+                    ELSE ?
+                END
+                WHERE status_id IS NULL OR status_id = 0
+            ");
+            if ($stmt) {
+                $stmt->bind_param('iii', $activeStatusId, $rejectedStatusId, $pendingStatusId);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
+
+        if ($pendingStatusId !== null) {
+            $conn->query("
+                UPDATE householdmemberverificationtbl
+                SET status_id = {$pendingStatusId}
+                WHERE (status_id IS NULL OR status_id = 0)
+            ");
+            $conn->query("
+                ALTER TABLE householdmemberverificationtbl
+                MODIFY COLUMN status_id INT(11) NOT NULL
+            ");
+        }
     }
 }
 
@@ -40,6 +124,26 @@ if (!function_exists('hmv_generate_request_id')) {
         hmv_ensure_request_table($conn);
         $generated = GenerateHouseholdMemberVerificationRequestID($conn);
         return $generated !== false ? (int)$generated : 0;
+    }
+}
+
+if (!function_exists('hmv_has_request_column')) {
+    function hmv_has_request_column(mysqli $conn, string $columnName): bool
+    {
+        $safeColumn = $conn->real_escape_string($columnName);
+        $res = $conn->query("SHOW COLUMNS FROM householdmemberverificationtbl LIKE '{$safeColumn}'");
+        $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+        if ($res instanceof mysqli_result) {
+            $res->free();
+        }
+        return $exists;
+    }
+}
+
+if (!function_exists('hmv_request_uses_status_lookup')) {
+    function hmv_request_uses_status_lookup(mysqli $conn): bool
+    {
+        return hmv_has_request_column($conn, 'status_id');
     }
 }
 
@@ -61,6 +165,46 @@ if (!function_exists('hmv_get_status_id')) {
         $statusId = $stmt->fetch() ? (int)$statusId : null;
         $stmt->close();
         return $statusId;
+    }
+}
+
+if (!function_exists('hmv_ensure_status_id')) {
+    function hmv_ensure_status_id(mysqli $conn, string $name, string $type): ?int
+    {
+        $resolved = hmv_get_status_id($conn, $name, $type);
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        $stmt = $conn->prepare("
+            INSERT INTO statuslookuptbl (status_name, status_type)
+            VALUES (?, ?)
+        ");
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('ss', $name, $type);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            return hmv_get_status_id($conn, $name, $type);
+        }
+        $statusId = (int)$stmt->insert_id;
+        $stmt->close();
+        return $statusId > 0 ? $statusId : hmv_get_status_id($conn, $name, $type);
+    }
+}
+
+if (!function_exists('hmv_get_household_member_status_id')) {
+    function hmv_get_household_member_status_id(mysqli $conn, string $name): ?int
+    {
+        return hmv_get_status_id($conn, $name, 'HouseholdMember');
+    }
+}
+
+if (!function_exists('hmv_ensure_household_member_status_id')) {
+    function hmv_ensure_household_member_status_id(mysqli $conn, string $name): ?int
+    {
+        return hmv_ensure_status_id($conn, $name, 'HouseholdMember');
     }
 }
 

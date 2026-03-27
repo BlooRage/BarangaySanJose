@@ -27,7 +27,7 @@
     const raw = String(status || "").trim();
     if (!raw) return "PendingReview";
     const key = raw.toLowerCase().replace(/[\s_]+/g, "");
-    if (key === "approved" || key === "verified") return "Approved";
+    if (key === "approved" || key === "verified" || key === "active") return "Approved";
     if (key === "rejected" || key === "declined" || key === "denied") return "Rejected";
     return "PendingReview";
   };
