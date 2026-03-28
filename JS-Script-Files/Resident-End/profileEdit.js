@@ -988,6 +988,38 @@ document.addEventListener("DOMContentLoaded", () => {
         return form;
     };
 
+    const parseJsonResponse = async (res) => {
+        const raw = await res.text().catch(() => "");
+        if (!raw) return {};
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            return {};
+        }
+    };
+
+    const ensureActiveSession = async () => {
+        const payload = new URLSearchParams();
+        if (csrfToken) {
+            payload.append("csrf_token", csrfToken);
+        }
+
+        const res = await fetch("../PhpFiles/Resident-End/session_touch.php", {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            },
+            credentials: "same-origin",
+            cache: "no-store",
+            body: payload.toString(),
+        });
+        const data = await parseJsonResponse(res);
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || "Unable to verify your session. Please refresh and try again.");
+        }
+    };
+
     let isSubmitting = false;
 
     const submitProfileRequest = async () => {
@@ -997,16 +1029,24 @@ document.addEventListener("DOMContentLoaded", () => {
         const originalText = btnNext.textContent;
         btnNext.textContent = "Submitting...";
         const form = buildProfileFormData();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        let controller = null;
+        let timeoutId = null;
 
         try {
+            await ensureActiveSession();
+            controller = new AbortController();
+            timeoutId = window.setTimeout(() => controller.abort(), 25000);
             const res = await fetch("../PhpFiles/Resident-End/resident_profile_update.php", {
                 method: "POST",
                 body: form,
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json",
+                },
+                cache: "no-store",
                 signal: controller.signal,
             });
-            const data = await res.json().catch(() => ({}));
+            const data = await parseJsonResponse(res);
             if (!res.ok || !data.success) {
                 throw new Error(data.message || "Failed to submit profile edit request.");
             }
@@ -1028,7 +1068,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     : err?.message || "Failed to submit profile edit request.";
             showNotice("Submission Failed", message);
         } finally {
-            clearTimeout(timeoutId);
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
             isSubmitting = false;
             btnNext.textContent = originalText;
             btnNext.disabled = false;
