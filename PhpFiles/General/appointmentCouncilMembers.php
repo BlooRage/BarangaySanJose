@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/piiCrypto.php';
+
 if (!function_exists('apcm_table_exists')) {
     function apcm_table_exists(mysqli $conn, string $tableName): bool
     {
@@ -155,6 +157,7 @@ if (!function_exists('apcm_fetch_council_members')) {
 
         $members = [];
         while ($row = $result->fetch_assoc()) {
+            $row = pii_decrypt_official_row($row) ?? $row;
             $officialId = trim((string)($row['official_id'] ?? ''));
             $userId = trim((string)($row['user_id'] ?? ''));
             if ($officialId === '' || $userId === '') {
