@@ -261,6 +261,9 @@ if ($householdId) {
     $res = $stmt->get_result();
 
     while ($row = $res->fetch_assoc()) {
+        if (function_exists('pii_decrypt_resident_row')) {
+            $row = pii_decrypt_resident_row($row) ?? $row;
+        }
         if ($row['role'] === 'Head' && $row['resident_id'] === $residentId) {
             $isHead = true;
         }
