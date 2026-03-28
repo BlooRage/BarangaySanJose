@@ -144,20 +144,24 @@ function otSendEmail(string $email, string $subject, string $body): void {
     } catch (\Throwable) { /* best-effort */ }
 }
 
-function otSendOnboardingInviteEmail(string $email, string $fullName, string $roleName, string $inviteLink): bool
+function otSendOnboardingInviteEmailDetailed(string $email, string $fullName, string $roleName, string $inviteLink): array
 {
+    $result = ['sent' => false, 'error' => ''];
+
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        return false;
+        $result['error'] = 'A valid invite email address is missing.';
+        return $result;
     }
 
     try {
         require_once __DIR__ . '/../EmailHandlers/emailSender.php';
         if (!class_exists('EmailSender')) {
-            return false;
+            $result['error'] = 'Email sender dependency is unavailable.';
+            return $result;
         }
         $mailConfig = require __DIR__ . '/../General/mailConfigurations.php';
         $sender = new EmailSender($mailConfig);
-        return $sender->send([
+        $result['sent'] = $sender->send([
             'type' => 'onboarding_access',
             'to' => $email,
             'subject' => 'Barangay San Jose Official Account Invite',
@@ -171,8 +175,18 @@ function otSendOnboardingInviteEmail(string $email, string $fullName, string $ro
             ],
             'bodyText' => "You were invited to onboard your Barangay San Jose account as {$roleName}.\nSTRICTLY ONE-TIME ACCESS.\nOpen: {$inviteLink}",
         ]);
+        if (!$result['sent']) {
+            $result['error'] = trim($sender->getLastError());
+            if ($result['error'] === '') {
+                $result['error'] = 'The SMTP server rejected the onboarding email.';
+            }
+            error_log('[officialTransitions][invite_email] ' . $result['error']);
+        }
+        return $result;
     } catch (\Throwable) {
-        return false;
+        $result['error'] = 'An unexpected error occurred while sending the onboarding email.';
+        error_log('[officialTransitions][invite_email] ' . $result['error']);
+        return $result;
     }
 }
 
@@ -192,6 +206,43 @@ function otSendSMS(string $phone, string $message): bool {
         }
     } catch (\Throwable) { /* best-effort */ }
     return false;
+}
+
+function otSendInviteSmsDetailed(string $phone, string $message): array
+{
+    $result = ['sent' => false, 'error' => ''];
+    $phone10 = oi_normalize_phone10($phone);
+    if (!oi_is_valid_phone10($phone10)) {
+        $result['error'] = 'A valid 10-digit mobile number is missing.';
+        return $result;
+    }
+
+    try {
+        $smsPath = __DIR__ . '/../General/sendSMS.php';
+        if (!file_exists($smsPath)) {
+            $result['error'] = 'SMS sender dependency is unavailable.';
+            return $result;
+        }
+        require_once $smsPath;
+        if (!function_exists('sendSMS')) {
+            $result['error'] = 'SMS sender function is unavailable.';
+            return $result;
+        }
+
+        $result['sent'] = (bool)sendSMS('0' . $phone10, $message);
+        if (!$result['sent']) {
+            $result['error'] = function_exists('getLastSmsError') ? trim((string)getLastSmsError()) : '';
+            if ($result['error'] === '') {
+                $result['error'] = 'The SMS gateway rejected the onboarding notification.';
+            }
+            error_log('[officialTransitions][invite_sms] ' . $result['error']);
+        }
+        return $result;
+    } catch (\Throwable) {
+        $result['error'] = 'An unexpected error occurred while sending the onboarding SMS.';
+        error_log('[officialTransitions][invite_sms] ' . $result['error']);
+        return $result;
+    }
 }
 
 function otNotifyUser(mysqli $conn, string $userId, string $subject, string $message): void {
@@ -645,14 +696,23 @@ function otDeliverOnboardingInvite(array $invite): array
     $fullName = trim((string)($delivery['full_name'] ?? ''));
     $roleName = trim((string)($delivery['role_name'] ?? ''));
 
-    return [
-        'email_sent' => $inviteLink !== '' && otSendOnboardingInviteEmail(
+    $emailResult = $inviteLink !== ''
+        ? otSendOnboardingInviteEmailDetailed(
             $email,
             $fullName,
             $roleName !== '' ? $roleName : 'Official',
             $inviteLink
-        ),
-        'sms_sent' => $phone10 !== '' && otSendSMS($phone10, 'Barangay San Jose: Your official onboarding access is ready. Please check your email for the one-time invite link.'),
+        )
+        : ['sent' => false, 'error' => 'Onboarding invite link is missing.'];
+    $smsResult = $phone10 !== ''
+        ? otSendInviteSmsDetailed($phone10, 'Barangay San Jose: Your official onboarding access is ready. Please check your email for the one-time invite link.')
+        : ['sent' => false, 'error' => 'Invite mobile number is missing.'];
+
+    return [
+        'email_sent' => (bool)($emailResult['sent'] ?? false),
+        'email_error' => trim((string)($emailResult['error'] ?? '')),
+        'sms_sent' => (bool)($smsResult['sent'] ?? false),
+        'sms_error' => trim((string)($smsResult['error'] ?? '')),
     ];
 }
 
@@ -1364,6 +1424,8 @@ if ($action === 'complete_transition') {
     $completionInviteLink = '';
     $completionInviteEmailSent = null;
     $completionInviteSmsSent = null;
+    $completionInviteEmailError = '';
+    $completionInviteSmsError = '';
     $linkedInviteId = 0;
     $pendingInviteDelivery = null;
     $pendingUserNotifications = [];
@@ -1833,14 +1895,20 @@ if ($action === 'complete_transition') {
         $deliveryStatus = otDeliverOnboardingInvite($pendingInviteDelivery);
         $completionInviteEmailSent = (bool)($deliveryStatus['email_sent'] ?? false);
         $completionInviteSmsSent = (bool)($deliveryStatus['sms_sent'] ?? false);
+        $completionInviteEmailError = trim((string)($deliveryStatus['email_error'] ?? ''));
+        $completionInviteSmsError = trim((string)($deliveryStatus['sms_error'] ?? ''));
     }
     if ($completionInviteEmailSent !== null || $completionInviteSmsSent !== null) {
         $deliveryParts = [];
         if ($completionInviteEmailSent !== null) {
-            $deliveryParts[] = $completionInviteEmailSent ? 'email sent' : 'email not sent';
+            $deliveryParts[] = $completionInviteEmailSent
+                ? 'email sent'
+                : ('email not sent' . ($completionInviteEmailError !== '' ? ' (' . $completionInviteEmailError . ')' : ''));
         }
         if ($completionInviteSmsSent !== null) {
-            $deliveryParts[] = $completionInviteSmsSent ? 'SMS sent' : 'SMS not sent';
+            $deliveryParts[] = $completionInviteSmsSent
+                ? 'SMS sent'
+                : ('SMS not sent' . ($completionInviteSmsError !== '' ? ' (' . $completionInviteSmsError . ')' : ''));
         }
         if ($deliveryParts) {
             $completionMessage .= ' Delivery status: ' . implode(', ', $deliveryParts) . '.';
@@ -1859,6 +1927,8 @@ if ($action === 'complete_transition') {
         'invite_link' => $completionInviteLink,
         'invite_email_sent' => $completionInviteEmailSent,
         'invite_sms_sent' => $completionInviteSmsSent,
+        'invite_email_error' => $completionInviteEmailError,
+        'invite_sms_error' => $completionInviteSmsError,
     ]);
 }
 

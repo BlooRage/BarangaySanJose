@@ -1118,10 +1118,24 @@
     btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete and Notify';
 
     if (data.success) {
+      const inviteEmailFailed = data.invite_email_sent === false;
+      const inviteSmsFailed = data.invite_sms_sent === false;
+      const inviteEmailError = String(data.invite_email_error || '').trim();
+      const inviteSmsError = String(data.invite_sms_error || '').trim();
+      const deliveryHadIssue = inviteEmailFailed || inviteSmsFailed;
       transitionDrafts.delete(String(transitionId || ''));
-      showToast(data.message || 'Access setup completed.');
-      if (data.invite_link && data.invite_email_sent === false) {
+      showToast(data.message || 'Access setup completed.', deliveryHadIssue ? 'warning' : 'success');
+      if (data.invite_link && inviteEmailFailed) {
+        if (inviteEmailError) {
+          showToast(`Invite email failed: ${inviteEmailError}`, 'warning');
+        }
         window.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link));
+      }
+      if (inviteSmsFailed) {
+        showToast(
+          inviteSmsError ? `Invite SMS failed: ${inviteSmsError}` : 'Invite SMS was not sent automatically.',
+          'warning'
+        );
       }
       getModal('modalSelectWinner')?.hide();
       loadTransitions();

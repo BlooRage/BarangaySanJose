@@ -2130,6 +2130,6 @@ if ($hasCouncilTbl) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260325-2"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260328-01"></script>
 </body>
 </html>

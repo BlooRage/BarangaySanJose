@@ -947,6 +947,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             ]);
             exit;
         } elseif ($action === 'promote') {
+            if ($requestedMode === 'official') {
+                throw new Exception('Promotion is no longer available in Official Management.');
+            }
             if ($targetProtectedCode !== '') {
                 throw new Exception('Protected accounts cannot be reassigned through promotion.');
             }
@@ -1039,6 +1042,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             ]);
             exit;
         } elseif ($action === 'change_department') {
+            if ($requestedMode === 'official') {
+                throw new Exception('Department reassignment is no longer available in Official Management.');
+            }
             if ($targetProtectedCode !== '') {
                 throw new Exception('Protected accounts cannot be reassigned through department changes.');
             }

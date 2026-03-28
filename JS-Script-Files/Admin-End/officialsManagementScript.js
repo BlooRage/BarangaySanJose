@@ -716,12 +716,14 @@
       items += `<li><button class="dropdown-item text-danger officials-action-btn" data-action="revoke_permission" data-official-id="${id}"><i class="fas fa-ban me-2"></i>Revoke Access</button></li>`;
     }
 
-    items += `<li><hr class="dropdown-divider"></li>`;
-    if (isProtected) {
-      items += `<li><span class="dropdown-item-text text-muted small"><i class="fas fa-lock me-2"></i>${escapeHtml(String(row.protected_label || "Protected account"))}: promotion and department change unavailable</span></li>`;
-    } else {
-      items += `<li><button class="dropdown-item officials-action-btn" data-action="promote" data-official-id="${id}"><i class="fas fa-arrow-up me-2"></i>Promote</button></li>`;
-      items += `<li><button class="dropdown-item officials-action-btn" data-action="change_department" data-official-id="${id}"><i class="fas fa-building me-2"></i>Change Department</button></li>`;
+    if (isPersonnelManagement) {
+      items += `<li><hr class="dropdown-divider"></li>`;
+      if (isProtected) {
+        items += `<li><span class="dropdown-item-text text-muted small"><i class="fas fa-lock me-2"></i>${escapeHtml(String(row.protected_label || "Protected account"))}: promotion and department change unavailable</span></li>`;
+      } else {
+        items += `<li><button class="dropdown-item officials-action-btn" data-action="promote" data-official-id="${id}"><i class="fas fa-arrow-up me-2"></i>Promote</button></li>`;
+        items += `<li><button class="dropdown-item officials-action-btn" data-action="change_department" data-official-id="${id}"><i class="fas fa-building me-2"></i>Change Department</button></li>`;
+      }
     }
 
     return `

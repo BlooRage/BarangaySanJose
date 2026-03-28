@@ -749,6 +749,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     </div>
   </div>
 
+  <?php if ($isPersonnelManagement): ?>
   <div class="modal fade" id="modalOfficialsMgmtPromote" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content p-3">
@@ -839,6 +840,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       </div>
     </div>
   </div>
+  <?php endif; ?>
 
   <div id="officialsMgmtConfirmModal" class="officials-confirm-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="officialsMgmtConfirmTitle" aria-describedby="officialsMgmtConfirmMessage" tabindex="-1">
     <div class="officials-confirm-card">
@@ -1064,7 +1066,11 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
               </div>
 
               <div class="officials-profile-system-note mt-3">
-                Assignment and access changes stay in the dedicated <strong>Manage Access</strong>, <strong>Promote</strong>, and <strong>Change Department</strong> actions.
+                <?php if ($isPersonnelManagement): ?>
+                  Assignment and access changes stay in the dedicated <strong>Manage Access</strong>, <strong>Promote</strong>, and <strong>Change Department</strong> actions.
+                <?php else: ?>
+                  Access changes stay in the dedicated <strong>Manage Access</strong> action.
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -1108,6 +1114,6 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260328-2"></script>
+  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260328-3"></script>
 </body>
 </html>
