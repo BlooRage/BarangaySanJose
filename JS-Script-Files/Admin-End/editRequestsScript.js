@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const csrfToken = String(window.ADMIN_EDIT_REQUESTS_CSRF_TOKEN || "").trim();
   const tbody = document.getElementById("tableBody");
   const searchInput = document.getElementById("searchInput");
   // Filter modal may provide either a select (legacy) or checkboxes (current).
@@ -295,7 +296,10 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("../PhpFiles/Admin-End/edit_requests.php", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+        },
         body: JSON.stringify({ action, request_id: requestId }),
       });
       const data = await res.json().catch(() => ({}));
@@ -578,7 +582,10 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("../PhpFiles/Admin-End/edit_requests.php", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+          },
           body: JSON.stringify({ action: "deny", request_id: pendingDenyId, admin_notes: remarks }),
         });
         const data = await res.json().catch(() => ({}));

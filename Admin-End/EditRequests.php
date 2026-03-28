@@ -128,6 +128,8 @@
 require_once "../PhpFiles/General/connection.php";
 require_once "includes/admin_guard.php";
 include "includes/sidebar.php";
+
+$csrfToken = ensureCsrfToken();
 ?>
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
@@ -393,8 +395,9 @@ include "includes/sidebar.php";
     resetBtnId: "btnTableColumnsReset",
     storageKey: "admin_cols_edit_requests_v1"
   };
+  window.ADMIN_EDIT_REQUESTS_CSRF_TOKEN = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260316-01"></script>
+<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260328-01"></script>
 </body>
 </html>

@@ -1,7 +1,5 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -451,6 +449,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['docs'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken(true);
+
     $payload = json_decode(file_get_contents('php://input'), true);
     if (!is_array($payload)) {
         $payload = $_POST;
