@@ -1150,7 +1150,6 @@ if ($hasCouncilTbl) {
                   <th>Current Official</th>
                   <th>Access Profile</th>
                   <th>Department</th>
-                  <th>Account Status</th>
                   <th>Term Dates</th>
                 </tr>
               </thead>
@@ -1162,15 +1161,6 @@ if ($hasCouncilTbl) {
                     $selectionClass = strcasecmp($selectionMethod, 'Elected') === 0
                         ? 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'
                         : 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
-                    $accountStatus = trim((string)($seat['account_status'] ?? ''));
-                    $accountClass = 'bg-light text-dark';
-                    if (stripos($accountStatus, 'active') !== false || stripos($accountStatus, 'acting') !== false) {
-                        $accountClass = 'bg-success';
-                    } elseif (stripos($accountStatus, 'suspend') !== false) {
-                        $accountClass = 'bg-warning text-dark';
-                    } elseif (stripos($accountStatus, 'inactive') !== false || stripos($accountStatus, 'disabled') !== false || stripos($accountStatus, 'revoked') !== false) {
-                        $accountClass = 'bg-secondary';
-                    }
                     $termStartLabel = $otFormatDateLabel((string)($seat['term_start'] ?? ''));
                     $termEndLabel = $otFormatDateLabel((string)($seat['term_end'] ?? ''));
                     $positionAccess = trim((string)($seat['current_position_access'] ?? ''));
@@ -1192,15 +1182,6 @@ if ($hasCouncilTbl) {
                     </td>
                     <td><?= htmlspecialchars($positionAccess !== '' ? $positionAccess : '—', ENT_QUOTES, 'UTF-8') ?></td>
                     <td><?= htmlspecialchars($departmentLabel !== '' ? $departmentLabel : '—', ENT_QUOTES, 'UTF-8') ?></td>
-                    <td>
-                      <?php if ($accountStatus !== ''): ?>
-                        <span class="badge <?= htmlspecialchars($accountClass, ENT_QUOTES, 'UTF-8') ?>">
-                          <?= htmlspecialchars($accountStatus, ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                      <?php else: ?>
-                        <span class="text-muted">—</span>
-                      <?php endif; ?>
-                    </td>
                     <td>
                       <div><?= htmlspecialchars($termStartLabel, ENT_QUOTES, 'UTF-8') ?></div>
                       <div class="small text-muted">to <?= htmlspecialchars($termEndLabel, ENT_QUOTES, 'UTF-8') ?></div>
@@ -1305,22 +1286,12 @@ if ($hasCouncilTbl) {
                     <tr>
                       <th>Seat</th>
                       <th>Current Holder</th>
-                      <th>Account</th>
                     </tr>
                   </thead>
                   <tbody>
                     <?php foreach ($batchPreviewSeats as $seat): ?>
                       <?php
                         $holderName = trim((string)($seat['current_official_name'] ?? ''));
-                        $accountStatus = trim((string)($seat['account_status'] ?? ''));
-                        $accountClass = 'bg-light text-dark';
-                        if (stripos($accountStatus, 'active') !== false || stripos($accountStatus, 'acting') !== false) {
-                            $accountClass = 'bg-success';
-                        } elseif (stripos($accountStatus, 'suspend') !== false) {
-                            $accountClass = 'bg-warning text-dark';
-                        } elseif (stripos($accountStatus, 'inactive') !== false || stripos($accountStatus, 'disabled') !== false || stripos($accountStatus, 'revoked') !== false) {
-                            $accountClass = 'bg-secondary';
-                        }
                       ?>
                       <tr>
                         <td class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
@@ -1329,15 +1300,6 @@ if ($hasCouncilTbl) {
                             <?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?>
                           <?php else: ?>
                             <span class="text-muted fst-italic">Vacant</span>
-                          <?php endif; ?>
-                        </td>
-                        <td>
-                          <?php if ($accountStatus !== ''): ?>
-                            <span class="badge <?= htmlspecialchars($accountClass, ENT_QUOTES, 'UTF-8') ?>">
-                              <?= htmlspecialchars($accountStatus, ENT_QUOTES, 'UTF-8') ?>
-                            </span>
-                          <?php else: ?>
-                            <span class="text-muted">—</span>
                           <?php endif; ?>
                         </td>
                       </tr>
@@ -1715,12 +1677,11 @@ if ($hasCouncilTbl) {
                   <th>Selection</th>
                   <th>Group</th>
                   <th>Current Holder</th>
-                  <th>Account</th>
                 </tr>
               </thead>
               <tbody id="nbAutoSeatPreviewBody">
                 <tr>
-                  <td colspan="5" class="text-center text-muted py-4">Loading elected seats…</td>
+                  <td colspan="4" class="text-center text-muted py-4">Loading elected seats…</td>
                 </tr>
               </tbody>
             </table>
@@ -2130,6 +2091,6 @@ if ($hasCouncilTbl) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260328-01"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260328-02"></script>
 </body>
 </html>

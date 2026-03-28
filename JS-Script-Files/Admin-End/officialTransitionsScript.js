@@ -349,16 +349,6 @@
   // ══════════════════════════════════════════════════════════════════════════
   const batchSeatPreview = Array.isArray(window.OT_BATCH_SEAT_PREVIEW) ? window.OT_BATCH_SEAT_PREVIEW : [];
 
-  function batchSeatStatusBadge(status) {
-    const text = String(status || '').trim();
-    if (!text) return '<span class="text-muted">—</span>';
-    let cls = 'bg-light text-dark';
-    if (/active/i.test(text)) cls = 'bg-success';
-    else if (/inactive/i.test(text)) cls = 'bg-secondary';
-    else if (/suspend/i.test(text)) cls = 'bg-warning text-dark';
-    return `<span class="badge ${cls}">${esc(text)}</span>`;
-  }
-
   function renderBatchSeatPreview() {
     const emptyEl = document.getElementById('nbAutoSeatPreviewEmpty');
     const wrapEl = document.getElementById('nbAutoSeatPreviewWrap');
@@ -370,7 +360,7 @@
       emptyEl.classList.remove('d-none');
       emptyEl.textContent = 'No elected seats are configured in the council records yet.';
       wrapEl.classList.add('d-none');
-      bodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No elected seats are available for this batch.</td></tr>';
+      bodyEl.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No elected seats are available for this batch.</td></tr>';
       return;
     }
 
@@ -384,7 +374,6 @@
           <td><span class="badge bg-primary">${esc(seat.selection_method || 'Elected')}</span></td>
           <td>${esc(seat.seat_group || '—')}</td>
           <td>${holder ? esc(holder) : '<span class="text-muted fst-italic">Vacant</span>'}</td>
-          <td>${batchSeatStatusBadge(seat.account_status)}</td>
         </tr>
       `;
     }).join('');
