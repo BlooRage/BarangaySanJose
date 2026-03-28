@@ -5932,22 +5932,39 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'first_name' => '',
         'middle_name' => '',
         'suffix' => '',
+        'full_name' => '',
         'birthdate' => '',
         'birthplace' => '',
         'age' => '',
         'sex' => '',
         'civil_status' => '',
+        'head_of_family' => 0,
+        'voter_status' => 0,
         'religion' => '',
+        'sector_membership' => '',
+        'status' => '',
         'occupation' => '',
+        'occupation_display' => '',
         'contact_number' => '',
         'full_address' => '',
         'barangay_residency' => '',
+        'unit_number' => '',
+        'house_number' => '',
+        'street_name' => '',
+        'phase_number' => '',
+        'subdivision' => '',
+        'area_number' => '',
+        'house_ownership' => '',
+        'house_type' => '',
         'residency_duration' => '',
         'emergency_first_name' => '',
         'emergency_middle_name' => '',
         'emergency_last_name' => '',
         'emergency_suffix' => '',
         'emergency_contact' => '',
+        'emergency_contact_number' => '',
+        'emergency_relationship' => '',
+        'emergency_full_name' => '',
         'emergency_address' => '',
         'id_picture_path' => '',
         'id_picture_url' => '',
@@ -5970,9 +5987,13 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             r.baranagayresidency,
             r.sex,
             r.civil_status,
+            r.head_of_family,
+            r.voter_status,
             r.religion,
+            r.sector_membership,
             r.occupation,
             r.occupation_detail,
+            rs.status_name AS status,
             u.phone_number,
             (
                 SELECT uf.file_path
@@ -6050,15 +6071,19 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             a.phase_number,
             a.subdivision,
             a.area_number
-            ,a.residency_duration,
+            ,a.house_ownership,
+            a.house_type,
+            a.residency_duration,
             e.first_name AS emergency_first_name,
             e.middle_name AS emergency_middle_name,
             e.last_name AS emergency_last_name,
             e.suffix AS emergency_suffix,
             e.phone_number AS emergency_contact,
+            e.relationship AS emergency_relationship,
             e.address AS emergency_address
         FROM residentinformationtbl r
         LEFT JOIN useraccountstbl u ON u.user_id = r.user_id
+        LEFT JOIN statuslookuptbl rs ON rs.status_id = r.status_id_resident
         LEFT JOIN emergencycontacttbl e ON e.user_id = r.user_id
         LEFT JOIN residentaddresstbl a
             ON a.address_id = (
@@ -6093,6 +6118,15 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
     $row = pii_decrypt_useraccount_row($row) ?? $row;
     $row = pii_decrypt_resident_address_row($row) ?? $row;
     $row = pii_decrypt_emergency_contact_row($row) ?? $row;
+    $row = pii_decrypt_assoc($row, [
+        'emergency_first_name',
+        'emergency_middle_name',
+        'emergency_last_name',
+        'emergency_suffix',
+        'emergency_contact',
+        'emergency_relationship',
+        'emergency_address',
+    ]) ?? $row;
 
     $birthdate = trim((string)($row['birthdate'] ?? ''));
     $age = '';
@@ -6118,6 +6152,18 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         ? ($occupationDetail !== '' ? $occupationDetail : 'Employed')
         : 'Unemployed';
     $resolvedIdPicturePath = dra_resolve_resident_2x2_picture_path($conn, (string)($row['resident_id'] ?? ''));
+    $fullName = trim(
+        (string)($row['firstname'] ?? '') . ' ' .
+        (!empty($row['middlename']) ? substr((string)$row['middlename'], 0, 1) . '. ' : '') .
+        (string)($row['lastname'] ?? '') .
+        (!empty($row['suffix']) ? ' ' . (string)$row['suffix'] : '')
+    );
+    $emergencyFullName = trim(
+        (string)($row['emergency_first_name'] ?? '') . ' ' .
+        (!empty($row['emergency_middle_name']) ? substr((string)$row['emergency_middle_name'], 0, 1) . '. ' : '') .
+        (string)($row['emergency_last_name'] ?? '') .
+        (!empty($row['emergency_suffix']) ? ' ' . (string)$row['emergency_suffix'] : '')
+    );
 
     $profile = [
         'resident_id' => (string)($row['resident_id'] ?? ''),
@@ -6126,22 +6172,39 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'first_name' => (string)($row['firstname'] ?? ''),
         'middle_name' => (string)($row['middlename'] ?? ''),
         'suffix' => (string)($row['suffix'] ?? ''),
+        'full_name' => $fullName,
         'birthdate' => $birthdate,
         'birthplace' => (string)($row['birthplace'] ?? ''),
         'age' => $age,
         'sex' => (string)($row['sex'] ?? ''),
         'civil_status' => (string)($row['civil_status'] ?? ''),
+        'head_of_family' => (int)($row['head_of_family'] ?? 0),
+        'voter_status' => (int)($row['voter_status'] ?? 0),
         'religion' => (string)($row['religion'] ?? ''),
+        'sector_membership' => (string)($row['sector_membership'] ?? ''),
+        'status' => (string)($row['status'] ?? ''),
         'occupation' => $occupation,
+        'occupation_display' => $occupation,
         'contact_number' => (string)($row['phone_number'] ?? ''),
         'full_address' => $fullAddress,
         'barangay_residency' => (string)($row['baranagayresidency'] ?? ''),
+        'unit_number' => (string)($row['unit_number'] ?? ''),
+        'house_number' => (string)($row['street_number'] ?? ''),
+        'street_name' => (string)($row['street_name'] ?? ''),
+        'phase_number' => (string)($row['phase_number'] ?? ''),
+        'subdivision' => (string)($row['subdivision'] ?? ''),
+        'area_number' => (string)($row['area_number'] ?? ''),
+        'house_ownership' => (string)($row['house_ownership'] ?? ''),
+        'house_type' => (string)($row['house_type'] ?? ''),
         'residency_duration' => (string)($row['residency_duration'] ?? ''),
         'emergency_first_name' => (string)($row['emergency_first_name'] ?? ''),
         'emergency_middle_name' => (string)($row['emergency_middle_name'] ?? ''),
         'emergency_last_name' => (string)($row['emergency_last_name'] ?? ''),
         'emergency_suffix' => (string)($row['emergency_suffix'] ?? ''),
         'emergency_contact' => (string)($row['emergency_contact'] ?? ''),
+        'emergency_contact_number' => (string)($row['emergency_contact'] ?? ''),
+        'emergency_relationship' => (string)($row['emergency_relationship'] ?? ''),
+        'emergency_full_name' => $emergencyFullName,
         'emergency_address' => (string)($row['emergency_address'] ?? ''),
         'id_picture_path' => $resolvedIdPicturePath !== '' ? $resolvedIdPicturePath : (string)($row['id_picture_path'] ?? ''),
         'id_picture_url' => dra_public_asset_path($resolvedIdPicturePath !== '' ? $resolvedIdPicturePath : (string)($row['id_picture_path'] ?? '')),

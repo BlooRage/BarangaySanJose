@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260328-05";
+  const MODAL_VERSION = "20260328-06";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -30,46 +30,6 @@
       buttonClass: "btn btn-danger modalBtn",
     },
   };
-
-  function iconMarkupForTone(tone) {
-    const normalizedTone = String(tone || "info").trim().toLowerCase();
-
-    if (normalizedTone === "success") {
-      return `
-        <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--success" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <circle class="uniform-modal__icon-ring" cx="12" cy="12" r="8.5"></circle>
-          <path class="uniform-modal__icon-stroke" d="M8.2 12.4 10.65 14.85 15.85 9.65"></path>
-        </svg>
-      `;
-    }
-
-    if (normalizedTone === "warning") {
-      return `
-        <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--warning" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path class="uniform-modal__icon-stroke" d="M12 5.1 19 18.1H5L12 5.1Z"></path>
-          <path class="uniform-modal__icon-stroke" d="M12 9.45v4.35"></path>
-          <circle class="uniform-modal__icon-fill" cx="12" cy="16.55" r="1.15"></circle>
-        </svg>
-      `;
-    }
-
-    if (normalizedTone === "danger") {
-      return `
-        <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--danger" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <circle class="uniform-modal__icon-ring" cx="12" cy="12" r="8.5"></circle>
-          <path class="uniform-modal__icon-stroke" d="M9.25 9.25 14.75 14.75M14.75 9.25l-5.5 5.5"></path>
-        </svg>
-      `;
-    }
-
-    return `
-      <svg class="uniform-modal__icon-svg uniform-modal__icon-svg--info" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-        <circle class="uniform-modal__icon-ring" cx="12" cy="12" r="8.5"></circle>
-        <path class="uniform-modal__icon-stroke" d="M12 10.25v5.15"></path>
-        <circle class="uniform-modal__icon-fill" cx="12" cy="7.55" r="1.15"></circle>
-      </svg>
-    `;
-  }
 
   function resolveAssetBase() {
     const scripts = Array.from(document.scripts || []);
@@ -161,9 +121,6 @@
             </div>
             <hr class="my-3" />
             <div class="modal-body text-center pt-0" id="umBody">
-              <div class="uniform-modal__icon" id="umIconWrap">
-                <span id="umIcon" class="uniform-modal__icon-glyph" aria-hidden="true"></span>
-              </div>
               <div class="uniform-modal__copy">
                 <p class="mb-0" id="umMessage"></p>
               </div>
@@ -254,7 +211,6 @@
     const contentEl = document.getElementById("umContent");
     const titleEl = document.getElementById("umTitle");
     const messageEl = document.getElementById("umMessage");
-    const iconEl = document.getElementById("umIcon");
     const actionsEl = document.getElementById("umActions");
     const tone = normalizeTone(request.tone, request.message || request.messageHtml || "");
 
@@ -274,7 +230,6 @@
     }
 
     contentEl.setAttribute("data-tone", tone);
-    iconEl.innerHTML = iconMarkupForTone(tone);
 
     buildButtons(actionsEl, request.buttons, tone);
     activeRequest = request;

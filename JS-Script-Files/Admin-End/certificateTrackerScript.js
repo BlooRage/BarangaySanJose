@@ -4042,6 +4042,24 @@
 
   function fillResidentProfileModal(data) {
     const placeholder = `${appBase}/Images/Profile-Placeholder.png`;
+    const displayName = firstNonEmpty([data?.full_name, manualResidentDisplayName(data)]);
+    const emergencyDisplayName = firstNonEmpty([
+      data?.emergency_full_name,
+      manualResidentDisplayName({
+        first_name: data?.emergency_first_name,
+        middle_name: data?.emergency_middle_name,
+        last_name: data?.emergency_last_name,
+        suffix: data?.emergency_suffix
+      })
+    ]);
+    const occupationDisplay = firstNonEmpty([data?.occupation_display, data?.occupation, 'Unemployed']);
+    const emergencyContactDisplay = firstNonEmpty([data?.emergency_contact_number, data?.emergency_contact]);
+    const emergencyRelationshipDisplay = firstNonEmpty([data?.emergency_relationship, data?.relationship]);
+    const ageDisplay = firstNonEmpty([data?.age, computeAgeFromBirthdate(data?.birthdate)]);
+    const headOfFamilyRaw = String(firstNonEmpty([data?.head_of_family]) || '').trim().toLowerCase();
+    const voterStatusRaw = String(firstNonEmpty([data?.voter_status]) || '').trim().toLowerCase();
+    const isHeadOfFamily = headOfFamilyRaw === '1' || headOfFamilyRaw === 'yes' || headOfFamilyRaw === 'true';
+    const isRegisteredVoter = voterStatusRaw === '1' || voterStatusRaw === 'registered' || voterStatusRaw === 'true';
     const imgEl = document.getElementById('img-modalIdPicture');
     if (imgEl) {
       const candidateRaw = String(data?.id_picture_url || '').trim();
@@ -4054,14 +4072,14 @@
     }
     setById('span-displayID', `#${String(data?.resident_id || '—')}`);
 
-    setById('txt-modalName', data?.full_name);
+    setById('txt-modalName', displayName);
     setById('txt-modalDob', data?.birthdate);
-    setById('txt-modalAge', computeAgeFromBirthdate(data?.birthdate));
+    setById('txt-modalAge', ageDisplay);
     setById('txt-modalSex', data?.sex);
     setById('txt-modalCivilStatus', data?.civil_status);
-    setById('txt-modalHeadOfFam', String(data?.head_of_family || '0') === '1' ? 'Yes' : 'No');
-    setById('txt-modalVoterStatus', String(data?.voter_status || '0') === '1' ? 'Registered' : 'Not Registered');
-    setById('txt-modalOccupation', data?.occupation_display || 'Unemployed');
+    setById('txt-modalHeadOfFam', isHeadOfFamily ? 'Yes' : 'No');
+    setById('txt-modalVoterStatus', isRegisteredVoter ? 'Registered' : 'Not Registered');
+    setById('txt-modalOccupation', occupationDisplay);
     setById('txt-modalReligion', data?.religion);
     setById('txt-modalSectorMembership', data?.sector_membership);
 
@@ -4081,9 +4099,9 @@
       }
     }
 
-    setById('txt-modalEmergencyFullName', data?.emergency_full_name);
-    setById('txt-modalEmergencyContactNumber', data?.emergency_contact_number);
-    setById('txt-modalEmergencyRelationship', data?.emergency_relationship);
+    setById('txt-modalEmergencyFullName', emergencyDisplayName);
+    setById('txt-modalEmergencyContactNumber', emergencyContactDisplay);
+    setById('txt-modalEmergencyRelationship', emergencyRelationshipDisplay);
     setById('txt-modalEmergencyAddress', data?.emergency_address);
 
     setAddressField('addr-unit-number', 'txt-modalUnitNumber', data?.unit_number);
@@ -8236,7 +8254,11 @@
 
     function manualNormalizeResident(record) {
       if (!record || typeof record !== 'object') return null;
-      return {
+      const emergencyFirstName = String(firstNonEmpty([record.emergency_first_name, record.emergency_first])).trim();
+      const emergencyMiddleName = String(firstNonEmpty([record.emergency_middle_name, record.emergency_middle])).trim();
+      const emergencyLastName = String(firstNonEmpty([record.emergency_last_name, record.emergency_last])).trim();
+      const emergencySuffix = String(firstNonEmpty([record.emergency_suffix])).trim();
+      const resident = {
         resident_id: String(firstNonEmpty([record.resident_id])).trim(),
         resident_user_id: String(firstNonEmpty([record.resident_user_id, record.user_id])).trim(),
         first_name: String(firstNonEmpty([record.firstname, record.first_name])).trim(),
@@ -8245,23 +8267,46 @@
         suffix: String(firstNonEmpty([record.suffix])).trim(),
         birthdate: String(firstNonEmpty([record.birthdate])).trim(),
         birthplace: String(firstNonEmpty([record.birthplace])).trim(),
+        age: String(firstNonEmpty([record.age])).trim(),
         sex: String(firstNonEmpty([record.sex])).trim(),
         civil_status: String(firstNonEmpty([record.civil_status])).trim(),
         religion: String(firstNonEmpty([record.religion])).trim(),
-        occupation: String(firstNonEmpty([record.occupation])).trim(),
+        occupation: String(firstNonEmpty([record.occupation, record.occupation_detail])).trim(),
+        occupation_display: String(firstNonEmpty([record.occupation_display, record.occupation, record.occupation_detail])).trim(),
+        head_of_family: String(firstNonEmpty([record.head_of_family])).trim(),
+        voter_status: String(firstNonEmpty([record.voter_status])).trim(),
+        sector_membership: String(firstNonEmpty([record.sector_membership])).trim(),
+        status: String(firstNonEmpty([record.status])).trim(),
         contact_number: String(firstNonEmpty([record.contact_number, record.phone_number])).trim(),
         full_address: String(firstNonEmpty([record.full_address])).trim(),
+        unit_number: String(firstNonEmpty([record.unit_number])).trim(),
+        house_number: String(firstNonEmpty([record.house_number, record.street_number])).trim(),
+        street_name: String(firstNonEmpty([record.street_name])).trim(),
+        phase_number: String(firstNonEmpty([record.phase_number])).trim(),
+        subdivision: String(firstNonEmpty([record.subdivision])).trim(),
+        area_number: String(firstNonEmpty([record.area_number])).trim(),
+        house_ownership: String(firstNonEmpty([record.house_ownership])).trim(),
+        house_type: String(firstNonEmpty([record.house_type])).trim(),
         residency_duration: String(firstNonEmpty([record.residency_duration])).trim(),
-        emergency_first_name: String(firstNonEmpty([record.emergency_first_name, record.emergency_first])).trim(),
-        emergency_middle_name: String(firstNonEmpty([record.emergency_middle_name, record.emergency_middle])).trim(),
-        emergency_last_name: String(firstNonEmpty([record.emergency_last_name, record.emergency_last])).trim(),
-        emergency_suffix: String(firstNonEmpty([record.emergency_suffix])).trim(),
-        emergency_contact: String(firstNonEmpty([record.emergency_contact, record.emergency_phone_number])).trim(),
+        emergency_first_name: emergencyFirstName,
+        emergency_middle_name: emergencyMiddleName,
+        emergency_last_name: emergencyLastName,
+        emergency_suffix: emergencySuffix,
+        emergency_contact: String(firstNonEmpty([record.emergency_contact, record.emergency_contact_number, record.emergency_phone_number])).trim(),
+        emergency_contact_number: String(firstNonEmpty([record.emergency_contact_number, record.emergency_contact, record.emergency_phone_number])).trim(),
+        emergency_relationship: String(firstNonEmpty([record.emergency_relationship, record.relationship])).trim(),
         emergency_address: String(firstNonEmpty([record.emergency_address])).trim(),
         id_picture_url: String(firstNonEmpty([record.id_picture_url])).trim(),
         id_picture_path: String(firstNonEmpty([record.id_picture_path])).trim(),
-        full_name: manualResidentDisplayName(record),
       };
+
+      resident.full_name = manualResidentDisplayName(record) || manualResidentDisplayName(resident);
+      resident.emergency_full_name = String(firstNonEmpty([
+        record.emergency_full_name,
+        [emergencyFirstName, emergencyMiddleName, emergencyLastName, emergencySuffix].filter(Boolean).join(' ')
+      ])).trim();
+
+      return resident;
     }
 
     function manualSuggestedPurpose(config) {

@@ -1100,33 +1100,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $remarks = 'Official onboarding 2x2';
                 $idNumber = null;
 
-                $ins = $conn->prepare("
-                    INSERT INTO unifiedfileattachmenttbl
-                        (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                    VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                if (!$ins) {
-                    throw new RuntimeException('Failed to prepare document upload save.');
+                try {
+                    insertUnifiedFileAttachment($conn, [
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'document_type_id' => $docTypeId,
+                        'file_name' => $moved['file_name'],
+                        'file_path' => $moved['file_path'],
+                        'file_type' => $ext,
+                        'user_id_uploaded_by' => $loggedUserId,
+                        'status_id_verify' => $statusVerifyId,
+                        'remarks' => $remarks,
+                        'id_number' => $idNumber,
+                    ], 'uploaded 2x2 picture');
+                } catch (Throwable $insertError) {
+                    $diskPath = (string)($moved['disk_path'] ?? '');
+                    if ($diskPath !== '' && file_exists($diskPath)) {
+                        @unlink($diskPath);
+                    }
+                    throw new RuntimeException($insertError->getMessage(), 0, $insertError);
                 }
-                $ins->bind_param(
-                    "ssissssiss",
-                    $sourceType,
-                    $sourceId,
-                    $docTypeId,
-                    $moved['file_name'],
-                    $moved['file_path'],
-                    $ext,
-                    $loggedUserId,
-                    $statusVerifyId,
-                    $remarks,
-                    $idNumber
-                );
-                if (!$ins->execute()) {
-                    $ins->close();
-                    throw new RuntimeException('Failed to save uploaded 2x2 picture.');
-                }
-                $ins->close();
 
                 $inviteId = (int)$sessionInvite['invite_id'];
                 $roleNormalized = strtolower(trim((string)($account['role_access'] ?? $sessionInvite['role_access'] ?? '')));
