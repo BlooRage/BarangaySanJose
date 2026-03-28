@@ -4508,8 +4508,13 @@
         alert('Unable to prepare the Barangay ID preview for printing.');
         return;
       }
+      const releaseRequestId = String(
+        paymentProofReleaseRequestId
+        || paymentProofModalState?.options?.releaseRequestId
+        || ''
+      ).trim();
       idPrintProcessContext = {
-        requestId: String(paymentProofReleaseRequestId || '').trim(),
+        requestId: releaseRequestId,
         frontHtml: cards[0]?.outerHTML || '',
         backHtml: cards[1]?.outerHTML || '',
         docUrl: String(paymentProofModalState?.docUrl || '').trim(),
@@ -4575,7 +4580,7 @@
         await printBarangayIdCards('back', idPrintProcessPreview);
         return;
       case 'back':
-        queueReleaseFromPaymentProof(paymentProofReleaseRequestId);
+        queueReleaseFromPaymentProof(idPrintProcessContext?.requestId || paymentProofReleaseRequestId);
         return;
       default:
         idPrintProcessPhase = 'front';
@@ -4842,6 +4847,7 @@
       openDocumentModal(docUrl, title, returnTarget, options);
       return;
     }
+    paymentProofReleaseRequestId = String(options?.releaseRequestId || requestId).trim();
 
     paymentProofModalState = {
       docUrl: String(docUrl || '').trim(),

@@ -3368,6 +3368,6 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-03"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260328-06"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260328-07"></script>
 </body>
 </html>
