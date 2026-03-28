@@ -346,6 +346,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       window.RESIDENT_PROFILE_EMAIL_VERIFIED = <?= $emailVerified ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_ALLOWED = <?= $canEditProfile ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE = <?= json_encode($editBlockMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+      window.RESIDENT_HOUSEHOLD_IS_HEAD = <?= $isHeadOfFamily ? 'true' : 'false' ?>;
       window.RESIDENT_HOUSEHOLD_CAN_MANAGE = <?= $canManageHouseholdMembers ? 'true' : 'false' ?>;
       window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE = <?= json_encode($householdManageMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
@@ -357,7 +358,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdMembers.js?v=20260328-1" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdMembers.js?v=20260328-2" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>
@@ -798,6 +799,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                     <div id="householdAdultCount" class="fw-semibold">0</div>
                                 </div>
                             </div>
+                            <?php if ($isHeadOfFamily): ?>
                             <div id="householdPendingRequestsWrap" class="mb-3 d-none">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div class="text-muted small">Pending Member Verification Requests</div>
@@ -805,6 +807,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 </div>
                                 <div id="householdPendingRequestsList" class="border rounded bg-light"></div>
                             </div>
+                            <?php endif; ?>
                             <div id="householdMembersGrid" class="row g-3"></div>
                             <div id="householdMembersEmpty" class="text-muted small mt-2 d-none">
                                 No household members yet.

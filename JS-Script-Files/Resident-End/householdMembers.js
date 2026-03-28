@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const grid = document.getElementById("householdMembersGrid");
     const empty = document.getElementById("householdMembersEmpty");
     if (!grid) return;
+    let isHeadOfFamily = Boolean(window.RESIDENT_HOUSEHOLD_IS_HEAD);
     let canManageMembers = Boolean(window.RESIDENT_HOUSEHOLD_CAN_MANAGE);
 
     const setJoinButtonState = (hasHousehold) => {
@@ -83,7 +84,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const renderPendingRequests = (requests) => {
-        if (!pendingWrapEl || !pendingListEl) return;
+        if (!pendingWrapEl || !pendingListEl || !isHeadOfFamily) {
+            if (pendingWrapEl) {
+                pendingWrapEl.classList.add("d-none");
+            }
+            return;
+        }
         const rows = Array.isArray(requests) ? requests : [];
         if (pendingCountEl) {
             pendingCountEl.textContent = String(rows.length);
@@ -183,6 +189,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             setJoinButtonState(!!data.has_household);
             updateLeaveButtonState(!!data.has_household);
+            isHeadOfFamily = Boolean(data.is_head ?? window.RESIDENT_HOUSEHOLD_IS_HEAD);
+            window.RESIDENT_HOUSEHOLD_IS_HEAD = isHeadOfFamily;
             canManageMembers = Boolean(data.can_manage_members ?? window.RESIDENT_HOUSEHOLD_CAN_MANAGE);
             window.RESIDENT_HOUSEHOLD_CAN_MANAGE = canManageMembers;
             window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE = String(data.head_verification_message || window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "");
