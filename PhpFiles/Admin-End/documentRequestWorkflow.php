@@ -6473,6 +6473,7 @@ if ($action === 'search_manual_residents') {
             r.sex,
             r.civil_status,
             r.religion,
+            r.sector_membership,
             r.occupation,
             r.occupation_detail,
             u.phone_number,
@@ -6567,6 +6568,7 @@ if ($action === 'search_manual_residents') {
             'sex' => (string)($row['sex'] ?? ''),
             'civil_status' => (string)($row['civil_status'] ?? ''),
             'religion' => (string)($row['religion'] ?? ''),
+            'sector_membership' => (string)($row['sector_membership'] ?? ''),
             'occupation' => $occupation,
             'contact_number' => (string)($row['phone_number'] ?? ''),
             'full_address' => dra_compose_resident_full_address([
