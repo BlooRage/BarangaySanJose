@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 require_once __DIR__ . '/../includes/admin_guard.php';
+require_once __DIR__ . '/../../PhpFiles/General/documentRequestWorkflow.php';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function rp_table_exists(mysqli $conn, string $t): bool {
@@ -313,6 +314,29 @@ function rp_request_status_key(string $stage): string {
     return 'pending';
 }
 
+function rp_document_request_effective_fee(mysqli $conn, array $row): ?float {
+    $docType = trim((string)($row['document_type'] ?? ''));
+    if ($docType === '') {
+        return null;
+    }
+    $baseFee = null;
+    if (isset($row['fee_amount']) && $row['fee_amount'] !== null && $row['fee_amount'] !== '' && is_numeric((string)$row['fee_amount'])) {
+        $baseFee = (float)$row['fee_amount'];
+    }
+    return dr_get_effective_document_fee_amount($conn, $docType, $row, $baseFee);
+}
+
+function rp_document_request_effective_stage(mysqli $conn, array $row): string {
+    $stage = strtolower(trim((string)($row['stage'] ?? 'submitted')));
+    $effectiveFee = rp_document_request_effective_fee($conn, $row);
+    if ($effectiveFee !== null && $effectiveFee <= 0.0) {
+        if (in_array($stage, ['for_payment', 'payment_submitted', 'payment_verified', 'payment_rejected'], true)) {
+            return 'ready_for_claim';
+        }
+    }
+    return $stage !== '' ? $stage : 'submitted';
+}
+
 function rp_request_channel_label(array $payload): string {
     $channel = strtolower(trim((string)($payload['_submission_channel'] ?? '')));
     if ($channel !== '' && str_contains($channel, 'walkin')) {
@@ -458,11 +482,16 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
 
-    return rp_safe_query($conn, "
+    $rows = rp_safe_query($conn, "
         SELECT
             'document' AS record_source,
             d.request_id AS source_id,
             COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified') AS document_type,
+            COALESCE(NULLIF(TRIM(d.stage), ''), 'submitted') AS stage,
+            COALESCE(d.resident_id, '') AS resident_id,
+            COALESCE(d.resident_user_id, '') AS resident_user_id,
+            COALESCE(d.fee_amount, NULL) AS fee_amount,
+            COALESCE(d.request_details, '') AS request_details,
             COALESCE({$areaExpr}, 'Unspecified') AS area_number,
             COALESCE({$sectorExpr}, '') AS sector_membership,
             TRIM(CONCAT_WS(
@@ -484,6 +513,11 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
           AND DATE({$financeDateExpr}) BETWEEN '{$df}' AND '{$dt}'
         ORDER BY {$financeDateExpr} ASC, d.request_id ASC
     ");
+
+    return array_values(array_filter($rows, static function (array $row) use ($conn): bool {
+        $effectiveFee = rp_document_request_effective_fee($conn, $row);
+        return !($effectiveFee !== null && $effectiveFee <= 0.0);
+    }));
 }
 
 function rp_fetch_manual_financial_rows(mysqli $conn, string $dateFrom, string $dateTo): array {
@@ -1459,7 +1493,8 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             continue;
         }
 
-        $statusKey = rp_request_status_key((string)($row['stage'] ?? ''));
+        $effectiveStage = rp_document_request_effective_stage($conn, $row);
+        $statusKey = rp_request_status_key($effectiveStage);
         $areaNumber = trim((string)($row['area_number'] ?? ''));
         $areaNumber = isset($officialReportAreaOptions[$areaNumber]) ? $areaNumber : '';
         $sectorLabels = array_values(array_intersect(
@@ -1491,7 +1526,7 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'request_type_key' => $requestTypeKey,
             'request_type_label' => $issuanceModuleConfig['request_types'][$requestTypeKey],
             'status_key' => $statusKey,
-            'status_label' => $reportFilterStatusOptions[$statusKey] ?? ucfirst($statusKey),
+            'status_label' => $reportFilterStatusOptions[$statusKey] ?? rp_stage_label($effectiveStage),
             'area_number' => $areaNumber,
             'sector_membership' => $sectorLabels,
             'sector_membership_label' => $sectorLabels !== [] ? implode(', ', $sectorLabels) : 'None',
