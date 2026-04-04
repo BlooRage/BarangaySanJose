@@ -6436,6 +6436,21 @@ function dra_manual_normalize_fee_rows($fees): array {
     return $cleanFees;
 }
 
+function dra_manual_payload_has_certificate_payment_exemption(array $payload): bool {
+    $sectorMembership = trim((string)($payload['sector_membership'] ?? ''));
+    if ($sectorMembership === '') {
+        return false;
+    }
+
+    foreach (dr_parse_sector_membership_csv($sectorMembership) as $sectorKey) {
+        if (in_array($sectorKey, ['pwd', 'seniorcitizen'], true)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 if ($action === 'search_manual_residents') {
     $search = trim((string)($_GET['q'] ?? ''));
     if ($search === '') {
@@ -6700,19 +6715,20 @@ if ($action === 'create_manual_request') {
     $cleanFees = dra_manual_normalize_fee_rows(json_decode((string)($_POST['fees'] ?? '[]'), true));
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker(['document_type' => $documentType]);
     $isClearanceDoc = dr_is_clearance_document_type($documentType);
+    $hasManualSectorExemption = dra_manual_payload_has_certificate_payment_exemption($payload);
 
     $defaultFee = dr_get_effective_document_fee_amount($conn, $documentType, [
         'document_type' => $documentType,
         'resident_id' => $residentId,
         'resident_user_id' => $residentUserId,
     ]);
-    if ($isFirstTimeJobSeeker) {
+    if ($isFirstTimeJobSeeker || $hasManualSectorExemption) {
         $defaultFee = 0.0;
     }
 
     $clearanceTotal = null;
     if ($isClearanceDoc) {
-        if (!$cleanFees) {
+        if (!$cleanFees && !$hasManualSectorExemption) {
             dr_respond_json(422, ['success' => false, 'message' => 'Please tag at least one clearance fee before submitting this manual issuance request.']);
         }
         $clearanceTotal = 0.0;
@@ -6862,8 +6878,11 @@ if ($action === 'create_manual_request') {
     if ($resolvedFeeAmount === null && $defaultFee !== null) {
         $resolvedFeeAmount = (float)$defaultFee;
     }
+    if ($hasManualSectorExemption) {
+        $resolvedFeeAmount = 0.0;
+    }
 
-    $requiresInspection = !$isFirstTimeJobSeeker && dr_requires_clearance_inspection($documentType);
+    $requiresInspection = !$isFirstTimeJobSeeker && !$hasManualSectorExemption && dr_requires_clearance_inspection($documentType);
     $initialStage = $requiresInspection ? DR_STAGE_FOR_INSPECTION : DR_STAGE_FOR_PAYMENT;
     if ($isFirstTimeJobSeeker) {
         $initialStage = DR_STAGE_FOR_INTERVIEW;

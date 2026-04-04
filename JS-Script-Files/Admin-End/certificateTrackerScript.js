@@ -7505,6 +7505,9 @@
     const manualFeeWrap = document.getElementById('manualFeeWrap');
     const manualFeeList = document.getElementById('manualFeeList');
     const manualFeeTotal = document.getElementById('manualFeeTotal');
+    const manualSectorMembershipWrap = document.getElementById('manualSectorMembershipWrap');
+    const manualSectorMembershipHint = document.getElementById('manualSectorMembershipHint');
+    const manualSectorCheckboxes = Array.from(manualPanel.querySelectorAll('[data-manual-sector]'));
     const manualPreviewBtn = document.getElementById('manualPreviewBtn');
     const manualSubmitBtn = document.getElementById('manualSubmitBtn');
     const manualResetBtn = document.getElementById('manualResetBtn');
@@ -7623,6 +7626,61 @@
 
     function manualCurrentMode() {
       return manualResidentModeWalkin?.checked ? 'walkin' : 'existing';
+    }
+
+    function manualSelectedSectorValues() {
+      return manualSectorCheckboxes
+        .filter((checkbox) => checkbox?.checked)
+        .map((checkbox) => normalizeSectorLabel(checkbox?.getAttribute('data-manual-sector') || ''))
+        .filter(Boolean);
+    }
+
+    function manualSetSelectedSectorValues(values = []) {
+      const normalized = new Set(parseSectorValues(Array.isArray(values) ? values.join(',') : values));
+      manualSectorCheckboxes.forEach((checkbox) => {
+        const label = normalizeSectorLabel(checkbox?.getAttribute('data-manual-sector') || '');
+        checkbox.checked = normalized.has(label);
+      });
+    }
+
+    function manualHasExemptSector(values = manualSelectedSectorValues()) {
+      const selected = new Set((Array.isArray(values) ? values : []).map((value) => normalizeSectorLabel(value)));
+      return selected.has('PWD') || selected.has('Senior Citizen');
+    }
+
+    function manualCurrentSectorValues() {
+      if (manualCurrentMode() === 'walkin') {
+        return manualSelectedSectorValues();
+      }
+      return parseSectorValues(manualSelectedResident?.sector_membership || '');
+    }
+
+    function manualSyncSectorMembershipUi() {
+      const isWalkin = manualCurrentMode() === 'walkin';
+      const activeSectors = isWalkin
+        ? manualSelectedSectorValues()
+        : parseSectorValues(manualSelectedResident?.sector_membership || '');
+
+      if (!isWalkin) {
+        manualSetSelectedSectorValues(activeSectors);
+      }
+
+      manualSectorCheckboxes.forEach((checkbox) => {
+        checkbox.disabled = !isWalkin;
+      });
+
+      if (!manualSectorMembershipHint) return;
+
+      if (isWalkin) {
+        manualSectorMembershipHint.textContent = manualHasExemptSector(activeSectors)
+          ? 'This walk-in resident is marked as PWD and/or Senior Citizen, so the request will skip payment and proceed directly to release.'
+          : 'Tick the applicable walk-in sector membership. PWD and Senior Citizen requests skip payment and proceed directly to release.';
+        return;
+      }
+
+      manualSectorMembershipHint.textContent = activeSectors.length
+        ? `Registered resident sector membership: ${activeSectors.join(', ')}. Payment exemption applies automatically for PWD and Senior Citizen.`
+        : 'Registered residents follow the linked resident record. Switch to walk-in mode to encode sector membership manually.';
     }
 
     function manualCurrentConfig() {
@@ -8372,10 +8430,17 @@
           label: 'Preview the document first to unlock submission.'
         };
       }
+      const hasExemptSector = manualHasExemptSector(manualCurrentSectorValues());
       if (config.kind === 'first_time_job_seeker') {
         return {
           key: 'for_interview',
           label: 'After submit: For Interview'
+        };
+      }
+      if (hasExemptSector) {
+        return {
+          key: 'ready_for_claim',
+          label: 'After submit: Ready for Release'
         };
       }
       if (config.clearance) {
@@ -8741,6 +8806,7 @@
         manualSelectedResidentMeta.textContent = '';
         manualSyncBarangayIdPhotoResidentSource();
       }
+      manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
       manualUpdateSummary();
     }
@@ -8749,6 +8815,7 @@
       if (!manualDynamicFields) return;
       if (!manualSelectedResident) {
         manualSyncBarangayIdPhotoResidentSource();
+        manualSyncSectorMembershipUi();
         return;
       }
       const resident = manualSelectedResident;
@@ -8767,6 +8834,7 @@
         }
       });
       manualSyncBarangayIdPhotoResidentSource();
+      manualSyncSectorMembershipUi();
     }
 
     function manualClearLinkedResidentFields() {
@@ -8848,6 +8916,7 @@
       manualResidentResultsWrap?.classList.add('d-none');
       manualResidentResults.innerHTML = '';
       manualResidentSearchHint?.classList.add('d-none');
+      manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
       manualUpdateSummary();
       manualSetAlert('Resident linked. Review the auto-filled details, edit if needed, then preview the document.', 'info');
@@ -8935,6 +9004,7 @@
         full_address: fullAddress,
         full_address_display: fullAddress,
         address: fullAddress,
+        sector_membership: manualCurrentSectorValues().join(', '),
       };
 
       if (config.kind === 'barangay_id') {
@@ -9045,6 +9115,8 @@
       manualFeeWrap?.classList.add('d-none');
       manualFeeList.innerHTML = '';
       manualFeeTotal.textContent = 'PHP 0.00';
+      manualSetSelectedSectorValues([]);
+      manualSyncSectorMembershipUi();
       manualPurpose.dataset.auto = '1';
       manualApplyContextDocumentSelection();
       manualSetAlert('', 'warning');
@@ -9094,6 +9166,7 @@
       manualSelectedResidentName.textContent = 'Registered resident';
       manualSelectedResidentMeta.textContent = '';
       manualSyncBarangayIdPhotoResidentSource();
+      manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
       manualUpdateSummary();
       manualSetAlert('Resident link cleared. You can keep encoding this as a walk-in request or search again.', 'info');
@@ -9183,6 +9256,10 @@
     });
     manualFeeList?.addEventListener('change', () => {
       manualUpdateFeeTotal();
+      manualMarkPreviewStale(true);
+    });
+    manualSectorMembershipWrap?.addEventListener('change', () => {
+      manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
     });
 
@@ -9346,7 +9423,7 @@
     manualPreviewBtn?.addEventListener('click', () => {
       try {
         const bundle = manualPreviewStateBundle();
-        if (bundle.config.clearance && !bundle.feeRows.length) {
+        if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
           manualSetAlert('Tag at least one clearance fee first so the manual request can proceed to finance after submission.', 'warning');
         }
         if (viewModalTitle) {
@@ -9403,7 +9480,7 @@
         if (manualCurrentMode() === 'existing' && !String(bundle.payload.resident_id || bundle.payload.resident_user_id || '').trim()) {
           throw new Error('Search and link a registered resident first, or switch the request to walk-in mode.');
         }
-        if (bundle.config.clearance && !bundle.feeRows.length) {
+        if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
           throw new Error('Tag at least one clearance fee before submitting this manual issuance request.');
         }
         if (bundle.signature !== manualPreviewSignature) {

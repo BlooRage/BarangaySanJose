@@ -2622,6 +2622,34 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card">
               <div class="manual-issuance-card-title">
+                <h6>Sector Membership</h6>
+                <span>Tick the applicable sector membership for walk-in residents. Registered residents follow the linked resident record.</span>
+              </div>
+              <div class="row g-2" id="manualSectorMembershipWrap">
+                <?php foreach (['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'] as $sectorOption): ?>
+                  <?php $sectorId = preg_replace('/[^A-Za-z0-9]/', '', $sectorOption); ?>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="manualSector<?= htmlspecialchars($sectorId, ENT_QUOTES, 'UTF-8') ?>"
+                        data-manual-sector="<?= htmlspecialchars($sectorOption, ENT_QUOTES, 'UTF-8') ?>"
+                      >
+                      <label class="form-check-label" for="manualSector<?= htmlspecialchars($sectorId, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($sectorOption, ENT_QUOTES, 'UTF-8') ?>
+                      </label>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <div class="manual-search-empty mt-3 mb-0" id="manualSectorMembershipHint">
+                Walk-in sector selections are saved with the request. PWD and Senior Citizen requests skip payment and proceed directly to release.
+              </div>
+            </div>
+
+            <div class="manual-issuance-card">
+              <div class="manual-issuance-card-title">
                 <h6>3. Document Specific Details</h6>
                 <span id="manualSpecificFieldsHint">Select a certificate or clearance type to load its manual encoding fields.</span>
               </div>
