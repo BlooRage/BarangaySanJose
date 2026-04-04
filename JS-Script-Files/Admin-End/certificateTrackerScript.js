@@ -7506,7 +7506,6 @@
     const manualFeeList = document.getElementById('manualFeeList');
     const manualFeeTotal = document.getElementById('manualFeeTotal');
     const manualSectorMembershipWrap = document.getElementById('manualSectorMembershipWrap');
-    const manualSectorMembershipHint = document.getElementById('manualSectorMembershipHint');
     const manualSectorCheckboxes = Array.from(manualPanel.querySelectorAll('[data-manual-sector]'));
     const manualPreviewBtn = document.getElementById('manualPreviewBtn');
     const manualSubmitBtn = document.getElementById('manualSubmitBtn');
@@ -7668,19 +7667,48 @@
       manualSectorCheckboxes.forEach((checkbox) => {
         checkbox.disabled = !isWalkin;
       });
+    }
 
-      if (!manualSectorMembershipHint) return;
+    function manualValidationTargets() {
+      const dynamicFields = manualDynamicFields
+        ? Array.from(manualDynamicFields.querySelectorAll('[data-manual-field]'))
+        : [];
+      return [
+        manualDocumentType,
+        manualLastName,
+        manualFirstName,
+        manualBirthdate,
+        manualSex,
+        manualContactNumber,
+        manualBirthplace,
+        manualFullAddress,
+        ...dynamicFields
+      ].filter(Boolean);
+    }
 
-      if (isWalkin) {
-        manualSectorMembershipHint.textContent = manualHasExemptSector(activeSectors)
-          ? 'This walk-in resident is marked as PWD and/or Senior Citizen, so the request will skip payment and proceed directly to release.'
-          : 'Tick the applicable walk-in sector membership. PWD and Senior Citizen requests skip payment and proceed directly to release.';
-        return;
+    function manualSetFieldInvalidState(field, invalid) {
+      if (!field) return;
+      field.classList.toggle('is-invalid', !!invalid);
+    }
+
+    function manualClearValidationState() {
+      manualValidationTargets().forEach((field) => manualSetFieldInvalidState(field, false));
+    }
+
+    function manualValidateRequiredFields() {
+      let firstInvalid = null;
+      manualValidationTargets().forEach((field) => {
+        const invalid = !field.checkValidity();
+        manualSetFieldInvalidState(field, invalid);
+        if (!firstInvalid && invalid && typeof field.focus === 'function') {
+          firstInvalid = field;
+        }
+      });
+      if (firstInvalid) {
+        firstInvalid.focus();
+        return false;
       }
-
-      manualSectorMembershipHint.textContent = activeSectors.length
-        ? `Registered resident sector membership: ${activeSectors.join(', ')}. Payment exemption applies automatically for PWD and Senior Citizen.`
-        : 'Registered residents follow the linked resident record. Switch to walk-in mode to encode sector membership manually.';
+      return true;
     }
 
     function manualCurrentConfig() {
@@ -8767,6 +8795,7 @@
       const config = manualCurrentConfig();
       const fields = manualFieldDefinitions(config);
       if (!manualDynamicFields || !manualSpecificFieldsHint) return;
+      manualClearValidationState();
       manualApplyCommonFieldRequirements(config);
       if (!config) {
         manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">Select a certificate or clearance type to load its matching manual encoding fields.</div></div>';
@@ -9041,9 +9070,11 @@
     function manualPreviewStateBundle() {
       const config = manualCurrentConfig();
       if (!config) {
+        manualSetFieldInvalidState(manualDocumentType, true);
         throw new Error('Select a certificate or clearance type first.');
       }
-      if (!manualForm.reportValidity()) {
+      manualClearValidationState();
+      if (!manualValidateRequiredFields()) {
         throw new Error('Complete the required form fields first.');
       }
 
@@ -9108,6 +9139,7 @@
       manualSelectedResidentCard?.classList.add('d-none');
       manualPreviewSignature = '';
       manualResetBarangayIdPhotoState();
+      manualClearValidationState();
       if (manualSubmitBtn) {
         manualSubmitBtn.disabled = true;
       }
@@ -9262,6 +9294,21 @@
       manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
     });
+    manualDocumentType?.addEventListener('change', () => {
+      manualSetFieldInvalidState(manualDocumentType, !manualDocumentType.checkValidity());
+    });
+    manualDynamicFields?.addEventListener('input', (event) => {
+      const field = event.target?.closest?.('[data-manual-field]');
+      if (!field) return;
+      manualSetFieldInvalidState(field, !field.checkValidity());
+      manualMarkPreviewStale(true);
+    });
+    manualDynamicFields?.addEventListener('change', (event) => {
+      const field = event.target?.closest?.('[data-manual-field]');
+      if (!field) return;
+      manualSetFieldInvalidState(field, !field.checkValidity());
+      manualMarkPreviewStale(true);
+    });
 
     [
       manualLastName,
@@ -9277,8 +9324,14 @@
       manualReligion,
       manualFullAddress
     ].forEach((field) => {
-      field?.addEventListener('input', () => manualMarkPreviewStale(true));
-      field?.addEventListener('change', () => manualMarkPreviewStale(true));
+      field?.addEventListener('input', () => {
+        manualSetFieldInvalidState(field, !field.checkValidity());
+        manualMarkPreviewStale(true);
+      });
+      field?.addEventListener('change', () => {
+        manualSetFieldInvalidState(field, !field.checkValidity());
+        manualMarkPreviewStale(true);
+      });
     });
 
     manualBarangayIdStartCameraBtn?.addEventListener('click', () => {

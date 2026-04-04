@@ -2643,9 +2643,6 @@ if ($certificateLaunchStage === 'release') {
                   </div>
                 <?php endforeach; ?>
               </div>
-              <div class="manual-search-empty mt-3 mb-0" id="manualSectorMembershipHint">
-                Walk-in sector selections are saved with the request. PWD and Senior Citizen requests skip payment and proceed directly to release.
-              </div>
             </div>
 
             <div class="manual-issuance-card">
