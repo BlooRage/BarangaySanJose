@@ -7728,6 +7728,7 @@ if ($action === 'personnel_approve') {
 
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker($row);
     $isClearanceDoc = dr_is_clearance_document_type((string)($row['document_type'] ?? ''));
+    $hasCertificatePaymentExemption = dr_request_has_certificate_payment_exemption($conn, $row, (string)($row['document_type'] ?? ''));
     if ($isClearanceDoc) {
         dr_ensure_clearance_fee_types_table($conn);
         dr_ensure_clearance_row_for_request($conn, $row);
@@ -7758,10 +7759,12 @@ if ($action === 'personnel_approve') {
             }
             $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
         }
-        if (!$taggedFees) {
+        if (!$taggedFees && !$hasCertificatePaymentExemption) {
             dr_respond_json(422, ['success' => false, 'message' => 'Please tag the applicable fees before approving this request.']);
         }
-        $defaultFee = dr_get_clearance_fee_total_for_request($conn, $requestId);
+        $defaultFee = $hasCertificatePaymentExemption
+            ? 0.0
+            : dr_get_clearance_fee_total_for_request($conn, $requestId);
     }
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
     $requiresInspection = !$isFirstTimeJobSeeker && dr_requires_clearance_inspection((string)($row['document_type'] ?? ''));

@@ -2454,11 +2454,6 @@ function dr_resident_has_certificate_payment_exemption(mysqli $conn, ?string $re
         }
     }
 
-    if ($foundNormalizedTarget) {
-        $cache[$residentId] = false;
-        return false;
-    }
-
     if (!dr_table_exists($conn, 'residentinformationtbl') || !dr_column_exists($conn, 'residentinformationtbl', 'sector_membership')) {
         $cache[$residentId] = false;
         return false;
