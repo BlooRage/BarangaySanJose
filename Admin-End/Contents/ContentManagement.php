@@ -34,6 +34,7 @@ $currentUserLabel = cms_content_current_user_display($conn, $currentUserId, $cur
 $canReviewContent = cms_content_can_review($conn, $currentUserId, $currentRole);
 
 $contentToolsUrl = appUrl('Admin-End/Contents/Contents.php') . '?tool=tracker#tracker-card';
+$createNewsUrl = appUrl('Admin-End/Contents/CreateNews.php');
 $createAnnouncementUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=page';
 $reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_issuance';
 
@@ -101,12 +102,14 @@ $hiddenEditorModules = [
 
 $editorMeta = [
     'announcements' => [
-        'subtitle' => 'This editor controls the public News page banner. News posts and sidebar announcements continue to use the Announcements module.',
+        'subtitle' => 'This editor controls the public News page banner. News posts now use a dedicated Create News workflow while announcements stay in the Announcements module.',
         'notes' => [
-            'Use the Announcements tools for public news posts, public announcements, SMS, email, and FAQ items.',
+            'Use Create News for full public news articles with a headline image and section builder.',
+            'Use the Announcements tools for public announcements, SMS, email, and FAQ items.',
         ],
         'quick_links' => [
             ['label' => 'Open Content Tools', 'href' => $canManageAnnouncements ? $contentToolsUrl : ''],
+            ['label' => 'Create News', 'href' => $canManageAnnouncements ? $createNewsUrl : ''],
             ['label' => 'Create Announcement', 'href' => $canManageAnnouncements ? $createAnnouncementUrl : ''],
         ],
     ],

@@ -9,7 +9,7 @@ $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
 $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
-$contentMgmtPages = ['Contents.php', 'CreateContent.php'];
+$contentMgmtPages = ['Contents.php', 'CreateContent.php', 'CreateNews.php'];
 $areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php', 'UserArchive.php'];
@@ -230,7 +230,7 @@ $isFinanceCreateActive = $current === 'FinancePayments.php' && $financeSection =
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
 $isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'create'], true);
 $contentCreateType = strtolower(trim((string)($_GET['type'] ?? 'page')));
-if (!in_array($contentCreateType, ['page', 'delivery', 'faq'], true)) {
+if (!in_array($contentCreateType, ['page', 'news', 'delivery', 'faq'], true)) {
     $contentCreateType = 'page';
 }
 $contentToolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
@@ -245,9 +245,10 @@ $contentRequestsView = strtolower(trim((string)($_GET['requests_view'] ?? 'my_re
 if (!in_array($contentRequestsView, ['my_requests', 'review_queue', 'archived_requests', 'approved_history'], true)) {
     $contentRequestsView = 'my_requests';
 }
-$isContentCreateSectionActive = $current === 'CreateContent.php';
+$isContentCreateSectionActive = in_array($current, ['CreateContent.php', 'CreateNews.php'], true);
 $isContentToolsSectionActive = $current === 'Contents.php';
 $isContentFaqCreateActive = $current === 'CreateContent.php' && $contentCreateType === 'faq';
+$isContentNewsCreateActive = $current === 'CreateNews.php';
 $isContentNavigatorActive = $current === 'ContentManagement.php' || $isContentFaqCreateActive;
 $isContentChangeRequestActive = $current === 'ContentManagement.php'
     && $contentManagementModule === 'requests';
@@ -1254,6 +1255,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isContentMgmtActive ? 'show' : '' ?>" id="announcements-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('announcements_page')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateNews.php')) ?>"
+                 class="link-dark rounded <?= $isContentNewsCreateActive ? 'active' : '' ?>">
+                Create News
+              </a>
+            </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
                  class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">

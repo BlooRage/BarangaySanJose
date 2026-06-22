@@ -71,40 +71,59 @@
                     <div class="p-4 servBox">
                         <h3>Certificates</h3>
                         <p>Request official barangay certificates for school, work, or personal use.  Verified and officially recorded. </p>
-                        <a href="../login"><button id="deptBtn" type="button" class="btn">Apply</button></a>
+                        <a href="../login?service=certificates" class="btn serviceApplyBtn" data-service-login data-service-slug="certificates" data-service-name="Certificates">Apply</a>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 servBox">
                         <h3>Clearances</h3>
                         <p>Apply for barangay clearance for employment, business, or legal purposes.</p>
-                        <a href="../login"><button id="deptBtn" type="button" class="btn">Apply</button></a>
+                        <a href="../login?service=clearances" class="btn serviceApplyBtn" data-service-login data-service-slug="clearances" data-service-name="Clearances">Apply</a>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 servBox">
                         <h3>Barangay ID</h3>
                         <p>Apply for a Barangay San Jose ID as proof of residency. Recognized for local transactions.</p>
-                        <a href="../login"><button id="deptBtn" type="button" class="btn">Apply</button></a>
+                        <a href="../login?service=barangay-id" class="btn serviceApplyBtn" data-service-login data-service-slug="barangay-id" data-service-name="Barangay ID">Apply</a>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 servBox">
                         <h3>Appointments</h3>
                         <p>Schedule a visit with the barangay office for specific services or concerns.  Organized and time efficient.</p>
-                        <a href="../login"><button id="deptBtn" type="button" class="btn">Apply</button></a>
+                        <a href="../login?service=appointments" class="btn serviceApplyBtn" data-service-login data-service-slug="appointments" data-service-name="Appointments">Apply</a>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 servBox">
                         <h3>Complaint</h3>
                         <p>Submit complaints to report issues affecting peace, order, or community welfare.</p>
-                        <a href="../login"><button id="deptBtn" type="button" class="btn">Apply</button></a>
+                        <a href="../login?service=complaints" class="btn serviceApplyBtn" data-service-login data-service-slug="complaints" data-service-name="Complaints">Apply</a>
                     </div>
                 </div>
             </div>
         </div>
     </section>
+
+    <div class="modal fade serviceAuthModal" id="serviceAuthModal" tabindex="-1" aria-labelledby="serviceAuthModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <button type="button" class="btn-close serviceAuthClose" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <p class="serviceAuthEyebrow">Resident Access Required</p>
+                    <h2 class="serviceAuthTitle" id="serviceAuthModalTitle">Login or Register</h2>
+                    <p class="serviceAuthCopy">
+                        To continue with <strong id="serviceAuthServiceName">this service</strong>, sign in to your resident account or register first.
+                    </p>
+                    <div class="serviceAuthActions">
+                        <a id="serviceAuthLoginLink" class="btn btn-orange text-white serviceAuthPrimary" href="../login">Login / Register</a>
+                    </div>
+                    <p class="serviceAuthHint mb-0">You will return to the selected service after authentication.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="footerWrapper">
         <footer id="footer">
@@ -139,6 +158,7 @@
 
     
     
+    <script src="../JS-Script-Files/publicPagePrefetch.js?v=20260622-1"></script>
     <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
@@ -161,6 +181,92 @@
         }
     </script>
     <script>
+        (function() {
+            const modalEl = document.getElementById("serviceAuthModal");
+            const modal = modalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+            const serviceNameEl = document.getElementById("serviceAuthServiceName");
+            const loginLinkEl = document.getElementById("serviceAuthLoginLink");
+            const redirectBase = "../account-redirect";
+
+            function isLoginUrl(value) {
+                try {
+                    const url = new URL(value, window.location.href);
+                    return /\/login$/i.test(url.pathname) || /\/Guest-End\/login(?:\.php)?$/i.test(url.pathname);
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            function hydrateModal(trigger) {
+                const serviceName = (trigger.dataset.serviceName || "this service").trim();
+                const loginHref = trigger.getAttribute("href") || "../login";
+
+                if (serviceNameEl) {
+                    serviceNameEl.textContent = serviceName;
+                }
+                if (loginLinkEl) {
+                    loginLinkEl.href = loginHref;
+                }
+            }
+
+            async function resolveAuthenticatedDestination(trigger) {
+                const serviceSlug = (trigger.dataset.serviceSlug || "").trim();
+                const probeUrl = serviceSlug
+                    ? redirectBase + "?service=" + encodeURIComponent(serviceSlug)
+                    : redirectBase;
+
+                const response = await fetch(probeUrl, {
+                    credentials: "same-origin",
+                });
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                return isLoginUrl(response.url) ? null : response.url;
+            }
+
+            document.addEventListener("click", async function(event) {
+                const trigger = event.target.closest("[data-service-login]");
+                if (!trigger) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                if (trigger.dataset.busy === "true") {
+                    return;
+                }
+
+                trigger.dataset.busy = "true";
+
+                try {
+                    const destination = await resolveAuthenticatedDestination(trigger);
+                    if (destination) {
+                        window.location.href = destination;
+                        return;
+                    }
+
+                    hydrateModal(trigger);
+                    if (modal) {
+                        modal.show();
+                        return;
+                    }
+                } catch (error) {
+                    hydrateModal(trigger);
+                    if (modal) {
+                        modal.show();
+                        return;
+                    }
+                } finally {
+                    trigger.dataset.busy = "false";
+                }
+
+                window.location.href = trigger.getAttribute("href") || "../login";
+            });
+        })();
+    </script>
+    <script>
         document.addEventListener("click", function (event) {
             var navbar = document.getElementById("navbarNav");
             var toggler = document.querySelector(".navbar-toggler");
@@ -179,7 +285,3 @@
         });
     </script></body>
 </html>
-
-
-
-

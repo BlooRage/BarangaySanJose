@@ -21,6 +21,7 @@ if (!isset($_SESSION['pending_user_id']) || ($_SESSION['pending_verify'] ?? '') 
 }
 
 $user_id = $_SESSION['pending_user_id'];
+$requestedService = normalizeRequestedResidentService($_SESSION['pending_post_login_service'] ?? '');
 
 // Get user phone + role
 $stmt = $conn->prepare("SELECT phone_number, role_access, status_id_account FROM useraccountstbl WHERE user_id = ? LIMIT 1");
@@ -96,6 +97,7 @@ if ((int)$user['status_id_account'] === (int)$inactiveStatusId) {
 
 // Create real login session
 unset($_SESSION['pending_user_id'], $_SESSION['pending_verify']);
+unset($_SESSION['pending_post_login_service']);
 
 // Prevent session fixation when an inactive account finishes verification.
 session_regenerate_id(true);
@@ -108,6 +110,6 @@ $_SESSION['show_not_verified_modal'] = true;
 
 echo json_encode([
   'success' => true,
-  'redirect' => resolveUnifiedProfileRedirect($conn, $user_id, (string)$user['role_access'])
+  'redirect' => resolveRequestedPostLoginRedirect($conn, $user_id, (string)$user['role_access'], $requestedService)
 ]);
 exit;

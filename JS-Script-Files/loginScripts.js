@@ -88,6 +88,8 @@ const tryAutoVerifyOtp = () => {
 let verifiedResetEmail = "";
 let verifiedResetPhone = "";
 const defaultLoginResolveRedirect = window.APP_LOGIN_RESOLVE_REDIRECT || "../account-redirect";
+const requestedLoginAuthMode = typeof window.APP_LOGIN_AUTH_MODE === "string" ? window.APP_LOGIN_AUTH_MODE : "";
+const requestedLoginService = typeof window.APP_LOGIN_REQUESTED_SERVICE === "string" ? window.APP_LOGIN_REQUESTED_SERVICE : "";
 
 // Inactive flow state
 let inactiveSession = {
@@ -1117,6 +1119,9 @@ if (verifyOTPBtn) {
         signupData.append("RPhoneNumber", phoneForDB(tempSignupData.phone));
         signupData.append("REmail", tempSignupData.email);
         signupData.append("RPassword", tempSignupData.password);
+        if (requestedLoginService) {
+          signupData.append("post_login_service", requestedLoginService);
+        }
 
         const signupRes = await fetch("../PhpFiles/Login/RegisterAccount.php", {
           method: "POST",
@@ -1277,6 +1282,9 @@ if (loginForm) {
       const formData = new FormData();
       formData.append("user", username);
       formData.append("loginPassword", password);
+      if (requestedLoginService) {
+        formData.append("post_login_service", requestedLoginService);
+      }
 
       const res = await fetch("../PhpFiles/Login/login.php", {
         method: "POST",
@@ -1320,6 +1328,12 @@ if (loginForm) {
     } finally {
       setLoginButtonLoading(false);
     }
+  });
+}
+
+if (requestedLoginAuthMode === "signup") {
+  window.requestAnimationFrame(() => {
+    switchToSignup();
   });
 }
 

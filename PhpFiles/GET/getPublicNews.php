@@ -43,8 +43,8 @@ foreach ($items as $item) {
         $contentHtml = (string)($item['content_html'] ?? '');
     }
 
-    $imageUrl = '';
-    if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $contentHtml, $matches)) {
+    $imageUrl = trim((string)($item['news_headline_image_url'] ?? ''));
+    if ($imageUrl === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $contentHtml, $matches)) {
         $imageUrl = (string)($matches[1] ?? '');
     }
 
@@ -77,4 +77,3 @@ echo json_encode([
     'item' => $latestItem,
     'items' => $newsItems
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-

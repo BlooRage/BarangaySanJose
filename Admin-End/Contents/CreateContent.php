@@ -13,7 +13,7 @@ if (!in_array($contentType, ['page', 'delivery', 'faq'], true)) {
   $contentType = 'page';
 }
 $typeMeta = [
-  'page' => ['title' => 'Create Page Announcement', 'description' => 'Create content for the guest and account pages, including news and announcement placements.'],
+  'page' => ['title' => 'Create Page Announcement', 'description' => 'Create public announcements for the guest and account pages.'],
   'delivery' => ['title' => 'Create SMS and Email Announcement', 'description' => 'Create delivery-first content for SMS and/or email recipients.'],
   'faq' => ['title' => 'Create FAQ Page Content', 'description' => 'Create an FAQ item that can be tracked inside content management.']
 ];
@@ -25,10 +25,10 @@ $guideMeta = [
   'page' => [
     'kicker' => 'Before You Start',
     'title' => 'Page Announcement Tips',
-    'subtitle' => 'Create content for the guest news section and/or the announcements areas shown on guest and account pages.',
-    'text' => 'Use a clear public-facing title, a short opening summary, and readable sections for residents scanning page content.',
+    'subtitle' => 'Create announcement content for the public areas shown on the guest and account pages.',
+    'text' => 'Use a clear public-facing title, a short opening summary, and readable sections for residents scanning page announcements.',
     'blocks' => [
-      ['title' => 'Page Placement', 'items' => ['News Section appears in the featured news area', 'Announcements appear on guest and/or account views', 'If both are selected, write a separate version for each']],
+      ['title' => 'Page Placement', 'items' => ['Announcements appear on guest and/or account views', 'Choose Guest Page, Account Page, or both', 'Use Create News for full news articles']],
       ['title' => 'Writing Tips', 'items' => ['Lead with the key update', 'Keep instructions easy to scan', 'Use bullets for schedules or requirements']]
     ]
   ],
@@ -97,7 +97,7 @@ $sharedMeta = [
     'title_label' => 'Title',
     'title_placeholder' => 'Enter announcement title',
     'body_label' => 'Body',
-    'body_helper' => 'Use headings, lists, and short paragraphs so the announcement stays readable in both news and announcement views.',
+    'body_helper' => 'Use headings, lists, and short paragraphs so the announcement stays readable on both guest and account announcement areas.',
     'editor_placeholder' => 'Write your announcement here...'
   ],
   'delivery' => [
@@ -175,11 +175,10 @@ $sharedMeta = [
                 <?php if ($isPageType): ?>
                 <div class="announcement-config-panel" id="pagePlacementPanel">
                   <h6 class="announcement-card-title">Page Placement</h6>
-                  <label class="form-label fw-semibold mb-2">Where should this appear?</label>
-                  <div class="form-check mb-2">
-                    <input class="form-check-input placement-checkbox" type="checkbox" value="public_news" id="placementPublicNews" name="placements[]" <?= $deliveryChannel === 'public_news' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                    <label class="form-check-label" for="placementPublicNews">News Section</label>
-                    <div class="form-text mt-0">Shows in the featured news area of the guest news page.</div>
+                  <label class="form-label fw-semibold mb-2">Where should this announcement appear?</label>
+                  <input class="form-check-input placement-checkbox d-none" type="checkbox" value="public_news" id="placementPublicNews" name="placements[]" hidden aria-hidden="true" tabindex="-1">
+                  <div class="rounded-3 border bg-light px-3 py-2 small text-body-secondary mb-3">
+                    News articles now use the separate <strong>Create News</strong> workflow.
                   </div>
                   <div class="form-check">
                     <input class="form-check-input placement-checkbox" type="checkbox" value="announcement" id="placementPublic" name="placements[]" <?= in_array($deliveryChannel, ['public', 'website', 'all'], true) ? 'checked' : '' ?>>
@@ -1143,7 +1142,6 @@ $sharedMeta = [
   </script>
 </body>
 </html>
-
 
 
 

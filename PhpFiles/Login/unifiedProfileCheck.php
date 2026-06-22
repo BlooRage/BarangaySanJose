@@ -5,9 +5,11 @@ require_once __DIR__ . '/redirectDestination.php';
 
 $userID = $_SESSION['user_id'] ?? null;
 $role   = $_SESSION['role'] ?? null;
+$requestedService = normalizeRequestedResidentService($_GET['service'] ?? '');
 
 if (!$userID || !$role) {
-    redirectToLogin();
+    $loginQuery = $requestedService !== '' ? 'service=' . rawurlencode($requestedService) : '';
+    redirectToLogin($loginQuery);
 }
-header('Location: ' . resolveUnifiedProfileRedirect($conn, (string)$userID, (string)$role));
+header('Location: ' . resolveRequestedPostLoginRedirect($conn, (string)$userID, (string)$role, $requestedService));
 exit;

@@ -334,33 +334,64 @@ body {
 @media (max-width: 992px) {
     .login-signup-container {
         min-width: 300px;
-        min-height: 520px;
+        min-height: 0;
         width: min(92vw, 560px);
         height: auto;
         margin: 8vh auto 20px;
+        overflow: visible;
     }
 
     .auth-image { display: none; }
 
     .form-wrapper {
         width: 100%;
-        min-height: 520px;
+        min-height: 0;
+        height: auto;
+        position: relative;
+        overflow: visible;
         transform: none !important;
     }
 
-    .form-box {
-        position: absolute;
+    .form-box,
+    #forgotpassword-verify,
+    #reset-password-step,
+    #otp-form {
+        position: relative;
+        inset: auto;
         width: 100%;
-        padding: 10px;
+        height: auto;
+        min-height: 0;
+        padding: 24px 20px 28px;
         transform: none !important;
-        transition: opacity 0.5s ease;
+        transition: none;
         background: #fff;
+        justify-content: flex-start;
+        align-items: stretch;
+        overflow: visible;
+        box-shadow: none;
+        border-radius: 0;
+        opacity: 1;
+        display: none;
     }
 
-    .form-box.active {
-        opacity: 1;
+    .form-box.active,
+    #forgotpassword-verify.active,
+    #reset-password-step.active,
+    #otp-form.active {
+        display: flex;
         z-index: 2;
         transform: none !important;
+    }
+
+    .form-box .alert,
+    #forgotpassword-verify .alert,
+    #reset-password-step .alert,
+    #otp-form .alert {
+        width: 100%;
+        font-size: 0.92rem;
+        line-height: 1.4;
+        padding: 10px 12px;
+        margin-bottom: 16px;
     }
 }
 
@@ -370,20 +401,19 @@ body {
     }
 
     .login-signup-container {
-        min-height: 480px;
+        min-height: 0;
         width: min(94vw, 520px);
         margin: 6vh auto 16px;
         border-radius: 12px;
     }
 
     .form-wrapper {
-        min-height: 480px;
+        min-height: 0;
     }
 
-    .form-box {
-        padding: 24px 20px;
-    }
-
+    .form-box,
+    #forgotpassword-verify,
+    #reset-password-step,
     #otp-form {
         padding: 24px 20px;
     }
@@ -391,19 +421,18 @@ body {
 
 @media (max-width: 576px) {
     .login-signup-container {
-        min-height: 440px;
+        min-height: 0;
         width: 94vw;
         margin: 5vh auto 12px;
     }
 
     .form-wrapper {
-        min-height: 440px;
+        min-height: 0;
     }
 
-    .form-box {
-        padding: 20px 16px;
-    }
-
+    .form-box,
+    #forgotpassword-verify,
+    #reset-password-step,
     #otp-form {
         padding: 20px 16px;
     }

@@ -108,6 +108,7 @@
         </footer>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script src="../JS-Script-Files/publicPagePrefetch.js?v=20260622-1"></script>
     <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         function escapeHtml(value) {
@@ -149,6 +150,59 @@
             `;
         }
 
+        function renderFaqItems(items) {
+            var left = document.getElementById("accordionLeft");
+            var right = document.getElementById("accordionRight");
+            if (!left || !right) {
+                return;
+            }
+
+            var faqItems = Array.isArray(items) ? items : [];
+            if (faqItems.length === 0) {
+                left.innerHTML = `
+                    <div class="accordionItemGroup">
+                        <div class="accordionBody" style="padding-left:20px;">
+                            <p>No FAQ items available yet.</p>
+                        </div>
+                    </div>
+                `;
+                right.innerHTML = "";
+                return;
+            }
+
+            var leftHtml = "";
+            var rightHtml = "";
+            faqItems.forEach(function (item, index) {
+                var sideId = index % 2 === 0 ? "accordionLeft" : "accordionRight";
+                var markup = buildFaqMarkup(item, index + 1, sideId, index === 0);
+                if (index % 2 === 0) {
+                    leftHtml += markup;
+                } else {
+                    rightHtml += markup;
+                }
+            });
+
+            left.innerHTML = leftHtml;
+            right.innerHTML = rightHtml;
+        }
+
+        function renderFaqError() {
+            var left = document.getElementById("accordionLeft");
+            var right = document.getElementById("accordionRight");
+            if (!left || !right) {
+                return;
+            }
+
+            left.innerHTML = `
+                <div class="accordionItemGroup">
+                    <div class="accordionBody" style="padding-left:20px;">
+                        <p>Unable to load FAQs right now. Please try again later.</p>
+                    </div>
+                </div>
+            `;
+            right.innerHTML = "";
+        }
+
         async function loadFaqItems() {
             var left = document.getElementById("accordionLeft");
             var right = document.getElementById("accordionRight");
@@ -157,50 +211,38 @@
             }
 
             try {
-                var response = await fetch("../PhpFiles/GET/getFaqItems.php", { credentials: "omit" });
-                var payload = await response.json();
-                if (!response.ok || !payload || payload.success !== true) {
+                var payload;
+                if (window.PublicPagePrefetch && typeof window.PublicPagePrefetch.fetchJson === "function") {
+                    payload = await window.PublicPagePrefetch.fetchJson("../PhpFiles/GET/getFaqItems.php", { credentials: "omit" });
+                } else {
+                    var response = await fetch("../PhpFiles/GET/getFaqItems.php", { credentials: "omit" });
+                    payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error("Unable to load FAQs.");
+                    }
+                }
+                if (!payload || payload.success !== true) {
                     throw new Error("Unable to load FAQs.");
                 }
 
-                var items = Array.isArray(payload.items) ? payload.items : [];
-                if (items.length === 0) {
-                    left.innerHTML = `
-                        <div class="accordionItemGroup">
-                            <div class="accordionBody" style="padding-left:20px;">
-                                <p>No FAQ items available yet.</p>
-                            </div>
-                        </div>
-                    `;
-                    right.innerHTML = "";
-                    return;
-                }
-
-                var leftHtml = "";
-                var rightHtml = "";
-                items.forEach(function (item, index) {
-                    var sideId = index % 2 === 0 ? "accordionLeft" : "accordionRight";
-                    var markup = buildFaqMarkup(item, index + 1, sideId, index === 0);
-                    if (index % 2 === 0) {
-                        leftHtml += markup;
-                    } else {
-                        rightHtml += markup;
-                    }
-                });
-
-                left.innerHTML = leftHtml;
-                right.innerHTML = rightHtml;
+                renderFaqItems(Array.isArray(payload.items) ? payload.items : []);
             } catch (error) {
-                left.innerHTML = `
-                    <div class="accordionItemGroup">
-                        <div class="accordionBody" style="padding-left:20px;">
-                            <p>Unable to load FAQs right now. Please try again later.</p>
-                        </div>
-                    </div>
-                `;
-                right.innerHTML = "";
+                renderFaqError();
             }
         }
+
+        (function hydrateFaqFromCache() {
+            if (!window.PublicPagePrefetch || typeof window.PublicPagePrefetch.readCachedJson !== "function") {
+                return;
+            }
+
+            var cachedPayload = window.PublicPagePrefetch.readCachedJson("../PhpFiles/GET/getFaqItems.php");
+            if (!cachedPayload || cachedPayload.success !== true) {
+                return;
+            }
+
+            renderFaqItems(Array.isArray(cachedPayload.items) ? cachedPayload.items : []);
+        })();
 
         loadFaqItems();
 
@@ -242,6 +284,3 @@
         });
     </script></body>
 </html>
-
-
-

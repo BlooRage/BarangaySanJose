@@ -19,7 +19,7 @@ if (!in_array($statusFilter, ['all', 'approved', 'denied', 'pending', 'draft'], 
   $statusFilter = 'all';
 }
 $typeFilter = strtolower(trim((string)($_GET['type_filter'] ?? 'all')));
-if (!in_array($typeFilter, ['all', 'page', 'delivery', 'faq'], true)) {
+if (!in_array($typeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $typeFilter = 'all';
 }
 
@@ -30,7 +30,7 @@ if (!in_array($queueChannelFilter, ['all', 'website', 'public', 'public_news', '
   $queueChannelFilter = 'all';
 }
 $queueTypeFilter = strtolower(trim((string)($_GET['queue_type'] ?? 'all')));
-if (!in_array($queueTypeFilter, ['all', 'page', 'delivery', 'faq'], true)) {
+if (!in_array($queueTypeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $queueTypeFilter = 'all';
 }
 $sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
@@ -47,6 +47,7 @@ $channelLabels = [
 
 $typeLabels = [
   'page' => 'Page Announcement',
+  'news' => 'News Article',
   'delivery' => 'SMS and Email Announcement',
   'faq' => 'FAQs Page'
 ];
@@ -333,6 +334,8 @@ foreach ($storedAnnouncements as $item) {
     'content_html' => (string)($item['content_html'] ?? ''),
     'public_news_title' => (string)($item['public_news_title'] ?? ''),
     'public_news_content_html' => (string)($item['public_news_content_html'] ?? ''),
+    'news_headline_image_url' => (string)($item['news_headline_image_url'] ?? ''),
+    'news_sections_json' => (string)($item['news_sections_json'] ?? ''),
     'public_title' => (string)($item['public_title'] ?? ''),
     'public_content_html' => (string)($item['public_content_html'] ?? ''),
     'review_result' => strtolower((string)($item['review_result'] ?? '')),
@@ -454,6 +457,8 @@ foreach ($announcementRows as $row) {
     'content_html' => (string)$row['content_html'],
     'public_news_title' => (string)($row['public_news_title'] ?? ''),
     'public_news_content_html' => (string)($row['public_news_content_html'] ?? ''),
+    'news_headline_image_url' => (string)($row['news_headline_image_url'] ?? ''),
+    'news_sections_json' => (string)($row['news_sections_json'] ?? ''),
     'public_title' => (string)($row['public_title'] ?? ''),
     'public_content_html' => (string)($row['public_content_html'] ?? ''),
     'sms_message' => (string)($row['sms_message'] ?? ''),
@@ -1077,6 +1082,10 @@ function ann_decode_faq_items(?string $json): array
                       <span>Page Announcement</span>
                     </label>
                     <label class="content-filter-option">
+                      <input class="form-check-input m-0" type="radio" name="type_filter" value="news" <?= $typeFilter === 'news' ? 'checked' : '' ?>>
+                      <span>News Article</span>
+                    </label>
+                    <label class="content-filter-option">
                       <input class="form-check-input m-0" type="radio" name="type_filter" value="delivery" <?= $typeFilter === 'delivery' ? 'checked' : '' ?>>
                       <span>SMS and Email</span>
                     </label>
@@ -1207,6 +1216,10 @@ function ann_decode_faq_items(?string $json): array
               <label class="content-filter-option">
                 <input class="form-check-input m-0" type="radio" name="queue_type" value="page" <?= $queueTypeFilter === 'page' ? 'checked' : '' ?>>
                 <span>Page Announcement</span>
+              </label>
+              <label class="content-filter-option">
+                <input class="form-check-input m-0" type="radio" name="queue_type" value="news" <?= $queueTypeFilter === 'news' ? 'checked' : '' ?>>
+                <span>News Article</span>
               </label>
               <label class="content-filter-option">
                 <input class="form-check-input m-0" type="radio" name="queue_type" value="delivery" <?= $queueTypeFilter === 'delivery' ? 'checked' : '' ?>>
@@ -1959,22 +1972,23 @@ function ann_decode_faq_items(?string $json): array
       function applyEditContentTypeMode(data) {
         currentEditContentType = String(data.content_type || "page").toLowerCase();
         const isPage = currentEditContentType === "page";
+        const isNews = currentEditContentType === "news";
         const isDelivery = currentEditContentType === "delivery";
         const isFaq = currentEditContentType === "faq";
         if (editAnnouncementTypeDisplay) {
           editAnnouncementTypeDisplay.value = typeText(currentEditContentType);
         }
         if (editAudienceGroup) {
-          editAudienceGroup.classList.toggle("d-none", isFaq);
+          editAudienceGroup.classList.toggle("d-none", isFaq || isNews);
         }
         if (editPagePlacementGroup) {
           editPagePlacementGroup.classList.toggle("d-none", !isPage);
         }
         if (editAdditionalDeliveryGroup) {
-          editAdditionalDeliveryGroup.classList.toggle("d-none", isFaq);
+          editAdditionalDeliveryGroup.classList.toggle("d-none", isFaq || isNews);
         }
         if (editAdditionalDeliveryLabel) {
-          editAdditionalDeliveryLabel.textContent = isPage ? "Page Destinations" : "Delivery";
+          editAdditionalDeliveryLabel.textContent = isPage ? "Page Destinations" : (isNews ? "Publication" : "Delivery");
         }
         if (editPageDestinationGroup) {
           editPageDestinationGroup.classList.toggle("d-none", !isPage);
@@ -2264,6 +2278,7 @@ function ann_decode_faq_items(?string $json): array
         document.getElementById("viewAnnouncementCreatedBy").textContent = data.created_by || "-";
         const contentType = String(data.content_type || "page").toLowerCase();
         const isPage = contentType === "page";
+        const isNews = contentType === "news";
         const isDelivery = contentType === "delivery";
         const placementsGroup = document.getElementById("viewAnnouncementPlacementsGroup");
         const channelsGroup = document.getElementById("viewAnnouncementChannelsGroup");
@@ -2280,7 +2295,7 @@ function ann_decode_faq_items(?string $json): array
           channelsGroup.classList.toggle("d-none", contentType === "faq");
         }
         if (channelsLabel) {
-          channelsLabel.textContent = isPage ? "Page Destinations" : "Delivery";
+          channelsLabel.textContent = isPage ? "Page Destinations" : (isNews ? "Publication" : "Delivery");
         }
         if (viewDeliveryMeta) {
           const hasSms = isDelivery && Array.isArray(data.channels) && data.channels.includes("sms") && String(data.sms_message || "").trim() !== "";
@@ -2294,10 +2309,12 @@ function ann_decode_faq_items(?string $json): array
         document.getElementById("viewAnnouncementPlacements").textContent = placementText(data.placements || []);
         document.getElementById("viewAnnouncementChannels").textContent = isPage
           ? channelText((data.channels || []).filter((channel) => channel === "public" || channel === "website"))
-          : channelText((data.channels || []).filter((channel) => channel === "sms" || channel === "email"));
-        const hasNewsPlacement = isPage && Array.isArray(data.placements) && data.placements.includes("public_news");
+          : (isNews
+            ? channelText((data.channels || []).filter((channel) => channel === "public_news"))
+            : channelText((data.channels || []).filter((channel) => channel === "sms" || channel === "email")));
+        const hasNewsPlacement = (isPage && Array.isArray(data.placements) && data.placements.includes("public_news")) || isNews;
         const hasAnnouncementPlacement = isPage && Array.isArray(data.placements) && data.placements.includes("announcement");
-        const isDualPlacement = hasNewsPlacement && hasAnnouncementPlacement;
+        const isDualPlacement = isPage && hasNewsPlacement && hasAnnouncementPlacement;
         const contentHeading = document.getElementById("viewAnnouncementContentHeading");
         const contentSurface = document.getElementById("viewAnnouncementContent");
         const dualContentSurface = document.getElementById("viewAnnouncementDualContent");
@@ -2997,10 +3014,6 @@ function ann_decode_faq_items(?string $json): array
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 </body>
 </html>
-
-
-
-
 
 
 

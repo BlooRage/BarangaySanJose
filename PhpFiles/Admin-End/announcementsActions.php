@@ -4,6 +4,7 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 require_once __DIR__ . "/announcementAudience.php";
+require_once __DIR__ . "/newsContent.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
 
@@ -130,13 +131,13 @@ if (!in_array($channel, ['all', 'website', 'public', 'public_news', 'sms', 'emai
 if (!in_array($status, ['all', 'approved', 'denied', 'pending', 'draft'], true)) {
   $status = 'all';
 }
-if (!in_array($typeFilter, ['all', 'page', 'delivery', 'faq'], true)) {
+if (!in_array($typeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $typeFilter = 'all';
 }
 if (!in_array($queueChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $queueChannel = 'all';
 }
-if (!in_array($queueType, ['all', 'page', 'delivery', 'faq'], true)) {
+if (!in_array($queueType, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $queueType = 'all';
 }
 if ($announcementId === '' || !in_array($action, ['approve', 'deny', 'delete', 'update', 'submit_review'], true)) {
@@ -234,6 +235,8 @@ foreach ($rows as $idx => $item) {
     $contentHtml = trim((string)($_POST['content_html'] ?? ''));
     $publicNewsTitle = trim((string)($_POST['public_news_title'] ?? ''));
     $publicNewsContentHtml = trim((string)($_POST['public_news_content_html'] ?? ''));
+    $headlineImageUrlInput = trim((string)($_POST['headline_image_url'] ?? ''));
+    $newsSectionsJsonInput = trim((string)($_POST['news_sections_json'] ?? ''));
     $publicTitle = trim((string)($_POST['public_title'] ?? ''));
     $publicContentHtml = trim((string)($_POST['public_content_html'] ?? ''));
     $audienceScope = strtolower(trim((string)($_POST['audience_scope'] ?? (string)($item['audience_scope'] ?? 'all'))));
@@ -247,7 +250,7 @@ foreach ($rows as $idx => $item) {
     $emailSubjectInput = trim((string)($_POST['email_subject'] ?? ''));
     $nextStatus = strtolower(trim((string)($_POST['status_update'] ?? $currentStatus)));
     $recordContentType = strtolower(trim((string)($item['content_type'] ?? 'page')));
-    if (!in_array($recordContentType, ['page', 'delivery', 'faq'], true)) {
+    if (!in_array($recordContentType, ['page', 'news', 'delivery', 'faq'], true)) {
       $recordContentType = 'page';
     }
     $placements = array_values(array_unique(array_filter((array)($_POST['placements'] ?? []), function ($placement) {
@@ -275,6 +278,8 @@ foreach ($rows as $idx => $item) {
 
     $hasAnnouncementPlacement = false;
     $hasNewsPlacement = false;
+    $newsHeadlineImageUrl = trim((string)($item['news_headline_image_url'] ?? ''));
+    $newsSectionsJson = trim((string)($item['news_sections_json'] ?? ''));
     if ($recordContentType === 'page') {
       if (!$placements) {
         ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one page placement.');
@@ -328,10 +333,45 @@ foreach ($rows as $idx => $item) {
       if (!$channels) {
         ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one valid delivery destination.');
       }
+    } elseif ($recordContentType === 'news') {
+      $placements = ['public_news'];
+      $channels = ['public_news'];
+      $publicTitle = '';
+      $publicContentHtml = '';
+      $audienceScope = 'all';
+      $areas = [];
+      $roleGroups = [];
+      $area = '';
+      $roleGroup = '';
+      $audience = 'All Residents';
+
+      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'News heading and body are required.');
+      }
+
+      $publicNewsTitle = $title;
+      $publicNewsContentHtml = $contentHtml;
+      $resolvedHeadlineImageUrl = $headlineImageUrlInput !== ''
+        ? $headlineImageUrlInput
+        : ($newsHeadlineImageUrl !== '' ? $newsHeadlineImageUrl : ann_news_extract_first_image_url($contentHtml));
+      if ($resolvedHeadlineImageUrl === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'News article needs a headline image.');
+      }
+      $newsHeadlineImageUrl = $resolvedHeadlineImageUrl;
+
+      $resolvedSectionsJson = $newsSectionsJsonInput !== '' ? $newsSectionsJsonInput : $newsSectionsJson;
+      if ($resolvedSectionsJson !== '') {
+        $resolvedSections = ann_news_decode_sections_json($resolvedSectionsJson);
+        $newsSectionsJson = $resolvedSections ? (json_encode($resolvedSections, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '') : '';
+      } else {
+        $newsSectionsJson = '';
+      }
     } elseif ($recordContentType === 'delivery') {
       $placements = [];
       $publicNewsTitle = '';
       $publicNewsContentHtml = '';
+      $newsHeadlineImageUrl = '';
+      $newsSectionsJson = '';
       $publicTitle = '';
       $publicContentHtml = '';
       $channels = array_values(array_unique(array_filter($channels, function ($ch) {
@@ -351,6 +391,8 @@ foreach ($rows as $idx => $item) {
       $channels = [];
       $publicNewsTitle = '';
       $publicNewsContentHtml = '';
+      $newsHeadlineImageUrl = '';
+      $newsSectionsJson = '';
       $publicTitle = '';
       $publicContentHtml = '';
       if ($title === '' || trim(strip_tags($contentHtml)) === '') {
@@ -381,6 +423,8 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['content_html'] = $contentHtml;
     $rows[$idx]['public_news_title'] = $publicNewsTitle;
     $rows[$idx]['public_news_content_html'] = $publicNewsContentHtml;
+    $rows[$idx]['news_headline_image_url'] = $newsHeadlineImageUrl;
+    $rows[$idx]['news_sections_json'] = $newsSectionsJson;
     $rows[$idx]['public_title'] = $publicTitle;
     $rows[$idx]['public_content_html'] = $publicContentHtml;
     if ($recordContentType === 'faq') {
@@ -465,6 +509,3 @@ foreach ($rows as $idx => $item) {
 if (!$found) {
   ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Content item not found.');
 }
-
-
-

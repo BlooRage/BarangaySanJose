@@ -114,3 +114,90 @@ if (!function_exists('resolveUnifiedProfileRedirect')) {
         }
     }
 }
+
+if (!function_exists('normalizeRequestedResidentService')) {
+    function normalizeRequestedResidentService(?string $service): string
+    {
+        $service = strtolower(trim((string)$service));
+        if ($service === '') {
+            return '';
+        }
+
+        $service = preg_replace('/[^a-z0-9]+/', '-', $service);
+        $service = trim((string)$service, '-');
+
+        $aliases = [
+            'barangayid' => 'barangay-id',
+            'barangay-id' => 'barangay-id',
+            'complaint' => 'complaints',
+            'complaints' => 'complaints',
+            'certificate' => 'certificates',
+            'certificates' => 'certificates',
+            'clearance' => 'clearances',
+            'clearances' => 'clearances',
+            'appointment' => 'appointments',
+            'appointments' => 'appointments',
+        ];
+
+        return $aliases[$service] ?? '';
+    }
+}
+
+if (!function_exists('residentServiceDisplayName')) {
+    function residentServiceDisplayName(?string $service): string
+    {
+        $service = normalizeRequestedResidentService($service);
+        $labels = [
+            'certificates' => 'Certificates',
+            'clearances' => 'Clearances',
+            'barangay-id' => 'Barangay ID',
+            'appointments' => 'Appointments',
+            'complaints' => 'Complaints',
+        ];
+
+        return $labels[$service] ?? '';
+    }
+}
+
+if (!function_exists('resolveResidentServiceRedirect')) {
+    function resolveResidentServiceRedirect(?string $service): ?string
+    {
+        $service = normalizeRequestedResidentService($service);
+        if ($service === '') {
+            return null;
+        }
+
+        $routes = [
+            'certificates' => appUrl('/Resident-End/Certificates/CertificatesLandingPage.php'),
+            'clearances' => appUrl('/Resident-End/Clearances/ClearancesLandingPage.php'),
+            'barangay-id' => appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php'),
+            'appointments' => appUrl('/Resident-End/Appointments/AppointmentsLandingPage.php'),
+            'complaints' => appUrl('/Resident-End/Complaints/ComplaintsLandingPage.php'),
+        ];
+
+        return $routes[$service] ?? null;
+    }
+}
+
+if (!function_exists('resolveRequestedPostLoginRedirect')) {
+    function resolveRequestedPostLoginRedirect(mysqli $conn, ?string $userId, ?string $role, ?string $requestedService = null): string
+    {
+        $defaultRedirect = resolveUnifiedProfileRedirect($conn, $userId, $role);
+        $normalizedRole = strtolower(trim((string)$role));
+
+        if ($normalizedRole !== 'resident') {
+            return $defaultRedirect;
+        }
+
+        $serviceRedirect = resolveResidentServiceRedirect($requestedService);
+        if ($serviceRedirect === null) {
+            return $defaultRedirect;
+        }
+
+        if (stripos($defaultRedirect, '/Resident-End/resident_registration') !== false) {
+            return $defaultRedirect;
+        }
+
+        return $serviceRedirect;
+    }
+}

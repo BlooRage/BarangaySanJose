@@ -4,6 +4,7 @@ require_once __DIR__ . "/../../Admin-End/includes/admin_guard.php";
 require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 require_once __DIR__ . "/announcementAudience.php";
+require_once __DIR__ . "/newsContent.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   header("Location: " . appUrl('/Admin-End/Contents/Contents.php'));
@@ -153,7 +154,7 @@ function ann_build_faq_html(array $items): string
 }
 
 $contentType = strtolower(trim((string)($_POST['content_type'] ?? 'page')));
-if (!in_array($contentType, ['page', 'delivery', 'faq'], true)) {
+if (!in_array($contentType, ['page', 'news', 'delivery', 'faq'], true)) {
   $contentType = 'page';
 }
 
@@ -161,6 +162,9 @@ $title = trim((string)($_POST["title"] ?? ""));
 $contentHtml = trim((string)($_POST["content_html"] ?? ""));
 $publicNewsTitle = trim((string)($_POST["public_news_title"] ?? ""));
 $publicNewsContentHtml = trim((string)($_POST["public_news_content_html"] ?? ""));
+$headlineImageUrl = trim((string)($_POST["headline_image_url"] ?? ""));
+$newsBodyHtml = trim((string)($_POST["news_body_html"] ?? ""));
+$newsSectionsJsonInput = trim((string)($_POST["news_sections_json"] ?? ""));
 $publicTitle = trim((string)($_POST["public_title"] ?? ""));
 $publicContentHtml = trim((string)($_POST["public_content_html"] ?? ""));
 $placements = array_values(array_unique(array_filter((array)($_POST["placements"] ?? []), function ($ch) {
@@ -192,6 +196,7 @@ $redirectUrl = $channelContext === "all" ? $redirectBase : ($redirectBase . "?ch
 
 $plainContent = trim(strip_tags($contentHtml));
 $faqItemsJson = '';
+$newsSectionsJson = '';
 $hasAnnouncementPlacement = in_array("announcement", $placements, true);
 $isDualPlacement = $hasAnnouncementPlacement && in_array("public_news", $placements, true);
 
@@ -249,10 +254,43 @@ if ($contentType === 'page') {
       $publicContentHtml = $contentHtml;
     }
   }
+} elseif ($contentType === 'news') {
+  $placements = ['public_news'];
+  $channels = ['public_news'];
+  $publicTitle = '';
+  $publicContentHtml = '';
+  $areas = [];
+  $roleGroups = [];
+  $area = '';
+  $roleGroup = '';
+  $audienceScope = 'all';
+
+  if ($title === '') {
+    ann_redirect_with_flash($redirectUrl, "warning", "News heading is required.");
+  }
+  if ($headlineImageUrl === '') {
+    ann_redirect_with_flash($redirectUrl, "warning", "Upload a headline image before saving the news article.");
+  }
+  if (trim(strip_tags($newsBodyHtml)) === '') {
+    ann_redirect_with_flash($redirectUrl, "warning", "News body is required.");
+  }
+
+  $newsSections = ann_news_decode_sections_json($newsSectionsJsonInput);
+  $contentHtml = ann_news_compose_html($headlineImageUrl, $newsBodyHtml, $newsSections, $title);
+  $plainContent = trim(strip_tags($contentHtml));
+  if ($plainContent === '') {
+    ann_redirect_with_flash($redirectUrl, "warning", "News content is required.");
+  }
+
+  $publicNewsTitle = $title;
+  $publicNewsContentHtml = $contentHtml;
+  $newsSectionsJson = $newsSections ? (json_encode($newsSections, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '') : '';
 } elseif ($contentType === 'delivery') {
   $placements = [];
   $publicNewsTitle = '';
   $publicNewsContentHtml = '';
+  $headlineImageUrl = '';
+  $newsSectionsJson = '';
   $publicTitle = '';
   $publicContentHtml = '';
   $channels = array_values(array_unique(array_filter($channels, function ($ch) {
@@ -276,6 +314,8 @@ if ($contentType === 'page') {
   $channels = [];
   $publicNewsTitle = '';
   $publicNewsContentHtml = '';
+  $headlineImageUrl = '';
+  $newsSectionsJson = '';
   $publicTitle = '';
   $publicContentHtml = '';
   $faqItems = ann_faq_items_from_post();
@@ -356,6 +396,8 @@ $record = [
   "content_html" => $contentHtml,
   "public_news_title" => $publicNewsTitle,
   "public_news_content_html" => $publicNewsContentHtml,
+  "news_headline_image_url" => $headlineImageUrl,
+  "news_sections_json" => $newsSectionsJson,
   "public_title" => $publicTitle,
   "public_content_html" => $publicContentHtml,
   "created_at" => date("Y-m-d H:i:s"),
@@ -371,6 +413,7 @@ if (!announcements_save_all($all)) {
 
 $itemLabel = [
   'page' => 'Page announcement',
+  'news' => 'News article',
   'delivery' => 'SMS and email announcement',
   'faq' => 'FAQ item'
 ][$contentType] ?? 'Content item';

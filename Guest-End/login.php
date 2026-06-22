@@ -14,6 +14,10 @@ header("Expires: 0");
 
 $appRoot = appRootPath();
 $guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
+$requestedService = normalizeRequestedResidentService($_GET['service'] ?? '');
+$requestedAuthMode = strtolower(trim((string)($_GET['auth'] ?? '')));
+$serviceLabel = residentServiceDisplayName($requestedService);
+$serviceAwareRedirect = appUrl('/account-redirect' . ($requestedService !== '' ? '?service=' . rawurlencode($requestedService) : ''));
 
 $inviteToken = trim((string)($_GET['invite'] ?? ''));
 if ($inviteToken !== '') {
@@ -23,7 +27,7 @@ if ($inviteToken !== '') {
 
 // Prevent redirect loops when a stale session has user_id but missing role.
 if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
-  header("Location: " . resolveUnifiedProfileRedirect($conn, (string)$_SESSION['user_id'], (string)$_SESSION['role']));
+  header("Location: " . resolveRequestedPostLoginRedirect($conn, (string)$_SESSION['user_id'], (string)$_SESSION['role'], $requestedService));
   exit;
 }
 if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
@@ -45,12 +49,14 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260211" />
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260622-1" />
     <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
     <script>
-      window.APP_LOGIN_RESOLVE_REDIRECT = <?= json_encode(appUrl('/account-redirect')) ?>;
+      window.APP_LOGIN_RESOLVE_REDIRECT = <?= json_encode($serviceAwareRedirect) ?>;
+      window.APP_LOGIN_AUTH_MODE = <?= json_encode($requestedAuthMode) ?>;
+      window.APP_LOGIN_REQUESTED_SERVICE = <?= json_encode($requestedService) ?>;
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
@@ -76,8 +82,8 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
             <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/news'), ENT_QUOTES, 'UTF-8') ?>">News</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/faq'), ENT_QUOTES, 'UTF-8') ?>">FAQ</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/contact'), ENT_QUOTES, 'UTF-8') ?>">Contact</a></li>
-            <li class="nav-item">
-              <a class="nav-link btn btn-orange text-white px-4 ms-2" href="<?= htmlspecialchars(appUrl('/login'), ENT_QUOTES, 'UTF-8') ?>">Login</a>
+            <li class="nav-item mx-lg-3">
+              <a class="nav-link active" aria-current="page" href="<?= htmlspecialchars(appUrl('/login'), ENT_QUOTES, 'UTF-8') ?>">Login</a>
             </li>
           </ul>
         </div>
@@ -93,6 +99,11 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
                LOGIN FORM (OLD IDs)
                ========================= -->
           <form class="form-box active" id="loginForm" action="../PhpFiles/Login/login.php" method="post" name="loginForm">
+            <?php if ($serviceLabel !== ''): ?>
+            <div class="alert alert-warning text-center py-2 mb-3" role="alert">
+              Continue to <strong><?= htmlspecialchars($serviceLabel, ENT_QUOTES, 'UTF-8') ?></strong> after signing in.
+            </div>
+            <?php endif; ?>
             <h1 class="mb-1 fs-2 text-center"><strong>Welcome Back!</strong></h1>
             <p class="text-center fs-6 text-muted intro-message">Please enter your credentials.</p>
             <h4 class="mb-3 fs-4 text-center"><strong>Login</strong></h4>
@@ -128,6 +139,11 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
                SIGNUP FORM (OLD IDs)
                ========================= -->
           <form class="form-box" id="signupForm" action="../PhpFiles/Login/RegisterAccount.php" method="post" name="signupForm">
+            <?php if ($serviceLabel !== ''): ?>
+            <div class="alert alert-warning text-center py-2 mb-3" role="alert">
+              Create an account to continue to <strong><?= htmlspecialchars($serviceLabel, ENT_QUOTES, 'UTF-8') ?></strong>.
+            </div>
+            <?php endif; ?>
             <h1 class="mb-1 fs-2 text-center"><strong>Good to see you!</strong></h1>
             <p class="text-center fs-6 text-muted intro-message">Sign up to get started</p>
             <h4 class="mb-3 text-center"><strong>Sign Up</strong></h4>
@@ -306,6 +322,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
         </div>
       </div>
     </main>
+    <script src="../JS-Script-Files/publicPagePrefetch.js?v=20260622-1"></script>
     <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
 
     <!-- ✅ NEW: SUCCESS MODAL (Bootstrap) -->

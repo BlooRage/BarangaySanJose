@@ -3,6 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <base href="./Guest-End/">
+    <script>
+        (function () {
+            try {
+                var url = new URL(window.location.href);
+                if ((url.searchParams.get('story') || '').trim() !== '') {
+                    document.documentElement.classList.add('news-has-requested-story');
+                }
+            } catch (error) {}
+        })();
+    </script>
     
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -65,45 +75,85 @@
 
     <main class="mainContentWrapper">
         <div class="container newsOuter py-5">
-            <div class="container newsContentGroup">
-                <div class="row g-5">
-                <div class="col-md-8 newsArticleGroup">
-                    <div class="articleImageWrapper mb-4" id="publicNewsImageWrapper" style="display: none;">
-                        <div class="placeholderImage"></div>
-                    </div>
-                    
-                    <h2 class="articleHeadline" id="publicNewsHeadline">Latest Barangay News</h2>
-                    <p class="announcementDate mb-3" id="publicNewsDate">-</p>
-                    
-                    <div class="articleBody" id="publicNewsBody">
-                        <p>No public news available yet.</p>
-                    </div>
-
-                    <section class="moreNewsSection" id="moreNewsSection" style="display: none;">
-                        <div class="moreNewsDivider">
-                            <span class="moreNewsDividerLine"></span>
-                            <span class="moreNewsDividerText">More News</span>
-                            <span class="moreNewsDividerLine"></span>
-                        </div>
-                        <div class="moreNewsList" id="moreNewsList"></div>
-                    </section>
-                </div>
-                
-
-                <div class="col-md-4 newsSidebarGroup">
-                    
-                    <div class="sidebarSection announcementsGroup">
-                        <h3 class="sidebarTitle">ANNOUNCEMENTS</h3>
-                        <div id="publicAnnouncementsList">
-                            <div class="announcementItem">
-                                <p class="announcementText">No public announcements available yet.</p>
-                                <div class="announcementPreviewText">Check back later for new barangay announcements.</div>
-                                <span class="announcementDate">-</span>
+            <div class="newsContentGroup">
+                <div class="newsPageStack">
+                    <section class="newsArchiveSection newsLandingSection" id="newsArchiveSection">
+                        <div class="newsLandingShell">
+                            <div class="newsLandingPrimary">
+                                <div class="newsArchiveHeader">
+                                    <p class="newsArchiveEyebrow">Published Stories</p>
+                                    <h2 class="newsArchiveTitle">News Stories</h2>
+                                    <p class="newsArchiveIntro">Browse the latest barangay stories through their image tiles, then open any story for the full article view.</p>
+                                </div>
+                                <div class="newsArchiveGrid" id="newsArchiveList"></div>
+                                <div class="newsArchivePagination" id="newsArchivePagination"></div>
                             </div>
+
+                            <aside class="landingAnnouncementRail" id="landingAnnouncementRail">
+                                <div class="landingAnnouncementPanel">
+                                    <div class="landingAnnouncementHeader">
+                                        <p class="landingAnnouncementEyebrow">Community Bulletin</p>
+                                        <h3 class="landingAnnouncementTitle">Announcements</h3>
+                                        <p class="landingAnnouncementIntro">The latest public notice stays pinned at the top, with the next updates stacked right under it.</p>
+                                    </div>
+                                    <div class="landingAnnouncementLatest" id="landingAnnouncementLatest">
+                                        <div class="landingAnnouncementEmpty">No public announcements available yet.</div>
+                                    </div>
+                                    <div class="landingAnnouncementActions">
+                                        <button type="button" class="landingAnnouncementMoreButton" id="landingAnnouncementMoreButton" style="display: none;">
+                                            View other announcements
+                                        </button>
+                                    </div>
+                                    <div class="landingAnnouncementStack" id="landingAnnouncementStack"></div>
+                                </div>
+                            </aside>
                         </div>
-                    </div>
-                    
-                    </div>
+                    </section>
+
+                    <section class="newsStorySection" id="newsStorySection" style="display: none;">
+                        <div class="newsStoryShell">
+                            <div class="newsStoryPrimary">
+                                <div class="newsStoryToolbar">
+                                    <a href="../news" class="newsBackButton" id="newsBackButton">
+                                        <i class="fa-solid fa-arrow-left-long" aria-hidden="true"></i>
+                                        <span>Return to all news</span>
+                                    </a>
+                                </div>
+
+                                <article class="newsArticleCard">
+                                    <p class="articleTag" id="publicNewsTag">Community Update</p>
+                                    <h2 class="articleHeadline" id="publicNewsHeadline">Latest Barangay News</h2>
+                                    <div class="articleMetaStrip">
+                                        <span class="articleDateBadge" id="publicNewsDate">-</span>
+                                    </div>
+                                    <p class="articleLead" id="publicNewsLead">Stay updated with the latest barangay developments, programs, and public notices.</p>
+
+                                    <div class="articleImageWrapper articleHeroWrapper mb-4" id="publicNewsImageWrapper" style="display: none;">
+                                        <div class="placeholderImage"></div>
+                                    </div>
+
+                                    <div class="articleBody articleRichContent" id="publicNewsBody">
+                                        <p>No public news available yet.</p>
+                                    </div>
+                                </article>
+                            </div>
+
+                            <aside class="landingAnnouncementRail storyAnnouncementRail" id="storyAnnouncementRail">
+                                <div class="landingAnnouncementPanel">
+                                    <div class="landingAnnouncementHeader">
+                                        <p class="landingAnnouncementEyebrow">Community Bulletin</p>
+                                        <h3 class="landingAnnouncementTitle">Announcements</h3>
+                                        <p class="landingAnnouncementIntro">Stay updated with the latest barangay notices while reading the full story.</p>
+                                    </div>
+                                    <div class="landingAnnouncementLatest" id="storyAnnouncementLatest">
+                                        <div class="landingAnnouncementEmpty">No public announcements available yet.</div>
+                                    </div>
+                                    <div class="landingAnnouncementStack" id="storyAnnouncementStack"></div>
+                                </div>
+                            </aside>
+                        </div>
+                    </section>
+
                 </div>
             </div>
         </div>
@@ -115,13 +165,33 @@
                 <div class="modal-header publicAnnouncementModalHeader">
                     <div>
                         <h5 class="modal-title" id="publicAnnouncementModalTitle">Announcement</h5>
-                        <div class="announcementDate mt-1" id="publicAnnouncementModalDate">-</div>
+                        <div class="articleMetaDate mt-1" id="publicAnnouncementModalDate">-</div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body publicAnnouncementModalBody">
-                    <div id="publicAnnouncementModalBody" class="articleBody publicAnnouncementModalArticle">
+                    <div class="publicAnnouncementModalMedia" id="publicAnnouncementModalMedia" style="display: none;"></div>
+                    <div id="publicAnnouncementModalBody" class="articleBody articleRichContent publicAnnouncementModalArticle">
                         <p>No announcement content available.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="announcementListModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content announcementListModalContent">
+                <div class="modal-header announcementListModalHeader">
+                    <div>
+                        <h5 class="modal-title" id="announcementListModalTitle">Other Announcements</h5>
+                        <p class="announcementListModalIntro" id="announcementListModalIntro">Browse other public notices available for mobile readers.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body announcementListModalBody">
+                    <div class="announcementListModalList" id="announcementListModalList">
+                        <div class="landingAnnouncementEmpty">No other announcements available yet.</div>
                     </div>
                 </div>
             </div>
@@ -160,6 +230,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script src="../JS-Script-Files/publicPagePrefetch.js?v=20260622-1"></script>
     <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
@@ -207,26 +278,24 @@
                 .replace(/'/g, '&#039;');
         }
 
-        function toModalParagraphHtml(html) {
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = String(html || '');
-            const plain = (wrapper.textContent || wrapper.innerText || '').replace(/\r/g, '').trim();
-            if (!plain) {
-                return '<p>No announcement content available.</p>';
+        function fetchJsonWithPrefetch(url, options) {
+            if (window.PublicPagePrefetch && typeof window.PublicPagePrefetch.fetchJson === "function") {
+                return window.PublicPagePrefetch.fetchJson(url, options || {});
             }
 
-            const lines = plain
-                .split(/\n+/)
-                .map(function (line) { return line.replace(/\s+/g, ' ').trim(); })
-                .filter(Boolean);
+            return fetch(url, options || {}).then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Unable to load content.");
+                }
+                return response.json();
+            });
+        }
 
-            if (!lines.length) {
-                return '<p>' + escapeHtml(plain.replace(/\s+/g, ' ').trim()) + '</p>';
+        function readCachedJsonWithPrefetch(url, maxAgeMs) {
+            if (window.PublicPagePrefetch && typeof window.PublicPagePrefetch.readCachedJson === "function") {
+                return window.PublicPagePrefetch.readCachedJson(url, maxAgeMs);
             }
-
-            return lines.map(function (line) {
-                return '<p>' + escapeHtml(line) + '</p>';
-            }).join('');
+            return null;
         }
 
         function toPreviewText(html, maxLength) {
@@ -239,200 +308,874 @@
             return plain.length > maxLength ? plain.slice(0, maxLength).trimEnd() + '...' : plain;
         }
 
+        function isStandaloneMediaBlock(el) {
+            if (!el || el.nodeType !== 1) {
+                return false;
+            }
+
+            const tag = String(el.tagName || '').toUpperCase();
+            const directMediaTags = ['IMG', 'FIGURE', 'PICTURE', 'VIDEO', 'IFRAME'];
+            if (directMediaTags.indexOf(tag) !== -1) {
+                return true;
+            }
+
+            if ((tag === 'P' || tag === 'DIV') && el.childElementCount === 1) {
+                const child = el.firstElementChild;
+                const childTag = child ? String(child.tagName || '').toUpperCase() : '';
+                const text = (el.textContent || '').replace(/\s+/g, '').trim();
+                return directMediaTags.indexOf(childTag) !== -1 && text === '';
+            }
+
+            return false;
+        }
+
+        function getRichContentParts(html) {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = String(html || '').trim();
+
+            let mediaHtml = '';
+            const firstBlock = Array.from(wrapper.children).find(function (el) {
+                return ['SCRIPT', 'STYLE'].indexOf(String(el.tagName || '').toUpperCase()) === -1;
+            });
+
+            if (firstBlock && isStandaloneMediaBlock(firstBlock)) {
+                const tag = String(firstBlock.tagName || '').toUpperCase();
+                mediaHtml = (tag === 'P' || tag === 'DIV') ? firstBlock.innerHTML : firstBlock.outerHTML;
+                firstBlock.remove();
+            }
+
+            const contentBlocks = Array.from(wrapper.children).filter(function (el) {
+                return ['SCRIPT', 'STYLE'].indexOf(String(el.tagName || '').toUpperCase()) === -1;
+            });
+            const firstTextBlock = contentBlocks.find(function (el) {
+                return !isStandaloneMediaBlock(el) && ((el.textContent || '').replace(/\s+/g, ' ').trim() !== '');
+            }) || null;
+
+            const bodyHtml = wrapper.innerHTML.trim();
+            const plainText = (wrapper.textContent || wrapper.innerText || '').replace(/\s+/g, ' ').trim();
+            const leadSourceText = firstTextBlock
+                ? (firstTextBlock.textContent || firstTextBlock.innerText || '').replace(/\s+/g, ' ').trim()
+                : plainText;
+
+            let bodyHtmlWithoutLead = bodyHtml;
+            if (firstTextBlock && contentBlocks.length > 1) {
+                firstTextBlock.remove();
+                bodyHtmlWithoutLead = wrapper.innerHTML.trim();
+            }
+
+            return {
+                mediaHtml: mediaHtml,
+                bodyHtml: bodyHtml,
+                bodyHtmlWithoutLead: bodyHtmlWithoutLead,
+                plainText: plainText,
+                leadText: toPreviewText(leadSourceText || bodyHtml || html || '', 240),
+                blockCount: contentBlocks.length
+            };
+        }
+
+        const newsPageState = {
+            newsItems: [],
+            announcementItems: [],
+            selectedNewsId: '',
+            currentNewsPage: 1,
+            archivePageSize: 0,
+            storySectionEl: null,
+            articleRefs: null,
+            archiveRefs: null,
+            backButtonEl: null,
+            landingAnnouncementRailEl: null,
+            landingAnnouncementLatestEl: null,
+            landingAnnouncementStackEl: null,
+            landingAnnouncementMoreButtonEl: null,
+            storyAnnouncementRailEl: null,
+            storyAnnouncementLatestEl: null,
+            storyAnnouncementStackEl: null,
+            announcementModalRefs: null,
+            announcementListModalRefs: null
+        };
+
+        const NEWS_TOPIC_RULES = [
+            { label: 'Disaster Response', keywords: ['fire', 'relief', 'evacuation', 'calamity', 'flood', 'typhoon', 'earthquake'] },
+            { label: 'Community Assembly', keywords: ['assembly', 'meeting', 'council', 'transparency', 'report', 'financial plan', 'governance'] },
+            { label: 'Public Safety', keywords: ['safety', 'security', 'emergency', 'incident', 'peace', 'order'] },
+            { label: 'Resident Services', keywords: ['service', 'certificate', 'clearance', 'appointment', 'id', 'application'] },
+            { label: 'Health Programs', keywords: ['health', 'medical', 'clinic', 'vaccination', 'wellness'] },
+            { label: 'Education & Youth', keywords: ['education', 'school', 'student', 'youth', 'scholarship'] },
+            { label: 'Livelihood', keywords: ['livelihood', 'employment', 'training', 'market', 'business'] },
+            { label: 'Environment', keywords: ['cleanup', 'waste', 'drainage', 'environment', 'tree', 'canal'] },
+            { label: 'Infrastructure', keywords: ['road', 'lighting', 'repair', 'construction', 'waterline', 'bridge'] }
+        ];
+
+        function deriveStoryLabel(item) {
+            const text = ((item && item.title) ? item.title : '') + ' ' + ((item && item.content_html) ? toPreviewText(item.content_html, 280) : '');
+            const lowerText = text.toLowerCase();
+            for (let i = 0; i < NEWS_TOPIC_RULES.length; i += 1) {
+                const rule = NEWS_TOPIC_RULES[i];
+                if (rule.keywords.some(function (keyword) { return lowerText.indexOf(keyword) !== -1; })) {
+                    return rule.label;
+                }
+            }
+            return 'Community Update';
+        }
+
+        function openAnnouncementModal(selectedItem) {
+            const refs = newsPageState.announcementModalRefs;
+            if (!selectedItem || !refs || !refs.modalInstance || !refs.titleEl || !refs.dateEl || !refs.bodyEl) {
+                return;
+            }
+
+            const contentParts = getRichContentParts(selectedItem.content_html || '');
+            refs.titleEl.textContent = selectedItem.title || 'Announcement';
+            refs.dateEl.textContent = selectedItem.posted_date || '-';
+            if (refs.mediaEl) {
+                refs.mediaEl.innerHTML = contentParts.mediaHtml || '';
+                refs.mediaEl.style.display = contentParts.mediaHtml ? '' : 'none';
+            }
+            refs.bodyEl.innerHTML = contentParts.bodyHtml || (contentParts.mediaHtml ? '' : '<p>No announcement content available.</p>');
+            refs.modalInstance.show();
+        }
+
+        function getRequestedNewsId() {
+            try {
+                const url = new URL(window.location.href);
+                return (url.searchParams.get('story') || '').trim();
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function getRequestedNewsPage() {
+            try {
+                const url = new URL(window.location.href);
+                const rawValue = parseInt((url.searchParams.get('page') || '').trim(), 10);
+                return Number.isFinite(rawValue) && rawValue > 0 ? rawValue : 1;
+            } catch (error) {
+                return 1;
+            }
+        }
+
+        function buildNewsStoryUrl(storyId, pageNumber) {
+            const normalizedPage = Number.isFinite(pageNumber) && pageNumber > 1
+                ? Math.max(1, Math.floor(pageNumber))
+                : 1;
+            try {
+                const url = new URL(window.location.href);
+                if (storyId) {
+                    url.searchParams.set('story', storyId);
+                } else {
+                    url.searchParams.delete('story');
+                }
+                if (normalizedPage > 1) {
+                    url.searchParams.set('page', String(normalizedPage));
+                } else {
+                    url.searchParams.delete('page');
+                }
+                return url.toString();
+            } catch (error) {
+                const params = [];
+                if (storyId) {
+                    params.push('story=' + encodeURIComponent(storyId));
+                }
+                if (normalizedPage > 1) {
+                    params.push('page=' + encodeURIComponent(String(normalizedPage)));
+                }
+                return params.length ? ('?' + params.join('&')) : window.location.pathname;
+            }
+        }
+
+        function getNewsArchivePageSize() {
+            const viewportWidth = Math.max(
+                window.innerWidth || 0,
+                document.documentElement ? (document.documentElement.clientWidth || 0) : 0
+            );
+
+            if (viewportWidth <= 767) {
+                return 3;
+            }
+            if (viewportWidth <= 1199) {
+                return 4;
+            }
+            return 9;
+        }
+
+        function isPlainLeftClick(event) {
+            return !!event
+                && event.button === 0
+                && !event.defaultPrevented
+                && !event.metaKey
+                && !event.ctrlKey
+                && !event.shiftKey
+                && !event.altKey;
+        }
+
+        function scrollToSectionTop(sectionEl) {
+            const topOffset = sectionEl
+                ? Math.max(0, Math.round(sectionEl.getBoundingClientRect().top + window.scrollY - 20))
+                : 0;
+
+            window.scrollTo({
+                top: topOffset,
+                behavior: 'auto'
+            });
+            document.body.scrollTop = topOffset;
+            document.documentElement.scrollTop = topOffset;
+        }
+
+        function updateNewsHistory(storyId, pageNumber, replaceHistory) {
+            if (!window.history || typeof window.history.pushState !== 'function') {
+                return;
+            }
+
+            const normalizedStoryId = String(storyId || '').trim();
+            const normalizedPage = Number.isFinite(pageNumber) && pageNumber > 0
+                ? Math.max(1, Math.floor(pageNumber))
+                : 1;
+            const targetUrl = buildNewsStoryUrl(normalizedStoryId, normalizedPage);
+            const historyMethod = replaceHistory ? 'replaceState' : 'pushState';
+
+            try {
+                window.history[historyMethod]({
+                    newsStoryId: normalizedStoryId,
+                    newsPage: normalizedPage
+                }, '', targetUrl);
+            } catch (error) {}
+        }
+
+        function findNewsItemById(storyId) {
+            const normalizedId = String(storyId || '').trim();
+            if (!normalizedId) {
+                return null;
+            }
+
+            const items = Array.isArray(newsPageState.newsItems) ? newsPageState.newsItems : [];
+            return items.find(function (entry) {
+                return String(entry.id || '') === normalizedId;
+            }) || null;
+        }
+
         function renderFeaturedNews(item, refs) {
+            const tagEl = refs.tagEl;
             const headlineEl = refs.headlineEl;
             const dateEl = refs.dateEl;
+            const leadEl = refs.leadEl;
             const bodyEl = refs.bodyEl;
             const imageWrapperEl = refs.imageWrapperEl;
 
             if (!item) {
+                if (tagEl) {
+                    tagEl.textContent = "Community Update";
+                }
                 headlineEl.textContent = "Latest Barangay News";
                 dateEl.textContent = "-";
+                if (leadEl) {
+                    leadEl.style.display = "";
+                    leadEl.textContent = "Stay updated with the latest barangay developments, programs, and public notices.";
+                }
                 bodyEl.innerHTML = "<p>No public news available yet.</p>";
                 imageWrapperEl.style.display = "none";
                 return;
             }
 
-            headlineEl.textContent = item.title || "Latest Barangay News";
-            dateEl.textContent = item.posted_date ? "Posted: " + item.posted_date : "-";
-            bodyEl.innerHTML = item.content_html && String(item.content_html).trim() !== ""
-                ? item.content_html
-                : "<p>No public news content available yet.</p>";
+            const contentParts = getRichContentParts(item.content_html || '');
+            const heroMediaHtml = contentParts.mediaHtml
+                || (item.image_url
+                    ? '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || "Public news image") + '">'
+                    : '');
+            const showLead = !!leadEl
+                && contentParts.bodyHtmlWithoutLead !== ""
+                && (contentParts.plainText.length > 260 || contentParts.blockCount > 1);
+            const renderedBodyHtml = showLead && contentParts.bodyHtmlWithoutLead !== ""
+                ? contentParts.bodyHtmlWithoutLead
+                : contentParts.bodyHtml;
 
-            if (item.image_url) {
+            if (tagEl) {
+                tagEl.textContent = deriveStoryLabel(item);
+            }
+            headlineEl.textContent = item.title || "Latest Barangay News";
+            dateEl.textContent = item.posted_date || "-";
+            if (leadEl) {
+                leadEl.style.display = showLead ? "" : "none";
+                leadEl.textContent = showLead ? contentParts.leadText : "";
+            }
+            bodyEl.innerHTML = renderedBodyHtml !== ""
+                ? renderedBodyHtml
+                : (heroMediaHtml ? "" : "<p>No public news content available yet.</p>");
+
+            if (heroMediaHtml) {
                 imageWrapperEl.style.display = "";
-                imageWrapperEl.innerHTML = '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || "Public news image") + '" class="img-fluid rounded-4 w-100">';
+                imageWrapperEl.innerHTML = heroMediaHtml;
             } else {
                 imageWrapperEl.style.display = "none";
+            }
+
+            newsPageState.selectedNewsId = String(item.id || '');
+        }
+
+        function navigateToNewsLanding(options) {
+            const opts = options || {};
+            const targetPage = Number.isFinite(opts.pageNumber) && opts.pageNumber > 0
+                ? Math.max(1, Math.floor(opts.pageNumber))
+                : Math.max(1, newsPageState.currentNewsPage || 1);
+
+            newsPageState.currentNewsPage = targetPage;
+            renderNewsArchive();
+            showNewsLanding();
+
+            if (opts.updateHistory !== false) {
+                updateNewsHistory('', newsPageState.currentNewsPage, !!opts.replaceHistory);
+            }
+            if (opts.scroll !== false) {
+                scrollToSectionTop(newsPageState.archiveRefs && newsPageState.archiveRefs.sectionEl);
+            }
+        }
+
+        function navigateToNewsStory(item, options) {
+            const opts = options || {};
+            if (!item) {
+                navigateToNewsLanding({
+                    pageNumber: opts.pageNumber,
+                    updateHistory: opts.updateHistory,
+                    replaceHistory: opts.replaceHistory,
+                    scroll: opts.scroll
+                });
+                return;
+            }
+
+            const targetPage = Number.isFinite(opts.pageNumber) && opts.pageNumber > 0
+                ? Math.max(1, Math.floor(opts.pageNumber))
+                : Math.max(1, newsPageState.currentNewsPage || 1);
+
+            newsPageState.currentNewsPage = targetPage;
+            showNewsStory(item);
+
+            if (opts.updateHistory !== false) {
+                updateNewsHistory(item.id || '', newsPageState.currentNewsPage, !!opts.replaceHistory);
+            }
+            if (opts.scroll !== false) {
+                scrollToSectionTop(newsPageState.storySectionEl);
+            }
+        }
+
+        function syncNewsViewFromLocation(options) {
+            const opts = options || {};
+            const requestedPage = getRequestedNewsPage();
+            const requestedId = getRequestedNewsId();
+            const targetPage = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+            const requestedItem = findNewsItemById(requestedId);
+
+            if (requestedItem) {
+                navigateToNewsStory(requestedItem, {
+                    pageNumber: targetPage,
+                    updateHistory: opts.updateHistory,
+                    replaceHistory: opts.replaceHistory,
+                    scroll: opts.scroll
+                });
+                return;
+            }
+
+            navigateToNewsLanding({
+                pageNumber: targetPage,
+                updateHistory: opts.updateHistory,
+                replaceHistory: opts.replaceHistory,
+                scroll: opts.scroll
+            });
+        }
+
+        function renderNewsArchive() {
+            const refs = newsPageState.archiveRefs;
+            if (!refs || !refs.sectionEl || !refs.listEl) {
+                return;
+            }
+
+            const items = Array.isArray(newsPageState.newsItems) ? newsPageState.newsItems : [];
+            const pageSize = getNewsArchivePageSize();
+            newsPageState.archivePageSize = pageSize;
+
+            if (!items.length) {
+                refs.sectionEl.style.display = "";
+                refs.listEl.innerHTML = '<div class="newsArchiveEmpty">No public news available yet. Please check back for the next barangay story.</div>';
+                if (refs.paginationEl) {
+                    refs.paginationEl.innerHTML = "";
+                }
+                return;
+            }
+
+            const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+            const currentPage = Math.min(Math.max(1, newsPageState.currentNewsPage || 1), totalPages);
+            const pageStart = (currentPage - 1) * pageSize;
+            const visibleItems = items.slice(pageStart, pageStart + pageSize);
+            newsPageState.currentNewsPage = currentPage;
+
+            refs.sectionEl.style.display = "";
+            refs.listEl.innerHTML = visibleItems.map(function (item) {
+                const imageSrc = String(item.image_url || '').trim() || '../Images/News_Placeholder.png';
+                const imageAlt = String(item.image_url || '').trim()
+                    ? (item.title || 'News image')
+                    : 'News placeholder image';
+                const tileMediaHtml = '<div class="newsArchiveMedia"><img src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageAlt) + '"></div>';
+
+                return ''
+                    + '<a class="newsArchiveTile" href="' + escapeHtml(buildNewsStoryUrl(item.id || '', currentPage)) + '"'
+                    + ' data-news-id="' + escapeHtml(String(item.id || '')) + '"'
+                    + ' data-news-page="' + escapeHtml(String(currentPage)) + '">'
+                    +      tileMediaHtml
+                    + '  <div class="newsArchiveCardBody">'
+                    + '    <span class="newsArchiveDate">' + escapeHtml(item.posted_date || '-') + '</span>'
+                    + '    <h4 class="newsArchiveHeadline">' + escapeHtml(item.title || 'Untitled story') + '</h4>'
+                    + '  </div>'
+                    + '</a>';
+            }).join('');
+
+            refs.listEl.querySelectorAll(".newsArchiveTile").forEach(function (tileEl) {
+                tileEl.addEventListener("click", function (event) {
+                    if (!isPlainLeftClick(event)) {
+                        return;
+                    }
+
+                    const storyId = (tileEl.getAttribute("data-news-id") || "").trim();
+                    const storyPage = parseInt(tileEl.getAttribute("data-news-page") || "", 10);
+                    const selectedItem = findNewsItemById(storyId);
+                    if (!selectedItem) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    navigateToNewsStory(selectedItem, {
+                        pageNumber: Number.isNaN(storyPage) ? currentPage : storyPage,
+                        updateHistory: true,
+                        scroll: true
+                    });
+                });
+            });
+
+            if (refs.paginationEl) {
+                if (totalPages <= 1) {
+                    refs.paginationEl.innerHTML = "";
+                    return;
+                }
+
+                const paginationItems = [];
+                if (totalPages <= 7) {
+                    for (let page = 1; page <= totalPages; page += 1) {
+                        paginationItems.push(page);
+                    }
+                } else if (currentPage <= 4) {
+                    paginationItems.push(1, 2, 3, 4, 'ellipsis', totalPages);
+                } else if (currentPage >= totalPages - 3) {
+                    paginationItems.push(1, 'ellipsis', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                } else {
+                    paginationItems.push(1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages);
+                }
+
+                refs.paginationEl.innerHTML = paginationItems.map(function (entry) {
+                    if (entry === 'ellipsis') {
+                        return '<span class="newsPaginationEllipsis" aria-hidden="true">...</span>';
+                    }
+
+                    const pageNumber = Number(entry) || 1;
+                    const isCurrent = pageNumber === currentPage;
+                    return ''
+                        + '<a class="newsPaginationLink' + (isCurrent ? ' is-current' : '') + '"'
+                        + ' href="' + escapeHtml(buildNewsStoryUrl('', pageNumber)) + '"'
+                        + ' data-page-number="' + escapeHtml(String(pageNumber)) + '"'
+                        + (isCurrent ? ' aria-current="page"' : '')
+                        + '>'
+                        +      escapeHtml(String(pageNumber))
+                        + '</a>';
+                }).join('');
+
+                refs.paginationEl.querySelectorAll(".newsPaginationLink").forEach(function (linkEl) {
+                    linkEl.addEventListener("click", function (event) {
+                        if (!isPlainLeftClick(event)) {
+                            return;
+                        }
+
+                        const pageNumber = parseInt(linkEl.getAttribute("data-page-number") || "", 10);
+                        if (Number.isNaN(pageNumber) || pageNumber === newsPageState.currentNewsPage) {
+                            event.preventDefault();
+                            return;
+                        }
+
+                        event.preventDefault();
+                        navigateToNewsLanding({
+                            pageNumber: pageNumber,
+                            updateHistory: true,
+                            scroll: true
+                        });
+                    });
+                });
+            }
+        }
+
+        function showNewsLanding() {
+            document.documentElement.classList.remove('news-has-requested-story');
+            const archiveRefs = newsPageState.archiveRefs;
+            if (archiveRefs && archiveRefs.sectionEl) {
+                archiveRefs.sectionEl.style.display = "";
+            }
+            if (newsPageState.storySectionEl) {
+                newsPageState.storySectionEl.style.display = "none";
+            }
+            if (newsPageState.backButtonEl) {
+                newsPageState.backButtonEl.setAttribute("href", buildNewsStoryUrl('', newsPageState.currentNewsPage));
+            }
+            newsPageState.selectedNewsId = '';
+        }
+
+        function showNewsStory(item) {
+            if (!item || !newsPageState.articleRefs || !newsPageState.storySectionEl) {
+                showNewsLanding();
+                return;
+            }
+
+            document.documentElement.classList.add('news-has-requested-story');
+            renderFeaturedNews(item, newsPageState.articleRefs);
+            if (newsPageState.archiveRefs && newsPageState.archiveRefs.sectionEl) {
+                newsPageState.archiveRefs.sectionEl.style.display = "none";
+            }
+            newsPageState.storySectionEl.style.display = "";
+            if (newsPageState.backButtonEl) {
+                newsPageState.backButtonEl.setAttribute("href", buildNewsStoryUrl('', newsPageState.currentNewsPage));
             }
         }
 
         (function () {
+            const featuredTagEl = document.getElementById("publicNewsTag");
             const headlineEl = document.getElementById("publicNewsHeadline");
             const dateEl = document.getElementById("publicNewsDate");
+            const leadEl = document.getElementById("publicNewsLead");
             const bodyEl = document.getElementById("publicNewsBody");
             const imageWrapperEl = document.getElementById("publicNewsImageWrapper");
-            const moreNewsSectionEl = document.getElementById("moreNewsSection");
-            const moreNewsListEl = document.getElementById("moreNewsList");
-            if (headlineEl && dateEl && bodyEl && imageWrapperEl && moreNewsSectionEl && moreNewsListEl) {
-                imageWrapperEl.style.display = "none";
-                fetch("../PhpFiles/GET/getPublicNews.php", {
-                    headers: {
-                        "Accept": "application/json"
-                    }
-                })
-                .then(function (response) {
-                    if (!response.ok) {
-                        throw new Error("Unable to load public news.");
-                    }
-                    return response.json();
-                })
-                .then(function (payload) {
-                    const items = payload && Array.isArray(payload.items) ? payload.items : [];
-                    const item = payload && payload.item ? payload.item : (items[0] || null);
-                    if (!item) {
-                        renderFeaturedNews(null, { headlineEl, dateEl, bodyEl, imageWrapperEl });
-                        moreNewsSectionEl.style.display = "none";
-                        return;
-                    }
-
-                    renderFeaturedNews(item, { headlineEl, dateEl, bodyEl, imageWrapperEl });
-
-                    const moreItems = items.slice(1);
-                    if (!moreItems.length) {
-                        moreNewsSectionEl.style.display = "none";
-                        moreNewsListEl.innerHTML = "";
-                        return;
-                    }
-
-                    moreNewsSectionEl.style.display = "";
-                    moreNewsListEl.innerHTML = moreItems.map(function (newsItem, idx) {
-                        const imageHtml = newsItem.image_url
-                            ? '<div class="moreNewsCardImage"><img src="' + escapeHtml(newsItem.image_url) + '" alt="' + escapeHtml(newsItem.title || 'News image') + '"></div>'
-                            : '';
-                        const divider = idx < moreItems.length - 1 ? '<div class="moreNewsCardDivider"></div>' : '';
-                        return ''
-                            + '<article class="moreNewsCard' + (idx === 0 ? ' is-active' : '') + '" tabindex="0" role="button"'
-                            + ' data-news-index="' + String(idx + 1) + '">'
-                            + '  <div class="moreNewsCardInner">'
-                            +       imageHtml
-                            + '    <div class="moreNewsCardContent">'
-                            + '      <p class="moreNewsCardDate">' + escapeHtml(newsItem.posted_date || '-') + '</p>'
-                            + '      <h3 class="moreNewsCardTitle">' + escapeHtml(newsItem.title || 'Untitled news') + '</h3>'
-                            + '      <p class="moreNewsCardText">' + escapeHtml(toPreviewText(newsItem.content_html || '', 220)) + '</p>'
-                            + '    </div>'
-                            + '  </div>'
-                            +      divider
-                            + '</article>';
-                    }).join('');
-
-                    moreNewsListEl.querySelectorAll(".moreNewsCard").forEach(function (cardEl) {
-                        function activateCard() {
-                            const index = parseInt(cardEl.getAttribute("data-news-index") || "", 10);
-                            const selectedItem = Number.isNaN(index) ? null : items[index];
-                            if (!selectedItem) {
-                                return;
-                            }
-                            renderFeaturedNews(selectedItem, { headlineEl, dateEl, bodyEl, imageWrapperEl });
-                            moreNewsListEl.querySelectorAll(".moreNewsCard").forEach(function (el) {
-                                el.classList.toggle("is-active", el === cardEl);
-                            });
-                            window.scrollTo({ top: headlineEl.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" });
-                        }
-
-                        cardEl.addEventListener("click", activateCard);
-                        cardEl.addEventListener("keydown", function (event) {
-                            if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                activateCard();
-                            }
-                        });
-                    });
-                })
-                .catch(function () {
-                    renderFeaturedNews(null, { headlineEl, dateEl, bodyEl, imageWrapperEl });
-                    moreNewsSectionEl.style.display = "none";
-                });
-            }
-        })();
-
-        (function () {
-            const listEl = document.getElementById("publicAnnouncementsList");
+            const newsStorySectionEl = document.getElementById("newsStorySection");
+            const newsArchiveSectionEl = document.getElementById("newsArchiveSection");
+            const newsArchiveListEl = document.getElementById("newsArchiveList");
+            const newsArchivePaginationEl = document.getElementById("newsArchivePagination");
+            const newsBackButtonEl = document.getElementById("newsBackButton");
+            const landingAnnouncementRailEl = document.getElementById("landingAnnouncementRail");
+            const landingAnnouncementLatestEl = document.getElementById("landingAnnouncementLatest");
+            const landingAnnouncementStackEl = document.getElementById("landingAnnouncementStack");
+            const landingAnnouncementMoreButtonEl = document.getElementById("landingAnnouncementMoreButton");
+            const storyAnnouncementRailEl = document.getElementById("storyAnnouncementRail");
+            const storyAnnouncementLatestEl = document.getElementById("storyAnnouncementLatest");
+            const storyAnnouncementStackEl = document.getElementById("storyAnnouncementStack");
             const modalEl = document.getElementById("publicAnnouncementModal");
             const modalTitleEl = document.getElementById("publicAnnouncementModalTitle");
             const modalDateEl = document.getElementById("publicAnnouncementModalDate");
+            const modalMediaEl = document.getElementById("publicAnnouncementModalMedia");
             const modalBodyEl = document.getElementById("publicAnnouncementModalBody");
-            const modalInstance = modalEl && window.bootstrap?.Modal
+            const announcementListModalEl = document.getElementById("announcementListModal");
+            const announcementListModalTitleEl = document.getElementById("announcementListModalTitle");
+            const announcementListModalIntroEl = document.getElementById("announcementListModalIntro");
+            const announcementListModalListEl = document.getElementById("announcementListModalList");
+            const modalInstance = modalEl && window.bootstrap && window.bootstrap.Modal
                 ? new bootstrap.Modal(modalEl)
                 : null;
-            if (!listEl) {
+            const announcementListModalInstance = announcementListModalEl && window.bootstrap && window.bootstrap.Modal
+                ? new bootstrap.Modal(announcementListModalEl)
+                : null;
+
+            if (!featuredTagEl || !headlineEl || !dateEl || !leadEl || !bodyEl || !imageWrapperEl || !newsStorySectionEl || !newsArchiveSectionEl || !newsArchiveListEl) {
                 return;
             }
 
-            fetch("../PhpFiles/GET/getPublicAnnouncements.php", {
-                headers: {
-                    "Accept": "application/json"
-                }
-            })
-            .then(function (response) {
-                if (!response.ok) {
-                    throw new Error("Unable to load announcements.");
-                }
-                return response.json();
-            })
-            .then(function (payload) {
-                const items = Array.isArray(payload.items) ? payload.items : [];
-                if (!items.length) {
-                    listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">No public announcements available yet.</p><div class="announcementPreviewText">Check back later for new barangay announcements.</div><span class="announcementDate">-</span></div>';
+            newsPageState.storySectionEl = newsStorySectionEl;
+            newsPageState.articleRefs = {
+                tagEl: featuredTagEl,
+                headlineEl: headlineEl,
+                dateEl: dateEl,
+                leadEl: leadEl,
+                bodyEl: bodyEl,
+                imageWrapperEl: imageWrapperEl
+            };
+            newsPageState.archiveRefs = {
+                sectionEl: newsArchiveSectionEl,
+                listEl: newsArchiveListEl,
+                paginationEl: newsArchivePaginationEl
+            };
+            newsPageState.backButtonEl = newsBackButtonEl;
+            newsPageState.landingAnnouncementRailEl = landingAnnouncementRailEl;
+            newsPageState.landingAnnouncementLatestEl = landingAnnouncementLatestEl;
+            newsPageState.landingAnnouncementStackEl = landingAnnouncementStackEl;
+            newsPageState.landingAnnouncementMoreButtonEl = landingAnnouncementMoreButtonEl;
+            newsPageState.storyAnnouncementRailEl = storyAnnouncementRailEl;
+            newsPageState.storyAnnouncementLatestEl = storyAnnouncementLatestEl;
+            newsPageState.storyAnnouncementStackEl = storyAnnouncementStackEl;
+            newsPageState.announcementModalRefs = {
+                modalInstance: modalInstance,
+                titleEl: modalTitleEl,
+                dateEl: modalDateEl,
+                mediaEl: modalMediaEl,
+                bodyEl: modalBodyEl
+            };
+            newsPageState.announcementListModalRefs = {
+                modalInstance: announcementListModalInstance,
+                titleEl: announcementListModalTitleEl,
+                introEl: announcementListModalIntroEl,
+                listEl: announcementListModalListEl
+            };
+
+            if (newsBackButtonEl) {
+                newsBackButtonEl.addEventListener("click", function (event) {
+                    if (!isPlainLeftClick(event)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    navigateToNewsLanding({
+                        pageNumber: newsPageState.currentNewsPage,
+                        updateHistory: true,
+                        scroll: true
+                    });
+                });
+            }
+
+            window.addEventListener("popstate", function () {
+                if (!Array.isArray(newsPageState.newsItems) || !newsPageState.newsItems.length) {
                     return;
                 }
 
-                listEl.innerHTML = items.map(function (item, idx) {
-                    const divider = idx < items.length - 1 ? '<hr class="sidebarDivider">' : '';
-                    return ''
-                        + '<div class="announcementItem announcementItemInteractive" tabindex="0" role="button"'
-                        + ' data-announcement-title="' + escapeHtml(item.title || 'Untitled announcement') + '"'
-                        + ' data-announcement-date="' + escapeHtml(item.posted_date || '-') + '"'
-                        + ' data-announcement-content="' + encodeURIComponent(item.content_html || '') + '">'
-                        + '  <p class="announcementText">' + escapeHtml(item.title || 'Untitled announcement') + '</p>'
-                        + '  <div class="announcementPreviewText">' + escapeHtml(toPreviewText(item.content_html || '', 140)) + '</div>'
-                        + '  <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
-                        + '</div>'
-                        + divider;
-                }).join('');
+                syncNewsViewFromLocation({
+                    updateHistory: false,
+                    scroll: true
+                });
+            });
 
-                listEl.querySelectorAll(".announcementItemInteractive").forEach(function (itemEl) {
-                    function openAnnouncementModal() {
-                        if (!modalInstance || !modalTitleEl || !modalDateEl || !modalBodyEl) {
+            if (landingAnnouncementMoreButtonEl) {
+                landingAnnouncementMoreButtonEl.addEventListener("click", function () {
+                    openAnnouncementListModal(newsPageState.announcementItems.slice(1));
+                });
+            }
+
+            window.addEventListener("resize", function () {
+                const nextPageSize = getNewsArchivePageSize();
+                if (nextPageSize === newsPageState.archivePageSize) {
+                    return;
+                }
+
+                if (Array.isArray(newsPageState.newsItems) && newsPageState.newsItems.length) {
+                    renderNewsArchive();
+                    if (newsPageState.backButtonEl) {
+                        newsPageState.backButtonEl.setAttribute("href", buildNewsStoryUrl('', newsPageState.currentNewsPage));
+                    }
+                }
+            });
+
+            function buildAnnouncementCardMarkup(item, index, variant) {
+                const imageHtml = item.image_url
+                    ? '<div class="' + (variant === "latest" ? 'landingAnnouncementFeatureMedia' : 'landingAnnouncementStackMedia') + '"><img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || 'Announcement image') + '"></div>'
+                    : '';
+                const wrapperClass = variant === "latest"
+                    ? 'landingAnnouncementFeature'
+                    : 'landingAnnouncementStackItem';
+                const titleClass = variant === "latest"
+                    ? 'landingAnnouncementFeatureTitle'
+                    : 'landingAnnouncementStackTitle';
+                const bodyClass = variant === "latest"
+                    ? 'landingAnnouncementFeatureBody'
+                    : 'landingAnnouncementStackBody';
+                const previewLength = variant === "latest" ? 120 : 82;
+                const emptyImageClass = variant === "stack" && !imageHtml ? ' is-text-only' : '';
+
+                return ''
+                    + '<div class="' + wrapperClass + emptyImageClass + ' announcementItemInteractive" tabindex="0" role="button" data-announcement-index="' + String(index) + '">'
+                    +      imageHtml
+                    + '  <div class="' + bodyClass + '">'
+                    + '      <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
+                    + '      <p class="' + titleClass + '">' + escapeHtml(item.title || 'Untitled announcement') + '</p>'
+                    + '      <div class="announcementPreviewText">' + escapeHtml(toPreviewText(item.content_html || '', previewLength)) + '</div>'
+                    + '  </div>'
+                    + '</div>';
+            }
+
+            function attachAnnouncementInteractions(scopeEl, items, onSelect) {
+                if (!scopeEl) {
+                    return;
+                }
+
+                scopeEl.querySelectorAll(".announcementItemInteractive").forEach(function (itemEl) {
+                    function openSelectedAnnouncement() {
+                        const index = parseInt(itemEl.getAttribute("data-announcement-index") || "", 10);
+                        const selectedItem = Number.isNaN(index) ? null : items[index];
+                        if (typeof onSelect === "function") {
+                            onSelect(selectedItem || null);
                             return;
                         }
-                        modalTitleEl.textContent = itemEl.getAttribute("data-announcement-title") || "Announcement";
-                        modalDateEl.textContent = itemEl.getAttribute("data-announcement-date") || "-";
-                        modalBodyEl.innerHTML = decodeURIComponent(itemEl.getAttribute("data-announcement-content") || "")
-                            || "<p>No announcement content available.</p>";
-                        modalInstance.show();
+                        openAnnouncementModal(selectedItem || null);
                     }
 
                     itemEl.addEventListener("click", function () {
-                        openAnnouncementModal();
+                        openSelectedAnnouncement();
                     });
                     itemEl.addEventListener("keydown", function (event) {
                         if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
-                            openAnnouncementModal();
+                            openSelectedAnnouncement();
                         }
                     });
                 });
+            }
+
+            function openAnnouncementFromList(selectedItem) {
+                const listRefs = newsPageState.announcementListModalRefs;
+                if (listRefs && listRefs.modalInstance) {
+                    listRefs.modalInstance.hide();
+                    window.setTimeout(function () {
+                        openAnnouncementModal(selectedItem || null);
+                    }, 180);
+                    return;
+                }
+                openAnnouncementModal(selectedItem || null);
+            }
+
+            function openAnnouncementListModal(items) {
+                const refs = newsPageState.announcementListModalRefs;
+                if (!refs || !refs.modalInstance || !refs.listEl) {
+                    return;
+                }
+
+                const listItems = Array.isArray(items) ? items : [];
+                if (refs.titleEl) {
+                    refs.titleEl.textContent = "Other Announcements";
+                }
+                if (refs.introEl) {
+                    refs.introEl.textContent = listItems.length
+                        ? "Choose another public notice to read in full."
+                        : "No other public notices are available right now.";
+                }
+                if (!listItems.length) {
+                    refs.listEl.innerHTML = '<div class="landingAnnouncementEmpty">No other announcements available yet.</div>';
+                } else {
+                    refs.listEl.innerHTML = listItems.map(function (item, idx) {
+                        return buildAnnouncementCardMarkup(item, idx, "stack");
+                    }).join("");
+                    attachAnnouncementInteractions(refs.listEl, listItems, openAnnouncementFromList);
+                }
+                refs.modalInstance.show();
+            }
+
+            function renderAnnouncementRail(railEl, latestEl, stackEl, items, options) {
+                const opts = options || {};
+                const moreButtonEl = opts.moreButtonEl || null;
+                if (!railEl || !latestEl || !stackEl) {
+                    return;
+                }
+
+                if (!items.length) {
+                    railEl.style.display = "";
+                    latestEl.innerHTML = '<div class="landingAnnouncementEmpty">No public announcements available yet.</div>';
+                    stackEl.innerHTML = "";
+                    if (moreButtonEl) {
+                        moreButtonEl.style.display = "none";
+                    }
+                    return;
+                }
+
+                railEl.style.display = "";
+                latestEl.innerHTML = buildAnnouncementCardMarkup(items[0], 0, "latest");
+                stackEl.innerHTML = items.slice(1, 4).map(function (item, idx) {
+                    return buildAnnouncementCardMarkup(item, idx + 1, "stack");
+                }).join("");
+                if (moreButtonEl) {
+                    moreButtonEl.style.display = items.length > 1 ? "" : "none";
+                }
+
+                attachAnnouncementInteractions(latestEl, items);
+                attachAnnouncementInteractions(stackEl, items);
+            }
+
+            function renderAnnouncementRails() {
+                const items = Array.isArray(newsPageState.announcementItems) ? newsPageState.announcementItems : [];
+                renderAnnouncementRail(
+                    newsPageState.landingAnnouncementRailEl,
+                    newsPageState.landingAnnouncementLatestEl,
+                    newsPageState.landingAnnouncementStackEl,
+                    items,
+                    {
+                        moreButtonEl: newsPageState.landingAnnouncementMoreButtonEl
+                    }
+                );
+                renderAnnouncementRail(
+                    newsPageState.storyAnnouncementRailEl,
+                    newsPageState.storyAnnouncementLatestEl,
+                    newsPageState.storyAnnouncementStackEl,
+                    items
+                );
+            }
+
+            imageWrapperEl.style.display = "none";
+            newsPageState.currentNewsPage = getRequestedNewsPage();
+            const requestedNewsId = getRequestedNewsId();
+            const hasRequestedStory = requestedNewsId !== '';
+
+            renderFeaturedNews(null, newsPageState.articleRefs);
+            if (hasRequestedStory) {
+                if (newsPageState.archiveRefs && newsPageState.archiveRefs.sectionEl) {
+                    newsPageState.archiveRefs.sectionEl.style.display = "none";
+                }
+                if (newsPageState.storySectionEl) {
+                    newsPageState.storySectionEl.style.display = "";
+                }
+                if (newsPageState.backButtonEl) {
+                    newsPageState.backButtonEl.setAttribute("href", buildNewsStoryUrl('', newsPageState.currentNewsPage));
+                }
+            } else {
+                showNewsLanding();
+            }
+
+            const cachedNewsPayload = readCachedJsonWithPrefetch("../PhpFiles/GET/getPublicNews.php");
+            if (cachedNewsPayload && Array.isArray(cachedNewsPayload.items)) {
+                newsPageState.newsItems = cachedNewsPayload.items;
+                syncNewsViewFromLocation({
+                    updateHistory: true,
+                    replaceHistory: true,
+                    scroll: false
+                });
+            }
+
+            const cachedAnnouncementsPayload = readCachedJsonWithPrefetch("../PhpFiles/GET/getPublicAnnouncements.php");
+            if (cachedAnnouncementsPayload && Array.isArray(cachedAnnouncementsPayload.items)) {
+                newsPageState.announcementItems = cachedAnnouncementsPayload.items;
+                renderAnnouncementRails();
+            }
+
+            fetchJsonWithPrefetch("../PhpFiles/GET/getPublicNews.php", {
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+            .then(function (payload) {
+                newsPageState.newsItems = payload && Array.isArray(payload.items) ? payload.items : [];
+                syncNewsViewFromLocation({
+                    updateHistory: true,
+                    replaceHistory: true,
+                    scroll: false
+                });
             })
             .catch(function () {
-                listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">Unable to load public announcements right now.</p><div class="announcementPreviewText">Please try again later.</div><span class="announcementDate">-</span></div>';
+                newsPageState.newsItems = [];
+                renderFeaturedNews(null, newsPageState.articleRefs);
+                navigateToNewsLanding({
+                    pageNumber: 1,
+                    updateHistory: true,
+                    replaceHistory: true,
+                    scroll: false
+                });
+            });
+
+            imageWrapperEl.style.display = "none";
+            fetchJsonWithPrefetch("../PhpFiles/GET/getPublicAnnouncements.php", {
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+            .then(function (payload) {
+                newsPageState.announcementItems = Array.isArray(payload.items) ? payload.items : [];
+                renderAnnouncementRails();
+            })
+            .catch(function () {
+                newsPageState.announcementItems = [];
+                renderAnnouncementRails();
             });
         })();
     </script></body>
 </html>
-
-
-
-
-
-

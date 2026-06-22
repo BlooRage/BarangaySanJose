@@ -4,6 +4,7 @@ require_once __DIR__ . "/../General/security.php";
 header('Content-Type: application/json');
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
+require_once __DIR__ . '/redirectDestination.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -62,6 +63,7 @@ try {
     $PhoneNumber = pii_normalize_phone10(trim($_POST['RPhoneNumber'] ?? ''));
     $Email       = pii_normalize_email(trim($_POST['REmail'] ?? ''));
     $Password    = $_POST['RPassword'] ?? '';
+    $requestedService = normalizeRequestedResidentService($_POST['post_login_service'] ?? '');
 
     // ===== Validation =====
     $errors = [];
@@ -223,11 +225,9 @@ VALUES (?, ?, ?, 1, ?, ?, 0, ?, ?, ?, ?, ?)
     $_SESSION['logged_in'] = true;
     $_SESSION['last_activity'] = time();
 
-    require_once __DIR__ . "/redirectDestination.php";
-
     echo json_encode([
         "success" => true,
-        "redirect" => resolveUnifiedProfileRedirect($conn, $UserID, $RoleAccess)
+        "redirect" => resolveRequestedPostLoginRedirect($conn, $UserID, $RoleAccess, $requestedService)
     ]);
     exit;
 

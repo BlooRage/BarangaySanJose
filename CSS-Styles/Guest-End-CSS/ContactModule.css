@@ -128,20 +128,24 @@
     font-size: 1.2em;
     font-weight: bold;
     color: var(--dark-text-color);
-    margin-bottom: 0;
+    margin-bottom: 8px;
 }
 
 .contactSubInfo {
     font-size: 0.9em;
     color: #666;
-    margin-bottom: 5px;
+    margin-bottom: 0;
+    line-height: 1.45;
 }
 
 .contactNumber {
+    display: inline-block;
     font-size: 1.1em;
     color: var(--primary-color);
     font-weight: bold;
-    margin-bottom: 25px;
+    margin-bottom: 10px;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.14em;
 }
 .contactContactRow {
     justify-content: center;
@@ -161,13 +165,16 @@
     align-items: center;
     display: flex;
     flex-direction: column;
+    height: 100%;
 }
 .contactCard.deptBox {
     width: 100%;
-    min-height: 120px;
+    min-height: 100%;
     justify-content: flex-start;
+    align-items: center;
+    text-align: center;
     margin: 0;
-    padding-bottom: 5px;
+    padding: 28px 26px;
 }
 .contactGridGroup {
     padding-bottom: 5px;
@@ -237,6 +244,12 @@
     }
     .bannerTitle {
         font-size: 2em;
+    }
+    .contactCard.deptBox {
+        padding: 24px 20px;
+    }
+    .contactCoverageList li {
+        font-size: 0.95em;
     }
 }
 

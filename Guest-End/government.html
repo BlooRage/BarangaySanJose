@@ -212,51 +212,80 @@
                 <div class="mapOverlay" id="mapOverlay">Click to enable map interaction</div>
                 <div id="map" class="vicinityMap"></div>
                 <div class="mapBadge" id="mapStatus">
-                    <b>Barangay San Jose (Rodriguez, Rizal)</b>
-                    Loading boundary from OpenStreetMap…
+                    <b>Barangay Boundary</b>
+                    San Jose, Rodriguez, Rizal
                 </div>
             </div>
             <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start vicinityGrid" data-cms-government-list="areas">
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 01</h3>
-                        <p class="vicinitySub">San Jose Proper</p>
+                        <ul class="vicinityList">
+                            <li>San Jose Proper</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 1A</h3>
-                        <p class="vicinitySub">Litex Village | Abatex Christine Creek | Med. Heights</p>
+                        <ul class="vicinityList">
+                            <li>Litex Village</li>
+                            <li>Abatex Christine Creek</li>
+                            <li>Med. Heights</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 02</h3>
-                        <p class="vicinitySub">VFW | Amychelle | Christine Villa Parnshey | Villa Ana | Zaniga Farm</p>
+                        <ul class="vicinityList">
+                            <li>VFW</li>
+                            <li>Amychelle</li>
+                            <li>Christine Villa Parnshey</li>
+                            <li>Villa Ana</li>
+                            <li>Zaniga Farm</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 03</h3>
-                        <p class="vicinitySub">Relocation</p>
+                        <ul class="vicinityList">
+                            <li>Relocation</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 04</h3>
-                        <p class="vicinitySub">Kasiglahan: Phase 1-B | Phase 1-C | Phase 1-D | Phase 1-M | Phase 1-A</p>
+                        <ul class="vicinityList">
+                            <li>Kasiglahan Phase 1-B</li>
+                            <li>Kasiglahan Phase 1-C</li>
+                            <li>Kasiglahan Phase 1-D</li>
+                            <li>Kasiglahan Phase 1-M</li>
+                            <li>Kasiglahan Phase 1-A</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 05</h3>
-                        <p class="vicinitySub">Kasiglahan: Phase 1-K | Phase 1K1 | Phase 1K2 | Phase 1-E | Phase 1-G</p>
+                        <ul class="vicinityList">
+                            <li>Kasiglahan Phase 1-K</li>
+                            <li>Kasiglahan Phase 1K1</li>
+                            <li>Kasiglahan Phase 1K2</li>
+                            <li>Kasiglahan Phase 1-E</li>
+                            <li>Kasiglahan Phase 1-G</li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 06</h3>
-                        <p class="vicinitySub">Sub-Urban | Metro Manila Hills</p>
+                        <ul class="vicinityList">
+                            <li>Sub-Urban</li>
+                            <li>Metro Manila Hills</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -297,6 +326,7 @@
 
     
     
+    <script src="../JS-Script-Files/publicPagePrefetch.js?v=20260622-1"></script>
     <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
@@ -352,17 +382,7 @@
                 });
             }
 
-            const base =
-                "https://portal.georisk.gov.ph/arcgis/rest/services/PSA/Barangay/MapServer/4/query";
-            const where =
-                "prov_name='Rizal' AND city_name LIKE 'Rodriguez%' AND brgy_name='San Jose'";
-            const url =
-                base +
-                "?where=" + encodeURIComponent(where) +
-                "&outFields=" + encodeURIComponent("reg_name,prov_name,city_name,brgy_name,psgc_10d") +
-                "&returnGeometry=true" +
-                "&outSR=4326" +
-                "&f=geojson";
+            const url = "../Public-Assets/Data/barangay-san-jose-boundary.geojson?v=20260619";
 
             try {
                 const res = await fetch(url);
@@ -372,7 +392,7 @@
 
                 const geojson = await res.json();
                 if (!geojson.features || geojson.features.length === 0) {
-                    throw new Error("No polygon returned. Check PSA layer attributes.");
+                    throw new Error("No boundary data found.");
                 }
 
                 const layer = L.geoJSON(geojson, {
@@ -389,12 +409,11 @@
 
                 const p = geojson.features[0].properties || {};
                 status.innerHTML =
-                    "<b>Border loaded</b>" +
-                    "<div style=\"opacity:.9\">PSA Barangay Boundary (GeoRisk portal)</div>" +
-                    `<div style="opacity:.75;margin-top:6px">${p.brgy_name || ""}, ${p.city_name || ""}, ${p.prov_name || ""}</div>`;
+                    "<b>Barangay Boundary</b>" +
+                    `<div style="opacity:.9">${p.name || "San Jose"}, ${p.city || "Rodriguez"}, ${p.province || "Rizal"}</div>`;
             } catch (e) {
                 status.innerHTML =
-                    "<b>Failed to load border</b>" +
+                    "<b>Boundary unavailable</b>" +
                     `<div style="opacity:.9;margin-top:6px">${String(e.message || e)}</div>`;
             }
         })();
@@ -418,9 +437,3 @@
         });
     </script></body>
 </html>
-
-
-
-
-
-

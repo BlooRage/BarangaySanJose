@@ -9,6 +9,7 @@ header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
 require '../General/connection.php';
+require_once __DIR__ . "/redirectDestination.php";
 ual_ensure_lock_columns($conn);
 ual_ensure_archive_support($conn);
 
@@ -19,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $userInput = trim($_POST['user'] ?? '');
 $password  = $_POST['loginPassword'] ?? '';
+$requestedService = normalizeRequestedResidentService($_POST['post_login_service'] ?? '');
 
 if ($userInput === '' || $password === '') {
     echo json_encode(['success' => false, 'error' => 'Please enter your credentials']);
@@ -247,6 +249,7 @@ if ($inactiveStatusId !== null && (int)$userData['status_id_account'] === (int)$
     // store only a "pending verification" session
     $_SESSION['pending_user_id'] = $userData['user_id'];
     $_SESSION['pending_verify']  = 'inactive';
+    $_SESSION['pending_post_login_service'] = $requestedService;
 
     // mask phone: show last 4 digits
     $phoneDigits = preg_replace('/\D/', '', (string)($userData['phone_number'] ?? ''));
@@ -257,7 +260,8 @@ if ($inactiveStatusId !== null && (int)$userData['status_id_account'] === (int)$
         'success'      => true,
         'status'       => 'inactive',
         'user_id'      => $userData['user_id'],     // you can remove this if you prefer session-only
-        'phone_masked' => $masked
+        'phone_masked' => $masked,
+        'redirect'     => resolveRequestedPostLoginRedirect($conn, (string)$userData['user_id'], (string)$userData['role_access'], $requestedService)
     ]);
     exit;
 }
@@ -302,6 +306,7 @@ if ($activeStatusId !== null) {
    SESSION + REDIRECT
 ============================= */
 unset($_SESSION['pending_user_id'], $_SESSION['pending_verify']);
+unset($_SESSION['pending_post_login_service']);
 
 // Prevent session fixation after successful authentication.
 session_regenerate_id(true);
@@ -312,12 +317,10 @@ $_SESSION['logged_in']  = true;
 $_SESSION['last_activity'] = time();
 $_SESSION['show_not_verified_modal'] = true;
 
-require_once __DIR__ . "/redirectDestination.php";
-
 echo json_encode([
     'success'  => true,
     'status'   => 'active',
-    'redirect' => resolveUnifiedProfileRedirect($conn, (string)$userData['user_id'], (string)$userData['role_access'])
+    'redirect' => resolveRequestedPostLoginRedirect($conn, (string)$userData['user_id'], (string)$userData['role_access'], $requestedService)
 ]);
 exit;
 ?>

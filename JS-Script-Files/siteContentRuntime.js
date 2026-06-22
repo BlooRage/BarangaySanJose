@@ -106,6 +106,32 @@
     return digits ? "tel:" + digits.replace(/^\+/, "") : "#";
   }
 
+  function buildContactCoverageItems(value) {
+    var wrapper = document.createElement("div");
+    var normalized = String(value || "")
+      .replace(/<\s*br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|ul|ol|h[1-6])\s*>/gi, "\n")
+      .replace(/&nbsp;/gi, " ");
+
+    wrapper.innerHTML = normalized;
+    return (wrapper.textContent || wrapper.innerText || "")
+      .replace(/\r/g, "")
+      .split(/\n|\|/)
+      .map(function (segment) {
+        return segment.replace(/\s+/g, " ").trim();
+      })
+      .filter(Boolean);
+  }
+
+  function buildContactCoverageText(value) {
+    var items = buildContactCoverageItems(value);
+    if (!items.length) {
+      return "";
+    }
+
+    return escapeHtml(items.join(" | "));
+  }
+
   function renderHome(root, payload) {
     setImage(root, '[data-cms-home="banner-image"]', payload.banner_image, "Home Banner");
     setImage(root, '[data-cms-home="about-image"]', payload.about_image, "About Us");
@@ -203,17 +229,90 @@
     var areasContainer = query(root, '[data-cms-government-list="areas"]');
     if (areasContainer) {
       var areas = Array.isArray(payload.areas) ? payload.areas : [];
-      areasContainer.innerHTML = areas.map(function (area) {
-        return [
-          '<div class="col">',
-          '  <div class="p-4 deptBox vicinityCard">',
-          '    <h3>' + (area.title_html || "") + "</h3>",
-          '    <p class="vicinitySub">' + (area.description_html || "") + "</p>",
-          "  </div>",
-          "</div>"
-        ].join("");
-      }).join("");
+      areasContainer.innerHTML = areas.map(buildGovernmentAreaCard).join("");
     }
+  }
+
+  function buildGovernmentAreaItems(value) {
+    var text = stripHtml(value || "");
+    if (!text) {
+      return [];
+    }
+
+    var segments = text.split("|").map(function (segment) {
+      return segment.trim();
+    }).filter(Boolean);
+
+    if (!segments.length) {
+      return [];
+    }
+
+    var firstSegment = segments[0];
+    var colonIndex = firstSegment.indexOf(":");
+    var items = [];
+
+    if (colonIndex !== -1) {
+      var prefix = firstSegment.slice(0, colonIndex).trim();
+      var firstItem = firstSegment.slice(colonIndex + 1).trim();
+      if (firstItem) {
+        items.push((prefix ? prefix + " " : "") + firstItem);
+      }
+      segments.slice(1).forEach(function (segment) {
+        items.push((prefix ? prefix + " " : "") + segment);
+      });
+      return items;
+    }
+
+    return segments;
+  }
+
+  function buildGovernmentAreaCard(area) {
+    var title = area && area.title_html ? area.title_html : "";
+    var items = buildGovernmentAreaItems(area && area.description_html ? area.description_html : "");
+    var listMarkup = items.length ? [
+      '<ul class="vicinityList">',
+      items.map(function (item) {
+        return '<li>' + escapeHtml(item) + '</li>';
+      }).join(""),
+      "</ul>"
+    ].join("") : '<p class="vicinityEmpty">No areas listed yet.</p>';
+
+    return [
+      '<div class="col">',
+      '  <div class="p-4 deptBox vicinityCard">',
+      '    <h3>' + title + "</h3>",
+      "    " + listMarkup,
+      "  </div>",
+      "</div>"
+    ].join("");
+  }
+
+  function getServiceApplyIntent(titleValue) {
+    var title = stripHtml(titleValue || "");
+    var normalized = title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+    var keywordIntents = [
+      { match: "barangay id", slug: "barangay-id", label: "Barangay ID" },
+      { match: "certificate", slug: "certificates", label: "Certificates" },
+      { match: "clearance", slug: "clearances", label: "Clearances" },
+      { match: "appointment", slug: "appointments", label: "Appointments" },
+      { match: "complaint", slug: "complaints", label: "Complaints" }
+    ];
+
+    for (var i = 0; i < keywordIntents.length; i += 1) {
+      if (normalized.indexOf(keywordIntents[i].match) !== -1) {
+        return {
+          slug: keywordIntents[i].slug,
+          label: keywordIntents[i].label
+        };
+      }
+    }
+
+    var fallbackSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return {
+      slug: fallbackSlug,
+      label: title || "This service"
+    };
   }
 
   function renderServices(root, payload) {
@@ -227,12 +326,14 @@
     }
     var services = Array.isArray(payload.services) ? payload.services : [];
     servicesContainer.innerHTML = services.map(function (service) {
+      var applyIntent = getServiceApplyIntent(service.title_html || "");
+      var loginHref = "../login" + (applyIntent.slug ? "?service=" + encodeURIComponent(applyIntent.slug) : "");
       return [
         '<div class="col">',
         '  <div class="p-4 servBox">',
         '    <h3>' + (service.title_html || "") + "</h3>",
         '    <div class="cms-runtime-richtext">' + (service.description_html || "") + "</div>",
-        '    <a href="../login"><button id="deptBtn" type="button" class="btn">Apply</button></a>',
+        '    <a href="' + escapeHtml(loginHref) + '" class="btn serviceApplyBtn" data-service-login data-service-slug="' + escapeHtml(applyIntent.slug) + '" data-service-name="' + escapeHtml(applyIntent.label) + '">Apply</a>',
         "  </div>",
         "</div>"
       ].join("");
@@ -332,12 +433,13 @@
       var areaHotlines = Array.isArray(payload.area_hotlines) ? payload.area_hotlines : [];
       areaContainer.innerHTML = areaHotlines.map(function (item) {
         var numberText = stripHtml(item.number_html || "");
+        var coverageText = buildContactCoverageText(item.location_html || "");
         return [
           '<div class="col-12 col-md-6 col-lg-4">',
           '  <div class="contactItem contactCard deptBox">',
           '    <p class="contactAreaName">' + (item.title_html || "") + "</p>",
-          '    <p class="contactSubInfo">' + (item.location_html || "") + "</p>",
           '    <a href="' + escapeHtml(telHref(numberText)) + '" class="contactNumber">' + (item.number_html || "") + "</a>",
+          coverageText ? '    <p class="contactSubInfo">' + coverageText + "</p>" : "",
           "  </div>",
           "</div>"
         ].join("");
@@ -392,11 +494,24 @@
 
   async function fetchPage(pageKey, endpoint) {
     var separator = endpoint.indexOf("?") === -1 ? "?" : "&";
-    var response = await fetch(endpoint + separator + "page=" + encodeURIComponent(pageKey), {
-      credentials: "omit"
-    });
-    var payload = await response.json();
-    if (!response.ok || !payload || payload.success !== true) {
+    var requestUrl = endpoint + separator + "page=" + encodeURIComponent(pageKey);
+    var payload;
+
+    if (window.PublicPagePrefetch && typeof window.PublicPagePrefetch.fetchJson === "function") {
+      payload = await window.PublicPagePrefetch.fetchJson(requestUrl, {
+        credentials: "omit"
+      });
+    } else {
+      var response = await fetch(requestUrl, {
+        credentials: "omit"
+      });
+      payload = await response.json();
+      if (!response.ok) {
+        throw new Error((payload && payload.message) || "Unable to load page content.");
+      }
+    }
+
+    if (!payload || payload.success !== true) {
       throw new Error((payload && payload.message) || "Unable to load page content.");
     }
     return payload.payload || {};

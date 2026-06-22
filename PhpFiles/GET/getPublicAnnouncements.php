@@ -41,11 +41,17 @@ foreach ($items as $item) {
         $contentHtml = (string)($item['content_html'] ?? '');
     }
 
+    $imageUrl = '';
+    if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $contentHtml, $matches)) {
+        $imageUrl = (string)($matches[1] ?? '');
+    }
+
     $publicAnnouncements[] = [
         'id' => (string)($item['id'] ?? ''),
         'title' => $title,
         'content_html' => $contentHtml,
-        'posted_date' => $postedDate
+        'posted_date' => $postedDate,
+        'image_url' => $imageUrl
     ];
 }
 
@@ -53,4 +59,3 @@ echo json_encode([
     'success' => true,
     'items' => array_slice($publicAnnouncements, 0, 6)
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-

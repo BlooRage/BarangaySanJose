@@ -421,78 +421,102 @@ foreach ($announcementItems as $item) {
 
       <h2 id="txt-sectionTitle" class="fw-bold border-bottom pb-2 mb-4">DASHBOARD</h2>
 
-      <div id="div-serviceGrid" class="row service-grid justify-content-center gx-4">
+      <div id="div-serviceGrid" class="row service-grid justify-content-center">
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-certificates"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Certificates/CertificatesLandingPage'">
-            <i class="fa-solid fa-file-lines fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">CERTIFICATE REQUEST</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-certificates"
+             class="card-action"
+             href="Certificates/CertificatesLandingPage"
+             aria-label="Open Certificate Request">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-file-lines"></i></span>
+            <span class="card-action__title">Certificate Request</span>
+            <span class="card-action__subtext">Quick access to resident service requests</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-clearances"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Clearances/ClearancesLandingPage'">
-            <i class="fa-solid fa-clipboard-check fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">CLEARANCES</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-clearances"
+             class="card-action"
+             href="Clearances/ClearancesLandingPage"
+             aria-label="Open Clearances">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-clipboard-check"></i></span>
+            <span class="card-action__title">Clearances</span>
+            <span class="card-action__subtext">Submit and manage barangay clearance requests</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-brgyId"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='BarangayId/BarangayIdLandingPage'">
-            <i class="fa-solid fa-id-card fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">BARANGAY ID</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-brgyId"
+             class="card-action"
+             href="BarangayId/BarangayIdLandingPage"
+             aria-label="Open Barangay ID">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-id-card"></i></span>
+            <span class="card-action__title">Barangay ID</span>
+            <span class="card-action__subtext">Access digital ID application and status tools</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-appointments"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Appointments/AppointmentsLandingPage'">
-            <i class="fa-solid fa-calendar-check fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">APPOINTMENTS</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-appointments"
+             class="card-action"
+             href="Appointments/AppointmentsLandingPage"
+             aria-label="Open Appointments">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></span>
+            <span class="card-action__title">Appointments</span>
+            <span class="card-action__subtext">View schedules and set your next barangay visit</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-announcements"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Announcements/AnnouncementsLandingPage'">
-            <i class="fa-solid fa-bullhorn fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">ANNOUNCEMENTS</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-announcements"
+             class="card-action"
+             href="Announcements/AnnouncementsLandingPage"
+             aria-label="Open Announcements">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-bullhorn"></i></span>
+            <span class="card-action__title">Announcements</span>
+            <span class="card-action__subtext">Read the latest community notices and updates</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-transactions"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='resident_transactions'">
-            <i class="fa-solid fa-money-check-dollar fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">TRANSACTIONS</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-transactions"
+             class="card-action"
+             href="resident_transactions"
+             aria-label="Open Transactions">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-money-check-dollar"></i></span>
+            <span class="card-action__title">Transactions</span>
+            <span class="card-action__subtext">Review payments and recent request activity</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-12 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-complaints"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Complaints/ComplaintsLandingPage'">
-            <i class="fa-solid fa-comment-dots fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">COMPLAINTS</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-complaints"
+             class="card-action"
+             href="Complaints/ComplaintsLandingPage"
+             aria-label="Open Complaints">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-comment-dots"></i></span>
+            <span class="card-action__title">Complaints</span>
+            <span class="card-action__subtext">Submit concerns and check complaint follow-ups</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
-        <div class="col-6 col-md-4 col-lg-3">
-          <div id="card-serviceRequest-profile"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='resident_profile'">
-            <i class="fa-solid fa-user-circle fa-2xl mb-3"></i><br>
-            <span class="fw-bold small">MY PROFILE</span>
-          </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a id="card-serviceRequest-profile"
+             class="card-action"
+             href="resident_profile"
+             aria-label="Open My Profile">
+            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-user-circle"></i></span>
+            <span class="card-action__title">My Profile</span>
+            <span class="card-action__subtext">Update account details and resident information</span>
+            <span class="card-action__arrow" aria-hidden="true"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+          </a>
         </div>
 
       </div>
