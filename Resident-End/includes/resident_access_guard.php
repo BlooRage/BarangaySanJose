@@ -109,6 +109,7 @@ if ($hasResidentProfile && !$isResidentVerified) {
     $scriptPath = resident_guard_normalize_public_path((string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $allowedForUnverified = [
         '/Resident-End/resident_dashboard.php',
+        '/Resident-End/resident_calendar.php',
         '/Resident-End/resident_profile.php',
         '/Resident-End/DocumentUpload.php',
         '/Resident-End/Certificates/CertificatesLandingPage.php',

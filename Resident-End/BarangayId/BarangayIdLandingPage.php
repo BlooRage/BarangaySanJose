@@ -44,6 +44,8 @@ $renewalAvailableLabel = $renewalAvailableDt instanceof DateTimeImmutable ? $ren
 $pendingRequestId = trim((string)($barangayIdState['pending_request_id'] ?? ''));
 $pendingStage = trim((string)($barangayIdState['pending_stage'] ?? ''));
 $pendingStageLabel = $pendingStage !== '' ? dr_stage_label($pendingStage) : '';
+$hasIssuedBarangayId = $latestDigitalIdRequestId !== '';
+$hasNoIssuedBarangayIdYet = !$hasIssuedBarangayId && $pendingRequestId === '';
 $daysUntilExpiry = isset($barangayIdState['latest_completed_days_until_expiry']) && $barangayIdState['latest_completed_days_until_expiry'] !== null
     ? (int)$barangayIdState['latest_completed_days_until_expiry']
     : null;
@@ -74,8 +76,8 @@ if ($notice === 'lost_reported') {
 
 $heroBadgeText = 'Application ready';
 $heroBadgeIcon = 'fa-solid fa-circle-check';
-$actionTitle = 'Apply for a new ID or open your digital copy';
-$actionBody = 'Start a new Barangay ID request any time. If your latest request is already completed, you can open the digital version immediately from here.';
+$actionTitle = 'Apply for a new Barangay ID';
+$actionBody = 'Start a new Barangay ID request here. After approval, your digital ID will also appear on this page.';
 $actionMeta = [];
 
 if ($pendingRequestId !== '') {
@@ -87,21 +89,26 @@ if ($pendingRequestId !== '') {
     if ($pendingStageLabel !== '') {
         $actionMeta[] = '<i class="fa-solid fa-list-check"></i>Status: ' . htmlspecialchars($pendingStageLabel, ENT_QUOTES, 'UTF-8');
     }
+} elseif ($hasNoIssuedBarangayIdYet && $submissionMode === 'new') {
+    $heroBadgeText = 'No Barangay ID yet';
+    $heroBadgeIcon = 'fa-solid fa-id-card';
+    $actionTitle = 'Apply for your first Barangay ID';
+    $actionBody = 'You do not have an issued Barangay ID yet. Submit your first application below.';
 } elseif ($submissionMode === 'replacement_lost') {
     $heroBadgeText = 'Lost ID reported';
     $heroBadgeIcon = 'fa-solid fa-triangle-exclamation';
     $actionTitle = 'Request a replacement Barangay ID';
-    $actionBody = 'Your last released Barangay ID has already been tagged as lost, so the replacement form is now available again.';
+    $actionBody = 'Your most recent Barangay ID was marked as lost. You can submit a replacement request now.';
 } elseif ($submissionMode === 'renewal') {
     $heroBadgeText = 'Renewal window open';
     $heroBadgeIcon = 'fa-solid fa-arrows-rotate';
     $actionTitle = 'Renew your Barangay ID';
-    $actionBody = 'Submit the renewal form to request a newly issued card with a fresh 2-year validity.';
+    $actionBody = 'Your Barangay ID is already within the renewal window. Submit a renewal request for a fresh 2-year validity.';
 } elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid') {
     $heroBadgeText = 'Currently active';
     $heroBadgeIcon = 'fa-solid fa-shield-halved';
     $actionTitle = 'Your Barangay ID is still valid';
-    $actionBody = 'You cannot file a new request yet while the current ID is still active, unless you first tag the current Barangay ID as lost.';
+    $actionBody = 'Your current Barangay ID is still active. New requests stay locked until the renewal window opens, unless you report this ID as lost.';
 }
 
 if ($validUntilLabel !== '') {
@@ -110,9 +117,22 @@ if ($validUntilLabel !== '') {
 if ($daysUntilExpiry !== null && $daysUntilExpiry >= 0 && $pendingRequestId === '') {
     $actionMeta[] = '<i class="fa-solid fa-hourglass-half"></i>' . htmlspecialchars((string)$daysUntilExpiry, ENT_QUOTES, 'UTF-8') . ' day' . ($daysUntilExpiry === 1 ? '' : 's') . ' until expiry';
 }
-if ($pendingRequestId === '') {
+if ($pendingRequestId === '' && $hasIssuedBarangayId) {
     $actionMeta[] = '<i class="fa-solid fa-calendar-plus"></i>Approved Barangay IDs receive a fresh 2-year validity.';
 }
+$displayActionMeta = array_slice($actionMeta, 0, 2);
+$showRequestsButton = $pendingRequestId !== '';
+$showApplyButton = !$showRequestsButton && (bool)($barangayIdState['can_submit_new_request'] ?? false);
+$showDigitalButton = $digitalIdViewUrl !== '';
+$showLostButton = (bool)($barangayIdState['can_report_lost'] ?? false);
+$hasActionButtons = $showRequestsButton || $showApplyButton || $showDigitalButton || $showLostButton;
+$displayActionMetaCount = count($displayActionMeta);
+$actionButtonCount = (int)$showRequestsButton + (int)$showApplyButton + (int)$showDigitalButton + (int)$showLostButton;
+$actionButtonLabel = match ($submissionMode) {
+    'renewal' => 'Renew Barangay ID',
+    'replacement_lost' => 'Request Replacement',
+    default => $hasNoIssuedBarangayIdYet ? 'Apply for Barangay ID' : 'Open Form',
+};
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -130,34 +150,56 @@ if ($pendingRequestId === '') {
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/barangayIdNav.css">
+    <link rel="stylesheet" href="../../CSS-Styles/modalStyle.css">
     <style>
         :root {
             --bid-page-accent: #de710c;
             --bid-page-accent-strong: #b85a00;
-            --bid-page-border: #f2d9c2;
-            --bid-page-ink: #241f1a;
-            --bid-page-muted: #675c50;
+            --bid-page-accent-soft: #fff2df;
+            --bid-page-border: #f1d4b6;
+            --bid-page-ink: #231a12;
+            --bid-page-muted: #6f6357;
+            --bid-page-panel: #fffaf4;
         }
-        body {
-            background: #fffdfb;
+
+        body.barangay-id-landing {
+            background: linear-gradient(180deg, #f3f5fa 0%, #fbfcff 22%, #ffffff 100%);
         }
-        #div-mainDisplay {
-            background: #ffffff !important;
+
+        .barangay-id-landing #div-mainDisplay {
+            background: transparent !important;
         }
-        .page-shell {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-        .page-header-icon {
-            height: 52px;
-            margin-bottom: 0;
-        }
-        .page-title {
-            font-size: 2.4rem;
-            font-weight: 700;
-            line-height: 1.05;
+
+        .bid-shell,
+        .bid-flow {
+            width: 100%;
+            max-width: none;
             margin: 0;
         }
+
+        .documents-page.barangay-id-landing .page-title {
+            margin-bottom: 1.5rem;
+        }
+
+        .documents-page.barangay-id-landing .bid-page-head {
+            margin-bottom: 0;
+        }
+
+        .documents-page.barangay-id-landing .bid-page-head hr {
+            margin: 0 0 1.5rem;
+            border-color: #cfc5bc;
+            opacity: 1;
+        }
+
+        .documents-page.barangay-id-landing .bid-page-head .page-description {
+            max-width: none;
+        }
+
+        .bid-action-shell {
+            max-width: 72rem;
+            margin: 0 0 1rem;
+        }
+
         .page-flash {
             display: grid;
             grid-template-columns: auto 1fr;
@@ -165,197 +207,583 @@ if ($pendingRequestId === '') {
             align-items: start;
             padding: 18px 20px;
             margin-bottom: 1.5rem;
-            border-radius: 16px;
+            border-radius: 20px;
             border: 1px solid var(--bid-page-border);
-            background: #fffaf5;
+            background: rgba(255, 250, 244, 0.92);
+            box-shadow: 0 18px 36px rgba(35, 26, 18, 0.06);
         }
+
         .page-flash__icon {
-            width: 44px;
-            height: 44px;
+            width: 46px;
+            height: 46px;
             display: grid;
             place-items: center;
-            border-radius: 14px;
+            border-radius: 15px;
             background: #fff;
             border: 1px solid var(--bid-page-border);
             color: var(--bid-page-accent-strong);
         }
+
         .page-flash__title {
             margin: 0 0 4px;
-            font-size: 1.06rem;
+            font-size: 1.05rem;
             font-weight: 800;
             color: var(--bid-page-ink);
         }
+
         .page-flash__body {
             margin: 0;
             color: var(--bid-page-muted);
             line-height: 1.65;
         }
+
         .page-flash--success .page-flash__icon {
             color: #1f8c49;
         }
+
         .page-flash--error .page-flash__icon {
             color: #c23f2e;
         }
+
         .page-flash--warning .page-flash__icon {
             color: #b85a00;
         }
-        .page-shell > .page-description {
-            margin: 0 0 1.5rem !important;
-        }
-        .page-subtitle {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #1f1f1f;
-        }
-        .info-card {
-            background: #fff7ef;
+
+        .bid-hero {
+            position: relative;
+            overflow: hidden;
+            padding: 2rem;
+            border-radius: 30px;
             border: 1px solid var(--bid-page-border);
-            border-radius: 16px;
-            padding: 20px 24px;
+            background:
+                radial-gradient(circle at top right, rgba(255, 219, 171, 0.58), rgba(255, 219, 171, 0) 28%),
+                linear-gradient(135deg, #fffdf9 0%, #fff6eb 52%, #fffdfa 100%);
+            box-shadow:
+                0 24px 52px rgba(35, 26, 18, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.95);
         }
-        .info-card .page-description,
-        .apply-section .page-description {
-            margin: 0 0 12px !important;
+
+        .bid-hero::before {
+            content: "";
+            position: absolute;
+            inset: 1px;
+            border-radius: inherit;
+            border: 1px solid rgba(255, 255, 255, 0.58);
+            pointer-events: none;
         }
+
+        .bid-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.55rem 0.9rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(241, 212, 182, 0.94);
+            color: var(--bid-page-accent-strong);
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .bid-hero__body {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .bid-hero__copy {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .bid-hero__heading {
+            display: flex;
+            align-items: center;
+            gap: 1.1rem;
+        }
+
+        .bid-hero__icon {
+            width: 88px;
+            height: 88px;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 26px;
+            background: linear-gradient(180deg, #ffe7c2 0%, #ffd89f 100%);
+            border: 1px solid #f2d0a9;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                0 16px 32px rgba(222, 113, 12, 0.12);
+        }
+
+        .bid-hero__icon img {
+            width: 46px;
+            height: 46px;
+            object-fit: contain;
+        }
+
+        .bid-hero__lede {
+            margin: 0.8rem 0 0;
+            max-width: 40rem;
+            color: #43382e;
+            font-size: 1.05rem;
+            line-height: 1.78;
+        }
+
+        .bid-highlight-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.85rem;
+        }
+
+        .bid-highlight-card {
+            padding: 1rem 1rem 0.95rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(241, 212, 182, 0.9);
+            box-shadow: 0 12px 28px rgba(35, 26, 18, 0.04);
+        }
+
+        .bid-highlight-card__label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-bottom: 0.55rem;
+            color: var(--bid-page-accent-strong);
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .bid-highlight-card h3 {
+            margin: 0 0 0.35rem;
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--bid-page-ink);
+        }
+
+        .bid-highlight-card p {
+            margin: 0;
+            color: var(--bid-page-muted);
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+
+        .bid-status-card {
+            height: 100%;
+            width: 100%;
+            max-width: none;
+            padding: 1.55rem 1.65rem;
+            border-radius: 22px;
+            background: #ffffff;
+            border: 1px solid #eadbc9;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+
         .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
+            gap: 0.55rem;
+            width: fit-content;
+            padding: 0.58rem 0.9rem;
             border-radius: 999px;
-            background: #fff6e7;
+            background: #fff8ee;
             color: #8a4b00;
-            border: 1px solid #efcda4;
+            border: 1px solid #efd4b4;
             font-size: 0.82rem;
             font-weight: 800;
         }
+
         .status-title {
             margin: 0;
-            font-size: 1.08rem;
-            font-weight: 700;
+            font-size: 1.24rem;
+            font-weight: 800;
+            line-height: 1.28;
             color: var(--bid-page-ink);
         }
+
         .status-copy {
-            color: #302922;
-            line-height: 1.75;
+            margin: 0;
+            max-width: 46rem;
+            color: #43382e;
+            line-height: 1.72;
         }
-        .info-list {
-            padding-left: 1.2rem;
-            margin: 0 0 12px !important;
-        }
-        .info-list li + li {
-            margin-top: 0.55rem;
-        }
-        .meta-chip-row {
+
+        .bid-meta-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 18px;
+            gap: 0.5rem;
+            margin-top: 0.1rem;
         }
+
         .meta-chip {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 0.68rem 0.9rem;
-            border-radius: 16px;
-            background: #fff;
-            border: 1px solid var(--bid-page-border);
+            gap: 0.5rem;
+            padding: 0.72rem 0.9rem;
+            border-radius: 14px;
+            background: #fffaf5;
+            border: 1px solid #efdcc9;
             color: #6a4521;
             font-weight: 700;
+            line-height: 1.35;
         }
-        .info-note {
-            margin-top: 16px !important;
-            color: var(--bid-page-muted);
-            line-height: 1.75;
+
+        .bid-meta-list.bid-meta-list--paired,
+        .bid-actions.bid-actions--paired {
+            width: 100%;
+            max-width: none;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
         }
-        .apply-section {
-            padding-top: 12px;
+
+        .bid-meta-list--paired .meta-chip,
+        .bid-actions--paired .bid-btn {
+            width: 100%;
         }
-        .apply-actions {
+
+        .bid-actions {
             display: flex;
-            justify-content: center;
-            gap: 12px;
             flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 0.1rem;
         }
-        .apply-actions .btn {
+
+        .bid-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 0.45rem;
+            width: auto;
             min-width: 180px;
-            padding: 0.56rem 1.35rem !important;
-            border-radius: 8px !important;
-            font-size: 0.95rem !important;
-            font-weight: 700 !important;
+            min-height: 48px;
+            padding: 0.78rem 1rem !important;
+            border-radius: 10px !important;
+            font-size: 0.92rem !important;
             line-height: 1.2 !important;
+            font-weight: 700 !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+            transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
         }
-        .apply-btn {
-            min-width: 180px;
-        }
-        .digital-id-btn,
-        .lost-report-btn {
-            background: linear-gradient(135deg, #ff9a3d 0%, #de710c 100%);
-            color: #fff;
-            border: 1px solid #c76007;
-            box-shadow: 0 10px 24px rgba(222, 113, 12, 0.22);
-        }
-        .digital-id-btn:hover,
-        .digital-id-btn:focus-visible,
-        .lost-report-btn:hover,
-        .lost-report-btn:focus-visible {
-            background: linear-gradient(135deg, #ffae58 0%, #c85c00 100%);
-            border-color: #b35300;
-            color: #fff;
-            box-shadow: 0 14px 28px rgba(200, 92, 0, 0.26);
-        }
-        .apply-note {
-            max-width: 780px;
-            margin: 14px auto 0;
+
+        .bid-btn i {
             font-size: 0.95rem;
+        }
+
+        .bid-btn--primary {
+            background: #de710c !important;
+            color: #fff !important;
+            border-color: #de710c !important;
+        }
+
+        .bid-btn--primary:hover,
+        .bid-btn--primary:focus-visible {
+            background: #c86208 !important;
+            color: #fff !important;
+            border-color: #c86208 !important;
+        }
+
+        .bid-btn--secondary {
+            background: #fff !important;
+            color: var(--bid-page-accent-strong) !important;
+            border-color: #efcfa9 !important;
+        }
+
+        .bid-btn--secondary:hover,
+        .bid-btn--secondary:focus-visible {
+            background: #fff8ef !important;
+            color: var(--bid-page-accent-strong) !important;
+            border-color: #e7be8e !important;
+        }
+
+        .bid-btn--warning {
+            background: #fff !important;
+            color: #b42318 !important;
+            border-color: #f0c9c5 !important;
+        }
+
+        .bid-btn--warning:hover,
+        .bid-btn--warning:focus-visible {
+            background: #fff5f4 !important;
+            color: #9f1d14 !important;
+            border-color: #e8b0aa !important;
+        }
+
+        .bid-status-note,
+        .bid-status-footnote {
+            margin: 0;
+            color: var(--bid-page-muted);
+            line-height: 1.68;
+            font-size: 0.94rem;
+        }
+
+        .bid-status-note {
+            max-width: 44rem;
+            color: var(--bid-page-accent-strong);
+            font-weight: 700;
+        }
+
+        .barangay-id-lost-modal .modal-content {
+            background: #ffffff !important;
+        }
+
+        .bid-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.9fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .bid-panel {
+            padding: 1.25rem;
+            border-radius: 22px;
+            border: 1px solid #eadbc9;
+            background: #ffffff;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+        }
+
+        .bid-panel--soft {
+            background: #fffdfb;
+        }
+
+        .bid-panel__eyebrow {
+            margin: 0 0 0.45rem;
+            color: var(--bid-page-accent-strong);
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .bid-panel__header h2 {
+            margin: 0 0 0.45rem;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--bid-page-ink);
+        }
+
+        .bid-panel__header p {
+            margin: 0;
             color: var(--bid-page-muted);
             line-height: 1.7;
         }
-        .digital-id-note {
-            margin: 12px 0 0;
-            font-size: 0.95rem;
-            font-weight: 700;
+
+        .bid-service-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .bid-service-card {
+            padding: 0.9rem;
+            border-radius: 16px;
+            background: #fcfbf9;
+            border: 1px solid #eee1d2;
+        }
+
+        .bid-service-card__icon {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 0.7rem;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #ffe8c5 0%, #ffd9a3 100%);
+            color: var(--bid-page-accent-strong);
+            font-size: 1rem;
+        }
+
+        .bid-service-card h3 {
+            margin: 0 0 0.4rem;
+            font-size: 0.96rem;
+            font-weight: 800;
+            color: var(--bid-page-ink);
+        }
+
+        .bid-service-card p {
+            margin: 0;
+            color: var(--bid-page-muted);
+            font-size: 0.9rem;
+            line-height: 1.54;
+        }
+
+        .bid-checklist {
+            list-style: none;
+            margin: 1.15rem 0 0;
+            padding: 0;
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .bid-checklist li {
+            position: relative;
+            padding-left: 1.65rem;
+            color: #3f352b;
+            line-height: 1.7;
+        }
+
+        .bid-checklist li::before {
+            content: "\f058";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            top: 0.05rem;
+            left: 0;
             color: var(--bid-page-accent-strong);
         }
+
+        .bid-reminder {
+            margin-top: 1.1rem;
+            padding: 1rem 1rem 1rem 0.95rem;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.75rem;
+            border-radius: 18px;
+            background: #fcfbf9;
+            border: 1px solid #eee1d2;
+        }
+
+        .bid-reminder i {
+            color: var(--bid-page-accent-strong);
+            margin-top: 0.2rem;
+        }
+
+        .bid-reminder p {
+            margin: 0;
+            color: var(--bid-page-muted);
+            line-height: 1.68;
+        }
+
+        @media (max-width: 991.98px) {
+            .bid-hero__body,
+            .bid-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .bid-status-card {
+                height: auto;
+            }
+        }
+
         @media (max-width: 767.98px) {
+            .bid-shell {
+                padding-top: 0.35rem;
+            }
+
+            .bid-flow,
+            .status-copy,
+            .bid-status-note {
+                max-width: none;
+            }
+
+            .bid-meta-list.bid-meta-list--paired,
+            .bid-actions.bid-actions--paired {
+                max-width: none;
+                grid-template-columns: 1fr;
+            }
+
+            .bid-action-shell {
+                max-width: none;
+            }
+
+            .bid-page-head {
+                margin-bottom: 1.2rem;
+            }
+
+            .bid-page-head hr {
+                margin: 0.95rem 0 1.2rem;
+            }
+
+            .bid-hero {
+                padding: 1.2rem;
+                border-radius: 24px;
+            }
+
+            .bid-hero__heading {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.9rem;
+            }
+
+            .bid-hero__icon {
+                width: 72px;
+                height: 72px;
+                border-radius: 20px;
+            }
+
+            .bid-hero__icon img {
+                width: 38px;
+                height: 38px;
+            }
+
             .page-title {
                 font-size: 2rem;
             }
-            .page-header {
-                align-items: flex-start !important;
+
+            .bid-hero__lede,
+            .page-description {
+                font-size: 0.95rem;
+                line-height: 1.68;
             }
-            .info-card {
-                padding: 18px 20px;
+
+            .bid-highlight-grid,
+            .bid-service-grid {
+                grid-template-columns: 1fr;
             }
-            .apply-actions {
+
+            .bid-status-card,
+            .bid-panel {
+                padding: 1.15rem;
+                border-radius: 22px;
+            }
+
+            .bid-actions {
+                gap: 0.55rem;
+                display: grid;
+            }
+
+            .bid-btn {
                 width: 100%;
-            }
-            .apply-actions .btn {
-                width: 100%;
+                font-size: 0.92rem !important;
+                padding: 0.82rem 0.95rem !important;
             }
         }
     </style>
 </head>
 
-<body>
+<body class="documents-page barangay-id-landing">
     <div class="d-flex min-vh-100">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5">
-            <div class="page-shell">
-                <div class="d-flex align-items-center gap-3 mb-3 page-header">
-                    <img src="../../Icons/Dashboard/brgyid.png" class="certificate-icon page-header-icon" alt="Barangay ID Service">
-                    <div>
-                        <h1 class="page-title mb-1">Barangay ID Application</h1>
-                    </div>
+        <header id="mobile-header">
+            <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar">
+                        <i class="fa-solid fa-bars fa-lg"></i>
+                    </button>
+                    <img src="<?= htmlspecialchars((string)$baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+                    <span class="logo-name">Barangay San Jose</span>
                 </div>
-                <hr>
+            </div>
+        </header>
 
+        <main id="div-mainDisplay" class="main-content flex-grow-1 p-4 p-md-5">
+            <div class="bid-shell">
                 <?php if (is_array($flash)): ?>
-                    <section class="page-flash page-flash--<?= htmlspecialchars((string)($flash['tone'] ?? 'warning'), ENT_QUOTES, 'UTF-8') ?>">
+                <section class="page-flash page-flash--<?= htmlspecialchars((string)($flash['tone'] ?? 'warning'), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="page-flash__icon">
                             <i class="<?= htmlspecialchars((string)($flash['icon'] ?? 'fa-solid fa-circle-info'), ENT_QUOTES, 'UTF-8') ?>"></i>
                         </div>
@@ -365,78 +793,72 @@ if ($pendingRequestId === '') {
                         </div>
                     </section>
                 <?php endif; ?>
-                <p class="page-description mb-4">
-                    Welcome to the Barangay San Jose Barangay ID Application. Review the service details below, then submit a new request, renewal, replacement, or open your digital copy once it is completed.
-                </p>
+                <div class="bid-flow">
+                    <section class="bid-page-head">
+                        <h1 class="page-title">Barangay ID</h1>
+                        <hr>
+                        <p class="page-description">
+                            Apply for a new Barangay ID, renew when eligible, request a replacement, or open your digital copy after approval.
+                        </p>
+                    </section>
 
-                <div class="info-card">
-                    <div class="mb-3">
-                        <span class="status-pill">
-                            <i class="<?= htmlspecialchars($heroBadgeIcon, ENT_QUOTES, 'UTF-8') ?>"></i>
-                            <?= htmlspecialchars($heroBadgeText, ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                    </div>
-                    <h2 class="page-subtitle mb-2">Barangay ID Services and Reminders</h2>
-                    <p class="status-title mb-2"><?= htmlspecialchars($actionTitle, ENT_QUOTES, 'UTF-8') ?></p>
-                    <p class="page-description status-copy mb-3"><?= htmlspecialchars($actionBody, ENT_QUOTES, 'UTF-8') ?></p>
-                    <p class="page-description mb-2">You may use this page to:</p>
-                    <ul class="page-description info-list">
-                        <li>Apply for a new Barangay ID once you are eligible to submit.</li>
-                        <li>Renew your existing Barangay ID within the 3-month renewal window before expiry.</li>
-                        <li>Request a replacement after tagging your current Barangay ID as lost.</li>
-                        <li>Open your digital Barangay ID once your latest request is completed.</li>
-                        <li>Use your issued Barangay ID as local proof of residence for barangay transactions and resident-facing services.</li>
-                        <li>Present it when requesting certificates, clearances, permits, and other community-related records.</li>
-                    </ul>
-                    <?php if ($actionMeta !== []): ?>
-                        <div class="meta-chip-row">
-                            <?php foreach ($actionMeta as $metaItem): ?>
-                                <span class="meta-chip"><?= $metaItem ?></span>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                    <p class="page-description info-note mb-0">
-                        Note: Bring additional valid identification whenever a transaction requires secondary proof of identity or extra verification.
-                    </p>
-                </div>
+                    <section class="bid-action-shell">
+                        <aside class="bid-status-card">
+                            <span class="status-pill">
+                                <i class="<?= htmlspecialchars($heroBadgeIcon, ENT_QUOTES, 'UTF-8') ?>"></i>
+                                <?= htmlspecialchars($heroBadgeText, ENT_QUOTES, 'UTF-8') ?>
+                            </span>
+                            <h2 class="status-title"><?= htmlspecialchars($actionTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                            <p class="status-copy"><?= htmlspecialchars($actionBody, ENT_QUOTES, 'UTF-8') ?></p>
 
-                <div class="text-center apply-section mt-4">
-                    <p class="page-description mb-3">
-                        <?= htmlspecialchars($pendingRequestId !== ''
-                            ? 'Open your request list below to monitor the status of your active Barangay ID application.'
-                            : 'Choose an option below to continue with your Barangay ID request or open your completed digital copy.', ENT_QUOTES, 'UTF-8') ?>
-                    </p>
-                    <div class="apply-actions">
-                        <?php if ($pendingRequestId !== ''): ?>
-                            <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars($documentRequestsUrl, ENT_QUOTES, 'UTF-8') ?>'">View My Requests</button>
-                        <?php elseif ($barangayIdState['can_submit_new_request'] ?? false): ?>
-                            <button class="btn apply-btn" type="button" data-apply-href="<?= htmlspecialchars($requestFormUrl, ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars(match ($submissionMode) {
-                                    'renewal' => 'Renew Barangay ID',
-                                    'replacement_lost' => 'Request Replacement',
-                                    default => 'Open Form',
-                                }, ENT_QUOTES, 'UTF-8') ?>
-                            </button>
-                        <?php endif; ?>
-                        <?php if ($digitalIdViewUrl !== ''): ?>
-                            <button class="btn digital-id-btn" type="button" onclick="location.href='<?= htmlspecialchars($digitalIdViewUrl, ENT_QUOTES, 'UTF-8') ?>'">View Digital ID</button>
-                        <?php endif; ?>
-                        <?php if ($barangayIdState['can_report_lost'] ?? false): ?>
-                            <button class="btn lost-report-btn" type="button" data-report-lost data-request-id="<?= htmlspecialchars($latestDigitalIdRequestId, ENT_QUOTES, 'UTF-8') ?>">Tag ID as Lost</button>
-                        <?php endif; ?>
-                    </div>
-                    <?php if ($submissionMode === 'replacement_lost' && $pendingRequestId === ''): ?>
-                        <p class="digital-id-note">Lost status recorded. The replacement form is open again.</p>
-                    <?php elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid' && $renewalAvailableLabel !== ''): ?>
-                        <p class="digital-id-note">Renewal becomes available on <?= htmlspecialchars($renewalAvailableLabel, ENT_QUOTES, 'UTF-8') ?> unless the active ID is tagged as lost first.</p>
-                    <?php elseif ($digitalIdViewUrl !== ''): ?>
-                        <p class="digital-id-note">Your latest completed Barangay ID can be opened online here.</p>
-                    <?php endif; ?>
-                    <p class="apply-note">
-                        <?= htmlspecialchars($pendingRequestId !== ''
-                            ? 'Monitor the active request first. Once it is completed, rejected, or cancelled, the next available Barangay ID action will appear here automatically.'
-                            : 'Residents with an active valid ID can renew within the 3-month window, or request a replacement after tagging the current ID as lost.', ENT_QUOTES, 'UTF-8') ?>
-                    </p>
+                            <?php if ($displayActionMeta !== []): ?>
+                                <div class="bid-meta-list<?= $displayActionMetaCount === 2 ? ' bid-meta-list--paired' : '' ?>">
+                                    <?php foreach ($displayActionMeta as $metaItem): ?>
+                                        <span class="meta-chip"><?= $metaItem ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($hasActionButtons): ?>
+                                <div class="bid-actions<?= $actionButtonCount === 2 ? ' bid-actions--paired' : '' ?>">
+                                    <?php if ($showRequestsButton): ?>
+                                        <button class="btn bid-btn bid-btn--primary" type="button" onclick="location.href='<?= htmlspecialchars($documentRequestsUrl, ENT_QUOTES, 'UTF-8') ?>'">
+                                            <i class="fa-solid fa-list-check"></i>
+                                            View My Requests
+                                        </button>
+                                    <?php elseif ($showApplyButton): ?>
+                                        <button class="btn bid-btn bid-btn--primary" type="button" data-apply-href="<?= htmlspecialchars($requestFormUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                            <i class="fa-solid fa-id-card"></i>
+                                            <?= htmlspecialchars($actionButtonLabel, ENT_QUOTES, 'UTF-8') ?>
+                                        </button>
+                                    <?php endif; ?>
+
+                                    <?php if ($showDigitalButton): ?>
+                                        <button class="btn bid-btn bid-btn--secondary" type="button" onclick="location.href='<?= htmlspecialchars($digitalIdViewUrl, ENT_QUOTES, 'UTF-8') ?>'">
+                                            <i class="fa-solid fa-qrcode"></i>
+                                            View Digital ID
+                                        </button>
+                                    <?php endif; ?>
+
+                                    <?php if ($showLostButton): ?>
+                                        <button class="btn bid-btn bid-btn--warning" type="button" data-report-lost data-request-id="<?= htmlspecialchars($latestDigitalIdRequestId, ENT_QUOTES, 'UTF-8') ?>">
+                                            <i class="fa-solid fa-triangle-exclamation"></i>
+                                            Tag ID as Lost
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($submissionMode === 'replacement_lost' && $pendingRequestId === ''): ?>
+                                <p class="bid-status-note">Lost status recorded. Replacement is now available.</p>
+                            <?php elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid' && $renewalAvailableLabel !== ''): ?>
+                                <p class="bid-status-note">Renewal opens on <?= htmlspecialchars($renewalAvailableLabel, ENT_QUOTES, 'UTF-8') ?>, unless this ID is reported as lost first.</p>
+                            <?php elseif ($digitalIdViewUrl !== ''): ?>
+                                <p class="bid-status-note">Your digital Barangay ID is ready to open here.</p>
+                            <?php endif; ?>
+
+                        </aside>
+                    </section>
                 </div>
             </div>
         </main>
@@ -448,7 +870,43 @@ if ($pendingRequestId === '') {
         <input type="hidden" name="redirect" value="1">
     </form>
 
+    <div class="modal fade uniform-modal barangay-id-lost-modal" id="barangayIdLostModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" id="umContent">
+                <div class="modal-header">
+                    <h5 class="modal-title text-black" id="barangayIdLostModalLabel">Confirm Lost Barangay ID</h5>
+                </div>
+                <hr class="my-0">
+                <div class="modal-body">
+                    <div class="uniform-modal__copy">
+                        <p class="mb-0">This will mark your current Barangay ID as lost and unlock the replacement form. Continue only if the card is really lost.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="row g-2 w-100">
+                        <div class="col-6">
+                            <button type="button" class="btn btn-outline-secondary modalBtn w-100" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-danger modalBtn w-100" id="confirmBarangayIdLostBtn">Tag as Lost</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const burgerBtn = document.getElementById("btn-burger");
+        const sidebar = document.getElementById("div-sidebarWrapper");
+
+        if (burgerBtn && sidebar) {
+            burgerBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("show");
+            });
+        }
+    </script>
     <script>
         const isResidentVerified = <?= $isResidentVerified ? 'true' : 'false' ?>;
         const verificationRequiredModalEl = document.getElementById('residentVerificationRequiredModal');
@@ -473,22 +931,55 @@ if ($pendingRequestId === '') {
         });
 
         const lostForm = document.getElementById('barangayIdLostForm');
+        const lostRequestInput = lostForm?.querySelector('input[name="request_id"]') || null;
+        const lostModalEl = document.getElementById('barangayIdLostModal');
+        const lostModal = (lostModalEl && window.bootstrap?.Modal)
+            ? bootstrap.Modal.getOrCreateInstance(lostModalEl)
+            : null;
+        const confirmLostBtn = document.getElementById('confirmBarangayIdLostBtn');
+        let pendingLostRequestId = '';
+
         document.querySelectorAll('[data-report-lost]').forEach((button) => {
             button.addEventListener('click', () => {
                 const targetRequestId = String(button.getAttribute('data-request-id') || '').trim();
                 if (!targetRequestId || !lostForm) {
                     return;
                 }
-                const confirmed = window.confirm('Tag this Barangay ID as lost and unlock the replacement form?');
-                if (!confirmed) {
+
+                pendingLostRequestId = targetRequestId;
+                if (lostRequestInput) {
+                    lostRequestInput.value = targetRequestId;
+                }
+
+                if (!lostModal) {
+                    lostForm.submit();
                     return;
                 }
-                const requestInput = lostForm.querySelector('input[name="request_id"]');
-                if (requestInput) {
-                    requestInput.value = targetRequestId;
+
+                lostModal.show();
+            });
+        });
+
+        if (confirmLostBtn) {
+            confirmLostBtn.addEventListener('click', () => {
+                if (!pendingLostRequestId || !lostForm) {
+                    return;
                 }
+
+                if (lostRequestInput) {
+                    lostRequestInput.value = pendingLostRequestId;
+                }
+
+                lostModal?.hide();
                 lostForm.submit();
             });
+        }
+
+        lostModalEl?.addEventListener('hidden.bs.modal', () => {
+            pendingLostRequestId = '';
+            if (lostRequestInput) {
+                lostRequestInput.value = '';
+            }
         });
     </script>
 </body>

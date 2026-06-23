@@ -370,7 +370,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 	  <script src="../JS-Script-Files/Resident-End/profileChangePassword.js?v=20260215-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileChangePhone.js?v=20260215-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileChangeEmail.js?v=20260215-1" defer></script>
-  <script src="../JS-Script-Files/Resident-End/profileUploadedDocuments.js?v=20260215-1" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileUploadedDocuments.js?v=20260623-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
 	    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <style>
@@ -441,6 +441,345 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         inset: 0;
         opacity: 0;
         cursor: pointer;
+      }
+      .uploaded-docs-shell {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 1rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(15, 23, 42, 0.04);
+        overflow: hidden;
+      }
+      .uploaded-docs-shell .card-header {
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 1rem 1.2rem;
+      }
+      .uploaded-docs-shell .card-body {
+        padding: 1.15rem 1.2rem 1.2rem;
+      }
+      .uploaded-docs-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .uploaded-docs-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #111827;
+      }
+      .uploaded-docs-copy {
+        margin: 0.28rem 0 0;
+        color: #6b7280;
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+      .uploaded-docs-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-left: auto;
+      }
+      .uploaded-docs-summary {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
+        color: #a35300;
+        border: 1px solid rgba(254, 153, 60, 0.45);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-weight: 700;
+      }
+      .uploaded-docs-summary .count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        background: #de710c;
+        color: #fff;
+        padding: 0 8px;
+        font-size: 0.85rem;
+      }
+      .btn-uploaded-refresh {
+        border-radius: 0.75rem;
+        font-weight: 700;
+      }
+      .uploaded-docs-table-wrap {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+      }
+      .uploaded-docs-table-wrap::-webkit-scrollbar {
+        height: 8px;
+      }
+      .uploaded-docs-table-wrap::-webkit-scrollbar-thumb {
+        background: rgba(108, 117, 125, 0.45);
+        border-radius: 999px;
+      }
+      .uploaded-docs-table-wrap::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .uploaded-docs-table {
+        width: 100%;
+      }
+      .uploaded-docs-table thead th {
+        padding: 0.7rem 0.95rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #111827;
+        background: #f7f8fa;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: normal;
+        line-height: 1.2;
+      }
+      .uploaded-docs-table tbody td {
+        padding: 0.78rem 0.95rem;
+        font-size: 0.94rem;
+        color: #1f2937;
+        border-bottom: 1px solid #eceff3;
+        vertical-align: middle;
+        background: #fff;
+      }
+      .uploaded-docs-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      .uploaded-docs-table tbody tr:hover td {
+        background: #fcfcfd;
+      }
+      .uploaded-doc-name {
+        font-weight: 700;
+        color: #111827;
+      }
+      .uploaded-doc-type {
+        color: #6b7280;
+        font-size: 0.84rem;
+      }
+      .uploaded-doc-category {
+        color: #6b7280;
+        font-size: 0.92rem;
+      }
+      .uploaded-doc-id {
+        font-weight: 600;
+        color: #7c3f00;
+      }
+      .uploaded-doc-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
+      }
+      .btn-udv-view {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 34px;
+        padding: 0.42rem 0.78rem;
+        border-radius: 0.75rem;
+        font-size: 0.82rem;
+        line-height: 1.15;
+        font-weight: 700 !important;
+        color: #fff !important;
+        border: 1px solid #de710c !important;
+        background: #de710c !important;
+        box-shadow: 0 8px 18px rgba(222, 113, 12, 0.14);
+      }
+      .btn-udv-view:hover,
+      .btn-udv-view:focus-visible {
+        color: #fff !important;
+        border-color: #b95606 !important;
+        background: #b95606 !important;
+      }
+      #uploadedDocsCards {
+        display: none;
+      }
+      .uploaded-doc-card {
+        border: 1px solid #eceff3;
+        border-radius: 14px;
+        padding: 0.95rem;
+        background: #fff;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+      }
+      .uploaded-doc-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .uploaded-doc-card-meta {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+      .uploaded-doc-label {
+        font-size: 0.78rem;
+        color: #495057;
+        text-transform: uppercase;
+        letter-spacing: .02em;
+        font-weight: 800;
+      }
+      .uploaded-doc-value {
+        font-size: 0.96rem;
+        color: #212529;
+        word-break: break-word;
+        white-space: normal;
+      }
+      #modalUploadedDocViewer .modal-dialog {
+        max-width: 1850px;
+        width: min(97vw, 1850px);
+      }
+      #modalUploadedDocViewer .modal-content {
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 1.1rem;
+        overflow: hidden;
+        box-shadow: 0 20px 55px rgba(15, 23, 42, 0.14);
+      }
+      #modalUploadedDocViewer .modal-header {
+        border-bottom: 1px solid #e9ecef;
+        padding: 1.1rem 1.45rem;
+        background: #ffffff;
+      }
+      #modalUploadedDocViewer .modal-body {
+        padding: 1rem 1.45rem 1.15rem;
+        background: #ffffff;
+      }
+      #modalUploadedDocViewer .modal-footer {
+        border-top: 1px solid #e9ecef;
+        padding: 0.95rem 1.45rem 1.1rem;
+        justify-content: flex-end;
+        background: #ffffff;
+      }
+      .uploaded-doc-viewer-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.25;
+      }
+      .uploaded-doc-preview-shell {
+        border: 1px solid #d9e1ea;
+        border-radius: 1rem;
+        background: #ffffff;
+        padding: 1rem;
+        min-height: 72vh;
+      }
+      .uploaded-doc-preview-body {
+        width: 100%;
+        min-height: calc(72vh - 2rem);
+      }
+      .uploaded-doc-preview-frame {
+        width: 100%;
+        height: 72vh;
+        border: 0;
+        border-radius: 0.8rem;
+        background: #ffffff;
+      }
+      .uploaded-doc-preview-image {
+        display: block;
+        max-width: 100%;
+        max-height: 72vh;
+        margin: 0 auto;
+        border-radius: 0.85rem;
+        background: #ffffff;
+      }
+      .uploaded-doc-preview-empty {
+        min-height: 72vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #6b7280;
+        background: #ffffff;
+        border: 1px dashed #d9e0e7;
+        border-radius: 0.85rem;
+        padding: 1.25rem;
+      }
+      .uploaded-doc-modal-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin: 0;
+        width: 100%;
+      }
+      .uploaded-doc-modal-btn {
+        min-height: 44px;
+        border-radius: 0.8rem;
+        padding: 0.68rem 1.1rem;
+        font-weight: 700;
+        box-shadow: none;
+        transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+      }
+      .uploaded-doc-modal-btn:hover,
+      .uploaded-doc-modal-btn:focus {
+        transform: none;
+        box-shadow: none;
+      }
+      .btn-uploaded-doc-open {
+        color: #175cd3;
+        background: #ffffff;
+        border: 1px solid #175cd3;
+      }
+      .btn-uploaded-doc-open:hover,
+      .btn-uploaded-doc-open:focus {
+        color: #1849a9;
+        background: #eff4ff;
+        border-color: #1849a9;
+      }
+      .btn-uploaded-doc-close {
+        background: #6b7280;
+        color: #ffffff;
+        border: 1px solid #6b7280;
+      }
+      .btn-uploaded-doc-close:hover,
+      .btn-uploaded-doc-close:focus {
+        background: #4b5563;
+        color: #ffffff;
+        border-color: #4b5563;
+      }
+      @media (max-width: 991.98px) {
+        .uploaded-docs-toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .uploaded-docs-actions {
+          margin-left: 0;
+          justify-content: flex-start;
+        }
+      }
+      @media (max-width: 767.98px) {
+        .uploaded-docs-table-wrap {
+          display: none !important;
+        }
+        #uploadedDocsCards {
+          display: block;
+          margin-top: 0.25rem;
+        }
+        .uploaded-doc-card-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .uploaded-doc-preview-shell {
+          padding: 0.75rem;
+          min-height: 62vh;
+        }
+        .uploaded-doc-preview-frame {
+          height: 62vh;
+        }
+        .uploaded-doc-preview-empty {
+          min-height: 62vh;
+        }
+        .uploaded-doc-modal-actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
       }
     </style>
 </head>
@@ -825,25 +1164,32 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
 
                 <div class="tab-pane fade" id="pane-uploaded-docs" role="tabpanel" aria-labelledby="tab-uploaded-docs" tabindex="0">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <strong>VERIFIED UPLOADED DOCUMENTS</strong>
-                            <button class="btn btn-outline-secondary btn-sm" id="btnRefreshUploadedDocs" type="button">
-                                Refresh
-                            </button>
+                    <div class="card uploaded-docs-shell shadow-sm mb-4">
+                        <div class="card-header">
+                            <div class="uploaded-docs-toolbar">
+                                <div>
+                                    <h2 class="uploaded-docs-title">Verified Uploaded Documents</h2>
+                                    <p class="uploaded-docs-copy">Only documents marked as verified by the barangay will appear here.</p>
+                                </div>
+                                <div class="uploaded-docs-actions">
+                                    <div class="uploaded-docs-summary">
+                                        <span>Verified Files</span>
+                                        <span class="count" id="uploadedDocsCount">0</span>
+                                    </div>
+                                    <button class="btn btn-outline-secondary btn-sm btn-uploaded-refresh" id="btnRefreshUploadedDocs" type="button">
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <div class="card-body">
-                            <div class="text-muted small mb-2">
-                                Only documents marked as Verified by the barangay will appear here.
-                            </div>
-
                             <div id="uploadedDocsError" class="alert alert-danger d-none" role="alert"></div>
 
                             <div id="uploadedDocsLoading" class="text-muted small">Loading...</div>
 
-                            <div class="table-responsive d-none" id="uploadedDocsTableWrap">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
+                            <div class="table-responsive uploaded-docs-table-wrap d-none" id="uploadedDocsTableWrap">
+                                <table class="table table-hover align-middle mb-0 uploaded-docs-table">
+                                    <thead>
                                         <tr>
                                             <th>Document</th>
                                             <th>Category</th>
@@ -859,6 +1205,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <div id="uploadedDocsEmpty" class="text-muted small d-none">
                                 No verified documents found.
                             </div>
+
+                            <div id="uploadedDocsCards" class="mt-2"></div>
                         </div>
                     </div>
                 </div>
@@ -1862,21 +2210,22 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
         <!-- Uploaded Document Viewer Modal -->
         <div class="modal fade" id="modalUploadedDocViewer" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="true" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1100px; width: 92vw;">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <div class="w-100">
-                            <h5 class="fw-bold mb-0" id="udvTitle">Document Preview</h5>
-                            <div class="small text-muted" id="udvSubtitle"></div>
-                        </div>
+                        <h5 class="uploaded-doc-viewer-title w-100 mb-0" id="udvTitle">Document Preview</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div id="udvBody" class="w-100"></div>
+                        <div class="uploaded-doc-preview-shell">
+                            <div id="udvBody" class="uploaded-doc-preview-body"></div>
+                        </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="#" class="btn btn-outline-primary d-none" id="udvOpenNewTab" target="_blank" rel="noopener">Open</a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <div class="uploaded-doc-modal-actions">
+                            <a href="#" class="btn btn-uploaded-doc-open uploaded-doc-modal-btn d-none" id="udvOpenNewTab" target="_blank" rel="noopener">Open Attachment in New Tab</a>
+                            <button type="button" class="btn btn-uploaded-doc-close uploaded-doc-modal-btn" data-bs-dismiss="modal">Close</button>
+                        </div>
                     </div>
                 </div>
         </div>

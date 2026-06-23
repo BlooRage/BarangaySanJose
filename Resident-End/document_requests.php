@@ -158,60 +158,129 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       word-break: break-word;
       white-space: normal;
     }
+    .table-responsive .table th:last-child,
+    .table-responsive .table td:last-child {
+      width: 1%;
+      min-width: 290px;
+      white-space: nowrap;
+    }
+    .request-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+    .request-actions .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0.42rem 0.78rem;
+      border-radius: 0.75rem;
+      font-size: 0.82rem;
+      line-height: 1.15;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: none !important;
+    }
+    .request-actions .btn-outline-secondary,
+    .request-actions .btn-outline-dark {
+      color: #475467;
+      border-color: #cfd6de;
+      background: #fff;
+    }
+    .request-actions .btn-outline-secondary:hover,
+    .request-actions .btn-outline-dark:hover,
+    .request-actions .btn-outline-secondary:focus-visible,
+    .request-actions .btn-outline-dark:focus-visible {
+      color: #1f2937;
+      border-color: #b8c2cc;
+      background: #f8fafc;
+    }
+    .request-actions .btn-outline-primary,
+    .request-actions .btn-primary,
+    .request-actions .btn-success {
+      color: #fff;
+      border-color: #de710c;
+      background: #de710c;
+    }
+    .request-actions .btn-outline-primary:hover,
+    .request-actions .btn-primary:hover,
+    .request-actions .btn-success:hover,
+    .request-actions .btn-outline-primary:focus-visible,
+    .request-actions .btn-primary:focus-visible,
+    .request-actions .btn-success:focus-visible {
+      color: #fff;
+      border-color: #b95606;
+      background: #b95606;
+    }
+    #viewModal .modal-dialog {
+      max-width: 1100px;
+      width: min(92vw, 1100px);
+    }
     #viewModal .modal-content {
-      border: 1px solid #e9ecef;
-      border-radius: 16px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 1rem;
       overflow: hidden;
       background: #fff;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
     }
     #viewModal .modal-header,
     #viewModal .modal-body,
     #viewModal .modal-footer {
       padding: 1rem 1.25rem;
     }
+    #viewModal .modal-header {
+      border-bottom: 1px solid #e9ecef;
+    }
     #viewModal .modal-body {
+      background: #f8fafc;
+    }
+    #viewModal .modal-footer {
+      border-top: 1px solid #e9ecef;
+      justify-content: flex-end;
       background: #fff;
     }
     #viewModal .tracker-profile-view {
       display: grid;
-      gap: 12px;
+      gap: 1rem;
     }
     #viewModal .tracker-form-section {
-      border: 1px solid #e9ecef;
-      border-color: #e78924;
-      border-radius: 12px;
+      border: 1px solid #e6ebf2;
+      border-radius: 14px;
       background: #ffffff;
-      padding: 12px;
+      padding: 1rem;
       margin-top: 0;
       display: grid;
-      gap: 12px;
+      gap: 0.85rem;
     }
     #viewModal .tracker-form-section-title {
       margin: 0;
-      font-size: 1rem;
+      font-size: 0.98rem;
       font-weight: 700;
-      color: #212529;
-      border-bottom: 1px dashed #e9ecef;
-      padding-bottom: 6px;
+      color: #111827;
+      border-bottom: 1px solid #eef2f6;
+      padding-bottom: 0.55rem;
     }
     #viewModal .tracker-form-subsection {
       display: grid;
       gap: 10px;
-      padding: 12px;
+      padding: 0.9rem;
       border: 1px solid #edf1f5;
-      border-radius: 10px;
-      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+      border-radius: 12px;
+      background: #fbfcfe;
     }
     #viewModal .tracker-form-subsection + .tracker-form-subsection {
       margin-top: 4px;
     }
     #viewModal .tracker-form-subsection-title {
       margin: 0;
-      font-size: 0.82rem;
-      font-weight: 800;
-      letter-spacing: 0.02em;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: #4b5563;
+      color: #667085;
     }
     #viewModal .tracker-form-grid {
       display: grid;
@@ -235,19 +304,21 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     #viewModal .tracker-form-label {
       margin: 0;
       line-height: 1.2;
-      font-size: 0.76rem;
-      color: #6b7280;
+      font-size: 0.74rem;
+      color: #667085;
       font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
     #viewModal .tracker-form-value {
-      min-height: 38px;
-      border: 1px solid #dbe0e6;
-      border-radius: 8px;
-      background: #f8fafc;
-      padding: 8px 10px;
+      min-height: 42px;
+      border: 1px solid #dde4ec;
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 10px 12px;
       font-size: 0.92rem;
       line-height: 1.45;
-      color: #111827;
+      color: #1f2937;
       font-weight: 500;
       word-break: break-word;
     }
@@ -286,24 +357,27 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
     #viewModal .view-form-label {
       margin: 0;
-      font-size: .92rem;
-      color: #111827;
-      font-weight: 600;
+      font-size: 0.74rem;
+      color: #667085;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
     #viewModal .view-form-label .required {
       color: #dc2626;
     }
     #viewModal .view-form-control {
       width: 100%;
-      min-height: 44px;
+      min-height: 42px;
       padding: 10px 12px;
-      border: 1px solid #a8a7a7;
-      border-radius: 6px;
-      background: #f8fafc;
-      color: #111827;
+      border: 1px solid #dde4ec;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #1f2937;
       font-weight: 500;
       display: flex;
       align-items: center;
+      line-height: 1.45;
       word-break: break-word;
     }
     .status-pill {
@@ -352,6 +426,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       }
       #requestCards {
         display: block;
+      }
+      #viewModal .modal-dialog {
+        width: calc(100vw - 1rem);
       }
       #viewModal .view-form-row.cols-2,
       #viewModal .view-form-row.cols-3,
@@ -554,8 +631,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   </div>
 </div>
 
-<div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
+<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="viewModalTitle">Certificate Request</h5>
@@ -565,7 +642,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         <div id="viewDetailsBody" class="tracker-profile-view"></div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -965,21 +1042,21 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
   function paymentActions(row) {
     const requestId = String(row.request_id || '');
-    const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view="${escapeHtml(requestId)}">View</button>`;
+    const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view="${escapeHtml(requestId)}">View</button>`;
     const method = String(row.payment_method || '').toLowerCase();
     const hasMode = method === 'gcash' || method === 'barangay';
     const modeLabel = hasMode ? 'Change Mode of Payment' : 'Select Mode of Payment';
     const modeButtonClass = hasMode ? 'btn-outline-secondary' : 'btn-outline-primary';
-    const modeBtn = `<button type="button" class="btn btn-sm ${modeButtonClass} me-1" data-open-mode="${escapeHtml(requestId)}">${modeLabel}</button>`;
+    const modeBtn = `<button type="button" class="btn btn-sm ${modeButtonClass}" data-open-mode="${escapeHtml(requestId)}">${modeLabel}</button>`;
     const payNowBtn = `<button class="btn btn-sm btn-primary" data-pay-now="${escapeHtml(requestId)}">Pay Now</button>`;
 
     if (method === 'gcash') {
-      return `${viewBtn}${payNowBtn}${modeBtn}`;
+      return `<span class="request-actions">${viewBtn}${payNowBtn}${modeBtn}</span>`;
     }
     if (method === 'barangay') {
-      return `${viewBtn}${modeBtn}`;
+      return `<span class="request-actions">${viewBtn}${modeBtn}</span>`;
     }
-    return `${viewBtn}${modeBtn}`;
+    return `<span class="request-actions">${viewBtn}${modeBtn}</span>`;
   }
 
   function filterBucket(row) {
@@ -1107,17 +1184,17 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
     tbody.innerHTML = items.map((r) => {
       let action = '<span class="text-muted small">-</span>';
-      const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view="${escapeHtml(r.request_id)}">View</button>`;
+      const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view="${escapeHtml(r.request_id)}">View</button>`;
       const proofBtn = r.payment_proof_path
-        ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
+        ? `<button class="btn btn-sm btn-outline-dark" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
         : '';
       const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">${isBarangayIdRequest(r) ? 'View Digital ID' : 'View Document'}</button>`;
       if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
         action = paymentActions(r);
       } else if (r.stage === 'completed') {
-        action = `${viewBtn}${proofBtn}${issuedBtn}`;
+        action = `<span class="request-actions">${viewBtn}${proofBtn}${issuedBtn}</span>`;
       } else {
-        action = `${viewBtn}${proofBtn}`;
+        action = `<span class="request-actions">${viewBtn}${proofBtn}</span>`;
       }
 
       const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
@@ -1258,17 +1335,17 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
       tbody.innerHTML = items.map((r) => {
         let action = '<span class="text-muted small">-</span>';
-        const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view="${escapeHtml(r.request_id)}">View</button>`;
+        const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view="${escapeHtml(r.request_id)}">View</button>`;
         const proofBtn = r.payment_proof_path
-          ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
+          ? `<button class="btn btn-sm btn-outline-dark" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
           : '';
         const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">${isBarangayIdRequest(r) ? 'View Digital ID' : 'View Document'}</button>`;
         if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
           action = paymentActions(r);
         } else if (r.stage === 'completed') {
-          action = `${viewBtn}${proofBtn}${issuedBtn}`;
+          action = `<span class="request-actions">${viewBtn}${proofBtn}${issuedBtn}</span>`;
         } else {
-          action = `${viewBtn}${proofBtn}`;
+          action = `<span class="request-actions">${viewBtn}${proofBtn}</span>`;
         }
 
         const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';

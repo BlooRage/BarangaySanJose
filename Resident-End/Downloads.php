@@ -149,6 +149,11 @@ if (isset($conn) && $conn instanceof mysqli) {
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
+        :root {
+            --downloads-hci-red: #d92d20;
+            --downloads-hci-red-dark: #b42318;
+            --downloads-hci-red-ring: rgba(217, 45, 32, 0.2);
+        }
         body {
             background: #f8f9fb;
         }
@@ -407,6 +412,92 @@ if (isset($conn) && $conn instanceof mysqli) {
             color: #de710c;
             margin-bottom: 0.9rem;
         }
+        #downloadViewerModal .modal-dialog {
+            max-width: 1100px;
+            width: min(92vw, 1100px);
+        }
+        #downloadViewerModal .modal-content {
+            border: 0;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+        }
+        #downloadViewerModal .modal-header {
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem 1.25rem;
+        }
+        #downloadViewerModal .modal-body {
+            padding: 1rem 1.25rem 1.15rem;
+            background: #f8fafc;
+        }
+        #downloadViewerModal .modal-footer {
+            border-top: 1px solid #e9ecef;
+            padding: 0.9rem 1.25rem 1rem;
+        }
+        .download-preview-frame {
+            width: 100%;
+            height: 70vh;
+            border: 1px solid #d9e0e7;
+            border-radius: 0.85rem;
+            background: #ffffff;
+        }
+        .download-preview-empty {
+            min-height: 14rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #6b7280;
+            background: #ffffff;
+            border: 1px dashed #d9e0e7;
+            border-radius: 0.85rem;
+            padding: 1.25rem;
+        }
+        .download-modal-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            width: 100%;
+            margin: 0;
+        }
+        .download-modal-btn {
+            min-height: 46px;
+            border-radius: 14px;
+            padding: 10px 18px;
+            font-weight: 700;
+            min-width: 220px;
+            box-shadow: none;
+            transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .download-modal-btn:hover,
+        .download-modal-btn:focus {
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-download-modal-open {
+            color: #fff;
+            background: var(--downloads-hci-red);
+            border: 1px solid var(--downloads-hci-red);
+        }
+        .btn-download-modal-open:hover,
+        .btn-download-modal-open:focus {
+            color: #fff;
+            background: var(--downloads-hci-red-dark);
+            border-color: var(--downloads-hci-red-dark);
+            box-shadow: 0 0 0 0.2rem var(--downloads-hci-red-ring);
+        }
+        .btn-download-modal-close {
+            background: #ffffff;
+            color: #344054;
+            border: 1px solid #d0d5dd;
+        }
+        .btn-download-modal-close:hover,
+        .btn-download-modal-close:focus {
+            background: #f8fafc;
+            color: #1f2937;
+            border-color: #cbd5e1;
+        }
         @media (max-width: 991.98px) {
             .admin-list-toolbar {
                 flex-direction: column;
@@ -450,6 +541,17 @@ if (isset($conn) && $conn instanceof mysqli) {
             }
             .download-actions .btn {
                 width: 100%;
+            }
+            .download-preview-frame {
+                height: 62vh;
+            }
+            .download-modal-actions {
+                flex-direction: column-reverse;
+                align-items: stretch;
+            }
+            .download-modal-btn {
+                width: 100%;
+                min-width: 0;
             }
         }
         @media (max-width: 480px) {
@@ -584,7 +686,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower((string)($item['document_type'] ?? '')));
                                     $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
                                     $viewUrl = $isBarangayId
-                                        ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId))
+                                        ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId) . '&embed=1')
                                         : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId));
                                     $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode($requestId);
                                     ?>
@@ -598,9 +700,13 @@ if (isset($conn) && $conn instanceof mysqli) {
                                         <td><span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span></td>
                                         <td>
                                             <div class="compact-table-actions">
-                                                <a class="btn btn-sm compact-table-btn btn-view-download" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
+                                                <button type="button"
+                                                        class="btn btn-sm compact-table-btn btn-view-download js-view-download"
+                                                        data-view-url="<?= htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                                        data-view-title="<?= htmlspecialchars((string)$item['document_type'], ENT_QUOTES, 'UTF-8') ?>"
+                                                        data-view-request-id="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
                                                     <i class="fa-regular fa-eye me-1"></i>View
-                                                </a>
+                                                </button>
                                                 <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
                                                     <i class="fa-solid fa-download me-1"></i>Download
                                                 </a>
@@ -624,7 +730,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                             $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower((string)($item['document_type'] ?? '')));
                             $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
                             $viewUrl = $isBarangayId
-                                ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId))
+                                ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId) . '&embed=1')
                                 : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId));
                             $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode($requestId);
                             ?>
@@ -655,9 +761,13 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     </div>
                                 </div>
                                 <div class="download-actions mt-3">
-                                    <a class="btn btn-sm compact-table-btn btn-view-download" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
+                                    <button type="button"
+                                            class="btn btn-sm compact-table-btn btn-view-download js-view-download"
+                                            data-view-url="<?= htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                            data-view-title="<?= htmlspecialchars((string)$item['document_type'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-view-request-id="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
                                         <i class="fa-regular fa-eye me-1"></i>View
-                                    </a>
+                                    </button>
                                     <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
                                         <i class="fa-solid fa-download me-1"></i>Download
                                     </a>
@@ -676,7 +786,108 @@ if (isset($conn) && $conn instanceof mysqli) {
     </main>
 </div>
 
+<div class="modal fade" id="downloadViewerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="fw-bold mb-0" id="downloadViewerTitle">Document Preview</h5>
+                    <div class="small text-muted" id="downloadViewerSubtitle"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="downloadViewerEmpty" class="download-preview-empty d-none">
+                    Document preview is unavailable right now.
+                </div>
+                <iframe id="downloadViewerFrame" class="download-preview-frame d-none" title="Document Preview"></iframe>
+            </div>
+            <div class="modal-footer">
+                <div class="download-modal-actions">
+                    <button type="button" class="btn btn-download-modal-close download-modal-btn" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn btn-download-modal-open download-modal-btn d-none" id="downloadViewerOpenNewTab" target="_blank" rel="noopener">
+                        Open in new tab
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const modalEl = document.getElementById('downloadViewerModal');
+        const frameEl = document.getElementById('downloadViewerFrame');
+        const emptyEl = document.getElementById('downloadViewerEmpty');
+        const titleEl = document.getElementById('downloadViewerTitle');
+        const subtitleEl = document.getElementById('downloadViewerSubtitle');
+        const openNewTabEl = document.getElementById('downloadViewerOpenNewTab');
+
+        if (!modalEl || !window.bootstrap?.Modal) {
+            return;
+        }
+
+        const viewerModal = new bootstrap.Modal(modalEl);
+
+        const resetViewer = () => {
+            if (frameEl) {
+                frameEl.src = 'about:blank';
+                frameEl.classList.add('d-none');
+            }
+            if (emptyEl) {
+                emptyEl.classList.add('d-none');
+            }
+            if (openNewTabEl) {
+                openNewTabEl.href = '#';
+                openNewTabEl.classList.add('d-none');
+            }
+            if (titleEl) {
+                titleEl.textContent = 'Document Preview';
+            }
+            if (subtitleEl) {
+                subtitleEl.textContent = '';
+            }
+        };
+
+        const openViewer = ({ url, title, requestId }) => {
+            resetViewer();
+
+            if (titleEl) {
+                titleEl.textContent = title || 'Document Preview';
+            }
+            if (subtitleEl) {
+                subtitleEl.textContent = requestId ? `Request ID: ${requestId}` : '';
+            }
+
+            if (url && frameEl) {
+                const viewUrl = url.includes('_ts=') ? url : `${url}${url.includes('?') ? '&' : '?'}_ts=${Date.now()}`;
+                frameEl.src = viewUrl;
+                frameEl.classList.remove('d-none');
+                if (openNewTabEl) {
+                    openNewTabEl.href = viewUrl;
+                    openNewTabEl.classList.remove('d-none');
+                }
+            } else if (emptyEl) {
+                emptyEl.classList.remove('d-none');
+            }
+
+            viewerModal.show();
+        };
+
+        document.querySelectorAll('.js-view-download').forEach((trigger) => {
+            trigger.addEventListener('click', () => {
+                openViewer({
+                    url: String(trigger.dataset.viewUrl || '').trim(),
+                    title: String(trigger.dataset.viewTitle || '').trim(),
+                    requestId: String(trigger.dataset.viewRequestId || '').trim(),
+                });
+            });
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', resetViewer);
+    });
+</script>
 </body>
 </html>

@@ -123,6 +123,12 @@ function receipts_build_view_url(string $workflowEndpoint, string $requestId): s
         . '&disposition=inline';
 }
 
+function receipts_build_download_url(string $workflowEndpoint, string $requestId): string
+{
+    return $workflowEndpoint
+        . '?action=download_invoice&request_id=' . rawurlencode($requestId);
+}
+
 $receiptItems = [];
 $queryError   = '';
 
@@ -204,6 +210,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                     'timestamp' => receipts_format_datetime((string)($row['transaction_timestamp'] ?? '')),
                     'payment_method' => receipts_format_payment_method((string)($row['payment_method'] ?? '')),
                     'receipt_url' => $canViewReceipt ? receipts_build_view_url($workflowEndpoint, $requestId) : '',
+                    'download_url' => $canViewReceipt ? receipts_build_download_url($workflowEndpoint, $requestId) : '',
                 ];
             }
             $stmt->close();
@@ -228,13 +235,18 @@ if (isset($conn) && $conn instanceof mysqli) {
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
+        :root {
+            --receipts-hci-red: #d92d20;
+            --receipts-hci-red-dark: #b42318;
+            --receipts-hci-red-ring: rgba(217, 45, 32, 0.2);
+        }
         body { background: #f8f9fb; }
         #mobile-header { display: none; }
         #div-mainDisplay { background: #f8f9fb !important; }
         .receipts-shell { width: 100%; }
         .txn-page-title {
             font-family: 'Charis SIL Bold', serif;
-            color: #177245;
+            color: #de710c;
             font-size: clamp(2rem, 4.4vw, 3rem);
             line-height: 1.1;
             margin: 0 0 0.65rem 0;
@@ -275,9 +287,9 @@ if (isset($conn) && $conn instanceof mysqli) {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
-            color: #065f46;
-            border: 1px solid rgba(34, 197, 94, 0.45);
+            background: linear-gradient(180deg, #fff8ef 0%, #ffe7c8 100%);
+            color: #8d4f13;
+            border: 1px solid rgba(243, 165, 83, 0.48);
             border-radius: 999px;
             padding: 8px 14px;
             font-weight: 700;
@@ -289,14 +301,14 @@ if (isset($conn) && $conn instanceof mysqli) {
             min-width: 28px;
             height: 28px;
             border-radius: 999px;
-            background: #198754;
+            background: #f58220;
             color: #fff;
             padding: 0 8px;
             font-size: 0.85rem;
         }
         .compact-admin-table { width: 100%; }
         .compact-admin-table thead th {
-            padding: 0.52rem 0.85rem;
+            padding: 0.7rem 0.95rem;
             font-size: 0.95rem;
             font-weight: 700;
             color: #111827;
@@ -306,7 +318,7 @@ if (isset($conn) && $conn instanceof mysqli) {
             line-height: 1.2;
         }
         .compact-admin-table tbody td {
-            padding: 0.38rem 0.85rem;
+            padding: 0.78rem 0.95rem;
             font-size: 0.94rem;
             color: #1f2937;
             border-bottom: 1px solid #eceff3;
@@ -315,40 +327,79 @@ if (isset($conn) && $conn instanceof mysqli) {
         }
         .compact-admin-table tbody tr:last-child td { border-bottom: 0; }
         .compact-admin-table tbody tr:hover td { background: #fcfcfd; }
+        .compact-admin-table .compact-table-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            flex-wrap: nowrap;
+        }
         .details-value { font-weight: 700; color: #111827; }
         .payment-id {
             font-weight: 700;
-            color: #065f46;
+            color: #a85a12;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
         }
-        .amount-value { font-weight: 700; color: #177245; }
+        .amount-value { font-weight: 700; color: #c66a10; }
         .timestamp-value { color: #334155; }
         .compact-table-btn {
-            padding: 0.22rem 0.5rem;
-            font-size: 0.76rem;
+            padding: 0.42rem 0.78rem;
+            font-size: 0.82rem;
             line-height: 1.15;
         }
+        .btn-receipt-view,
+        .btn-receipt-download {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.38rem;
+            min-height: 34px;
+            border-radius: 0.75rem;
+            white-space: nowrap;
+            font-weight: 700 !important;
+            letter-spacing: 0.01em;
+        }
         .btn-receipt-view {
-            color: #fff;
-            border-color: #198754;
-            background: #198754;
-            font-weight: 500 !important;
+            color: var(--receipts-hci-red) !important;
+            border: 1px solid rgba(217, 45, 32, 0.28) !important;
+            background: #fff5f4 !important;
         }
         .btn-receipt-view:hover {
-            color: #fff;
-            border-color: #157347;
-            background: #157347;
+            color: var(--receipts-hci-red-dark) !important;
+            border-color: rgba(180, 35, 24, 0.32) !important;
+            background: #ffe7e5 !important;
+        }
+        .btn-receipt-download {
+            color: #fff !important;
+            border: 1px solid var(--receipts-hci-red) !important;
+            background: var(--receipts-hci-red) !important;
+        }
+        .btn-receipt-download:hover {
+            color: #fff !important;
+            border-color: var(--receipts-hci-red-dark) !important;
+            background: var(--receipts-hci-red-dark) !important;
+        }
+        .btn-receipt-view:focus-visible,
+        .btn-receipt-download:focus-visible,
+        .btn-receipt-open:focus-visible {
+            box-shadow: 0 0 0 0.2rem var(--receipts-hci-red-ring);
         }
         .receipts-table { table-layout: auto; min-width: 100%; }
         .receipts-table th, .receipts-table td { white-space: normal; }
-        .receipts-table th:last-child, .receipts-table td:last-child { min-width: 148px; }
+        .receipts-table th:last-child, .receipts-table td:last-child {
+            width: 1%;
+            min-width: 300px;
+            white-space: nowrap;
+            text-align: center;
+        }
         #receiptCards { display: none; }
         .receipt-card {
             border: 1px solid #eceff3;
-            border-radius: 12px;
-            padding: 0.9rem;
+            border-radius: 14px;
+            padding: 0.95rem;
             background: #fff;
             margin-bottom: 0.75rem;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
         }
         .receipt-card-header {
             display: flex;
@@ -372,7 +423,105 @@ if (isset($conn) && $conn instanceof mysqli) {
             white-space: normal;
         }
         .empty-state { padding: 3rem 1.5rem; text-align: center; color: #6b7280; }
-        .empty-state i { font-size: 2.2rem; color: #198754; margin-bottom: 0.9rem; }
+        .empty-state i { font-size: 2.2rem; color: #f58220; margin-bottom: 0.9rem; }
+        #receiptViewerModal .modal-dialog {
+            max-width: 1100px;
+            width: min(92vw, 1100px);
+        }
+        #receiptViewerModal .modal-content {
+            border: 0;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+        }
+        #receiptViewerModal .modal-header {
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem 1.25rem;
+        }
+        #receiptViewerModal .modal-body {
+            padding: 1rem 1.25rem 1.15rem;
+            background: #f8fafc;
+        }
+        #receiptViewerModal .modal-footer {
+            border-top: 1px solid #e9ecef;
+            padding: 0.9rem 1.25rem 1rem;
+        }
+        .receipt-modal-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            width: 100%;
+            margin: 0;
+        }
+        .receipt-modal-btn {
+            min-height: 46px;
+            border-radius: 14px;
+            padding: 10px 18px;
+            font-weight: 700;
+            min-width: 220px;
+            box-shadow: none;
+            transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .receipt-modal-btn:hover,
+        .receipt-modal-btn:focus {
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-receipt-open {
+            color: var(--receipts-hci-red);
+            background: #fff5f4;
+            border: 1px solid rgba(217, 45, 32, 0.28);
+        }
+        .btn-receipt-open:hover,
+        .btn-receipt-open:focus {
+            color: var(--receipts-hci-red-dark);
+            background: #ffe7e5;
+            border-color: rgba(180, 35, 24, 0.32);
+            box-shadow: 0 0 0 0.2rem var(--receipts-hci-red-ring);
+        }
+        .btn-receipt-modal-download {
+            color: #fff;
+            background: var(--receipts-hci-red);
+            border: 1px solid var(--receipts-hci-red);
+        }
+        .btn-receipt-modal-download:hover,
+        .btn-receipt-modal-download:focus {
+            color: #fff;
+            background: var(--receipts-hci-red-dark);
+            border-color: var(--receipts-hci-red-dark);
+            box-shadow: 0 0 0 0.2rem var(--receipts-hci-red-ring);
+        }
+        .btn-receipt-close {
+            background: #ffffff;
+            color: #344054;
+            border: 1px solid #d0d5dd;
+        }
+        .btn-receipt-close:hover,
+        .btn-receipt-close:focus {
+            background: #f8fafc;
+            color: #1f2937;
+            border-color: #cbd5e1;
+        }
+        .receipt-preview-frame {
+            width: 100%;
+            height: 70vh;
+            border: 1px solid #d9e0e7;
+            border-radius: 0.85rem;
+            background: #ffffff;
+        }
+        .receipt-preview-empty {
+            min-height: 14rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #6b7280;
+            background: #ffffff;
+            border: 1px dashed #d9e0e7;
+            border-radius: 0.85rem;
+            padding: 1.25rem;
+        }
         @media (max-width: 991.98px) {
             .admin-list-toolbar { flex-direction: column; align-items: stretch; }
             .admin-list-actions { margin-left: 0; justify-content: flex-start; }
@@ -385,6 +534,24 @@ if (isset($conn) && $conn instanceof mysqli) {
             #receiptCards { display: block; margin-top: 0.25rem; }
             .txn-page-title { font-size: clamp(1.7rem, 7.5vw, 2.15rem); margin-bottom: 0.4rem; }
             .receipt-card-header { flex-direction: column; align-items: stretch; }
+            .receipt-preview-frame { height: 62vh; }
+            #receiptViewerModal .modal-footer {
+                padding-top: 0.85rem;
+            }
+            .btn-receipt-view {
+                width: 100%;
+            }
+            .btn-receipt-download {
+                width: 100%;
+            }
+            .receipt-modal-actions {
+                flex-direction: column-reverse;
+                align-items: stretch;
+            }
+            .receipt-modal-btn {
+                width: 100%;
+                min-width: 0;
+            }
         }
         @media (max-width: 480px) {
             .receipts-table { min-width: 720px; }
@@ -490,6 +657,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     <?php
                                     $requestId = (string)$item['request_id'];
                                     $receiptUrl = (string)($item['receipt_url'] ?? '');
+                                    $downloadUrl = (string)($item['download_url'] ?? '');
                                     ?>
                                     <tr>
                                         <td class="payment-id"><?= htmlspecialchars((string)$item['payment_id']) ?></td>
@@ -499,12 +667,20 @@ if (isset($conn) && $conn instanceof mysqli) {
                                         <td><?= htmlspecialchars((string)$item['payment_method']) ?></td>
                                         <td>
                                             <?php if ($receiptUrl !== ''): ?>
-                                                <a class="btn btn-sm compact-table-btn btn-receipt-view"
-                                                   href="<?= htmlspecialchars($receiptUrl) ?>"
-                                                   target="_blank"
-                                                   rel="noopener">
-                                                    <i class="fa-solid fa-file-pdf me-1"></i>View Receipt
-                                                </a>
+                                                <span class="compact-table-actions">
+                                                    <button type="button"
+                                                       class="btn btn-sm compact-table-btn btn-receipt-view js-view-receipt"
+                                                       data-receipt-url="<?= htmlspecialchars($receiptUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                                       data-receipt-download-url="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                                       data-receipt-title="<?= htmlspecialchars((string)$item['details'], ENT_QUOTES, 'UTF-8') ?>"
+                                                       data-receipt-id="<?= htmlspecialchars((string)$item['payment_id'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
+                                                    </button>
+                                                    <a href="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                                       class="btn btn-sm compact-table-btn btn-receipt-download">
+                                                        <i class="fa-solid fa-download"></i><span>Download</span>
+                                                    </a>
+                                                </span>
                                             <?php else: ?>
                                                 <span class="text-muted small">Unavailable</span>
                                             <?php endif; ?>
@@ -517,7 +693,10 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <div id="receiptCards" class="mt-2">
                         <?php foreach ($receiptItems as $item): ?>
-                            <?php $receiptUrl = (string)($item['receipt_url'] ?? ''); ?>
+                            <?php
+                            $receiptUrl = (string)($item['receipt_url'] ?? '');
+                            $downloadUrl = (string)($item['download_url'] ?? '');
+                            ?>
                             <article class="receipt-card">
                                 <div class="receipt-card-header">
                                     <div>
@@ -539,13 +718,19 @@ if (isset($conn) && $conn instanceof mysqli) {
                                         <div class="txn-value"><?= htmlspecialchars((string)$item['payment_method']) ?></div>
                                     </div>
                                 </div>
-                                <div class="mt-3">
+                                <div class="mt-3 d-grid gap-2">
                                     <?php if ($receiptUrl !== ''): ?>
-                                        <a class="btn btn-sm compact-table-btn btn-receipt-view w-100"
-                                           href="<?= htmlspecialchars($receiptUrl) ?>"
-                                           target="_blank"
-                                           rel="noopener">
-                                            <i class="fa-solid fa-file-pdf me-1"></i>View Receipt
+                                        <button type="button"
+                                           class="btn btn-sm compact-table-btn btn-receipt-view w-100 js-view-receipt"
+                                           data-receipt-url="<?= htmlspecialchars($receiptUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-receipt-download-url="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-receipt-title="<?= htmlspecialchars((string)$item['details'], ENT_QUOTES, 'UTF-8') ?>"
+                                           data-receipt-id="<?= htmlspecialchars((string)$item['payment_id'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
+                                        </button>
+                                        <a href="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           class="btn btn-sm compact-table-btn btn-receipt-download w-100">
+                                            <i class="fa-solid fa-download"></i><span>Download</span>
                                         </a>
                                     <?php else: ?>
                                         <span class="text-muted small">Receipt unavailable.</span>
@@ -560,7 +745,120 @@ if (isset($conn) && $conn instanceof mysqli) {
     </main>
 </div>
 
+<div class="modal fade" id="receiptViewerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="fw-bold mb-0" id="receiptViewerTitle">Official Receipt</h5>
+                    <div class="small text-muted" id="receiptViewerSubtitle"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="receiptViewerEmpty" class="receipt-preview-empty d-none">
+                    Receipt preview is unavailable right now.
+                </div>
+                <iframe id="receiptViewerFrame" class="receipt-preview-frame d-none" title="Official Receipt Preview"></iframe>
+            </div>
+            <div class="modal-footer">
+                <div class="receipt-modal-actions">
+                    <button type="button" class="btn btn-receipt-close receipt-modal-btn" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn btn-receipt-open receipt-modal-btn d-none" id="receiptViewerOpenNewTab" target="_blank" rel="noopener">
+                        Open in new tab
+                    </a>
+                    <a href="#" class="btn btn-receipt-modal-download receipt-modal-btn d-none" id="receiptViewerDownload">
+                        Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const modalEl = document.getElementById('receiptViewerModal');
+        const frameEl = document.getElementById('receiptViewerFrame');
+        const emptyEl = document.getElementById('receiptViewerEmpty');
+        const titleEl = document.getElementById('receiptViewerTitle');
+        const subtitleEl = document.getElementById('receiptViewerSubtitle');
+        const openNewTabEl = document.getElementById('receiptViewerOpenNewTab');
+        const downloadEl = document.getElementById('receiptViewerDownload');
+
+        if (!modalEl || !window.bootstrap?.Modal) {
+            return;
+        }
+
+        const receiptModal = new bootstrap.Modal(modalEl);
+
+        const resetReceiptViewer = () => {
+            if (frameEl) {
+                frameEl.src = 'about:blank';
+                frameEl.classList.add('d-none');
+            }
+            if (emptyEl) {
+                emptyEl.classList.add('d-none');
+            }
+            if (openNewTabEl) {
+                openNewTabEl.href = '#';
+                openNewTabEl.classList.add('d-none');
+            }
+            if (downloadEl) {
+                downloadEl.href = '#';
+                downloadEl.classList.add('d-none');
+            }
+            if (titleEl) {
+                titleEl.textContent = 'Official Receipt';
+            }
+            if (subtitleEl) {
+                subtitleEl.textContent = '';
+            }
+        };
+
+        const openReceiptViewer = ({ url, downloadUrl, title, paymentId }) => {
+            resetReceiptViewer();
+
+            if (titleEl) {
+                titleEl.textContent = title || 'Official Receipt';
+            }
+            if (subtitleEl) {
+                subtitleEl.textContent = paymentId ? `Transaction ID: ${paymentId}` : '';
+            }
+
+            if (url && frameEl) {
+                frameEl.src = url;
+                frameEl.classList.remove('d-none');
+                if (openNewTabEl) {
+                    openNewTabEl.href = url;
+                    openNewTabEl.classList.remove('d-none');
+                }
+                if (downloadEl && downloadUrl) {
+                    downloadEl.href = downloadUrl;
+                    downloadEl.classList.remove('d-none');
+                }
+            } else if (emptyEl) {
+                emptyEl.classList.remove('d-none');
+            }
+
+            receiptModal.show();
+        };
+
+        document.querySelectorAll('.js-view-receipt').forEach((trigger) => {
+            trigger.addEventListener('click', () => {
+                openReceiptViewer({
+                    url: String(trigger.dataset.receiptUrl || '').trim(),
+                    downloadUrl: String(trigger.dataset.receiptDownloadUrl || '').trim(),
+                    title: String(trigger.dataset.receiptTitle || '').trim(),
+                    paymentId: String(trigger.dataset.receiptId || '').trim(),
+                });
+            });
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', resetReceiptViewer);
+    });
+</script>
 </body>
 </html>

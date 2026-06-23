@@ -97,6 +97,8 @@ try {
             'document_type_name' => (string)($row['document_type_name'] ?? ''),
             'document_category' => (string)($row['document_category'] ?? ''),
             'public_url' => toPublicPath((string)($row['file_path'] ?? '')),
+            'viewer_url' => '../PhpFiles/Resident-End/viewUploadedDocument.php?attachment_id=' . rawurlencode((string)($row['attachment_id'] ?? '')),
+            'open_url' => '../PhpFiles/Resident-End/viewUploadedDocument.php?attachment_id=' . rawurlencode((string)($row['attachment_id'] ?? '')),
             'is_profile_source' => ($residentId !== '' && (string)($row['source_type'] ?? '') === 'ResidentProfiling' && (string)($row['source_id'] ?? '') === $residentId),
         ];
     }
@@ -108,4 +110,3 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error. Please try again.']);
 }
-

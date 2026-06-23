@@ -44,11 +44,59 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
-$current = basename($_SERVER['PHP_SELF']);
+$current = basename((string)($_SERVER['PHP_SELF'] ?? ''));
 
 function activeLink($page, $current) {
   return $page === $current ? 'active' : '';
 }
+
+function isCurrentPage($current, array $pages): bool {
+  return in_array($current, $pages, true);
+}
+
+function activeGroup($current, array $pages): string {
+  return isCurrentPage($current, $pages) ? 'active' : '';
+}
+
+$dashboardPages = ['resident_dashboard.php'];
+$calendarPages = ['resident_calendar.php'];
+$certificatePages = [
+  'CertificatesLandingPage.php',
+  'CohabitationForm.php',
+  'FirstTimeJobSeekerForm.php',
+  'GoodMoralForm.php',
+  'IdentityForm.php',
+  'IndigencyForm.php',
+  'ResidencyForm.php',
+];
+$clearancePages = [
+  'ClearancesLandingPage.php',
+  'BarangayCertificationForm.php',
+  'BusinessClearanceForm.php',
+  'CommercialForm.php',
+  'ElectricalForm.php',
+  'OtherPermitsForm.php',
+  'ResidentialForm.php',
+  'TricycleForm.php',
+  'WaterForm.php',
+];
+$barangayIdPages = [
+  'BarangayIdLandingPage.php',
+  'BarangayIdForm.php',
+  'DigitalId.php',
+];
+$complaintPages = [
+  'ComplaintsLandingPage.php',
+  'ComplaintsForm.php',
+];
+$appointmentPages = [
+  'AppointmentsLandingPage.php',
+  'AppointmentForm.php',
+];
+$announcementPages = ['AnnouncementsLandingPage.php'];
+$downloadPages = ['Downloads.php'];
+$officialReceiptPages = ['OfficialReceipts.php'];
+$accountPages = ['resident_profile.php'];
 
 $transactionPages = [
   'resident_activity.php',
@@ -221,11 +269,27 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 <aside id="div-sidebarWrapper"
        class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
-  <!-- LOGO HEADER (ADMIN-STYLE) -->
-  <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_dashboard" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
-    <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
-  </a>
+  <div class="sidebar-header">
+    <!-- LOGO HEADER (ADMIN-STYLE) -->
+    <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_dashboard"
+       class="sidebar-brand-link link-dark text-decoration-none"
+       title="Dashboard Home">
+      <img src="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/San_Jose_LOGO.jpg"
+           alt="Barangay San Jose Logo"
+           class="sidebar-brand-logo">
+      <span class="sidebar-brand-title logo-name">Barangay San Jose</span>
+    </a>
+
+    <button type="button"
+            id="btn-sidebarCollapse"
+            class="sidebar-edge-toggle"
+            aria-label="Collapse navigation"
+            aria-pressed="false"
+            title="Collapse navigation"
+            hidden>
+      <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+    </button>
+  </div>
 
   <!-- RESIDENT PROFILE -->
   <div id="div-sidebarProfile" class="text-center mb-4">
@@ -238,7 +302,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       width="90"
       height="90"
     >
-    <h2 id="txt-sidebarName" class="h6 fw-bold mb-0"><?= htmlspecialchars($displayName) ?></h2>
+    <h2 id="txt-sidebarName" class="h6 fw-bold mb-0 sidebar-profile-name"><?= htmlspecialchars($displayName) ?></h2>
   </div>
 
   <!-- NAV LINKS -->
@@ -246,65 +310,86 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     <nav id="nav-sidebarLinks" class="text-start flex-grow-1 overflow-auto">
 
       <div id="group-navHome" class="mb-3">
-        <p class="text-muted small fw-bold mb-1">Home</p>
+        <p class="text-muted small fw-bold mb-1 sidebar-group-title">Home</p>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_dashboard"
-           class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
-          <i class="fa-solid fa-newspaper"></i>Dashboard
+           class="a-sidebarLink <?= activeGroup($current, $dashboardPages) ?>"
+           <?= isCurrentPage($current, $dashboardPages) ? 'aria-current="page"' : '' ?>
+           title="Dashboard">
+          <i class="fa-solid fa-newspaper"></i><span class="sidebar-link-text">Dashboard</span>
+        </a>
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_calendar"
+           class="a-sidebarLink <?= activeGroup($current, $calendarPages) ?>"
+           <?= isCurrentPage($current, $calendarPages) ? 'aria-current="page"' : '' ?>
+           title="Calendar">
+          <i class="fa-regular fa-calendar-days"></i><span class="sidebar-link-text">Calendar</span>
         </a>
       </div>
 
       <div id="group-navServices" class="mb-3">
-        <p class="text-muted small fw-bold mb-1">Services</p>
+        <p class="text-muted small fw-bold mb-1 sidebar-group-title">Services</p>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Certificates/CertificatesLandingPage"
-           class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
-          <i class="fa-solid fa-certificate"></i>Certificates
+           class="a-sidebarLink <?= activeGroup($current, $certificatePages) ?>"
+           <?= isCurrentPage($current, $certificatePages) ? 'aria-current="page"' : '' ?>
+           title="Certificates">
+          <i class="fa-solid fa-certificate"></i><span class="sidebar-link-text">Certificates</span>
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Clearances/ClearancesLandingPage"
-           class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
-          <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
+           class="a-sidebarLink <?= activeGroup($current, $clearancePages) ?>"
+           <?= isCurrentPage($current, $clearancePages) ? 'aria-current="page"' : '' ?>
+           title="Clearances">
+          <i class="fa-solid fa-file-circle-check fa-sm"></i><span class="sidebar-link-text">Clearances</span>
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/BarangayId/BarangayIdLandingPage"
-           class="a-sidebarLink <?= (in_array($current, ['BarangayIdLandingPage.php', 'BarangayIdForm.php'], true) ? 'active' : '') ?>">
-          <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
+           class="a-sidebarLink <?= activeGroup($current, $barangayIdPages) ?>"
+           <?= isCurrentPage($current, $barangayIdPages) ? 'aria-current="page"' : '' ?>
+           title="Barangay ID">
+          <i class="fa-solid fa-id-badge fa-lg"></i><span class="sidebar-link-text">Barangay ID</span>
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Complaints/ComplaintsLandingPage"
-           class="a-sidebarLink <?= (in_array($current, ['ComplaintsForm.php'], true) ? 'active' : '') ?>">
-          <i class="fa-solid fa-comment-dots"></i>Complaints
+           class="a-sidebarLink <?= activeGroup($current, $complaintPages) ?>"
+           <?= isCurrentPage($current, $complaintPages) ? 'aria-current="page"' : '' ?>
+           title="Complaints">
+          <i class="fa-solid fa-comment-dots"></i><span class="sidebar-link-text">Complaints</span>
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentsLandingPage"
-           class="a-sidebarLink <?= (in_array($current, ['AppointmentForm.php'], true) ? 'active' : '') ?>">
-          <i class="fa-regular fa-calendar-days"></i>Appointments
+           class="a-sidebarLink <?= activeGroup($current, $appointmentPages) ?>"
+           <?= isCurrentPage($current, $appointmentPages) ? 'aria-current="page"' : '' ?>
+           title="Appointments">
+          <i class="fa-solid fa-business-time"></i><span class="sidebar-link-text">Appointments</span>
         </a>
       </div>
 
       <div id="group-navInfo" class="mb-3">
-        <p class="text-muted small fw-bold mb-1">Info</p>
+        <p class="text-muted small fw-bold mb-1 sidebar-group-title">Info</p>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Announcements/AnnouncementsLandingPage"
-           class="a-sidebarLink <?= (in_array($current, ['AnnouncementsLandingPage.php'], true) ? 'active' : '') ?>">
-          <i class="fa-solid fa-bullhorn"></i>Announcements
+           class="a-sidebarLink <?= activeGroup($current, $announcementPages) ?>"
+           <?= isCurrentPage($current, $announcementPages) ? 'aria-current="page"' : '' ?>
+           title="Announcements">
+          <i class="fa-solid fa-bullhorn"></i><span class="sidebar-link-text">Announcements</span>
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Downloads"
-           class="a-sidebarLink <?= activeLink('Downloads.php', $current) ?>">
-          <i class="fa-solid fa-download"></i>Downloads
+           class="a-sidebarLink <?= activeGroup($current, $downloadPages) ?>"
+           <?= isCurrentPage($current, $downloadPages) ? 'aria-current="page"' : '' ?>
+           title="Downloads">
+          <i class="fa-solid fa-download"></i><span class="sidebar-link-text">Downloads</span>
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/OfficialReceipts"
-           class="a-sidebarLink <?= activeLink('OfficialReceipts.php', $current) ?>">
-          <i class="fa-solid fa-receipt"></i>Official Receipts
+           class="a-sidebarLink <?= activeGroup($current, $officialReceiptPages) ?>"
+           <?= isCurrentPage($current, $officialReceiptPages) ? 'aria-current="page"' : '' ?>
+           title="Official Receipts">
+          <i class="fa-solid fa-receipt"></i><span class="sidebar-link-text">Official Receipts</span>
         </a>
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isTransactionsActive ? '' : 'collapsed' ?>"
+        <button id="btn-sidebarTransactions"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isTransactionsActive ? 'active' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#resident-transactions-collapse"
-                aria-expanded="<?= $isTransactionsActive ? 'true' : 'false' ?>">
-          <i class="fa-solid fa-clock-rotate-left"></i>Transactions
+                data-collapsed-href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions"
+                aria-expanded="<?= $isTransactionsActive ? 'true' : 'false' ?>"
+                title="Transactions">
+          <i class="fa-solid fa-clock-rotate-left"></i><span class="sidebar-link-text">Transactions</span>
         </button>
         <div class="collapse <?= $isTransactionsActive ? 'show' : '' ?>" id="resident-transactions-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_activity"
-                 class="link-dark rounded <?= activeLink('resident_activity.php', $current) ?>">
-                Summary
-              </a>
-            </li>
             <li>
               <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions"
                  class="link-dark rounded <?= activeLink('resident_transactions.php', $current) ?>">
@@ -337,14 +422,17 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     <hr>
 
     <div class="sidebar-actions">
-      <a class="account-button btn btn-sm w-100 mb-2"
-         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_profile">
-        <i class="fa-solid fa-circle-user"></i> Account
+      <a class="account-button btn btn-sm w-100 mb-2 <?= activeGroup($current, $accountPages) ?>"
+         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_profile"
+         <?= isCurrentPage($current, $accountPages) ? 'aria-current="page"' : '' ?>
+         title="Account">
+        <i class="fa-solid fa-circle-user"></i><span class="sidebar-action-text">Account</span>
       </a>
       <a class="btn btn-danger btn-sm w-100 logout-link"
          href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/logout"
+         title="Logout"
          data-logout-message="Are you sure you want to logout?">
-        <i class="bi bi-box-arrow-right me-1"></i> Logout
+        <i class="bi bi-box-arrow-right me-1"></i><span class="sidebar-action-text">Logout</span>
       </a>
     </div>
   </div>
@@ -374,6 +462,68 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const sidebarEl = document.getElementById("div-sidebarWrapper");
+    const toggleBtn = document.getElementById("btn-sidebarCollapse");
+    const transactionsBtn = document.getElementById("btn-sidebarTransactions");
+    const mobileHeaderEl = document.getElementById("mobile-header");
+    const desktopQuery = window.matchMedia("(min-width: 769px)");
+    const storageKey = "residentSidebarCollapsed";
+    const isCollapsibleViewport = () => {
+      return desktopQuery.matches && (!mobileHeaderEl || window.getComputedStyle(mobileHeaderEl).display === "none");
+    };
+
+    const applySidebarState = (collapsed) => {
+      if (!sidebarEl || !toggleBtn) return;
+
+      const canCollapse = isCollapsibleViewport();
+      const shouldCollapse = canCollapse && collapsed;
+      sidebarEl.classList.toggle("is-collapsed", shouldCollapse);
+      document.body.classList.toggle("resident-sidebar-collapsed", shouldCollapse);
+      if (toggleBtn) {
+        toggleBtn.hidden = !canCollapse;
+      }
+      toggleBtn.setAttribute("aria-pressed", shouldCollapse ? "true" : "false");
+      toggleBtn.setAttribute("aria-label", shouldCollapse ? "Expand navigation" : "Collapse navigation");
+      toggleBtn.title = shouldCollapse ? "Expand navigation" : "Collapse navigation";
+    };
+
+    const syncSidebarMode = () => {
+      const collapsed = localStorage.getItem(storageKey) === "1";
+      applySidebarState(collapsed);
+    };
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        if (!isCollapsibleViewport()) return;
+        const nextCollapsed = !sidebarEl?.classList.contains("is-collapsed");
+        localStorage.setItem(storageKey, nextCollapsed ? "1" : "0");
+        applySidebarState(nextCollapsed);
+      });
+    }
+
+    if (transactionsBtn) {
+      transactionsBtn.addEventListener("click", (event) => {
+        if (!isCollapsibleViewport() || !sidebarEl?.classList.contains("is-collapsed")) return;
+        const fallbackHref = transactionsBtn.dataset.collapsedHref || "";
+        if (fallbackHref === "") return;
+        event.preventDefault();
+        window.location.href = fallbackHref;
+      });
+    }
+
+    if (typeof desktopQuery.addEventListener === "function") {
+      desktopQuery.addEventListener("change", syncSidebarMode);
+    } else if (typeof desktopQuery.addListener === "function") {
+      desktopQuery.addListener(syncSidebarMode);
+    }
+
+    window.addEventListener("resize", syncSidebarMode);
+    syncSidebarMode();
+  });
+</script>
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {

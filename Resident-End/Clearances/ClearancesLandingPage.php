@@ -19,15 +19,15 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260623-29">
     <style>
         .requirements-top {
             list-style-type: disc;
         }
 
         .requirements-top > li::marker {
-            color: #000;
-            font-size: 1.1em;
+            color: #de710c;
+            font-size: 1.05em;
         }
 
         .requirements-numeric {
@@ -44,9 +44,21 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
     </style>
 </head>
 
-<body>
+<body class="documents-page documents-page--stacked-grid">
     <div class="d-flex min-vh-100">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
+
+        <header id="mobile-header">
+            <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar">
+                        <i class="fa-solid fa-bars fa-lg"></i>
+                    </button>
+                    <img src="../../Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+                    <span class="logo-name">Barangay San Jose</span>
+                </div>
+            </div>
+        </header>
 
         <main id="div-mainDisplay" class="main-content flex-grow-1 p-4 p-md-5 bg-light">
             <h1 class="page-title">Barangay Clearances</h1>
@@ -57,7 +69,7 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
             </p>
 
             <?php if (!$isResidentVerified): ?>
-                <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+                <div class="alert alert-warning border-0 shadow-sm mb-4 documents-alert" role="alert">
                     Verify your resident account first to request clearances online. If needed, you can still walk in at the barangay to request a document in person.
                 </div>
             <?php endif; ?>
@@ -66,19 +78,26 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
 
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 certificate-grid justify-content-center">
                 <div class="col d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../Icons/Dashboard/businessclearance.png" class="certificate-icon" alt="For Business Clearance">
-                        <h3>FOR BUSINESS CLEARANCE</h3>
-                        <p class="certificate-text">
-                            Apply for barangay business clearance for new applications, renewals, and compliance checks.
-                        </p>
-                        <button
-                            class="btn apply-btn"
-                            type="button"
-                            <?= $clearanceApplyTriggerAttrs ?>
-                            data-title="Business Clearance Requirements"
-                            data-apply-href="BusinessClearanceForm"
-                            data-body="
+                    <div class="certificate-card certificate-card--no-meta card-action w-100">
+                        <div class="certificate-card__main">
+                            <div class="certificate-icon-wrap">
+                                <img src="../../Icons/Dashboard/businessclearance.png" class="certificate-icon" alt="For Business Clearance">
+                            </div>
+                            <div class="certificate-card__content">
+                                <h3 class="certificate-card__title">FOR BUSINESS CLEARANCE</h3>
+                                <p class="certificate-text">
+                                    Apply for barangay business clearance for new applications, renewals, and compliance checks.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="certificate-card__footer">
+                            <button
+                                class="btn apply-btn"
+                                type="button"
+                                <?= $clearanceApplyTriggerAttrs ?>
+                                data-title="Business Clearance Requirements"
+                                data-apply-href="BusinessClearanceForm"
+                                data-body="
                                 <p class='mb-2'><span class='fw-semibold'>Filing a renewal application is required one (1) year from the issuance date of your permit.</span></p>
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li class='mb-2'>
@@ -135,24 +154,32 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
                                     </li> -->
                                 </ul>
                             "
-                        >
-                            Apply Now
-                        </button>
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="col d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../Icons/Dashboard/tricycle.png" class="certificate-icon" alt="For Tricycle Permit">
-                        <h3>FOR TRICYCLE PERMIT</h3>
-                        <p class="certificate-text">Apply for barangay clearance required for tricycle permit processing.</p>
-                        <button
-                            class="btn apply-btn"
-                            type="button"
-                            <?= $clearanceApplyTriggerAttrs ?>
-                            data-title="Tricycle Permit Requirements"
-                            data-apply-href="TricycleForm"
-                            data-body="
+                    <div class="certificate-card certificate-card--no-meta card-action w-100">
+                        <div class="certificate-card__main">
+                            <div class="certificate-icon-wrap">
+                                <img src="../../Icons/Dashboard/tricycle.png" class="certificate-icon" alt="For Tricycle Permit">
+                            </div>
+                            <div class="certificate-card__content">
+                                <h3 class="certificate-card__title">FOR TRICYCLE PERMIT</h3>
+                                <p class="certificate-text">Apply for barangay clearance required for tricycle permit processing.</p>
+                            </div>
+                        </div>
+                        <div class="certificate-card__footer">
+                            <button
+                                class="btn apply-btn"
+                                type="button"
+                                <?= $clearanceApplyTriggerAttrs ?>
+                                data-title="Tricycle Permit Requirements"
+                                data-apply-href="TricycleForm"
+                                data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li class='mb-2'>
                                         New Application
@@ -176,24 +203,32 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
                                 </ul>
                                 <p class='mt-2 mb-0 text-muted small'>If the vehicle is not named after the owner, upload a notarized deed of sale.</p>
                             "
-                        >
-                            Apply Now
-                        </button>
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="col d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../Icons/Dashboard/electricity.png" class="certificate-icon" alt="For Electrical Permit">
-                        <h3>FOR ELECTRICAL PERMIT</h3>
-                        <p class="certificate-text">Apply for barangay clearance required for electrical permit processing.</p>
-                        <button
-                            class="btn apply-btn"
-                            type="button"
-                            <?= $clearanceApplyTriggerAttrs ?>
-                            data-title="Barangay Clearance for Electrical Permit Requirements"
-                            data-apply-href="ElectricalForm"
-                            data-body="
+                    <div class="certificate-card certificate-card--no-meta card-action w-100">
+                        <div class="certificate-card__main">
+                            <div class="certificate-icon-wrap">
+                                <img src="../../Icons/Dashboard/electricity.png" class="certificate-icon" alt="For Electrical Permit">
+                            </div>
+                            <div class="certificate-card__content">
+                                <h3 class="certificate-card__title">FOR ELECTRICAL PERMIT</h3>
+                                <p class="certificate-text">Apply for barangay clearance required for electrical permit processing.</p>
+                            </div>
+                        </div>
+                        <div class="certificate-card__footer">
+                            <button
+                                class="btn apply-btn"
+                                type="button"
+                                <?= $clearanceApplyTriggerAttrs ?>
+                                data-title="Barangay Clearance for Electrical Permit Requirements"
+                                data-apply-href="ElectricalForm"
+                                data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
                                         New Application
@@ -221,24 +256,32 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
                                     </li>
                                 </ul>
                             "
-                        >
-                            Apply Now
-                        </button>
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="col d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../Icons/Dashboard/water.png" class="certificate-icon" alt="For Water Permit">
-                        <h3>FOR WATER PERMIT</h3>
-                        <p class="certificate-text">Apply for barangay clearance required for water permit processing.</p>
-                        <button
-                            class="btn apply-btn"
-                            type="button"
-                            <?= $clearanceApplyTriggerAttrs ?>
-                            data-title="Barangay Clearance for Water Permit Requirements"
-                            data-apply-href="WaterForm"
-                            data-body="
+                    <div class="certificate-card certificate-card--no-meta card-action w-100">
+                        <div class="certificate-card__main">
+                            <div class="certificate-icon-wrap">
+                                <img src="../../Icons/Dashboard/water.png" class="certificate-icon" alt="For Water Permit">
+                            </div>
+                            <div class="certificate-card__content">
+                                <h3 class="certificate-card__title">FOR WATER PERMIT</h3>
+                                <p class="certificate-text">Apply for barangay clearance required for water permit processing.</p>
+                            </div>
+                        </div>
+                        <div class="certificate-card__footer">
+                            <button
+                                class="btn apply-btn"
+                                type="button"
+                                <?= $clearanceApplyTriggerAttrs ?>
+                                data-title="Barangay Clearance for Water Permit Requirements"
+                                data-apply-href="WaterForm"
+                                data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
                                         New Application
@@ -266,24 +309,32 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
                                     </li>
                                 </ul>
                             "
-                        >
-                            Apply Now
-                        </button>
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="col d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../Icons/Dashboard/residential.png" class="certificate-icon" alt="For Residential Permit">
-                        <h3>FOR RESIDENTIAL PERMIT</h3>
-                        <p class="certificate-text">Apply for barangay clearance required for residential permit processing.</p>
-                        <button
-                            class="btn apply-btn"
-                            type="button"
-                            <?= $clearanceApplyTriggerAttrs ?>
-                            data-title="Barangay Clearance for Residential Permit Requirements"
-                            data-apply-href="ResidentialForm"
-                            data-body="
+                    <div class="certificate-card certificate-card--no-meta card-action w-100">
+                        <div class="certificate-card__main">
+                            <div class="certificate-icon-wrap">
+                                <img src="../../Icons/Dashboard/residential.png" class="certificate-icon" alt="For Residential Permit">
+                            </div>
+                            <div class="certificate-card__content">
+                                <h3 class="certificate-card__title">FOR RESIDENTIAL PERMIT</h3>
+                                <p class="certificate-text">Apply for barangay clearance required for residential permit processing.</p>
+                            </div>
+                        </div>
+                        <div class="certificate-card__footer">
+                            <button
+                                class="btn apply-btn"
+                                type="button"
+                                <?= $clearanceApplyTriggerAttrs ?>
+                                data-title="Barangay Clearance for Residential Permit Requirements"
+                                data-apply-href="ResidentialForm"
+                                data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
                                         New Application
@@ -311,24 +362,32 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
                                     </li>
                                 </ul>
                             "
-                        >
-                            Apply Now
-                        </button>
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="col d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../Icons/Dashboard/commercial.png" class="certificate-icon" alt="For Commercial Permit">
-                        <h3>FOR COMMERCIAL PERMIT</h3>
-                        <p class="certificate-text">Apply for barangay clearance required for commercial permit processing.</p>
-                        <button
-                            class="btn apply-btn"
-                            type="button"
-                            <?= $clearanceApplyTriggerAttrs ?>
-                            data-title="Barangay Clearance for Commercial Permit Requirements"
-                            data-apply-href="CommercialForm"
-                            data-body="
+                    <div class="certificate-card certificate-card--no-meta card-action w-100">
+                        <div class="certificate-card__main">
+                            <div class="certificate-icon-wrap">
+                                <img src="../../Icons/Dashboard/commercial.png" class="certificate-icon" alt="For Commercial Permit">
+                            </div>
+                            <div class="certificate-card__content">
+                                <h3 class="certificate-card__title">FOR COMMERCIAL PERMIT</h3>
+                                <p class="certificate-text">Apply for barangay clearance required for commercial permit processing.</p>
+                            </div>
+                        </div>
+                        <div class="certificate-card__footer">
+                            <button
+                                class="btn apply-btn"
+                                type="button"
+                                <?= $clearanceApplyTriggerAttrs ?>
+                                data-title="Barangay Clearance for Commercial Permit Requirements"
+                                data-apply-href="CommercialForm"
+                                data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
                                         New Application
@@ -357,9 +416,10 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
                                     </li>
                                 </ul>
                             "
-                        >
-                            Apply Now
-                        </button>
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -393,6 +453,16 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
     <?php include __DIR__ . '/../includes/document_issuance_verification_modal.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const burgerBtn = document.getElementById("btn-burger");
+        const sidebar = document.getElementById("div-sidebarWrapper");
+
+        if (burgerBtn && sidebar) {
+            burgerBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("show");
+            });
+        }
+    </script>
     <script>
         const requirementsModal = document.getElementById('requirementsModal');
         const verificationRequiredModalEl = document.getElementById('residentVerificationRequiredModal');
