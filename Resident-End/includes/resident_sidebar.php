@@ -59,6 +59,7 @@ function activeGroup($current, array $pages): string {
 }
 
 $dashboardPages = ['resident_dashboard.php'];
+$householdPages = ['resident_household.php'];
 $calendarPages = ['resident_calendar.php'];
 $certificatePages = [
   'CertificatesLandingPage.php',
@@ -317,6 +318,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            title="Dashboard">
           <i class="fa-solid fa-newspaper"></i><span class="sidebar-link-text">Dashboard</span>
         </a>
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_household"
+           class="a-sidebarLink <?= activeGroup($current, $householdPages) ?>"
+           <?= isCurrentPage($current, $householdPages) ? 'aria-current="page"' : '' ?>
+           title="Household Profile">
+          <i class="fa-solid fa-house-user"></i><span class="sidebar-link-text">Household Profile</span>
+        </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_calendar"
            class="a-sidebarLink <?= activeGroup($current, $calendarPages) ?>"
            <?= isCurrentPage($current, $calendarPages) ? 'aria-current="page"' : '' ?>
@@ -468,7 +475,38 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     const sidebarEl = document.getElementById("div-sidebarWrapper");
     const toggleBtn = document.getElementById("btn-sidebarCollapse");
     const transactionsBtn = document.getElementById("btn-sidebarTransactions");
-    const mobileHeaderEl = document.getElementById("mobile-header");
+    const ensureMobileHeader = () => {
+      const existingHeader = document.getElementById("mobile-header");
+      if (existingHeader) {
+        return existingHeader;
+      }
+
+      const mainDisplayEl = document.getElementById("div-mainDisplay");
+      const headerEl = document.createElement("header");
+      headerEl.id = "mobile-header";
+      headerEl.innerHTML = `
+        <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar" onclick="document.getElementById('div-sidebarWrapper')?.classList.toggle('show')">
+              <i class="fa-solid fa-bars fa-lg"></i>
+            </button>
+            <img src="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+            <span class="logo-name">Barangay San Jose</span>
+          </div>
+        </div>
+      `;
+
+      const hostEl = mainDisplayEl?.parentNode || document.body;
+      if (hostEl && mainDisplayEl) {
+        hostEl.insertBefore(headerEl, mainDisplayEl);
+      } else if (hostEl) {
+        hostEl.insertBefore(headerEl, hostEl.firstChild);
+      }
+
+      return headerEl;
+    };
+
+    const mobileHeaderEl = ensureMobileHeader();
     const desktopQuery = window.matchMedia("(min-width: 769px)");
     const storageKey = "residentSidebarCollapsed";
     const isCollapsibleViewport = () => {

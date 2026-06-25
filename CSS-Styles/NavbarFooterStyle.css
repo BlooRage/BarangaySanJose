@@ -41,9 +41,25 @@ h5 {
     width: 100%;
     display: block;
     font-family: 'Geist', sans-serif;
-    background-color: #FFFFFF;
+    position: sticky;
+    top: 0;
+    z-index: 1100;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+    backdrop-filter: blur(16px);
     margin: 0;
     padding: 0;
+}
+.navbarWrapper .navbar {
+    min-height: 86px;
+    padding: 0.75rem 0;
+}
+.navbarWrapper .container-fluid {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding-left: clamp(16px, 2.6vw, 34px);
+    padding-right: clamp(16px, 2.6vw, 34px);
 }
 .label {
     display: block;
@@ -55,27 +71,36 @@ h5 {
     text-align: center;
 }
 #navbarLogo {
-    width: 60px;
-    height: 60px;
-    margin-right: 10px;
+    width: 56px;
+    height: 56px;
+    margin-right: 8px;
     border-radius: 50%;
+    flex: 0 0 56px;
+    display: block;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    object-position: center;
 }
 #navbarBrand {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    line-height: 1;
 }
 #navbarBrand {
     font-family: 'Charis SIL Regular', serif;
-    font-size: 40px;
+    font-size: clamp(2rem, 2.4vw, 3rem);
+    letter-spacing: -0.02em;
     color: #000000;
 }
 #navbarLinks {
     font-family: 'Geist', sans-serif;
-    font-size: 20px;
+    font-size: 18px;
+    font-weight: 500;
 }
 #navbarLinks a {
     color: #000000;
+    padding: 0.45rem 0.8rem;
     transition: all 0.2s ease-in-out;
 }
 #navbarLinks a:hover {
@@ -91,7 +116,7 @@ h5 {
     background-color: #FE993C;
     border-color: #FE993C;
     color: #ffffff;
-    border-radius: 8px;
+    border-radius: 12px;
     transition: background 0.2s ease;
 }
 
@@ -188,24 +213,21 @@ h5 {
     color: #3c2414;
 }
 @media (max-width: 768px) {
-    .navbar {
-        position: sticky;
-        top: 0;
-        z-index: 1100;
-    }
     #navbarLogo {
         width: 44px;
         height: 44px;
         margin-right: 6px;
         border-radius: 50%;
+        flex: 0 0 44px;
     }
 
     #navbarBrand {
         font-size: 20px;
+        gap: 8px;
     }
 
     #navbarLinks {
-        font-size: 18px;
+        font-size: 17px;
         text-align: center;
     }
 
@@ -247,8 +269,12 @@ h5 {
 }
 
 @media (max-width: 1199.98px) {
+    .navbarWrapper .navbar {
+        min-height: 74px;
+    }
     .navbar-collapse {
         text-align: center;
+        padding-top: 0.65rem;
     }
     #navbarLinks {
         display: flex;

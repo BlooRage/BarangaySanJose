@@ -81,6 +81,93 @@ foreach ($announcementItems as $item) {
     'posted_date_iso' => $postedDateIso
   ];
 }
+
+$dashboardCards = [
+  [
+    'id' => 'certificates',
+    'href' => 'Certificates/CertificatesLandingPage',
+    'label' => 'Certificate Request',
+    'subtext' => 'Quick access to resident requests',
+    'icon' => 'fa-solid fa-file-lines',
+  ],
+  [
+    'id' => 'clearances',
+    'href' => 'Clearances/ClearancesLandingPage',
+    'label' => 'Clearance Request',
+    'subtext' => 'Manage barangay clearance requests',
+    'icon' => 'fa-solid fa-clipboard-check',
+  ],
+  [
+    'id' => 'barangay-id',
+    'href' => 'BarangayId/BarangayIdLandingPage',
+    'label' => 'Barangay ID',
+    'subtext' => 'Access ID application and status',
+    'icon' => 'fa-solid fa-id-card',
+  ],
+  [
+    'id' => 'complaints',
+    'href' => 'Complaints/ComplaintsLandingPage',
+    'label' => 'Complaints',
+    'subtext' => 'Submit concerns and follow-ups',
+    'icon' => 'fa-solid fa-comment-dots',
+  ],
+  [
+    'id' => 'appointments',
+    'href' => 'Appointments/AppointmentsLandingPage',
+    'label' => 'Appointments',
+    'subtext' => 'View schedules and set visits',
+    'icon' => 'fa-solid fa-calendar-check',
+  ],
+  [
+    'id' => 'announcements',
+    'href' => 'Announcements/AnnouncementsLandingPage',
+    'label' => 'Announcements',
+    'subtext' => 'Read community notices and updates',
+    'icon' => 'fa-solid fa-bullhorn',
+  ],
+  [
+    'id' => 'downloads',
+    'href' => 'Downloads',
+    'label' => 'Downloads',
+    'subtext' => 'Get your generated files and records',
+    'icon' => 'fa-solid fa-download',
+  ],
+  [
+    'id' => 'transactions',
+    'href' => 'resident_transactions',
+    'label' => 'Transactions',
+    'subtext' => 'Review payments and activity',
+    'icon' => 'fa-solid fa-money-check-dollar',
+  ],
+  [
+    'id' => 'official-receipts',
+    'href' => 'OfficialReceipts',
+    'label' => 'Official Receipts',
+    'subtext' => 'View issued barangay payment receipts',
+    'icon' => 'fa-solid fa-receipt',
+  ],
+  [
+    'id' => 'calendar',
+    'href' => 'resident_calendar',
+    'label' => 'Calendar',
+    'subtext' => 'See resident events and schedules',
+    'icon' => 'fa-regular fa-calendar-days',
+  ],
+  [
+    'id' => 'household-profile',
+    'href' => 'resident_household',
+    'label' => 'Household Profile',
+    'subtext' => 'Manage your household and family record',
+    'icon' => 'fa-solid fa-house-user',
+  ],
+  [
+    'id' => 'account-profile',
+    'href' => 'resident_profile',
+    'label' => 'Account Profile',
+    'subtext' => 'Update account and resident information',
+    'icon' => 'fa-solid fa-user-circle',
+  ],
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -194,94 +281,18 @@ foreach ($announcementItems as $item) {
       <h2 id="txt-sectionTitle" class="fw-bold border-bottom pb-2 mb-4">DASHBOARD</h2>
 
       <div id="div-serviceGrid" class="row service-grid justify-content-center">
-
+        <?php foreach ($dashboardCards as $card): ?>
         <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-certificates"
+          <a id="card-serviceRequest-<?= htmlspecialchars($card['id'], ENT_QUOTES, 'UTF-8') ?>"
              class="card-action"
-             href="Certificates/CertificatesLandingPage"
-             aria-label="Open Certificate Request">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-file-lines"></i></span>
-            <span class="card-action__title">Certificate Request</span>
-            <span class="card-action__subtext">Quick access to resident requests</span>
+             href="<?= htmlspecialchars($card['href'], ENT_QUOTES, 'UTF-8') ?>"
+             aria-label="Open <?= htmlspecialchars($card['label'], ENT_QUOTES, 'UTF-8') ?>">
+            <span class="card-action__icon" aria-hidden="true"><i class="<?= htmlspecialchars($card['icon'], ENT_QUOTES, 'UTF-8') ?>"></i></span>
+            <span class="card-action__title"><?= htmlspecialchars($card['label'], ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="card-action__subtext"><?= htmlspecialchars($card['subtext'], ENT_QUOTES, 'UTF-8') ?></span>
           </a>
         </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-clearances"
-             class="card-action"
-             href="Clearances/ClearancesLandingPage"
-             aria-label="Open Clearances">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-clipboard-check"></i></span>
-            <span class="card-action__title">Clearances</span>
-            <span class="card-action__subtext">Manage barangay clearance requests</span>
-          </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-brgyId"
-             class="card-action"
-             href="BarangayId/BarangayIdLandingPage"
-             aria-label="Open Barangay ID">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-id-card"></i></span>
-            <span class="card-action__title">Barangay ID</span>
-            <span class="card-action__subtext">Access ID application and status</span>
-          </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-appointments"
-             class="card-action"
-             href="Appointments/AppointmentsLandingPage"
-             aria-label="Open Appointments">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></span>
-            <span class="card-action__title">Appointments</span>
-            <span class="card-action__subtext">View schedules and set visits</span>
-          </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-announcements"
-             class="card-action"
-             href="Announcements/AnnouncementsLandingPage"
-             aria-label="Open Announcements">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-bullhorn"></i></span>
-            <span class="card-action__title">Announcements</span>
-            <span class="card-action__subtext">Read community notices and updates</span>
-          </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-transactions"
-             class="card-action"
-             href="resident_transactions"
-             aria-label="Open Transactions">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-money-check-dollar"></i></span>
-            <span class="card-action__title">Transactions</span>
-            <span class="card-action__subtext">Review payments and activity</span>
-          </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-complaints"
-             class="card-action"
-             href="Complaints/ComplaintsLandingPage"
-             aria-label="Open Complaints">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-comment-dots"></i></span>
-            <span class="card-action__title">Complaints</span>
-            <span class="card-action__subtext">Submit concerns and follow-ups</span>
-          </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-lg-3">
-          <a id="card-serviceRequest-profile"
-             class="card-action"
-             href="resident_profile"
-             aria-label="Open My Profile">
-            <span class="card-action__icon" aria-hidden="true"><i class="fa-solid fa-user-circle"></i></span>
-            <span class="card-action__title">My Profile</span>
-            <span class="card-action__subtext">Update account and resident info</span>
-          </a>
-        </div>
+        <?php endforeach; ?>
 
       </div>
 

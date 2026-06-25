@@ -103,12 +103,11 @@ $paginationEnd = min($totalPages, $currentPage + 2);
     }
 
     .announcements-page .page-title {
-      margin-bottom: 1.5rem;
-      font-family: 'Geist', sans-serif;
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      font-size: clamp(2.4rem, 4vw, 3.7rem);
-      line-height: 1.02;
+      margin: 0 0 0.65rem;
+      font-family: 'Charis SIL Bold', serif;
+      color: #de710c;
+      font-size: clamp(2rem, 4.4vw, 3rem);
+      line-height: 1.1;
     }
 
     .announcements-page .page-divider {
@@ -180,12 +179,12 @@ $paginationEnd = min($totalPages, $currentPage + 2);
     .announcement-title {
       margin: 0;
       max-width: 24ch;
-      font-family: 'Geist', sans-serif;
-      font-weight: 800;
-      letter-spacing: -0.035em;
+      font-family: 'Charis SIL Bold', serif;
+      font-weight: 400;
+      letter-spacing: -0.01em;
       color: #c96c14;
-      font-size: clamp(1.32rem, 1.7vw, 1.75rem);
-      line-height: 1.12;
+      font-size: clamp(1.28rem, 1.75vw, 1.72rem);
+      line-height: 1.16;
       text-wrap: balance;
     }
 
@@ -211,6 +210,7 @@ $paginationEnd = min($totalPages, $currentPage + 2);
       font-family: 'Geist', sans-serif;
       line-height: 1.72;
       font-size: 1rem;
+      font-weight: 400;
     }
 
     .announcement-body h1,
@@ -220,12 +220,12 @@ $paginationEnd = min($totalPages, $currentPage + 2);
     .announcement-body h5,
     .announcement-body h6 {
       margin: 0 0 0.8rem;
-      font-family: 'Geist', sans-serif !important;
-      font-size: clamp(1.02rem, 1.15vw, 1.18rem);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      line-height: 1.3;
-      color: #b86417 !important;
+      font-family: inherit !important;
+      font-size: inherit !important;
+      font-weight: 400 !important;
+      letter-spacing: normal;
+      line-height: inherit;
+      color: inherit !important;
     }
 
     .announcement-body p,
@@ -235,10 +235,11 @@ $paginationEnd = min($totalPages, $currentPage + 2);
     .announcement-body td,
     .announcement-body th,
     .announcement-body blockquote {
-      font-family: 'Geist', sans-serif !important;
-      color: #4a5970 !important;
-      font-size: 1rem;
-      line-height: 1.72;
+      font-family: inherit !important;
+      color: inherit !important;
+      font-size: inherit !important;
+      line-height: inherit !important;
+      font-weight: inherit;
     }
 
     .announcement-body p,
@@ -256,18 +257,8 @@ $paginationEnd = min($totalPages, $currentPage + 2);
 
     .announcement-body strong,
     .announcement-body b {
-      color: #243247 !important;
-      font-weight: 700;
-    }
-
-    .announcement-body p > strong:only-child,
-    .announcement-body p > b:only-child,
-    .announcement-body div > strong:only-child,
-    .announcement-body div > b:only-child,
-    .announcement-body li > strong:only-child,
-    .announcement-body li > b:only-child {
       color: inherit !important;
-      font-weight: 400 !important;
+      font-weight: 700 !important;
     }
 
     .announcement-body a {

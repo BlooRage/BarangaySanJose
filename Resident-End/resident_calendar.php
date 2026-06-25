@@ -90,19 +90,21 @@ $calendarPayload = array_map(static function (array $item): array {
     }
 
     .calendar-page-header {
-      margin-bottom: 1.5rem;
+      margin-bottom: 0;
     }
 
     .calendar-page-title {
       font-family: 'Charis SIL Bold', serif;
-      font-size: clamp(2.35rem, 4.8vw, 4rem);
+      font-size: 3rem;
       color: var(--calendar-accent);
-      line-height: 1.04;
+      line-height: 1.1;
+      letter-spacing: 0;
       margin: 0;
+      margin-bottom: 1.5rem;
     }
 
     .calendar-page-rule {
-      margin: 1rem 0 1.15rem;
+      margin: 0 0 1.5rem;
       border: 0;
       border-top: 1px solid #d6d8dc;
       opacity: 1;
@@ -600,13 +602,17 @@ $calendarPayload = array_map(static function (array $item): array {
     }
 
     @media (max-width: 767.98px) {
+      .calendar-page-header {
+        margin-bottom: 0;
+      }
+
       .calendar-page-title {
-        font-size: clamp(1.55rem, 7.2vw, 2.1rem);
-        line-height: 1.08;
+        font-size: 2rem;
+        line-height: 1.1;
       }
 
       .calendar-page-rule {
-        margin: 0.75rem 0 0.9rem;
+        margin: 0 0 1rem;
       }
 
       .calendar-copy {

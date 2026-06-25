@@ -126,7 +126,7 @@
                                     <div class="articleMetaStrip">
                                         <span class="articleDateBadge" id="publicNewsDate">-</span>
                                     </div>
-                                    <p class="articleLead" id="publicNewsLead">Stay updated with the latest barangay developments, programs, and public notices.</p>
+                                    <p class="articleLead" id="publicNewsLead" style="display: none;"></p>
 
                                     <div class="articleImageWrapper articleHeroWrapper mb-4" id="publicNewsImageWrapper" style="display: none;">
                                         <div class="placeholderImage"></div>
@@ -329,9 +329,83 @@
             return false;
         }
 
+        function sanitizeRichContentMedia(wrapper) {
+            if (!wrapper || !wrapper.querySelectorAll) {
+                return;
+            }
+
+            wrapper.querySelectorAll('img, source, iframe, video').forEach(function (mediaEl) {
+                const tag = String(mediaEl.tagName || '').toUpperCase();
+                let sourceValue = '';
+
+                if (tag === 'IMG' || tag === 'IFRAME' || tag === 'VIDEO') {
+                    sourceValue = String(mediaEl.getAttribute('src') || '').trim();
+                } else if (tag === 'SOURCE') {
+                    sourceValue = String(mediaEl.getAttribute('src') || mediaEl.getAttribute('srcset') || '').trim();
+                }
+
+                const isInlineData = sourceValue.startsWith('data:');
+                const isProtocolSource = /^(https?:)?\/\//i.test(sourceValue);
+                const isRelativeSource = sourceValue.startsWith('/') || sourceValue.startsWith('./') || sourceValue.startsWith('../');
+                const looksValidSource = sourceValue !== '' && !/^javascript:/i.test(sourceValue) && (isInlineData || isProtocolSource || isRelativeSource);
+
+                if (looksValidSource) {
+                    return;
+                }
+
+                const removableParent = mediaEl.closest('figure, picture, p, div');
+                if (removableParent && removableParent !== wrapper && (removableParent.textContent || '').replace(/\s+/g, '').trim() === '') {
+                    removableParent.remove();
+                    return;
+                }
+
+                mediaEl.remove();
+            });
+        }
+
+        function attachMediaFallbacks(rootEl) {
+            if (!rootEl || !rootEl.querySelectorAll) {
+                return;
+            }
+
+            rootEl.querySelectorAll('img').forEach(function (imgEl) {
+                if (imgEl.dataset.fallbackBound === '1') {
+                    return;
+                }
+                imgEl.dataset.fallbackBound = '1';
+                imgEl.addEventListener('error', function () {
+                    const featureMedia = imgEl.closest('.landingAnnouncementFeatureMedia, .landingAnnouncementStackMedia, .announcementThumb, .newsArchiveMedia');
+                    if (featureMedia) {
+                        const interactiveCard = featureMedia.closest('.landingAnnouncementFeature, .landingAnnouncementStackItem, .announcementCardInner');
+                        featureMedia.remove();
+                        if (interactiveCard) {
+                            interactiveCard.classList.add('is-text-only');
+                        }
+                        return;
+                    }
+
+                    const figureEl = imgEl.closest('figure');
+                    if (figureEl) {
+                        figureEl.remove();
+                        return;
+                    }
+
+                    const mediaWrapper = imgEl.closest('.articleHeroWrapper, .publicAnnouncementModalMedia');
+                    if (mediaWrapper) {
+                        mediaWrapper.style.display = 'none';
+                        mediaWrapper.innerHTML = '';
+                        return;
+                    }
+
+                    imgEl.remove();
+                });
+            });
+        }
+
         function getRichContentParts(html) {
             const wrapper = document.createElement('div');
             wrapper.innerHTML = String(html || '').trim();
+            sanitizeRichContentMedia(wrapper);
 
             let mediaHtml = '';
             const firstBlock = Array.from(wrapper.children).find(function (el) {
@@ -430,8 +504,10 @@
             if (refs.mediaEl) {
                 refs.mediaEl.innerHTML = contentParts.mediaHtml || '';
                 refs.mediaEl.style.display = contentParts.mediaHtml ? '' : 'none';
+                attachMediaFallbacks(refs.mediaEl);
             }
             refs.bodyEl.innerHTML = contentParts.bodyHtml || (contentParts.mediaHtml ? '' : '<p>No announcement content available.</p>');
+            attachMediaFallbacks(refs.bodyEl);
             refs.modalInstance.show();
         }
 
@@ -568,8 +644,8 @@
                 headlineEl.textContent = "Latest Barangay News";
                 dateEl.textContent = "-";
                 if (leadEl) {
-                    leadEl.style.display = "";
-                    leadEl.textContent = "Stay updated with the latest barangay developments, programs, and public notices.";
+                    leadEl.style.display = "none";
+                    leadEl.textContent = "";
                 }
                 bodyEl.innerHTML = "<p>No public news available yet.</p>";
                 imageWrapperEl.style.display = "none";
@@ -581,12 +657,7 @@
                 || (item.image_url
                     ? '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || "Public news image") + '">'
                     : '');
-            const showLead = !!leadEl
-                && contentParts.bodyHtmlWithoutLead !== ""
-                && (contentParts.plainText.length > 260 || contentParts.blockCount > 1);
-            const renderedBodyHtml = showLead && contentParts.bodyHtmlWithoutLead !== ""
-                ? contentParts.bodyHtmlWithoutLead
-                : contentParts.bodyHtml;
+            const renderedBodyHtml = contentParts.bodyHtml;
 
             if (tagEl) {
                 tagEl.textContent = deriveStoryLabel(item);
@@ -594,8 +665,8 @@
             headlineEl.textContent = item.title || "Latest Barangay News";
             dateEl.textContent = item.posted_date || "-";
             if (leadEl) {
-                leadEl.style.display = showLead ? "" : "none";
-                leadEl.textContent = showLead ? contentParts.leadText : "";
+                leadEl.style.display = "none";
+                leadEl.textContent = "";
             }
             bodyEl.innerHTML = renderedBodyHtml !== ""
                 ? renderedBodyHtml
@@ -604,9 +675,12 @@
             if (heroMediaHtml) {
                 imageWrapperEl.style.display = "";
                 imageWrapperEl.innerHTML = heroMediaHtml;
+                attachMediaFallbacks(imageWrapperEl);
             } else {
                 imageWrapperEl.style.display = "none";
             }
+
+            attachMediaFallbacks(bodyEl);
 
             newsPageState.selectedNewsId = String(item.id || '');
         }
@@ -708,17 +782,17 @@
 
             refs.sectionEl.style.display = "";
             refs.listEl.innerHTML = visibleItems.map(function (item) {
-                const imageSrc = String(item.image_url || '').trim() || '../Images/News_Placeholder.png';
-                const imageAlt = String(item.image_url || '').trim()
+                const rawImageSrc = String(item.image_url || '').trim();
+                const imageSrc = rawImageSrc || '../Images/News_Placeholder.png';
+                const imageAlt = rawImageSrc
                     ? (item.title || 'News image')
                     : 'News placeholder image';
-                const tileMediaHtml = '<div class="newsArchiveMedia"><img src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageAlt) + '"></div>';
 
                 return ''
                     + '<a class="newsArchiveTile" href="' + escapeHtml(buildNewsStoryUrl(item.id || '', currentPage)) + '"'
                     + ' data-news-id="' + escapeHtml(String(item.id || '')) + '"'
                     + ' data-news-page="' + escapeHtml(String(currentPage)) + '">'
-                    +      tileMediaHtml
+                    + '  <div class="newsArchiveMedia"><img src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageAlt) + '"></div>'
                     + '  <div class="newsArchiveCardBody">'
                     + '    <span class="newsArchiveDate">' + escapeHtml(item.posted_date || '-') + '</span>'
                     + '    <h4 class="newsArchiveHeadline">' + escapeHtml(item.title || 'Untitled story') + '</h4>'
@@ -747,6 +821,7 @@
                     });
                 });
             });
+            attachMediaFallbacks(refs.listEl);
 
             if (refs.paginationEl) {
                 if (totalPages <= 1) {
@@ -974,14 +1049,14 @@
                     ? 'landingAnnouncementFeatureBody'
                     : 'landingAnnouncementStackBody';
                 const previewLength = variant === "latest" ? 120 : 82;
-                const emptyImageClass = variant === "stack" && !imageHtml ? ' is-text-only' : '';
+                const emptyImageClass = !imageHtml ? ' is-text-only' : '';
 
                 return ''
                     + '<div class="' + wrapperClass + emptyImageClass + ' announcementItemInteractive" tabindex="0" role="button" data-announcement-index="' + String(index) + '">'
                     +      imageHtml
                     + '  <div class="' + bodyClass + '">'
-                    + '      <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
                     + '      <p class="' + titleClass + '">' + escapeHtml(item.title || 'Untitled announcement') + '</p>'
+                    + '      <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
                     + '      <div class="announcementPreviewText">' + escapeHtml(toPreviewText(item.content_html || '', previewLength)) + '</div>'
                     + '  </div>'
                     + '</div>';
@@ -1081,6 +1156,8 @@
 
                 attachAnnouncementInteractions(latestEl, items);
                 attachAnnouncementInteractions(stackEl, items);
+                attachMediaFallbacks(latestEl);
+                attachMediaFallbacks(stackEl);
             }
 
             function renderAnnouncementRails() {

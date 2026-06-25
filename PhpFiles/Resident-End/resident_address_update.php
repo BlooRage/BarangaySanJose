@@ -227,86 +227,6 @@ function getDocumentTypeId(mysqli $conn, string $name): int {
     return $newId;
 }
 
-function isHeadOfFamily(mysqli $conn, string $residentId): bool {
-    $stmt = $conn->prepare("
-        SELECT head_of_family
-        FROM residentinformationtbl
-        WHERE resident_id = ?
-        LIMIT 1
-    ");
-    if (!$stmt) {
-        return false;
-    }
-    $stmt->bind_param("s", $residentId);
-    $stmt->execute();
-    $stmt->bind_result($headRaw);
-    $value = '';
-    if ($stmt->fetch()) {
-        $value = strtolower(trim((string)$headRaw));
-    }
-    $stmt->close();
-    return in_array($value, ['yes', 'true', '1', 'y'], true);
-}
-
-function getActiveHouseholdId(mysqli $conn, string $residentId, int $activeStatusId): ?int {
-    $stmt = $conn->prepare("
-        SELECT household_id
-        FROM householdmemberresidenttbl
-        WHERE resident_id = ? AND status_id = ?
-        ORDER BY household_id DESC
-        LIMIT 1
-    ");
-    if (!$stmt) {
-        return null;
-    }
-    $stmt->bind_param("si", $residentId, $activeStatusId);
-    $stmt->execute();
-    $stmt->bind_result($householdId);
-    $value = $stmt->fetch() ? (int)$householdId : null;
-    $stmt->close();
-    return $value ?: null;
-}
-
-function countOtherActiveResidentMembers(mysqli $conn, int $householdId, string $residentId, int $activeStatusId): int {
-    $stmt = $conn->prepare("
-        SELECT COUNT(*)
-        FROM householdmemberresidenttbl
-        WHERE household_id = ?
-          AND status_id = ?
-          AND resident_id IS NOT NULL
-          AND resident_id <> ?
-    ");
-    if (!$stmt) {
-        return 0;
-    }
-    $stmt->bind_param("iis", $householdId, $activeStatusId, $residentId);
-    $stmt->execute();
-    $stmt->bind_result($count);
-    $value = $stmt->fetch() ? (int)$count : 0;
-    $stmt->close();
-    return $value;
-}
-
-function isResidentEligibleNewHead(mysqli $conn, int $householdId, string $candidateResidentId, int $activeStatusId): bool {
-    $stmt = $conn->prepare("
-        SELECT 1
-        FROM householdmemberresidenttbl
-        WHERE household_id = ?
-          AND status_id = ?
-          AND resident_id = ?
-          AND role <> 'Head'
-        LIMIT 1
-    ");
-    if (!$stmt) {
-        return false;
-    }
-    $stmt->bind_param("iis", $householdId, $activeStatusId, $candidateResidentId);
-    $stmt->execute();
-    $ok = $stmt->get_result()->num_rows > 0;
-    $stmt->close();
-    return $ok;
-}
-
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable']);
@@ -538,48 +458,6 @@ $changes = [
     'residency_duration' => $newAddress['residency_duration'],
     'address_system' => $newAddress['address_system'],
 ];
-$newHeadResidentId = cleanString($payload['new_head_resident_id'] ?? '');
-$activeHouseholdMemberStatusId = getStatusId($conn, 'Active', 'HouseholdMember');
-$isHead = isHeadOfFamily($conn, $residentId);
-if ($activeHouseholdMemberStatusId !== null && $isHead) {
-    $householdId = getActiveHouseholdId($conn, $residentId, $activeHouseholdMemberStatusId);
-    if ($householdId !== null) {
-        $otherActiveResidentCount = countOtherActiveResidentMembers(
-            $conn,
-            $householdId,
-            $residentId,
-            $activeHouseholdMemberStatusId
-        );
-        if ($otherActiveResidentCount > 0 && $newHeadResidentId === '') {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'message' => 'Please assign a new head of household before submitting.'
-            ]);
-            exit;
-        }
-        if ($newHeadResidentId !== '' && !isResidentEligibleNewHead($conn, $householdId, $newHeadResidentId, $activeHouseholdMemberStatusId)) {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'message' => 'Selected new head is not an eligible active household member.'
-            ]);
-            exit;
-        }
-    }
-}
-
-if ($newHeadResidentId !== '') {
-    if (!$isHead) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Only the head of family can assign a new head of household.'
-        ]);
-        exit;
-    }
-    $changes['new_head_resident_id'] = $newHeadResidentId;
-}
 
 $userFolder = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$userId);
 if ($userFolder === '') {

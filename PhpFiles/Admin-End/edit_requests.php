@@ -659,58 +659,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->close();
 
                     if ($householdId) {
-                        if ($currentRole === 'Head') {
-                            $newHeadId = trim((string)($changes['new_head_resident_id'] ?? ''));
-                            if ($newHeadId === '') {
-                                throw new Exception('Missing new head for household.');
-                            }
-                            $stmt = $conn->prepare("
-                                SELECT 1
-                                FROM householdmemberresidenttbl
-                                WHERE household_id = ? AND resident_id = ? AND status_id = ? AND role <> 'Head'
-                                LIMIT 1
-                            ");
-                            $stmt->bind_param("isi", $householdId, $newHeadId, $memberActiveStatusId);
-                            $stmt->execute();
-                            $eligible = $stmt->get_result()->num_rows > 0;
-                            $stmt->close();
-                            if (!$eligible) {
-                                throw new Exception('Selected member is not eligible to become head.');
-                            }
-
-                            $upd = $conn->prepare("UPDATE householdtbl SET head_resident_id = ? WHERE household_id = ?");
-                            $upd->bind_param("si", $newHeadId, $householdId);
-                            if (!$upd->execute()) {
-                                throw new Exception('Failed to reassign household head.');
-                            }
-                            $upd->close();
-
+                        if ($currentRole !== 'Head') {
                             $upd = $conn->prepare("
                                 UPDATE householdmemberresidenttbl
-                                SET role = CASE
-                                    WHEN resident_id = ? THEN 'Head'
-                                    WHEN resident_id = ? THEN 'Member'
-                                    ELSE role
-                                END
-                                WHERE household_id = ? AND status_id = ?
+                                SET status_id = ?
+                                WHERE household_id = ? AND resident_id = ? AND status_id = ?
                             ");
-                            $upd->bind_param("ssii", $newHeadId, $row['resident_id'], $householdId, $memberActiveStatusId);
+                            $upd->bind_param("iisi", $memberRemovedStatusId, $householdId, $row['resident_id'], $memberActiveStatusId);
                             if (!$upd->execute()) {
-                                throw new Exception('Failed to update household roles.');
+                                throw new Exception('Failed to remove from household.');
                             }
                             $upd->close();
                         }
-
-                        $upd = $conn->prepare("
-                            UPDATE householdmemberresidenttbl
-                            SET status_id = ?
-                            WHERE household_id = ? AND resident_id = ? AND status_id = ?
-                        ");
-                        $upd->bind_param("iisi", $memberRemovedStatusId, $householdId, $row['resident_id'], $memberActiveStatusId);
-                        if (!$upd->execute()) {
-                            throw new Exception('Failed to remove from household.');
-                        }
-                        $upd->close();
                     }
                 }
             } elseif ($requestType === 'emergency') {

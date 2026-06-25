@@ -4,7 +4,6 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once "../PhpFiles/GET/getResidentProfile.php";
 require_once "../PhpFiles/General/uploadLimits.php";
 require_once "../PhpFiles/General/uniqueIDGenerate.php";
-require_once "../PhpFiles/Resident-End/householdHeadVerification.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
@@ -35,11 +34,6 @@ $headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
 $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
 $residentStatusRaw = trim((string)($residentinformationtbl['status_name_resident'] ?? ''));
 $residentStatusKey = strtolower(str_replace([' ', '_', '-'], '', $residentStatusRaw));
-$isResidentVerified = in_array($residentStatusKey, ['verifiedresident', 'verified'], true);
-$householdHeadVerification = hhv_get_resident_head_verification($conn, (string)$residentId);
-$canManageHouseholdMembers = $isHeadOfFamily && (bool)($householdHeadVerification['can_manage_members'] ?? false);
-$householdManageMessage = trim((string)($householdHeadVerification['message'] ?? ''));
-$canSendHouseholdInvite = $canManageHouseholdMembers && $isResidentVerified;
 $editStatusKey = $residentStatusKey !== '' ? $residentStatusKey : 'notverified';
 $canEditProfile = !in_array($editStatusKey, ['notverified', 'pendingverification'], true);
 $editBlockMessage = 'Your account must be verified before you can edit your profile, address, or emergency contact.';
@@ -346,9 +340,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       window.RESIDENT_PROFILE_EMAIL_VERIFIED = <?= $emailVerified ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_ALLOWED = <?= $canEditProfile ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE = <?= json_encode($editBlockMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-      window.RESIDENT_HOUSEHOLD_IS_HEAD = <?= $isHeadOfFamily ? 'true' : 'false' ?>;
-      window.RESIDENT_HOUSEHOLD_CAN_MANAGE = <?= $canManageHouseholdMembers ? 'true' : 'false' ?>;
-      window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE = <?= json_encode($householdManageMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
       window.RESIDENT_PROFILE_SEX = <?= json_encode((string)($residentinformationtbl['sex'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_CSRF_TOKEN = <?= json_encode($residentCsrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
@@ -358,12 +349,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdMembers.js?v=20260328-2" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js?v=20260328-3" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileEmergency.js" defer></script>
@@ -821,11 +809,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="tab-household" data-bs-toggle="tab" data-bs-target="#pane-household" type="button" role="tab" aria-controls="pane-household" aria-selected="false">
-                        Household
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="tab-uploaded-docs" data-bs-toggle="tab" data-bs-target="#pane-uploaded-docs" type="button" role="tab" aria-controls="pane-uploaded-docs" aria-selected="false">
                         Uploaded Documents
                     </button>
@@ -1090,79 +1073,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 	            </div>
 
                 </div>
-                <div class="tab-pane fade" id="pane-household" role="tabpanel" aria-labelledby="tab-household" tabindex="0">
-                    <?php if (!$isHeadOfFamily): ?>
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header">
-                            <strong>JOIN HOUSEHOLD</strong>
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-2 align-items-end">
-                                <div class="col-12 col-md-8">
-                                    <label for="householdJoinCode" class="form-label small text-muted">Invite Code</label>
-                                    <input type="text" class="form-control" id="householdJoinCode" placeholder="Enter invite code">
-                                </div>
-                                <div class="col-12 col-md-4">
-                                    <button class="btn btn-primary w-100" id="btnJoinHousehold">Join Household</button>
-                                </div>
-                            </div>
-                            <div id="householdJoinResult" class="small mt-2"></div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <strong>HOUSEHOLD INFORMATION</strong>
-                            <?php if ($isHeadOfFamily): ?>
-                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#householdInviteModal" <?= $canManageHouseholdMembers ? '' : 'disabled' ?>>
-                                Add Household Member
-                            </button>
-                            <?php else: ?>
-                            <button class="btn btn-danger btn-sm" id="btnLeaveHousehold">
-                                Leave Household
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <div class="text-muted small">Address</div>
-                                <div id="householdAddress" class="fw-semibold">—</div>
-                            </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-6 col-md-4">
-                                    <div class="text-muted small">Minors</div>
-                                    <div id="householdMinorCount" class="fw-semibold">0</div>
-                                </div>
-                                <div class="col-6 col-md-4">
-                                    <div class="text-muted small">Adults</div>
-                                    <div id="householdAdultCount" class="fw-semibold">0</div>
-                                </div>
-                            </div>
-                            <?php if ($isHeadOfFamily): ?>
-                            <div id="householdPendingRequestsWrap" class="mb-3 d-none">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div class="text-muted small">Pending Member Verification Requests</div>
-                                    <div id="householdPendingRequestCount" class="fw-semibold">0</div>
-                                </div>
-                                <div id="householdPendingRequestsList" class="border rounded bg-light"></div>
-                            </div>
-                            <?php endif; ?>
-                            <div id="householdMembersGrid" class="row g-3"></div>
-                            <div id="householdMembersEmpty" class="text-muted small mt-2 d-none">
-                                No household members yet.
-                            </div>
-                            <?php if ($isHeadOfFamily && $householdManageMessage !== ''): ?>
-                            <div id="householdHeadVerificationNotice" class="alert alert-warning small mt-3 mb-0<?= $canManageHouseholdMembers ? ' d-none' : '' ?>">
-                                <?= htmlspecialchars($householdManageMessage, ENT_QUOTES, 'UTF-8') ?>
-                            </div>
-                            <?php endif; ?>
-                            <div class="mt-3 text-muted small">
-                                Only the head of the family can add or manage household members.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="tab-pane fade" id="pane-uploaded-docs" role="tabpanel" aria-labelledby="tab-uploaded-docs" tabindex="0">
                     <div class="card uploaded-docs-shell shadow-sm mb-4">
                         <div class="card-header">
@@ -1213,106 +1123,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             </div>
 
         </main>
-    </div>
-
-    <?php if ($isHeadOfFamily): ?>
-    <div class="modal fade" id="householdInviteModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Invite Household Members</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <?php if (!$isResidentVerified): ?>
-                        <div class="alert alert-warning small mb-2">
-                            Your account must be verified before sending household invite codes via SMS.
-                        </div>
-                    <?php endif; ?>
-                    <?php if ($householdManageMessage !== ''): ?>
-                        <div class="alert alert-warning small mb-2<?= $canManageHouseholdMembers ? ' d-none' : '' ?>" id="householdManageAlert">
-                            <?= htmlspecialchars($householdManageMessage, ENT_QUOTES, 'UTF-8') ?>
-                        </div>
-                    <?php endif; ?>
-                    <div class="mb-3">
-                        <p class="text small mb-2">
-                            Invite members with accounts via SMS.
-                        </p>
-                        <div id="householdInvitePhoneList" class="d-flex flex-column gap-2">
-                            <div class="input-group">
-                                <span class="input-group-text">+63</span>
-                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{10}$" maxlength="10">
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-primary btn-sm mt-2" id="btnAddInvitePhone">
-                            Add Another Number
-                        </button>
-                        <div class="form-text mt-2">Use PH format starting with +63.</div>
-                        <div id="householdInviteResult" class="small mt-2"></div>
-                    </div>
-                    <hr class="my-3">
-                    <div>
-                        <p class="text small mb-2">
-                            Submit a non-registered household member for verification.
-                        </p>
-                        <div class="alert alert-info small mb-3">
-                            A birth certificate is required. The member will only be added to the household after admin verification.
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted">Last Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="hmLastName" placeholder="Last Name">
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted">First Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="hmFirstName" placeholder="First Name">
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted">Middle Name</label>
-                                <input type="text" class="form-control" id="hmMiddleName" placeholder="Middle Name">
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted">Suffix</label>
-                                <input type="text" class="form-control" id="hmSuffix" placeholder="Suffix (e.g. Jr.)">
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small text-muted">Birthdate <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" id="hmBirthdate">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small text-muted">Birth Certificate <span class="text-danger">*</span></label>
-                                <input type="file" class="form-control" id="hmBirthCertificate" accept=".pdf,.jpg,.jpeg,.png">
-                                <div class="form-text">Accepted file types: PDF, JPG, JPEG, PNG.</div>
-                            </div>
-                        </div>
-                        <div id="householdMemberAddResult" class="small mt-2"></div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Submit Verification Request</button>
-                    <button class="btn btn-success" id="btnSendHouseholdInvite" data-verified="<?= $isResidentVerified ? '1' : '0' ?>" <?= $canSendHouseholdInvite ? '' : 'disabled' ?>>Send Invites</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-
-    <div class="modal fade" id="householdMemberSubmitSuccessModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content p-3">
-                <div class="modal-header justify-content-center border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-center w-100">Verification Request Submitted</h5>
-                </div>
-                <hr>
-                <div class="modal-body text-center">
-                    <p class="mb-0" id="householdMemberSubmitSuccessMessage">Household member verification request submitted. Please wait for admin review.</p>
-                </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-primary w-100" data-bs-dismiss="modal">OK</button>
-                </div>
-            </div>
-        </div>
     </div>
 
     <div class="modal fade" id="editProfileModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -1703,21 +1513,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                 <div class="modal-body">
                     <div class="alert alert-warning small mb-3">
-                        Changing your address will remove you from your household.
+                        <?php if ($isHeadOfFamily): ?>
+                            Changing your address will update the household address under your family record.
+                        <?php else: ?>
+                            Changing your address will remove you from your current household.
+                        <?php endif; ?>
                     </div>
-                    <?php if ($isHeadOfFamily): ?>
-                    <div id="headReassignBlock" class="border rounded p-2 mb-3 d-none" data-is-head="<?= $isHeadOfFamily ? '1' : '0' ?>">
-                        <label class="form-label fw-bold mb-1">Assign New Head of Household</label>
-                        <select class="form-select" id="newHeadResidentId">
-                            <option value="">Select a member</option>
-                        </select>
-                        <div class="form-text">Required before a household head can change address.</div>
-                        <div id="headReassignLoading" class="text-muted small mt-2 d-none">Loading household members...</div>
-                        <div id="headReassignEmpty" class="text-danger small mt-2 d-none">
-                            You must have at least one other active household member to reassign the head role.
-                        </div>
-                    </div>
-                    <?php endif; ?>
 
                     <div class="row g-2 mb-2">
                         <div class="col-12">

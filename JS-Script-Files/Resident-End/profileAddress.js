@@ -7,10 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const resultEl = document.getElementById("addressSaveResult");
     const uploadResultEl = document.getElementById("addressUploadResult");
-    const headBlock = document.getElementById("headReassignBlock");
-    const headSelect = document.getElementById("newHeadResidentId");
-    const headEmpty = document.getElementById("headReassignEmpty");
-    const headLoading = document.getElementById("headReassignLoading");
     const deniedAlert = document.getElementById("addressDeniedAlert");
     const deniedText = document.getElementById("addressDeniedText");
     const modalTrigger =
@@ -28,9 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const editBlockedMessage =
         window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
         "Your account must be verified before you can change your address.";
-    let requiresReassign = false;
     let suppressFormResetOnHide = false;
-    const isHead = headBlock?.dataset?.isHead === "1";
     const addressSystemEl = document.getElementById("addressSystemEdit");
     const houseWrapper = document.getElementById("addressHouseWrapper");
     const lotBlockWrapper = document.getElementById("addressLotBlockWrapper");
@@ -342,11 +336,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        if (requiresReassign && headSelect && headSelect.value.trim()) {
-            const selectedText = headSelect.options[headSelect.selectedIndex]?.text || headSelect.value.trim();
-            rows.push({ field: "New Head of Household", from: "Current head", to: selectedText });
-        }
-
         return rows;
     };
 
@@ -391,11 +380,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (residencyEl) residencyEl.value = AUTO_RESIDENCY_DURATION;
         toggleAddressSystem();
         toggleHouseTypeOther();
-        if (headSelect) headSelect.value = "";
         if (resultEl) resultEl.textContent = "";
         if (uploadResultEl) uploadResultEl.textContent = "";
         clearFieldErrors();
-        if (headEmpty) headEmpty.classList.add("d-none");
         updateSaveState();
     };
 
@@ -404,22 +391,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const updateSaveState = () => {
         const hasChanges = isDirty();
         const valid = hasChanges ? validate({ showErrors: false, includeSupportDocs: false }) : true;
-        const needsHead = requiresReassign && headSelect && !headSelect.value.trim();
         if (!hasChanges) {
             setMessage("");
             clearFieldErrors();
         } else if (valid) {
             setMessage("");
             clearFieldErrors();
-        } else if (needsHead) {
-            setMessage("Please assign a new head of household first.", true);
         } else if (isPendingRequest) {
             setMessage("You already have a pending address change request.", true);
         } else {
             setMessage("");
             clearFieldErrors();
         }
-        saveBtn.disabled = !hasChanges || !valid || needsHead || isPendingRequest;
+        saveBtn.disabled = !hasChanges || !valid || isPendingRequest;
     };
 
     const toggleAddressSystem = () => {
@@ -466,10 +450,6 @@ document.addEventListener("DOMContentLoaded", () => {
             updateSaveState();
         });
     }
-    if (headSelect) {
-        headSelect.addEventListener("change", updateSaveState);
-    }
-
     const hideFormModalIfOpen = async () => {
         if (!modalEl || !window.bootstrap?.Modal) return false;
         const formModal = bootstrap.Modal.getInstance(modalEl);
@@ -498,14 +478,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!validate({ showErrors: true, includeSupportDocs: false })) {
             return;
         }
-        if (requiresReassign) {
-            const newHeadId = headSelect ? headSelect.value.trim() : "";
-            if (!newHeadId) {
-                setMessage("Please assign a new head of household first.", true);
-                return;
-            }
-        }
-
         const rows = buildChangeRows();
         if (!rows.length) {
             setMessage("No changes detected.", true);
@@ -558,23 +530,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (requiresReassign) {
-            const newHeadId = headSelect ? headSelect.value.trim() : "";
-            if (!newHeadId) {
-                setMessage("Please assign a new head of household first.", true);
-                saveBtn.disabled = false;
-                return;
-            }
-        }
-
         const payload = buildPayload();
         const formData = new FormData();
         Object.entries(payload).forEach(([key, value]) => {
             formData.append(key, value);
         });
-        if (requiresReassign && headSelect) {
-            formData.append("new_head_resident_id", headSelect.value.trim());
-        }
         if (addressSupportTypeEl) {
             formData.append("supporting_address_type", addressSupportTypeEl.value.trim());
         }
@@ -621,55 +581,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    const loadHeadReassign = async () => {
-        if (!headBlock || !headSelect) return;
-        if (headLoading) headLoading.classList.remove("d-none");
-        try {
-            const res = await fetch("../PhpFiles/Resident-End/household_members.php");
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success || !data.is_head || !data.has_household) {
-                requiresReassign = false;
-                headBlock.classList.add("d-none");
-                if (headEmpty) headEmpty.classList.add("d-none");
-                updateSaveState();
-                return;
-            }
-
-            const eligible = (data.members || []).filter(
-                (m) => m && m.resident_id && m.role !== "Head"
-            );
-
-            headSelect.innerHTML = '<option value="">Select a member</option>';
-            if (eligible.length === 0) {
-                requiresReassign = false;
-                if (headEmpty) headEmpty.classList.add("d-none");
-                headBlock.classList.add("d-none");
-                updateSaveState();
-                return;
-            }
-
-            eligible.forEach((m) => {
-                const opt = document.createElement("option");
-                opt.value = m.resident_id;
-                opt.textContent = m.name || "Member";
-                headSelect.appendChild(opt);
-            });
-
-            if (headEmpty) headEmpty.classList.add("d-none");
-            headBlock.classList.remove("d-none");
-            requiresReassign = true;
-            updateSaveState();
-        } catch (e) {
-            // ignore
-        } finally {
-            if (headLoading) headLoading.classList.add("d-none");
-        }
-    };
-
-    if (headBlock && isHead) {
-        headBlock.classList.remove("d-none");
-        requiresReassign = false;
-    }
     toggleAddressSystem();
     toggleHouseTypeOther();
     fieldIds.forEach((id) => {
@@ -683,7 +594,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     initialPayload = buildPayload();
     currentProfilePayload = getCurrentProfilePayload();
-    loadHeadReassign();
     const showNotice = (title, message) => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
         if (noticeBodyEl) noticeBodyEl.textContent = message || "";

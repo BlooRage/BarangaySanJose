@@ -118,44 +118,131 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
     <style>
         body {
-            background: #fffdfb;
+            background:
+                radial-gradient(circle at top left, rgba(254, 153, 60, 0.12), transparent 24%),
+                linear-gradient(180deg, #fff7f0 0%, #fffdfb 36%, #ffffff 100%);
         }
-        #div-mainDisplay {
-            background: #ffffff !important;
+        .complaint-form-shell {
+            width: min(100%, 1180px);
         }
-        #div-mainDisplay .form-title,
-        #div-mainDisplay .form-subtitle,
-        #div-mainDisplay .back-link {
-            max-width: 1300px;
+        .complaint-form-page {
+            align-items: flex-start;
+            padding-top: clamp(20px, 4vw, 40px);
+            padding-bottom: clamp(28px, 5vw, 48px);
+        }
+        .complaint-form-shell.application-card {
+            padding: clamp(24px, 3vw, 38px);
+            border-color: rgba(222, 113, 12, 0.24);
+            box-shadow: 0 28px 60px rgba(60, 36, 20, 0.08);
+        }
+        .complaint-form-header {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+            padding-top: 0.25rem;
+        }
+        .complaint-form-header .back-link {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin: 0;
+            padding: 0.45rem 0.7rem;
+            border-radius: 999px;
+            color: #2f3640;
+            background: #fff4e8;
+            transform: translateY(-50%);
+        }
+        .complaint-form-header .back-link:hover,
+        .complaint-form-header .back-link:focus-visible {
+            color: #b75f0d;
+            background: #ffe8d0;
+        }
+        .complaint-form-header .back-link:focus-visible {
+            outline: none;
+        }
+        .complaint-form-card .form-title,
+        .complaint-form-card .form-subtitle {
+            max-width: 780px;
             margin-left: auto;
             margin-right: auto;
         }
-        #div-mainDisplay .page-form {
-            max-width: 1300px;
+        .complaint-form-card .page-form {
+            width: 100%;
             margin: 0 auto;
-            padding-bottom: 48px;
+            padding-bottom: 8px;
         }
         h1 {
-            font-size: 2.8rem !important;
+            font-size: clamp(2.5rem, 5vw, 4.2rem) !important;
             font-weight: 700;
         }
         h2.section-title,
         h3.section-title {
-            font-size: 1.4rem;
+            font-size: 1.55rem;
             font-weight: 600;
             margin-top: 32px;
             margin-bottom: 24px;
         }
-    </style></head>
+        @media (max-width: 768px) {
+            .complaint-form-header {
+                justify-content: flex-start;
+                padding-top: 0;
+                padding-left: 0;
+            }
+            .complaint-form-header .back-link {
+                position: static;
+                transform: none;
+                margin-right: 0.75rem;
+            }
+            .complaint-form-header .form-title {
+                text-align: left;
+            }
+        }
+        @media (max-width: 480px) {
+            .complaint-form-shell.application-card {
+                padding: 20px 16px;
+            }
+            .complaint-form-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.9rem;
+            }
+            .complaint-form-header .back-link {
+                margin-right: 0;
+            }
+            .complaint-form-header .form-title,
+            .complaint-form-card .form-subtitle {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
 <body>
-<div class="d-flex min-vh-100">
-    <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
+    <div class="d-flex min-vh-100">
+        <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-    <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
-        
-                <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
-                    <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
-                        <i class="bi bi-arrow-left-short fs-3"></i>
+        <header id="mobile-header">
+            <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar">
+                        <i class="fa-solid fa-bars fa-lg"></i>
+                    </button>
+                    <img src="../../Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+                    <span class="logo-name">Barangay San Jose</span>
+                </div>
+            </div>
+        </header>
+
+        <main id="div-mainDisplay" class="application-main complaint-form-page flex-grow-1 px-3 px-md-4 pb-4 px-md-5 pb-md-5">
+            <div class="application-card application-card--muted complaint-form-shell complaint-form-card">
+                <div class="complaint-form-header">
+                    <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="back-link text-decoration-none">
+                        <i class="bi bi-arrow-left-short fs-3" aria-hidden="true"></i>
+                        <span>Back</span>
                     </a>
                     <h1 class="form-title m-0">Complaint Form</h1>
                 </div>
@@ -338,9 +425,20 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         <button type="submit" class="submit-btn">SUBMIT</button>
                     </div>
                 </form>
-    </main>
-</div>
+            </div>
+        </main>
+    </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const burgerBtn = document.getElementById("btn-burger");
+    const sidebar = document.getElementById("div-sidebarWrapper");
+
+    if (burgerBtn && sidebar) {
+        burgerBtn.addEventListener("click", () => {
+            sidebar.classList.toggle("show");
+        });
+    }
+</script>
 <script src="../../JS-Script-Files/modalHandler.js"></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
