@@ -3,7 +3,7 @@ require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (empty($_SESSION['user_id']) || !in_array($_SESSION['role'] ?? '', ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true)) {
+if (empty($_SESSION['user_id']) || !in_array(normalizeRoleName((string)($_SESSION['role'] ?? '')), ['superadmin', 'official', 'personnel'], true)) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;

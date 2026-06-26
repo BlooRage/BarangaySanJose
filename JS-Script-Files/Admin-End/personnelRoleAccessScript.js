@@ -508,7 +508,7 @@
     if (!row) return;
 
     if (modalTitleEl) {
-      modalTitleEl.textContent = isCreate ? "Create Role Based Permissions" : "Manage Role Based Permissions";
+      modalTitleEl.textContent = isCreate ? "Create Access Control Profile" : "Manage Access Control Profile";
     }
     if (modalNoticeEl) {
       modalNoticeEl.textContent = isCreate
@@ -643,7 +643,7 @@
     });
     const data = await parseJsonResponse(res);
     if (!res.ok || !data?.success) {
-      throw new Error(data?.message || "Unable to save role-based permissions.");
+      throw new Error(data?.message || "Unable to save access control changes.");
     }
 
     return data;
@@ -798,7 +798,7 @@
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         await load();
       } catch (error) {
-        window.alert(error?.message || "Unable to save role-based permissions.");
+        window.alert(error?.message || "Unable to save access control changes.");
       } finally {
         setLoadingState(false);
       }
@@ -813,7 +813,7 @@
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         await load();
       } catch (error) {
-        window.alert(error?.message || "Unable to reset role-based permissions.");
+        window.alert(error?.message || "Unable to reset access control profile.");
       } finally {
         setLoadingState(false);
       }

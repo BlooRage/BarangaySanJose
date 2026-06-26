@@ -4,7 +4,7 @@ require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 
 header('Content-Type: application/json; charset=utf-8');
 

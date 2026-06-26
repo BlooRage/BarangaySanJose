@@ -9,7 +9,7 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 
 header('Content-Type: application/json; charset=utf-8');
 

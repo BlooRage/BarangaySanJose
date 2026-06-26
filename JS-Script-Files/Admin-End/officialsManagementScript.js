@@ -698,11 +698,9 @@
     const id = escapeHtml(safe(row.official_id));
     const approvalState = String(row.profile_approval_state || "");
     const isRevoked = String(row.permission_state || "") === "Revoked";
-    const isProtected = String(row.protected_code || "").trim() !== "";
+    const readyForInvite = Boolean(row.ready_for_invite);
+    const onboardingStatus = String(row.onboarding_status || "");
     let items = "";
-
-    items += `<li><button class="dropdown-item officials-action-btn" data-action="manage_access" data-official-id="${id}"><i class="fas fa-list-check me-2"></i>Manage Access</button></li>`;
-    items += `<li><hr class="dropdown-divider"></li>`;
 
     if (approvalState === "PendingApproval") {
       items += `<li><button class="dropdown-item text-success officials-action-btn" data-action="approve_profile" data-official-id="${id}"><i class="fas fa-check me-2"></i>Approve Profile</button></li>`;
@@ -710,20 +708,20 @@
       items += `<li><hr class="dropdown-divider"></li>`;
     }
 
-    if (isRevoked) {
-      items += `<li><button class="dropdown-item officials-action-btn" data-action="restore_permission" data-official-id="${id}"><i class="fas fa-unlock me-2"></i>Restore Access</button></li>`;
+    if (readyForInvite) {
+      items += `<li><button class="dropdown-item officials-action-btn" data-action="send_invite" data-official-id="${id}"><i class="fas fa-paper-plane me-2"></i>Send Invite</button></li>`;
     } else {
-      items += `<li><button class="dropdown-item text-danger officials-action-btn" data-action="revoke_permission" data-official-id="${id}"><i class="fas fa-ban me-2"></i>Revoke Access</button></li>`;
+      items += `<li><button class="dropdown-item officials-action-btn" data-action="mark_ready_for_invite" data-official-id="${id}"><i class="fas fa-circle-check me-2"></i>Check Invite Readiness</button></li>`;
     }
+    if (onboardingStatus) {
+      items += `<li><span class="dropdown-item-text text-muted small"><i class="fas fa-info-circle me-2"></i>Onboarding: ${escapeHtml(onboardingStatus)}</span></li>`;
+    }
+    items += `<li><hr class="dropdown-divider"></li>`;
 
-    if (isPersonnelManagement) {
-      items += `<li><hr class="dropdown-divider"></li>`;
-      if (isProtected) {
-        items += `<li><span class="dropdown-item-text text-muted small"><i class="fas fa-lock me-2"></i>${escapeHtml(String(row.protected_label || "Protected account"))}: promotion and department change unavailable</span></li>`;
-      } else {
-        items += `<li><button class="dropdown-item officials-action-btn" data-action="promote" data-official-id="${id}"><i class="fas fa-arrow-up me-2"></i>Promote</button></li>`;
-        items += `<li><button class="dropdown-item officials-action-btn" data-action="change_department" data-official-id="${id}"><i class="fas fa-building me-2"></i>Change Department</button></li>`;
-      }
+    if (isRevoked) {
+      items += `<li><button class="dropdown-item officials-action-btn" data-action="restore_permission" data-official-id="${id}"><i class="fas fa-unlock me-2"></i>Unlock Account</button></li>`;
+    } else {
+      items += `<li><button class="dropdown-item text-danger officials-action-btn" data-action="revoke_permission" data-official-id="${id}"><i class="fas fa-lock me-2"></i>Lock Account</button></li>`;
     }
 
     return `
@@ -831,11 +829,14 @@
     refreshBtn.disabled = !!isLoading;
   };
 
-  const postAction = async (action, officialId) => {
+  const postAction = async (action, officialId, extraFields = {}) => {
     const body = new FormData();
     body.append("action", action);
     body.append("official_id", officialId);
     body.append("mode", managementMode);
+    Object.entries(extraFields).forEach(([key, value]) => {
+      body.append(key, String(value ?? ""));
+    });
 
     const res = await fetch(apiUrl, {
       method: "POST",
@@ -850,6 +851,52 @@
 
     return data;
   };
+
+  const requestSecureOtpChallenge = async (secureAction, officialId = "", actionLabel = "this action") => {
+    const actorPassword = window.prompt(`Enter your current password to continue with ${actionLabel}:`);
+    if (actorPassword === null) {
+      return null;
+    }
+    if (!String(actorPassword).trim()) {
+      throw new Error("Password confirmation is required.");
+    }
+
+    const body = new FormData();
+    body.append("action", "request_secure_action_otp");
+    body.append("secure_action", secureAction);
+    body.append("mode", managementMode);
+    if (officialId) {
+      body.append("official_id", officialId);
+    }
+    body.append("actor_password", actorPassword);
+
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      body,
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Unable to send OTP.");
+    }
+
+    const deliveryLabel = String(data.delivery_label || "").trim();
+    const otpCode = window.prompt(
+      deliveryLabel
+        ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
+        : "Enter the 6-digit OTP sent to your verified contact:"
+    );
+    if (otpCode === null) {
+      return null;
+    }
+
+    return {
+      challenge_key: String(data.challenge_key || ""),
+      otp_code: String(otpCode || "").trim(),
+    };
+  };
+
+  window.requestOfficialsManagementSecureConfirmation = requestSecureOtpChallenge;
 
   const openPromoteModal = (officialId) => {
     const row = state.rowsRaw.find((r) => String(r.official_id) === String(officialId));
@@ -1266,28 +1313,21 @@
           });
           return;
         }
-        if (action === "manage_access") {
-          openAccessModal(officialId);
-          return;
-        }
-        if (action === "promote") {
-          openPromoteModal(officialId);
-          return;
-        }
-        if (action === "change_department") {
-          openDepartmentModal(officialId);
-          return;
-        }
-
         let label = "update";
         if (action === "revoke_permission") label = "revoke";
         else if (action === "restore_permission") label = "restore";
         else if (action === "approve_profile") label = "approve";
         else if (action === "reject_profile") label = "reject";
+        else if (action === "mark_ready_for_invite") label = "check";
+        else if (action === "send_invite") label = "send";
 
         const target = action === "approve_profile" || action === "reject_profile"
           ? "this profile approval"
-          : "this account permission";
+          : action === "mark_ready_for_invite"
+            ? "this invite readiness"
+            : action === "send_invite"
+              ? "this onboarding invite"
+              : "this account status";
 
         const confirmed = await confirmActionModal({
           title: "Confirm Action",
@@ -1299,7 +1339,16 @@
 
         try {
           btn.disabled = true;
-          await postAction(action, officialId);
+          const extraFields = {};
+          if (["send_invite", "revoke_permission", "restore_permission"].includes(action)) {
+            const secureAction = await requestSecureOtpChallenge(action, officialId, label + " " + target);
+            if (!secureAction) {
+              btn.disabled = false;
+              return;
+            }
+            Object.assign(extraFields, secureAction);
+          }
+          await postAction(action, officialId, extraFields);
           await load();
         } catch (error) {
           window.alert(error?.message || "Unable to update permission state.");

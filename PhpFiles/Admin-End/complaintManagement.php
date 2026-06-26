@@ -4,7 +4,7 @@ require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 verifyCsrfToken(false);
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 

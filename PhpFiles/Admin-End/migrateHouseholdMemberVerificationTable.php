@@ -9,7 +9,7 @@ require_once __DIR__ . '/../General/householdMemberVerification.php';
 
 $isCli = PHP_SAPI === 'cli';
 if (!$isCli) {
-    requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+    requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
     header('Content-Type: application/json; charset=utf-8');
 }
 

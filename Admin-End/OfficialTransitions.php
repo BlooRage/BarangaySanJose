@@ -2,11 +2,12 @@
 require_once "../PhpFiles/General/connection.php";
 require_once "../PhpFiles/General/adminModulePermissions.php";
 require_once "../PhpFiles/General/audit.php";
-require_once "../PhpFiles/General/officialTransitionSettings.php";
+require_once "../PhpFiles/General/officialGovernance.php";
 require_once "includes/admin_guard.php";
 
 requireRoleSession(['SuperAdmin'], false);
 amp_ensure_permission_storage($conn);
+ogw_ensure_schema($conn);
 
 if (!function_exists('ot_filter_catalog_for_regular_officials')) {
     function ot_filter_catalog_for_regular_officials(array $catalog): array
@@ -80,22 +81,11 @@ if (!function_exists('ot_ensure_transition_schema')) {
         }
         $done = true;
 
-        $hasTransitionsTable = $conn->query("SHOW TABLES LIKE 'officialtransitionstbl'");
+        $hasTransitionsTable = $conn->query("SHOW TABLES LIKE 'officialgovernancetransitiontbl'");
         if (!($hasTransitionsTable instanceof mysqli_result) || $hasTransitionsTable->num_rows === 0) {
             return;
         }
 
-        $columnDefinitions = [
-            'council_id' => "ALTER TABLE officialtransitionstbl ADD COLUMN council_id INT DEFAULT NULL AFTER transition_id",
-            'proclamation_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN proclamation_date DATE DEFAULT NULL AFTER batch_label",
-            'next_election_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN next_election_date DATE DEFAULT NULL AFTER proclamation_date",
-        ];
-
-        foreach ($columnDefinitions as $column => $sql) {
-            if (!ot_transition_column_exists($conn, 'officialtransitionstbl', $column)) {
-                $conn->query($sql);
-            }
-        }
     }
 }
 
@@ -183,98 +173,29 @@ $transitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
 if ($transitionTool === '' || in_array($transitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
     $transitionTool = 'current_term';
 }
-if (!in_array($transitionTool, ['current_term', 'create_new_term', 'settings'], true)) {
+if (!in_array($transitionTool, ['current_term', 'create_new_term'], true)) {
     $transitionTool = 'current_term';
 }
 
 $autoOpenNewTermModal = false;
-$transitionPageDescription = 'View the current official term, its assigned seats, and the access handovers already in progress.';
+$transitionPageDescription = 'Handle seat assignment, turnover, replacement, and demotion while keeping incoming access pending for Access Control review.';
 if ($transitionTool === 'create_new_term') {
-    $transitionPageDescription = 'Create the next official term, generate elected seat handovers, and re-encode the incoming elected winners and appointed officials.';
-} elseif ($transitionTool === 'settings') {
-    $transitionPageDescription = 'Adjust the reminder and access-revocation timing used by the Official Transition module.';
+    $transitionPageDescription = 'Create a governance cycle, open the elected seats for reassignment, and prepare the incoming office holders before access is granted.';
 }
 $transitionQueueTitle = $transitionTool === 'create_new_term'
-    ? 'New Term Re-encoding Queue'
-    : 'Current Term Handover Queue';
+    ? 'Governance Cycle Queue'
+    : 'Seat Assignment Queue';
 $transitionQueueDescription = $transitionTool === 'create_new_term'
-    ? 'After creating the term, use this queue to encode elected winners and any appointed officials that still need access setup.'
-    : 'Monitor the outgoing and incoming access handovers that belong to the currently active term.';
+    ? 'After creating the governance cycle, use this queue to encode elected winners and any replacement or appointed seat holders before access review.'
+    : 'Monitor the outgoing and incoming seat changes that belong to the currently active governance cycle.';
 $scheduleSectionTitle = $transitionTool === 'create_new_term'
-    ? 'Term Schedule Templates'
-    : 'Official Term-End Schedules';
+    ? 'Governance Cycle Templates'
+    : 'Governance Cycle Records';
 
 $officialTransitionFlash = null;
 if (!empty($_SESSION['official_transition_flash']) && is_array($_SESSION['official_transition_flash'])) {
     $officialTransitionFlash = $_SESSION['official_transition_flash'];
     unset($_SESSION['official_transition_flash']);
-}
-
-$transitionSettingDefinitions = ot_transition_settings_definitions();
-$transitionSettings = ot_transition_settings_load($conn);
-$transitionSettingLabels = [
-    'it_admin' => ot_transition_settings_days_label((int)$transitionSettings['it_admin_update_notice_days'], 'IT Reminder'),
-    'outgoing' => ot_transition_settings_days_label((int)$transitionSettings['outgoing_notice_days'], 'Outgoing Notice'),
-    'revoke' => ot_transition_settings_days_label((int)$transitionSettings['access_revoke_days'], 'Access Revocation'),
-    'post' => ot_transition_settings_days_label((int)$transitionSettings['post_election_followup_days'], 'Post-Election Follow-up'),
-];
-
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_notification_settings') {
-    $actorUserId = (string)($_SESSION['user_id'] ?? '');
-
-    try {
-        $settingsToSave = [];
-        foreach ($transitionSettingDefinitions as $key => $definition) {
-            $rawValue = trim((string)($_POST[$key] ?? ''));
-            if ($rawValue === '' || filter_var($rawValue, FILTER_VALIDATE_INT) === false) {
-                throw new RuntimeException('All notification timing values must be whole numbers.');
-            }
-
-            $value = (int)$rawValue;
-            $min = (int)($definition['min'] ?? 0);
-            $max = (int)($definition['max'] ?? 365);
-            if ($value < $min || $value > $max) {
-                throw new RuntimeException(sprintf('%s must be between %d and %d days.', (string)($definition['label'] ?? $key), $min, $max));
-            }
-            $settingsToSave[$key] = $value;
-        }
-
-        if ($settingsToSave['it_admin_update_notice_days'] < $settingsToSave['outgoing_notice_days']) {
-            throw new RuntimeException('The IT administrator reminder should happen on or before the outgoing notice window.');
-        }
-        if ($settingsToSave['outgoing_notice_days'] < $settingsToSave['access_revoke_days']) {
-            throw new RuntimeException('Outgoing notice must be scheduled on or before the privilege revocation day.');
-        }
-
-        ot_transition_settings_upsert($conn, $settingsToSave, $actorUserId);
-
-        insertUnifiedAuditLog(
-            $conn,
-            $actorUserId,
-            (string)($_SESSION['role'] ?? 'SuperAdmin'),
-            'OfficialTransitions',
-            'settings',
-            'notification_timing',
-            'save_notification_settings',
-            'values',
-            null,
-            json_encode($settingsToSave, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'Updated official transition notification timing settings.'
-        );
-
-        $_SESSION['official_transition_flash'] = [
-            'type' => 'success',
-            'message' => 'Official transition settings updated.',
-        ];
-    } catch (Throwable $e) {
-        $_SESSION['official_transition_flash'] = [
-            'type' => 'danger',
-            'message' => $e->getMessage(),
-        ];
-    }
-
-    header('Location: OfficialTransitions.php?tool=settings');
-    exit;
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST['action'] ?? ''), ['save_kagawad_permissions', 'save_official_permissions'], true)) {
@@ -474,32 +395,24 @@ if ($aoRes instanceof mysqli_result) {
     $aoRes->close();
 }
 
-$hasTransTbl = $conn->query("SHOW TABLES LIKE 'officialtransitionstbl'")->num_rows > 0;
+$hasTransTbl = $conn->query("SHOW TABLES LIKE 'officialgovernancetransitiontbl'")->num_rows > 0;
 
-// ── Election schedules ────────────────────────────────────────────────────────
+// ── Batch records ─────────────────────────────────────────────────────────────
 $electionSchedules = [];
 if ($hasTransTbl) {
-    $ignoredPositionSql = ot_ignored_transition_seat_sql($conn, 'position');
+    $ignoredPositionSql = ot_ignored_transition_seat_sql($conn, 'seat_name');
     $elRes = $conn->query("
         SELECT
                batch_label,
-               COALESCE(MAX(proclamation_date), MAX(effective_date)) AS proclamation_date,
-               COALESCE(MAX(next_election_date), MAX(election_date)) AS next_election_date,
-               MAX(notify_3mo_sent)       AS n3,
-               MAX(notify_1mo_sent)       AS n1,
-               MAX(deactivated_7d_before) AS n7,
-               MAX(notify_post_sent)      AS np,
-               COUNT(*)                   AS position_count,
-               SUM(status='Completed')    AS completed_count
-        FROM officialtransitionstbl
-        WHERE (next_election_date IS NOT NULL OR election_date IS NOT NULL)
-          AND batch_label IS NOT NULL
+               MAX(effective_date) AS effective_date,
+               COUNT(*) AS position_count,
+               SUM(status='Completed') AS completed_count
+        FROM officialgovernancetransitiontbl
+        WHERE batch_label IS NOT NULL
+          AND batch_label <> ''
           AND {$ignoredPositionSql}
-        GROUP BY
-            batch_label,
-            COALESCE(next_election_date, election_date),
-            COALESCE(proclamation_date, effective_date)
-        ORDER BY COALESCE(next_election_date, election_date) DESC
+        GROUP BY batch_label
+        ORDER BY MAX(effective_date) DESC, batch_label DESC
     ");
     if ($elRes instanceof mysqli_result) {
         while ($r = $elRes->fetch_assoc()) {
@@ -509,23 +422,7 @@ if ($hasTransTbl) {
     }
 }
 
-$currentTermEditableSchedule = null;
-$closestUpcomingTs = null;
-$todayTs = strtotime(date('Y-m-d'));
-foreach ($electionSchedules as $schedule) {
-    $scheduleDate = trim((string)($schedule['next_election_date'] ?? ''));
-    $scheduleTs = $scheduleDate !== '' ? strtotime($scheduleDate) : false;
-    if ($scheduleTs === false || $scheduleTs < $todayTs) {
-        continue;
-    }
-    if ($closestUpcomingTs === null || $scheduleTs < $closestUpcomingTs) {
-        $closestUpcomingTs = $scheduleTs;
-        $currentTermEditableSchedule = $schedule;
-    }
-}
-if ($currentTermEditableSchedule === null && !empty($electionSchedules)) {
-    $currentTermEditableSchedule = $electionSchedules[0];
-}
+$currentTermEditableSchedule = $electionSchedules[0] ?? null;
 $newTermEditableSchedule = $electionSchedules[0] ?? null;
 $termEditSchedule = $transitionTool === 'create_new_term'
     ? $newTermEditableSchedule
@@ -671,7 +568,7 @@ if ($hasCouncilTbl) {
   <meta charset="UTF-8" />
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Official Transition</title>
+  <title>Official Transition and Seat Assignment</title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -679,12 +576,6 @@ if ($hasCouncilTbl) {
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
   <style>
     #main-display { min-width: 0; }
-
-    /* ── Election schedule timeline pills ── */
-    .notif-pill { font-size: .72rem; white-space: nowrap; }
-    .notif-pill.sent    { background:#d1e7dd; color:#0f5132; }
-    .notif-pill.pending { background:#fff3cd; color:#664d03; }
-    .notif-pill.na      { background:#e9ecef; color:#6c757d; }
 
     /* ── Transition table ── */
     .ot-table-shell { overflow-x: auto; }
@@ -891,7 +782,7 @@ if ($hasCouncilTbl) {
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
       <div>
         <h2 style="font-family:'Charis SIL Bold';color:#DE710C;">
-          Official Transition
+          Official Governance Transition
         </h2>
         <p class="text-muted mb-0" style="font-size:.9rem;">
           <?= htmlspecialchars($transitionPageDescription, ENT_QUOTES, 'UTF-8') ?>
@@ -902,15 +793,15 @@ if ($hasCouncilTbl) {
         <button class="btn btn-outline-secondary btn-sm" id="btnOtQuickActions"
                 data-bs-toggle="modal" data-bs-target="#modalQuickActions"
                 <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
-          <i class="fas fa-bolt me-1"></i> Access Actions
+          <i class="fas fa-bolt me-1"></i> Transition Actions
         </button>
         <a class="btn btn-outline-primary btn-sm" href="OfficialTransitions.php?tool=create_new_term">
-          <i class="fas fa-layer-group me-1"></i> Create New Term
+          <i class="fas fa-layer-group me-1"></i> Create Governance Cycle
         </a>
         <button class="btn btn-primary btn-sm" id="btnNewTransition"
                 data-bs-toggle="modal" data-bs-target="#modalNewTransition"
                 <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
-          <i class="fas fa-plus me-1"></i> New Official Handover
+          <i class="fas fa-plus me-1"></i> New Seat Assignment
         </button>
       </div>
       <?php endif; ?>
@@ -924,90 +815,8 @@ if ($hasCouncilTbl) {
     <?php endif; ?>
     <?php if ($transitionTool === 'current_term' && !$hasConfiguredTermSchedule): ?>
       <div class="alert alert-warning mb-4">
-        No term is configured yet. Current officials are treated as inactive until a term is created.
+        No governance cycle is configured yet. Create the initial cycle first so turnover and seat assignment tracking can begin.
       </div>
-    <?php endif; ?>
-
-    <?php if ($transitionTool === 'settings'): ?>
-    <div class="row g-4 mb-4">
-      <div class="col-md-6 col-xl-3">
-        <div class="ot-overview-card h-100">
-          <div class="ot-overview-label">IT Reminder</div>
-          <div class="ot-overview-value"><?= (int)$transitionSettings['it_admin_update_notice_days'] ?></div>
-          <div class="ot-overview-note">Days before election to remind the IT Administrator to review the term schedule.</div>
-        </div>
-      </div>
-      <div class="col-md-6 col-xl-3">
-        <div class="ot-overview-card h-100">
-          <div class="ot-overview-label">Outgoing Notice</div>
-          <div class="ot-overview-value"><?= (int)$transitionSettings['outgoing_notice_days'] ?></div>
-          <div class="ot-overview-note">Days before election to notify outgoing officials that their access will be revoked.</div>
-        </div>
-      </div>
-      <div class="col-md-6 col-xl-3">
-        <div class="ot-overview-card h-100">
-          <div class="ot-overview-label">Access Revocation</div>
-          <div class="ot-overview-value"><?= (int)$transitionSettings['access_revoke_days'] ?></div>
-          <div class="ot-overview-note">Days before election when outgoing official privileges are revoked automatically.</div>
-        </div>
-      </div>
-      <div class="col-md-6 col-xl-3">
-        <div class="ot-overview-card h-100">
-          <div class="ot-overview-label">Post-Election Follow-up</div>
-          <div class="ot-overview-value"><?= (int)$transitionSettings['post_election_followup_days'] ?></div>
-          <div class="ot-overview-note">Days after election to remind the IT Administrator to review unresolved transitions.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="bg-white rounded-3 shadow-sm border mb-4">
-      <div class="p-3 border-bottom">
-        <div class="fw-semibold">Notification Timing Settings</div>
-        <div class="small text-muted">Set how early reminders are sent before the election date and when outgoing access is revoked.</div>
-      </div>
-      <form method="post" class="p-3">
-        <input type="hidden" name="action" value="save_notification_settings">
-        <div class="row g-4">
-          <?php foreach ($transitionSettingDefinitions as $settingKey => $settingDefinition): ?>
-            <?php
-              $settingValue = (int)($transitionSettings[$settingKey] ?? $settingDefinition['default'] ?? 0);
-              $settingMin = (int)($settingDefinition['min'] ?? 0);
-              $settingMax = (int)($settingDefinition['max'] ?? 365);
-            ?>
-            <div class="col-12 col-lg-6">
-              <label class="form-label fw-semibold" for="<?= htmlspecialchars($settingKey, ENT_QUOTES, 'UTF-8') ?>">
-                <?= htmlspecialchars((string)($settingDefinition['label'] ?? $settingKey), ENT_QUOTES, 'UTF-8') ?>
-              </label>
-              <div class="input-group">
-                <input
-                  type="number"
-                  class="form-control"
-                  id="<?= htmlspecialchars($settingKey, ENT_QUOTES, 'UTF-8') ?>"
-                  name="<?= htmlspecialchars($settingKey, ENT_QUOTES, 'UTF-8') ?>"
-                  min="<?= $settingMin ?>"
-                  max="<?= $settingMax ?>"
-                  step="1"
-                  value="<?= $settingValue ?>"
-                  required
-                >
-                <span class="input-group-text">days</span>
-              </div>
-              <div class="form-text">
-                <?= htmlspecialchars((string)($settingDefinition['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-        <div class="alert alert-info small mt-4 mb-0">
-          Recommended order: IT reminder should be the earliest window, outgoing notice should come before access revocation, and access revocation must stay at 1 day or more before election day.
-        </div>
-        <div class="d-flex justify-content-end mt-4">
-          <button type="submit" class="btn btn-primary">
-            <i class="fas fa-save me-1"></i> Save Settings
-          </button>
-        </div>
-      </form>
-    </div>
     <?php endif; ?>
 
     <?php if ($transitionTool === 'current_term'): ?>
@@ -1048,74 +857,55 @@ if ($hasCouncilTbl) {
         </div>
         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAddElection"
                 <?= $termEditSchedule === null ? 'disabled' : '' ?>>
-          <i class="fas fa-edit me-1"></i> Edit Term Details
+          <i class="fas fa-pen-to-square me-1"></i> Edit Cycle Label
         </button>
       </div>
       <div class="p-3">
         <?php if (empty($electionSchedules)): ?>
-          <p class="text-muted mb-0 small text-center py-2">No term transition dates scheduled.</p>
+          <p class="text-muted mb-0 small text-center py-2">No governance cycle records available yet.</p>
         <?php else: ?>
-          <?php
-            $notifPillClass = static function (int $sent): string {
-                return $sent ? 'sent' : 'pending';
-            };
-            $notifPillLabel = static function (int $sent, bool $isPast, string $label): string {
-                return $sent ? 'Sent' : ($isPast ? 'Missed' : $label);
-            };
-          ?>
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0" id="electionScheduleTable">
               <thead class="table-light">
                 <tr>
                   <th>Term / Label</th>
-                  <th>Proclamation Date</th>
-                  <th>Next Election Date</th>
+                  <th>Effective Date</th>
                   <th>Positions</th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['it_admin'], ENT_QUOTES, 'UTF-8') ?></th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['outgoing'], ENT_QUOTES, 'UTF-8') ?></th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['revoke'], ENT_QUOTES, 'UTF-8') ?></th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['post'], ENT_QUOTES, 'UTF-8') ?></th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 <?php foreach ($electionSchedules as $es): ?>
                   <?php
-                    $proclamationDate = (string)($es['proclamation_date'] ?? '');
-                    $nextElectionDate = (string)($es['next_election_date'] ?? '');
+                    $effectiveDate = (string)($es['effective_date'] ?? '');
                     $label = htmlspecialchars($es['batch_label'] ?? '', ENT_QUOTES, 'UTF-8');
-                    $daysUntil = $nextElectionDate !== '' ? (int)round((strtotime($nextElectionDate) - time()) / 86400) : 0;
-                    $isPast = $daysUntil < 0;
-                    $proclamationFmt = $proclamationDate !== '' ? date('M d, Y', strtotime($proclamationDate)) : '—';
-                    $nextElectionFmt = $nextElectionDate !== '' ? date('M d, Y', strtotime($nextElectionDate)) : '—';
+                    $effectiveFmt = $effectiveDate !== '' ? date('M d, Y', strtotime($effectiveDate)) : '—';
+                    $effectiveTs = $effectiveDate !== '' ? strtotime($effectiveDate) : false;
+                    $daysUntil = $effectiveTs ? (int)round(($effectiveTs - time()) / 86400) : 0;
+                    $isPast = $effectiveTs ? $daysUntil < 0 : false;
                   ?>
                   <tr>
                     <td class="fw-semibold"><?= $label ?></td>
-                    <td><?= htmlspecialchars($proclamationFmt, ENT_QUOTES, 'UTF-8') ?></td>
                     <td>
-                      <?= htmlspecialchars($nextElectionFmt, ENT_QUOTES, 'UTF-8') ?>
-                      <?php if ($nextElectionDate !== '' && $daysUntil > 0): ?>
+                      <?= htmlspecialchars($effectiveFmt, ENT_QUOTES, 'UTF-8') ?>
+                      <?php if ($effectiveTs && $daysUntil > 0): ?>
                         <span class="badge bg-secondary ms-1"><?= $daysUntil ?>d away</span>
-                      <?php elseif ($nextElectionDate !== '' && $daysUntil === 0): ?>
+                      <?php elseif ($effectiveTs && $daysUntil === 0): ?>
                         <span class="badge bg-warning text-dark ms-1">Today</span>
-                      <?php elseif ($nextElectionDate !== ''): ?>
+                      <?php elseif ($effectiveTs): ?>
                         <span class="badge bg-light text-muted ms-1"><?= abs($daysUntil) ?>d ago</span>
                       <?php endif; ?>
                     </td>
                     <td><?= (int)$es['position_count'] ?> pos / <?= (int)$es['completed_count'] ?> done</td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n3']) ?>"><?= $notifPillLabel((int)$es['n3'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n1']) ?>"><?= $notifPillLabel((int)$es['n1'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n7']) ?>"><?= $notifPillLabel((int)$es['n7'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['np']) ?>"><?= $notifPillLabel((int)$es['np'], $daysUntil > 0, 'Pending') ?></span></td>
                     <td>
                       <div class="d-flex gap-1 justify-content-end">
-                      <button class="btn btn-xs btn-outline-secondary py-0 px-2"
-                              onclick="otResendNotif(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
-                              title="Manually trigger pending notifications">
-                        <i class="fas fa-redo fa-xs"></i>
+                      <button class="btn btn-xs btn-outline-danger py-0 px-2"
+                              onclick="otDemoteBatch(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>)"
+                              title="Demote all outgoing officials in this governance cycle">
+                        <i class="fas fa-user-minus fa-xs"></i>
                       </button>
                       <button class="btn btn-xs btn-outline-danger py-0 px-2"
-                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
+                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>)"
                               title="Delete this schedule and its linked transitions">
                         <i class="fas fa-trash fa-xs"></i>
                       </button>
@@ -1134,7 +924,7 @@ if ($hasCouncilTbl) {
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-bottom">
         <div>
           <div class="fw-semibold">Current Term Officials</div>
-          <div class="small text-muted">View the official currently assigned to each active council seat.</div>
+          <div class="small text-muted">View the official currently assigned to each active council seat and the seat details that will be reused during transition.</div>
         </div>
       </div>
       <div class="p-3">
@@ -1151,6 +941,7 @@ if ($hasCouncilTbl) {
                   <th>Access Profile</th>
                   <th>Department</th>
                   <th>Term Dates</th>
+                  <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1186,6 +977,19 @@ if ($hasCouncilTbl) {
                       <div><?= htmlspecialchars($termStartLabel, ENT_QUOTES, 'UTF-8') ?></div>
                       <div class="small text-muted">to <?= htmlspecialchars($termEndLabel, ENT_QUOTES, 'UTF-8') ?></div>
                     </td>
+                    <td class="text-end">
+                      <?php if (!empty($seat['current_official_id']) && $holderName !== ''): ?>
+                        <button
+                          type="button"
+                          class="btn btn-xs btn-outline-danger py-0 px-2"
+                          onclick="otDemoteOfficial(<?= htmlspecialchars(json_encode((string)$seat['current_official_id']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($holderName), ENT_QUOTES, 'UTF-8') ?>)"
+                          title="Demote this official and vacate the seat">
+                          <i class="fas fa-user-minus me-1"></i> Demote
+                        </button>
+                      <?php else: ?>
+                        <span class="text-muted small">—</span>
+                      <?php endif; ?>
+                    </td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -1200,13 +1004,13 @@ if ($hasCouncilTbl) {
         <div class="bg-white rounded-3 shadow-sm border h-100">
           <div class="p-3 border-bottom d-flex align-items-start justify-content-between flex-wrap gap-3">
             <div>
-              <div class="fw-semibold">Create New Term Workflow</div>
-              <div class="small text-muted">Use this page to prepare the next term and encode the incoming officials who will receive access.</div>
+              <div class="fw-semibold">Create Governance Cycle Workflow</div>
+              <div class="small text-muted">Use this page to prepare the next governance cycle and encode the incoming officials who will receive access.</div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-primary btn-sm" id="btnNewBatch"
                       data-bs-toggle="modal" data-bs-target="#modalNewBatch">
-                <i class="fas fa-layer-group me-1"></i> Create New Term
+                <i class="fas fa-layer-group me-1"></i> Create Governance Cycle
               </button>
               <button class="btn btn-outline-primary btn-sm" id="btnNewTransition"
                       data-bs-toggle="modal" data-bs-target="#modalNewTransition">
@@ -1219,8 +1023,8 @@ if ($hasCouncilTbl) {
               <div class="ot-workflow-step">
                 <span class="ot-workflow-step-index">1</span>
                 <div>
-                  <div class="fw-semibold">Create the term record</div>
-                  <div class="small text-muted">Set the term label, proclamation date, and next election date for the incoming term.</div>
+                  <div class="fw-semibold">Create the governance cycle record</div>
+                  <div class="small text-muted">Set the cycle label and generate the elected seat turnover records.</div>
                 </div>
               </div>
               <div class="ot-workflow-step">
@@ -1234,7 +1038,7 @@ if ($hasCouncilTbl) {
                 <span class="ot-workflow-step-index">3</span>
                 <div>
                   <div class="fw-semibold">Encode appointed officials</div>
-                  <div class="small text-muted">Use <span class="fw-semibold">Encode Appointed Official</span> for appointment and reappointment seats that are not auto-generated by the new term record.</div>
+                  <div class="small text-muted">Use <span class="fw-semibold">Encode Appointed Official</span> for appointment and reappointment seats that are not auto-generated by the governance cycle record.</div>
                 </div>
               </div>
             </div>
@@ -1244,7 +1048,7 @@ if ($hasCouncilTbl) {
       <div class="col-xl-5">
         <div class="bg-white rounded-3 shadow-sm border h-100">
           <div class="p-3 border-bottom">
-            <div class="fw-semibold">New Term Snapshot</div>
+            <div class="fw-semibold">Governance Cycle Snapshot</div>
             <div class="small text-muted">What gets created automatically and what still needs manual encoding.</div>
           </div>
           <div class="p-3">
@@ -1252,7 +1056,7 @@ if ($hasCouncilTbl) {
               <div class="ot-overview-card">
                 <div class="ot-overview-label">Auto-generated Seats</div>
                 <div class="ot-overview-value"><?= (int)count($batchPreviewSeats) ?></div>
-                <div class="ot-overview-note">Elected seats that will receive transition rows when the term is created.</div>
+                <div class="ot-overview-note">Elected seats that will receive transition rows when the governance cycle is created.</div>
               </div>
               <div class="ot-overview-card">
                 <div class="ot-overview-label">Manual Seats</div>
@@ -1262,7 +1066,7 @@ if ($hasCouncilTbl) {
             </div>
             <div class="alert alert-info small mt-3 mb-0">
               <i class="fas fa-info-circle me-1"></i>
-              Create New Term handles the elected winners queue. Appointed officials still go through the handover form using <span class="fw-semibold">Appointment</span> or <span class="fw-semibold">Reappointment</span>.
+              Governance cycle creation handles the elected winners queue. Appointed officials still go through the handover form using <span class="fw-semibold">Appointment</span> or <span class="fw-semibold">Reappointment</span>.
             </div>
           </div>
         </div>
@@ -1362,74 +1166,55 @@ if ($hasCouncilTbl) {
           <span class="fw-semibold"><?= htmlspecialchars($scheduleSectionTitle, ENT_QUOTES, 'UTF-8') ?></span>
         </div>
         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalNewBatch">
-          <i class="fas fa-plus me-1"></i> Add Term Details
+          <i class="fas fa-plus me-1"></i> Add Governance Cycle
         </button>
       </div>
       <div class="p-3">
         <?php if (empty($electionSchedules)): ?>
-          <p class="text-muted mb-0 small text-center py-2">No term transition dates scheduled.</p>
+          <p class="text-muted mb-0 small text-center py-2">No governance cycle records available yet.</p>
         <?php else: ?>
-          <?php
-            $notifPillClass = static function (int $sent): string {
-                return $sent ? 'sent' : 'pending';
-            };
-            $notifPillLabel = static function (int $sent, bool $isPast, string $label): string {
-                return $sent ? 'Sent' : ($isPast ? 'Missed' : $label);
-            };
-          ?>
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0" id="electionScheduleTable">
               <thead class="table-light">
                 <tr>
                   <th>Term / Label</th>
-                  <th>Proclamation Date</th>
-                  <th>Next Election Date</th>
+                  <th>Effective Date</th>
                   <th>Positions</th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['it_admin'], ENT_QUOTES, 'UTF-8') ?></th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['outgoing'], ENT_QUOTES, 'UTF-8') ?></th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['revoke'], ENT_QUOTES, 'UTF-8') ?></th>
-                  <th><?= htmlspecialchars($transitionSettingLabels['post'], ENT_QUOTES, 'UTF-8') ?></th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 <?php foreach ($electionSchedules as $es): ?>
                   <?php
-                    $proclamationDate = (string)($es['proclamation_date'] ?? '');
-                    $nextElectionDate = (string)($es['next_election_date'] ?? '');
+                    $effectiveDate = (string)($es['effective_date'] ?? '');
                     $label = htmlspecialchars($es['batch_label'] ?? '', ENT_QUOTES, 'UTF-8');
-                    $daysUntil = $nextElectionDate !== '' ? (int)round((strtotime($nextElectionDate) - time()) / 86400) : 0;
-                    $isPast = $daysUntil < 0;
-                    $proclamationFmt = $proclamationDate !== '' ? date('M d, Y', strtotime($proclamationDate)) : '—';
-                    $nextElectionFmt = $nextElectionDate !== '' ? date('M d, Y', strtotime($nextElectionDate)) : '—';
+                    $effectiveFmt = $effectiveDate !== '' ? date('M d, Y', strtotime($effectiveDate)) : '—';
+                    $effectiveTs = $effectiveDate !== '' ? strtotime($effectiveDate) : false;
+                    $daysUntil = $effectiveTs ? (int)round(($effectiveTs - time()) / 86400) : 0;
+                    $isPast = $effectiveTs ? $daysUntil < 0 : false;
                   ?>
                   <tr>
                     <td class="fw-semibold"><?= $label ?></td>
-                    <td><?= htmlspecialchars($proclamationFmt, ENT_QUOTES, 'UTF-8') ?></td>
                     <td>
-                      <?= htmlspecialchars($nextElectionFmt, ENT_QUOTES, 'UTF-8') ?>
-                      <?php if ($nextElectionDate !== '' && $daysUntil > 0): ?>
+                      <?= htmlspecialchars($effectiveFmt, ENT_QUOTES, 'UTF-8') ?>
+                      <?php if ($effectiveTs && $daysUntil > 0): ?>
                         <span class="badge bg-secondary ms-1"><?= $daysUntil ?>d away</span>
-                      <?php elseif ($nextElectionDate !== '' && $daysUntil === 0): ?>
+                      <?php elseif ($effectiveTs && $daysUntil === 0): ?>
                         <span class="badge bg-warning text-dark ms-1">Today</span>
-                      <?php elseif ($nextElectionDate !== ''): ?>
+                      <?php elseif ($effectiveTs): ?>
                         <span class="badge bg-light text-muted ms-1"><?= abs($daysUntil) ?>d ago</span>
                       <?php endif; ?>
                     </td>
                     <td><?= (int)$es['position_count'] ?> pos / <?= (int)$es['completed_count'] ?> done</td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n3']) ?>"><?= $notifPillLabel((int)$es['n3'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n1']) ?>"><?= $notifPillLabel((int)$es['n1'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n7']) ?>"><?= $notifPillLabel((int)$es['n7'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['np']) ?>"><?= $notifPillLabel((int)$es['np'], $daysUntil > 0, 'Pending') ?></span></td>
                     <td>
                       <div class="d-flex gap-1 justify-content-end">
-                      <button class="btn btn-xs btn-outline-secondary py-0 px-2"
-                              onclick="otResendNotif(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
-                              title="Manually trigger pending notifications">
-                        <i class="fas fa-redo fa-xs"></i>
+                      <button class="btn btn-xs btn-outline-danger py-0 px-2"
+                              onclick="otDemoteBatch(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>)"
+                              title="Demote all outgoing officials in this governance cycle">
+                        <i class="fas fa-user-minus fa-xs"></i>
                       </button>
                       <button class="btn btn-xs btn-outline-danger py-0 px-2"
-                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
+                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>)"
                               title="Delete this schedule and its linked transitions">
                         <i class="fas fa-trash fa-xs"></i>
                       </button>
@@ -1489,7 +1274,7 @@ if ($hasCouncilTbl) {
               <th>Type</th>
               <th>Position</th>
               <th>Outgoing Official</th>
-              <th>Term / Election</th>
+              <th>Cycle</th>
               <th>Effective Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -1591,21 +1376,11 @@ if ($hasCouncilTbl) {
               <input type="date" class="form-control" name="effective_date" id="ntEffectiveDate">
             </div>
 
-            <!-- Batch Label (election types only) -->
+            <!-- Governance Cycle Label (turnover types only) -->
             <div class="col-12 col-md-6" id="ntBatchLabelWrap" style="display:none;">
-              <label class="form-label fw-semibold">Batch Label</label>
+              <label class="form-label fw-semibold">Governance Cycle Label</label>
               <input type="text" class="form-control" name="batch_label" id="ntBatchLabel"
-                     placeholder="e.g. 2025 Election Batch">
-            </div>
-            <!-- Proclamation Date (election types only) -->
-            <div class="col-12 col-md-6" id="ntProclamationDateWrap" style="display:none;">
-              <label class="form-label fw-semibold">Proclamation Date</label>
-              <input type="date" class="form-control" name="proclamation_date" id="ntProclamationDate">
-            </div>
-            <!-- Next Election Date (election types only) -->
-            <div class="col-12 col-md-6" id="ntNextElectionDateWrap" style="display:none;">
-              <label class="form-label fw-semibold">Next Election Date</label>
-              <input type="date" class="form-control" name="next_election_date" id="ntNextElectionDate">
+                     placeholder="e.g. 2026 Governance Cycle">
             </div>
 
             <!-- Reason -->
@@ -1629,45 +1404,41 @@ if ($hasCouncilTbl) {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL: Create New Term
+     MODAL: Create Governance Cycle
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalNewBatch" tabindex="-1" aria-labelledby="modalNewBatchLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalNewBatchLabel">
-          <i class="fas fa-layer-group me-2 text-primary"></i> Create New Term
+          <i class="fas fa-layer-group me-2 text-primary"></i> Create Governance Cycle
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form id="formNewBatch" novalidate>
         <div class="modal-body">
           <div class="row g-3 mb-4">
-            <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">Term Label <span class="text-danger">*</span></label>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Governance Cycle Label <span class="text-danger">*</span></label>
               <input type="text" class="form-control" name="batch_label" id="nbLabel" required
-                     placeholder="e.g. 2025-2028 Barangay Term">
+                     placeholder="e.g. 2026 Governance Cycle">
             </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">Proclamation Date <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="proclamation_date" id="nbProclamationDate" required>
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">Next Election Date <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="next_election_date" id="nbNextElectionDate" required>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Effective Date</label>
+              <input type="date" class="form-control" name="effective_date" id="nbEffectiveDate">
             </div>
           </div>
 
           <p class="fw-semibold mb-2">Included council seats:</p>
           <div class="alert alert-info py-2 small mb-3">
             <i class="fas fa-info-circle me-1"></i>
-            The system will automatically include every elected seat in the active council structure. Outgoing officials are detected per seat automatically for the new term.
+            The system will automatically include every elected seat in the active council structure. Outgoing officials are detected per seat automatically for the governance cycle.
           </div>
           <?php if (empty($batchPreviewSeats)): ?>
             <div class="alert alert-warning small">No council seats found. Run the migration first.</div>
           <?php else: ?>
           <div id="nbAutoSeatPreviewEmpty" class="alert alert-light border small mb-0">
-            The elected seats for this batch are shown below.
+            The elected seats for this governance cycle are shown below.
           </div>
           <div class="table-responsive" id="nbAutoSeatPreviewWrap">
             <table class="table table-sm align-middle">
@@ -1691,7 +1462,7 @@ if ($hasCouncilTbl) {
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnSubmitNewBatch">
-            <i class="fas fa-layer-group me-1"></i> Create Term
+            <i class="fas fa-layer-group me-1"></i> Create Governance Cycle
           </button>
         </div>
       </form>
@@ -1700,48 +1471,33 @@ if ($hasCouncilTbl) {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL: Add Election Date (standalone, no batch)
+     MODAL: Edit Governance Cycle Label
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalAddElection" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-calendar-plus me-2 text-primary"></i> Edit Term Details</h5>
+        <h5 class="modal-title"><i class="fas fa-pen-to-square me-2 text-primary"></i> Edit Governance Cycle Label</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form id="formAddElection" novalidate>
         <div class="modal-body">
           <input type="hidden" name="original_batch_label" id="aeOriginalBatchLabel">
-          <input type="hidden" name="proclamation_date" id="aeProclamationDateHidden">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Term Label <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="aeBatchLabel" disabled
-                   placeholder="e.g. 2025-2028 Barangay Term">
-            <div class="form-text text-muted">This is locked after the term is created.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Proclamation Date <span class="text-danger">*</span></label>
-            <input type="date" class="form-control" id="aeProclamationDate" disabled>
-            <div class="form-text text-muted">This stays fixed to preserve the original term record.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Next Election Date <span class="text-danger">*</span></label>
-            <input type="date" class="form-control" name="next_election_date" id="aeNextElectionDate" required>
-            <div class="form-text text-muted" id="aeNextElectionHelp">You can adjust the month and day, but the election year stays locked.</div>
+            <label class="form-label fw-semibold">Governance Cycle Label <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="batch_label" id="aeBatchLabel" required
+                   placeholder="e.g. 2026 Governance Cycle">
+            <div class="form-text text-muted">Update the label used across the governance cycle and turnover records.</div>
           </div>
           <div class="alert alert-info py-2 small d-none" id="aeNoEditableScheduleAlert">
             <i class="fas fa-info-circle me-1"></i>
-            Create a term first before editing its details.
-          </div>
-          <div class="alert alert-warning py-2 small">
-            <i class="fas fa-exclamation-triangle me-1"></i>
-            If you are updating an existing term schedule, all unprocessed notification flags for that term will be reset.
+            Create a governance cycle first before editing its label.
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnSubmitEditTermDetails">
-            <i class="fas fa-save me-1"></i> Save Term Details
+            <i class="fas fa-save me-1"></i> Save Label
           </button>
         </div>
       </form>

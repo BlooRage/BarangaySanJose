@@ -16,7 +16,8 @@ function archiveUserNormalizeRole(string $role): string
     $k = strtolower(trim($role));
     if ($k === 'officials' || $k === 'official') return 'Official';
     if ($k === 'personnels' || $k === 'personnel') return 'Personnel';
-    if ($k === 'admin' || $k === 'employee') return 'Official';
+    if ($k === 'admin') return 'Official';
+    if ($k === 'employee') return 'Personnel';
     if ($k === 'superadmin') return 'SuperAdmin';
     if ($k === 'resident') return 'Resident';
     return trim($role) !== '' ? trim($role) : 'Unknown';

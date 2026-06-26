@@ -6,7 +6,7 @@ require_once __DIR__ . "/announcementDelivery.php";
 require_once __DIR__ . "/announcementAudience.php";
 require_once __DIR__ . "/newsContent.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header("Location: " . appUrl('/Admin-End/Contents/Contents.php'));
@@ -105,7 +105,7 @@ function ann_action_current_user_display(mysqli $conn, string $userId, string $f
     'SuperAdmin' => 'SuperAdmin',
     'Official' => 'Official',
     'Personnel' => 'Personnel',
-    'Employee' => 'Employee'
+    'Employee' => 'Personnel'
   ];
   $position = $positionMap[$rawPosition] ?? $rawPosition;
 
@@ -113,6 +113,20 @@ function ann_action_current_user_display(mysqli $conn, string $userId, string $f
     return $fallback;
   }
   return $position !== '' ? ($nameShort . ' - ' . $position) : $nameShort;
+}
+
+function ann_action_should_send_delivery(array $record): bool
+{
+  $contentType = strtolower(trim((string)($record['content_type'] ?? '')));
+  if ($contentType === 'news') {
+    return false;
+  }
+
+  $channels = array_values(array_filter((array)($record['channels'] ?? []), static function ($channel): bool {
+    return is_string($channel) && $channel !== '';
+  }));
+
+  return (bool)array_intersect($channels, ['sms', 'email']);
 }
 
 $action = strtolower(trim((string)($_POST['action'] ?? '')));
@@ -196,9 +210,12 @@ foreach ($rows as $idx => $item) {
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to save approval change.');
     }
-    $deliveryResult = ann_delivery_send($conn, $rows[$idx]);
-    announcements_save_all($rows);
-    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content approved.' . ann_delivery_message_suffix($deliveryResult));
+    if (ann_action_should_send_delivery($rows[$idx])) {
+      $deliveryResult = ann_delivery_send($conn, $rows[$idx]);
+      announcements_save_all($rows);
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content approved.' . ann_delivery_message_suffix($deliveryResult));
+    }
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content approved.');
   }
 
   if ($action === 'deny') {
@@ -452,7 +469,7 @@ foreach ($rows as $idx => $item) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to update content item.');
     }
     $deliverySuffix = '';
-    if ($isSuperAdmin && $nextStatus === 'approved') {
+    if ($isSuperAdmin && $nextStatus === 'approved' && ann_action_should_send_delivery($rows[$idx])) {
       $deliveryResult = ann_delivery_send($conn, $rows[$idx]);
       announcements_save_all($rows);
       $deliverySuffix = ann_delivery_message_suffix($deliveryResult);

@@ -994,7 +994,6 @@ function GenerateUserID($conn, $roleAccess) {
         "SuperAdmin" => "S",
         "Personnel"  => "P",
         "Personnels" => "P",
-        "Employee"   => "E",
         "Official"   => "O",
         "Officials"  => "O",
         "Resident"   => "R"

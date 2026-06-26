@@ -701,6 +701,43 @@ if (!function_exists('amp_ensure_permission_storage')) {
         ");
 
         $conn->query("
+            CREATE TABLE IF NOT EXISTS officialaccessrolepermissiontbl (
+                role_permission_id INT NOT NULL,
+                department_key VARCHAR(160) NOT NULL DEFAULT '',
+                position_key VARCHAR(160) NOT NULL DEFAULT '',
+                department_label VARCHAR(160) DEFAULT NULL,
+                position_label VARCHAR(160) DEFAULT NULL,
+                permission_key VARCHAR(120) NOT NULL,
+                is_allowed TINYINT(1) NOT NULL DEFAULT 1,
+                granted_by_user_id VARCHAR(20) DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (role_permission_id),
+                UNIQUE KEY uniq_access_role_permission (department_key, position_key, permission_key),
+                KEY idx_access_role_scope (department_key, position_key),
+                KEY idx_access_role_permission_key (permission_key),
+                KEY idx_access_role_allowed (is_allowed)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS officialaccessroleprofiletbl (
+                role_access_profile_id INT NOT NULL,
+                department_key VARCHAR(160) NOT NULL DEFAULT '',
+                position_key VARCHAR(160) NOT NULL DEFAULT '',
+                department_label VARCHAR(160) DEFAULT NULL,
+                position_label VARCHAR(160) DEFAULT NULL,
+                area_assignee_access VARCHAR(50) DEFAULT NULL,
+                area_coverage_access TEXT DEFAULT NULL,
+                permissions_initialized TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (role_access_profile_id),
+                UNIQUE KEY uniq_access_role_profile (department_key, position_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+
+        $conn->query("
             CREATE TABLE IF NOT EXISTS personnelrolemodulepermissionstbl (
                 role_permission_id INT NOT NULL,
                 department_key VARCHAR(160) NOT NULL DEFAULT '',
@@ -739,6 +776,8 @@ if (!function_exists('amp_ensure_permission_storage')) {
         idg_ensure_numeric_generated_key($conn, 'officialaccessprofiletbl', 'access_profile_id', 'INT NOT NULL');
         idg_ensure_numeric_generated_key($conn, 'officialseatmodulepermissionstbl', 'seat_permission_id', 'INT NOT NULL');
         idg_ensure_numeric_generated_key($conn, 'officialseataccessprofiletbl', 'seat_access_profile_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'officialaccessrolepermissiontbl', 'role_permission_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'officialaccessroleprofiletbl', 'role_access_profile_id', 'INT NOT NULL');
         idg_ensure_numeric_generated_key($conn, 'personnelrolemodulepermissionstbl', 'role_permission_id', 'INT NOT NULL');
         idg_ensure_numeric_generated_key($conn, 'personnelroleaccessprofiletbl', 'role_access_profile_id', 'INT NOT NULL');
     }
@@ -1068,7 +1107,7 @@ if (!function_exists('amp_has_saved_personnel_role_access_profile')) {
         $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
         $stmt = $conn->prepare("
             SELECT 1
-            FROM personnelroleaccessprofiletbl
+            FROM officialaccessroleprofiletbl
             WHERE department_key = ?
               AND position_key = ?
               AND permissions_initialized = 1
@@ -1093,7 +1132,7 @@ if (!function_exists('amp_upsert_personnel_role_access_profile')) {
 
         $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
         $stmt = $conn->prepare("
-            INSERT INTO personnelroleaccessprofiletbl
+            INSERT INTO officialaccessroleprofiletbl
                 (role_access_profile_id, department_key, position_key, department_label, position_label, permissions_initialized)
             VALUES
                 (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), 1)
@@ -1106,7 +1145,7 @@ if (!function_exists('amp_upsert_personnel_role_access_profile')) {
         if (!$stmt) {
             throw new RuntimeException('Failed to save personnel role access profile metadata.');
         }
-        $roleAccessProfileId = GenerateTenDigitMetaID($conn, 'personnelroleaccessprofiletbl', 'role_access_profile_id');
+        $roleAccessProfileId = GenerateTenDigitMetaID($conn, 'officialaccessroleprofiletbl', 'role_access_profile_id');
         if ($roleAccessProfileId === false) {
             throw new RuntimeException('Failed to generate personnel role access profile ID.');
         }
@@ -1131,7 +1170,7 @@ if (!function_exists('amp_replace_personnel_role_module_permissions')) {
 
         $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
         $deleteStmt = $conn->prepare("
-            DELETE FROM personnelrolemodulepermissionstbl
+            DELETE FROM officialaccessrolepermissiontbl
             WHERE department_key = ?
               AND position_key = ?
         ");
@@ -1150,12 +1189,12 @@ if (!function_exists('amp_replace_personnel_role_module_permissions')) {
             if ($permissionKey === '') {
                 continue;
             }
-            $rolePermissionId = GenerateTenDigitMetaID($conn, 'personnelrolemodulepermissionstbl', 'role_permission_id');
+            $rolePermissionId = GenerateTenDigitMetaID($conn, 'officialaccessrolepermissiontbl', 'role_permission_id');
             if ($rolePermissionId === false) {
                 throw new RuntimeException('Failed to generate personnel role permission ID.');
             }
             $insertStmt = $conn->prepare("
-                INSERT INTO personnelrolemodulepermissionstbl
+                INSERT INTO officialaccessrolepermissiontbl
                     (role_permission_id, department_key, position_key, department_label, position_label, permission_key, is_allowed, granted_by_user_id)
                 VALUES
                     (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 1, NULLIF(?, ''))
@@ -1188,7 +1227,7 @@ if (!function_exists('amp_delete_personnel_role_access_profile')) {
         $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
 
         $deletePermissions = $conn->prepare("
-            DELETE FROM personnelrolemodulepermissionstbl
+            DELETE FROM officialaccessrolepermissiontbl
             WHERE department_key = ?
               AND position_key = ?
         ");
@@ -1199,7 +1238,7 @@ if (!function_exists('amp_delete_personnel_role_access_profile')) {
         }
 
         $deleteProfile = $conn->prepare("
-            DELETE FROM personnelroleaccessprofiletbl
+            DELETE FROM officialaccessroleprofiletbl
             WHERE department_key = ?
               AND position_key = ?
         ");
@@ -1221,7 +1260,7 @@ if (!function_exists('amp_get_effective_permission_keys_for_personnel_role')) {
 
         $stmt = $conn->prepare("
             SELECT permission_key
-            FROM personnelrolemodulepermissionstbl
+            FROM officialaccessrolepermissiontbl
             WHERE department_key = ?
               AND position_key = ?
               AND is_allowed = 1

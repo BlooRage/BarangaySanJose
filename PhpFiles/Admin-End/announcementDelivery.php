@@ -95,7 +95,7 @@ function ann_delivery_target_groups(array $announcement): array
 
   $audience = strtolower((string)($announcement['audience'] ?? 'all residents'));
   if (strpos($audience, 'official') !== false) return ['official'];
-  if (strpos($audience, 'employee') !== false || strpos($audience, 'personnel') !== false) return ['employee'];
+  if (strpos($audience, 'employee') !== false || strpos($audience, 'personnel') !== false) return ['personnel'];
   return ['resident'];
 }
 
@@ -128,7 +128,7 @@ function ann_delivery_staff_group_matches(?string $accountRole, ?string $infoRol
     if ($targetGroup === 'official' && in_array($role, ['official', 'admin', 'superadmin'], true)) {
       return true;
     }
-    if ($targetGroup === 'employee' && in_array($role, ['employee'], true)) {
+    if ($targetGroup === 'personnel' && in_array($role, ['personnel'], true)) {
       return true;
     }
   }
@@ -138,7 +138,7 @@ function ann_delivery_staff_group_matches(?string $accountRole, ?string $infoRol
     if ($targetGroup === 'official' && in_array($raw, ['official', 'officials', 'admin', 'superadmin'], true)) {
       return true;
     }
-    if ($targetGroup === 'employee' && in_array($raw, ['employee', 'personnel', 'personnels'], true)) {
+    if ($targetGroup === 'personnel' && in_array($raw, ['employee', 'personnel', 'personnels'], true)) {
       return true;
     }
   }
@@ -226,7 +226,7 @@ function ann_delivery_fetch_recipients(mysqli $conn, array $announcement): array
       continue;
     }
 
-    if (in_array($group, ['official', 'employee'], true)) {
+    if (in_array($group, ['official', 'personnel'], true)) {
       if (!$areaFilters) {
         foreach (ann_delivery_fetch_staff_recipients($conn, $group, '') as $recipient) {
           $recipients[$recipient['user_id']] = $recipient;

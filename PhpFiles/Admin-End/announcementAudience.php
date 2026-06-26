@@ -18,7 +18,7 @@ function ann_audience_normalize_group(string $group): string
         return 'official';
     }
     if ($group === 'employees' || $group === 'employee' || $group === 'personnel' || $group === 'personnels') {
-        return 'employee';
+        return 'personnel';
     }
     if ($group === 'residents' || $group === 'resident') {
         return 'resident';
@@ -186,4 +186,3 @@ function ann_audience_fetch_resident_context(mysqli $conn, string $userId): arra
         'area' => trim((string)($row['area_number'] ?? '')),
     ];
 }
-

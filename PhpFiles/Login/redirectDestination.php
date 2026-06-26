@@ -19,7 +19,7 @@ if (!function_exists('resolveUnifiedProfileRedirect')) {
             return appUrl('/login');
         }
 
-        $officialRoles = ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'];
+        $officialRoles = ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin'];
         if (in_array($role, $officialRoles, true)) {
             oi_ensure_invite_table($conn);
 
@@ -83,8 +83,11 @@ if (!function_exists('resolveUnifiedProfileRedirect')) {
                 if ($normalizedRole === 'personnels') {
                     $normalizedRole = 'personnel';
                 }
-                if ($normalizedRole === 'admin' || $normalizedRole === 'employee') {
+                if ($normalizedRole === 'admin') {
                     $normalizedRole = 'official';
+                }
+                if ($normalizedRole === 'employee') {
+                    $normalizedRole = 'personnel';
                 }
 
                 if (in_array($normalizedRole, ['official', 'personnel'], true)) {

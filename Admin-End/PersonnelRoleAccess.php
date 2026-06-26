@@ -57,7 +57,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
   <meta charset="UTF-8" />
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Personnel Role Based Permissions</title>
+  <title>Access Control</title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -262,10 +262,10 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
       <div class="mb-4">
-        <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Role Based Permissions</h2>
+        <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Access Control</h2>
         <p class="text-muted mb-0">
-          Set the default permissions for each department position or personnel role.
-          Personnel assigned to that position inherit the default access, while direct access changes from Personnel Tracker still work as per-person overrides.
+          Set the default module permissions for each department position and use these profiles as the approval baseline for incoming access.
+          This module is the final gate for permission assignment, while Official Management keeps profile data and Official Transition handles seats and turnover.
         </p>
       </div>
 
@@ -277,7 +277,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           <i class="fas fa-user-plus me-1"></i> Account Invite
         </a>
         <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>" class="btn btn-primary btn-sm">
-          <i class="fas fa-shield-halved me-1"></i> Role Based Permissions
+          <i class="fas fa-shield-halved me-1"></i> Access Control
         </a>
       </div>
 
@@ -317,7 +317,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           <div class="role-access-toolbar-meta">
             <div class="small text-muted" id="personnelRoleAccessMeta">Loading permission profiles...</div>
             <button id="btnPersonnelRoleAccessCreate" class="btn btn-primary btn-sm" type="button">
-              <i class="fas fa-plus me-1"></i> Add Role Profile
+              <i class="fas fa-plus me-1"></i> Add Access Profile
             </button>
             <button id="btnPersonnelRoleAccessRefresh" class="btn btn-outline-secondary btn-sm" type="button">
               <i class="fas fa-arrows-rotate me-1"></i> Refresh
@@ -339,7 +339,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
               </tr>
             </thead>
             <tbody id="personnelRoleAccessTbody">
-              <tr><td colspan="7" class="text-center text-muted py-4">Loading position permission profiles...</td></tr>
+              <tr><td colspan="7" class="text-center text-muted py-4">Loading access profiles...</td></tr>
             </tbody>
           </table>
         </div>
@@ -351,7 +351,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
       <div class="modal-content p-3">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold" id="personnelRoleAccessModalTitle">Manage Role Based Permissions</h5>
+          <h5 class="modal-title fw-bold" id="personnelRoleAccessModalTitle">Manage Access Control Profile</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body d-grid gap-3">
@@ -359,7 +359,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           <input type="hidden" id="personnelRoleAccessPosition">
 
           <div class="alert alert-info mb-0" id="personnelRoleAccessModalNotice">
-            This profile applies to the selected department position. Saving here updates the default permissions that personnel in this position inherit.
+            This profile applies to the selected department position. Saving here updates the default permissions that users in this position inherit when Access Control approves their access.
           </div>
 
           <div class="role-access-meta-grid">

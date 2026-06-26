@@ -39,7 +39,7 @@ function ann_creator_position_label(array $row): string
       "SuperAdmin" => "SuperAdmin",
       "Official" => "Official",
       "Personnel" => "Personnel",
-      "Employee" => "Employee"
+      "Employee" => "Personnel"
     ];
     return $map[$raw] ?? $raw;
   }
@@ -151,6 +151,20 @@ function ann_build_faq_html(array $items): string
   }
 
   return implode('', $blocks);
+}
+
+function ann_should_send_delivery_for_record(array $record): bool
+{
+  $contentType = strtolower(trim((string)($record['content_type'] ?? '')));
+  if ($contentType === 'news') {
+    return false;
+  }
+
+  $channels = array_values(array_filter((array)($record['channels'] ?? []), static function ($channel): bool {
+    return is_string($channel) && $channel !== '';
+  }));
+
+  return (bool)array_intersect($channels, ['sms', 'email']);
 }
 
 $contentType = strtolower(trim((string)($_POST['content_type'] ?? 'page')));
@@ -423,8 +437,12 @@ if ($status === "pending") {
   $msg = ucfirst($itemLabel) . " submitted for review.";
 }
 if ($status === "approved") {
-  $deliveryResult = ann_delivery_send($conn, $all[0]);
-  announcements_save_all($all);
-  $msg = ucfirst($itemLabel) . " posted successfully." . ann_delivery_message_suffix($deliveryResult);
+  if (ann_should_send_delivery_for_record($all[0])) {
+    $deliveryResult = ann_delivery_send($conn, $all[0]);
+    announcements_save_all($all);
+    $msg = ucfirst($itemLabel) . " posted successfully." . ann_delivery_message_suffix($deliveryResult);
+  } else {
+    $msg = ucfirst($itemLabel) . " posted successfully.";
+  }
 }
 ann_redirect_with_flash($redirectUrl, "success", $msg);

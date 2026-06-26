@@ -16,8 +16,8 @@ $managementEntitySingular = $isPersonnelManagement ? 'Personnel' : 'Official';
 $managementEntityPlural = $isPersonnelManagement ? 'Personnel' : 'Officials';
 $managementPageTitle = $isPersonnelManagement ? 'Personnel Tracker' : 'Official Management';
 $managementDescription = $isPersonnelManagement
-  ? 'Track all personnel records in one list, including SuperAdmin accounts. Access changes stay inside the checklist modal.'
-  : 'Track current and past barangay officials. Current officials are shown by default, and access changes stay inside the checklist modal.';
+  ? 'Maintain personnel profile records, check readiness for onboarding, and lock or unlock accounts without changing seat assignments.'
+  : 'Maintain official profile records, check invite readiness, and manage onboarding-safe account locking without changing seats or permissions here.';
 $managementCurrentLabel = $isPersonnelManagement ? 'Current Personnel' : 'Current Officials';
 $managementPastLabel = $isPersonnelManagement ? 'Past Personnel' : 'Past Officials';
 $managementSearchPlaceholder = $isPersonnelManagement
@@ -557,6 +557,9 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
           </div>
           <?php endif; ?>
           <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2 ms-auto">
+            <button id="btnOfficialsMgmtSendAllInvites" class="btn btn-primary btn-sm" type="button" title="Send onboarding invites for all ready profiles">
+              <i class="fas fa-paper-plane me-1"></i> Send All Invites
+            </button>
             <div class="input-group admin-search">
               <input id="officialsMgmtSearch" class="form-control" placeholder="<?= htmlspecialchars($managementSearchPlaceholder, ENT_QUOTES, 'UTF-8') ?>" />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
@@ -1112,6 +1115,36 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       areaOptions: <?= json_encode(array_values($officialsMgmtAreaOptions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       permissionCatalog: <?= json_encode($officialsMgmtPermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
+  </script>
+  <script>
+    document.getElementById('btnOfficialsMgmtSendAllInvites')?.addEventListener('click', async () => {
+      if (typeof window.requestOfficialsManagementSecureConfirmation !== 'function') {
+        window.alert('Secure confirmation is not ready right now.');
+        return;
+      }
+      try {
+        const secureConfirmation = await window.requestOfficialsManagementSecureConfirmation(
+          'send_all_invites',
+          '',
+          'send all ready onboarding invites'
+        );
+        if (!secureConfirmation) return;
+        const body = new URLSearchParams();
+        body.set('action', 'send_all_invites');
+        body.set('mode', <?= json_encode($managementMode, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>);
+        body.set('challenge_key', secureConfirmation.challenge_key || '');
+        body.set('otp_code', secureConfirmation.otp_code || '');
+        const res = await fetch('../PhpFiles/Admin-End/officialsManagement.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        });
+        const data = await res.json();
+        window.alert(data.message || (data.success ? 'Invites sent.' : 'Unable to send invites.'));
+      } catch (error) {
+        window.alert('Unable to send invites right now.');
+      }
+    });
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
   <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260328-3"></script>

@@ -3,7 +3,7 @@ session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 
 function normalizeResidentId($value): ?string {
     $id = trim((string)$value);

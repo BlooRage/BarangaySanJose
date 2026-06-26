@@ -5,16 +5,19 @@ require_once "../General/security.php";
 require_once "../General/audit.php";
 require_once "../General/officialInviteCommon.php";
 require_once "../General/adminModulePermissions.php";
+require_once "../General/officialGovernance.php";
 
 requireRoleSession(['SuperAdmin']);
 oi_ensure_invite_table($conn);
 amp_ensure_permission_storage($conn);
+ogw_ensure_schema($conn);
 
 header('Content-Type: application/json; charset=utf-8');
 
 function normalizeRole(string $role): string {
     $k = strtolower(trim($role));
-    if ($k === 'officials' || $k === 'official' || $k === 'admin' || $k === 'employee') return 'Official';
+    if ($k === 'officials' || $k === 'official' || $k === 'admin') return 'Official';
+    if ($k === 'employee') return 'Personnel';
     if ($k === 'personnels' || $k === 'personnel') return 'Personnel';
     if ($k === 'superadmin') return 'SuperAdmin';
     return trim($role);
@@ -430,6 +433,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $action = trim((string)($_POST['action'] ?? ''));
         $requestedMode = requestedManagementMode((string)($_POST['mode'] ?? 'official'));
         $auditModuleName = $requestedMode === 'personnel' ? 'Personnel Management' : 'Officials Management';
+        $secureModuleKey = 'officials_management';
+        if ($action === 'request_secure_action_otp') {
+            $secureAction = trim((string)($_POST['secure_action'] ?? ''));
+            $allowedSecureActions = ['send_all_invites', 'send_invite', 'revoke_permission', 'restore_permission', 'lock_account', 'unlock_account'];
+            if (!in_array($secureAction, $allowedSecureActions, true)) {
+                throw new Exception('This action cannot use secure confirmation.');
+            }
+
+            $targetLabel = $requestedMode === 'personnel' ? 'personnel workflow action' : 'official workflow action';
+            $officialIdForLabel = trim((string)($_POST['official_id'] ?? ''));
+            if ($officialIdForLabel !== '') {
+                $targetDetail = officialsManagementLoadProfileDetailOrFail($conn, $officialIdForLabel);
+                $targetLabel = trim((string)($targetDetail['full_name'] ?? ''));
+                if ($targetLabel === '') {
+                    $targetLabel = $officialIdForLabel;
+                }
+                if (in_array($secureAction, ['revoke_permission', 'lock_account'], true)) {
+                    $targetLabel = 'lock account for ' . $targetLabel;
+                } elseif (in_array($secureAction, ['restore_permission', 'unlock_account'], true)) {
+                    $targetLabel = 'unlock account for ' . $targetLabel;
+                } elseif ($secureAction === 'send_invite') {
+                    $targetLabel = 'send onboarding invite for ' . $targetLabel;
+                }
+            } elseif ($secureAction === 'send_all_invites') {
+                $targetLabel = 'send all ready onboarding invites';
+            }
+
+            $challenge = ogw_issue_secure_action_otp(
+                $conn,
+                $actorUserId,
+                (string)($_POST['actor_password'] ?? ''),
+                $secureModuleKey,
+                $secureAction,
+                $targetLabel
+            );
+            echo json_encode([
+                'success' => true,
+                'message' => 'OTP sent to ' . ($challenge['delivery_label'] !== '' ? $challenge['delivery_label'] : 'your verified contact') . '.',
+                'challenge_key' => $challenge['challenge_key'],
+                'expires_at' => $challenge['expires_at'],
+                'delivery_label' => $challenge['delivery_label'],
+            ]);
+            exit;
+        }
+        if ($action === 'send_all_invites') {
+            ogw_consume_secure_action_otp(
+                $conn,
+                $actorUserId,
+                (string)($_POST['challenge_key'] ?? ''),
+                (string)($_POST['otp_code'] ?? ''),
+                $secureModuleKey,
+                'send_all_invites'
+            );
+            $scope = $requestedMode === 'personnel' ? 'Personnel' : 'Official';
+            $result = ogw_send_all_ready_invites($conn, $actorUserId, $scope);
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                $auditModuleName,
+                'OfficialProfileWorkflow',
+                $scope,
+                'OFFICIAL_SEND_ALL_INVITES',
+                'invite_batch',
+                null,
+                (string)count($result['sent']),
+                'Sent onboarding invites for ready profiles.'
+            );
+            echo json_encode([
+                'success' => true,
+                'message' => count($result['sent']) . ' invite(s) sent.',
+                'sent' => $result['sent'],
+                'skipped' => $result['skipped'],
+            ]);
+            exit;
+        }
         $officialId = trim((string)($_POST['official_id'] ?? ''));
         if ($officialId === '') {
             throw new Exception('Invalid account record.');
@@ -490,11 +569,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             throw new Exception($superadminManageReason);
         }
 
-        if ($action === 'update_profile_info') {
-            if ($requestedMode !== 'personnel') {
-                throw new Exception('Profile editing is available in Personnel Tracker only.');
+        if ($action === 'mark_ready_for_invite') {
+            $workflow = ogw_sync_profile_workflow($conn, $officialId);
+            if (!$workflow['ready_for_invite']) {
+                throw new Exception('Complete the profile first before marking it ready for invite.');
             }
+            echo json_encode([
+                'success' => true,
+                'message' => 'Profile is ready for invite.',
+                'workflow' => $workflow,
+            ]);
+            exit;
+        }
 
+        if ($action === 'send_invite') {
+            ogw_consume_secure_action_otp(
+                $conn,
+                $actorUserId,
+                (string)($_POST['challenge_key'] ?? ''),
+                (string)($_POST['otp_code'] ?? ''),
+                $secureModuleKey,
+                'send_invite'
+            );
+            $invite = ogw_send_official_invite($conn, $officialId, $actorUserId);
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                $auditModuleName,
+                'OfficialProfileWorkflow',
+                $officialId,
+                'OFFICIAL_SEND_INVITE',
+                'invite_id',
+                null,
+                (string)($invite['invite_id'] ?? ''),
+                'Sent onboarding invite from profile workflow.'
+            );
+            echo json_encode([
+                'success' => true,
+                'message' => 'Onboarding invite sent successfully.',
+                'invite' => $invite,
+            ]);
+            exit;
+        }
+
+        if ($action === 'update_profile_info') {
             $targetDetail = officialsManagementLoadProfileDetailOrFail($conn, $officialId);
 
             $lastName = trim((string)($_POST['lastname'] ?? ''));
@@ -743,7 +862,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Personnel profile updated successfully.',
+                'message' => ($requestedMode === 'personnel' ? 'Personnel' : 'Official') . ' profile updated successfully.',
                 'data' => array_merge($updatedProfile, [
                     'can_edit_profile' => $canEditProfile,
                     'edit_profile_disabled_reason' => $editProfileDisabledReason,
@@ -754,15 +873,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         $nextStatusId = null;
         $auditAction = '';
-        if ($action === 'revoke_permission') {
+        if ($action === 'revoke_permission' || $action === 'lock_account') {
+            ogw_consume_secure_action_otp(
+                $conn,
+                $actorUserId,
+                (string)($_POST['challenge_key'] ?? ''),
+                (string)($_POST['otp_code'] ?? ''),
+                $secureModuleKey,
+                'revoke_permission'
+            );
             if ($targetDisplayRole === 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
                 throw new Exception('At least one active SuperAdmin account must remain.');
             }
             $nextStatusId = $statusInactiveId;
-            $auditAction = 'OFFICIAL_PERMISSION_REVOKE';
-        } elseif ($action === 'restore_permission') {
+            $auditAction = 'OFFICIAL_ACCOUNT_LOCK';
+        } elseif ($action === 'restore_permission' || $action === 'unlock_account') {
+            ogw_consume_secure_action_otp(
+                $conn,
+                $actorUserId,
+                (string)($_POST['challenge_key'] ?? ''),
+                (string)($_POST['otp_code'] ?? ''),
+                $secureModuleKey,
+                'restore_permission'
+            );
             $nextStatusId = $statusActiveId;
-            $auditAction = 'OFFICIAL_PERMISSION_RESTORE';
+            $auditAction = 'OFFICIAL_ACCOUNT_UNLOCK';
         } elseif ($action === 'approve_profile' || $action === 'reject_profile') {
             $inviteId = (int)($target['invite_id'] ?? 0);
             if ($inviteId <= 0) {
@@ -809,320 +944,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             ]);
             exit;
         } elseif ($action === 'update_access_profile') {
-            $displayRole = trim((string)($_POST['display_role'] ?? 'Admin'));
-            $accessExpiresOn = trim((string)($_POST['access_expires_on'] ?? ''));
-            $requestedPermissionKeys = $_POST['permission_keys'] ?? [];
-            if (!is_array($requestedPermissionKeys)) {
-                $requestedPermissionKeys = [];
-            }
-
-            if ($targetProtectedCode === 'BARANGAY_CAPTAIN') {
-                throw new Exception('The Barangay Captain access level is managed through official transitions.');
-            }
-
-            if (!in_array($displayRole, ['Admin', 'SuperAdmin'], true)) {
-                throw new Exception('Invalid display role.');
-            }
-            if ($targetProtectedCode !== '' && $displayRole !== 'SuperAdmin') {
-                throw new Exception('Protected accounts must remain SuperAdmin.');
-            }
-
-            $validPermissionKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
-            $permissionMap = [];
-            foreach ($requestedPermissionKeys as $permissionKey) {
-                $permissionKey = trim((string)$permissionKey);
-                if ($permissionKey !== '' && isset($validPermissionKeys[$permissionKey])) {
-                    $permissionMap[$permissionKey] = true;
-                }
-            }
-
-            if ($displayRole !== 'SuperAdmin') {
-                foreach (array_keys($permissionMap) as $permissionKey) {
-                    if (amp_is_admin_only_permission($permissionKey)) {
-                        throw new Exception('Admin-only modules require the SuperAdmin display role.');
-                    }
-                }
-            }
-
-            if ($targetProtectedCode === 'IT_SUPERADMIN') {
-                foreach (amp_get_it_superadmin_locked_permission_keys() as $permissionKey) {
-                    $permissionMap[$permissionKey] = true;
-                }
-            }
-
-            if ($accessExpiresOn !== '') {
-                $dt = DateTimeImmutable::createFromFormat('Y-m-d', $accessExpiresOn);
-                if (!$dt || $dt->format('Y-m-d') !== $accessExpiresOn) {
-                    throw new Exception('Access expiration must be a valid date.');
-                }
-            }
-
-            $nextStorageRole = $displayRole === 'SuperAdmin'
-                ? 'SuperAdmin'
-                : amp_storage_role_for_admin_display(
-                    (string)($targetAccount['position_access'] ?? ''),
-                    (string)($targetAccount['account_role_access'] ?? '')
-                );
-
-            if ($targetDisplayRole === 'SuperAdmin' && $nextStorageRole !== 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
-                throw new Exception('At least one active SuperAdmin account must remain.');
-            }
-
-            $today = new DateTimeImmutable('today');
-            $expiresImmediately = false;
-            if ($accessExpiresOn !== '') {
-                try {
-                    $expiryDate = new DateTimeImmutable($accessExpiresOn);
-                    $expiresImmediately = $expiryDate < $today;
-                } catch (Throwable) {
-                    $expiresImmediately = false;
-                }
-            }
-
-            if ($expiresImmediately && $targetDisplayRole === 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
-                throw new Exception('At least one active SuperAdmin account must remain.');
-            }
-
-            $conn->begin_transaction();
-            try {
-                $upOi = $conn->prepare("
-                    UPDATE officialinformationtbl
-                    SET role_access = ?,
-                        term_end = NULLIF(?, ''),
-                        last_updated = CURRENT_TIMESTAMP
-                    WHERE official_id = ?
-                    LIMIT 1
-                ");
-                if (!$upOi) {
-                    throw new Exception('Failed to update official access profile.');
-                }
-                $upOi->bind_param('sss', $nextStorageRole, $accessExpiresOn, $officialId);
-                $upOi->execute();
-                $upOi->close();
-
-                $upUa = $conn->prepare("UPDATE useraccountstbl SET role_access = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
-                if (!$upUa) {
-                    throw new Exception('Failed to sync account role.');
-                }
-                $upUa->bind_param('ss', $nextStorageRole, $userId);
-                $upUa->execute();
-                $upUa->close();
-
-                if ($expiresImmediately) {
-                    $upStatus = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
-                    if ($upStatus) {
-                        $upStatus->bind_param('is', $statusInactiveId, $userId);
-                        $upStatus->execute();
-                        $upStatus->close();
-                    }
-                }
-
-                replaceOfficialModulePermissions($conn, $officialId, $userId, array_keys($permissionMap), $actorUserId);
-                upsertOfficialAccessProfile($conn, $officialId, $userId);
-                $conn->commit();
-            } catch (Throwable $e) {
-                $conn->rollback();
-                throw $e;
-            }
-
-            insertUnifiedAuditLog(
-                $conn,
-                $actorUserId,
-                $actorRole,
-                $auditModuleName,
-                'OfficialAccessProfile',
-                $officialId,
-                'OFFICIAL_ACCESS_PROFILE_UPDATE',
-                'display_role / term_end / module_permissions',
-                $targetDisplayRole . ' / ' . (string)($targetAccount['term_end'] ?? '') . ' / ' . $oldPermissionSummary,
-                $displayRole . ' / ' . $accessExpiresOn . ' / ' . officialsPermissionSummary($permissionMap),
-                'Updated access profile and module checklist.',
-                null
-            );
-
-            echo json_encode([
-                'success' => true,
-                'message' => 'Access profile updated successfully.',
-                'updated' => true,
-            ]);
-            exit;
+            throw new Exception('Access assignment now belongs to Access Control. Use the Access Control module for permissions and area access.');
         } elseif ($action === 'promote') {
-            if ($requestedMode === 'official') {
-                throw new Exception('Promotion is no longer available in Official Management.');
-            }
-            if ($targetProtectedCode !== '') {
-                throw new Exception('Protected accounts cannot be reassigned through promotion.');
-            }
-            $newPosition = trim((string)($_POST['new_position'] ?? ''));
-            $areaNumber  = trim((string)($_POST['area_number'] ?? ''));
-            if ($newPosition === '') {
-                throw new Exception('New position is required.');
-            }
-
-            $positionsByRole = [
-                'SuperAdmin' => ['IT Administrator'],
-                'Official'   => ['Barangay Official', 'Barangay Secretary'],
-                'Personnel'  => [
-                    'Department Public Assistance Desk',
-                    'Department Secretary',
-                    'Department OIC (Officer In Charge)',
-                    'Barangay Police',
-                    'Desk Officer',
-                    'Area OIC',
-                    'Barangay Treasurer',
-                ],
-            ];
-            $newRole = null;
-            foreach ($positionsByRole as $roleKey => $positions) {
-                if (in_array($newPosition, $positions, true)) {
-                    $newRole = $roleKey;
-                    break;
-                }
-            }
-            if ($newRole === null) {
-                throw new Exception('Invalid position selected.');
-            }
-            $newAudience = managementAudienceFromPosition($newPosition, $newRole);
-            if ($requestedMode === 'personnel' && $newAudience !== 'personnel') {
-                throw new Exception('Personnel Tracker can only assign personnel positions.');
-            }
-            if ($requestedMode === 'official' && $newAudience !== 'official') {
-                throw new Exception('Official Management can only assign official positions.');
-            }
-
-            $posColExists  = false;
-            $pColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
-            if ($pColRes instanceof mysqli_result && $pColRes->num_rows > 0) $posColExists = true;
-
-            $areaColExists = false;
-            $aColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
-            if ($aColRes instanceof mysqli_result && $aColRes->num_rows > 0) $areaColExists = true;
-
-            if ($posColExists && $areaColExists) {
-                $upOi = $conn->prepare("UPDATE officialinformationtbl SET role_access = ?, position_access = ?, area_number = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
-                if (!$upOi) throw new Exception('Failed to update official record.');
-                $upOi->bind_param("ssss", $newRole, $newPosition, $areaNumber, $officialId);
-            } elseif ($posColExists) {
-                $upOi = $conn->prepare("UPDATE officialinformationtbl SET role_access = ?, position_access = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
-                if (!$upOi) throw new Exception('Failed to update official record.');
-                $upOi->bind_param("sss", $newRole, $newPosition, $officialId);
-            } else {
-                $upOi = $conn->prepare("UPDATE officialinformationtbl SET role_access = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
-                if (!$upOi) throw new Exception('Failed to update official record.');
-                $upOi->bind_param("ss", $newRole, $officialId);
-            }
-            $upOi->execute();
-            $upOi->close();
-
-            $upUa = $conn->prepare("UPDATE useraccountstbl SET role_access = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
-            if (!$upUa) throw new Exception('Failed to sync user account role.');
-            $upUa->bind_param("ss", $newRole, $userId);
-            $upUa->execute();
-            $upUa->close();
-
-            insertUnifiedAuditLog(
-                $conn,
-                (string)($_SESSION['user_id'] ?? ''),
-                $actorRole,
-                $auditModuleName,
-                'OfficialAccount',
-                $officialId,
-                'OFFICIAL_PROMOTE',
-                'position_access',
-                (string)($target['role_access'] ?? ''),
-                "{$newRole} / {$newPosition}",
-                "Promoted to {$newRole} / {$newPosition}.",
-                null
-            );
-
-            echo json_encode([
-                'success' => true,
-                'message' => "Position updated to {$newPosition} successfully.",
-                'updated' => true,
-            ]);
-            exit;
+            throw new Exception('Seat changes and promotions now belong to Official Transition.');
         } elseif ($action === 'change_department') {
-            if ($requestedMode === 'official') {
-                throw new Exception('Department reassignment is no longer available in Official Management.');
-            }
-            if ($targetProtectedCode !== '') {
-                throw new Exception('Protected accounts cannot be reassigned through department changes.');
-            }
-            $newDepartment = trim((string)($_POST['new_department'] ?? ''));
-            $newDeptPosition = trim((string)($_POST['new_position'] ?? ''));
-            $areaNumber    = trim((string)($_POST['area_number'] ?? ''));
-            if ($newDepartment === '') {
-                throw new Exception('Department is required.');
-            }
-            if ($newDeptPosition === '') {
-                throw new Exception('Position is required.');
-            }
-            $newAudience = managementAudienceFromPosition($newDeptPosition, '');
-            if ($requestedMode === 'personnel' && $newAudience !== 'personnel') {
-                throw new Exception('Personnel Tracker can only assign personnel positions.');
-            }
-            if ($requestedMode === 'official' && $newAudience !== 'official') {
-                throw new Exception('Official Management can only assign official positions.');
-            }
-
-            $posColExists2  = false;
-            $pColRes2 = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
-            if ($pColRes2 instanceof mysqli_result && $pColRes2->num_rows > 0) $posColExists2 = true;
-
-            $areaColExists2 = false;
-            $aColRes2 = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
-            if ($aColRes2 instanceof mysqli_result && $aColRes2->num_rows > 0) $areaColExists2 = true;
-
-            // Fetch current values for audit log
-            $oldDept = '';
-            $oldPos  = '';
-            $deptFetch = $conn->prepare("SELECT department, position_access FROM officialinformationtbl WHERE official_id = ? LIMIT 1");
-            if ($deptFetch) {
-                $deptFetch->bind_param("s", $officialId);
-                $deptFetch->execute();
-                $deptRow = $deptFetch->get_result()->fetch_assoc();
-                $oldDept = (string)($deptRow['department'] ?? '');
-                $oldPos  = (string)($deptRow['position_access'] ?? '');
-                $deptFetch->close();
-            }
-
-            if ($posColExists2 && $areaColExists2 && $areaNumber !== '') {
-                $upDept = $conn->prepare("UPDATE officialinformationtbl SET department = ?, position_access = ?, area_number = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
-                if (!$upDept) throw new Exception('Failed to update department.');
-                $upDept->bind_param("ssss", $newDepartment, $newDeptPosition, $areaNumber, $officialId);
-            } elseif ($posColExists2) {
-                $upDept = $conn->prepare("UPDATE officialinformationtbl SET department = ?, position_access = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
-                if (!$upDept) throw new Exception('Failed to update department.');
-                $upDept->bind_param("sss", $newDepartment, $newDeptPosition, $officialId);
-            } else {
-                $upDept = $conn->prepare("UPDATE officialinformationtbl SET department = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
-                if (!$upDept) throw new Exception('Failed to update department.');
-                $upDept->bind_param("ss", $newDepartment, $officialId);
-            }
-            $upDept->execute();
-            $upDept->close();
-
-            insertUnifiedAuditLog(
-                $conn,
-                (string)($_SESSION['user_id'] ?? ''),
-                $actorRole,
-                $auditModuleName,
-                'OfficialAccount',
-                $officialId,
-                'OFFICIAL_DEPT_CHANGE',
-                'department / position_access',
-                "{$oldDept} / {$oldPos}",
-                "{$newDepartment} / {$newDeptPosition}",
-                "Department changed to {$newDepartment}, position to {$newDeptPosition}.",
-                null
-            );
-
-            echo json_encode([
-                'success' => true,
-                'message' => "Department changed to {$newDepartment} — {$newDeptPosition} successfully.",
-                'updated' => true,
-            ]);
-            exit;
+            throw new Exception('Seat assignment, department assignment, and demotion now belong to Official Transition.');
         } else {
             throw new Exception('Invalid action.');
         }
@@ -1151,9 +977,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         echo json_encode([
             'success' => true,
-            'message' => $action === 'revoke_permission'
-                ? 'Permissions revoked successfully.'
-                : 'Permissions restored successfully.',
+            'message' => ($action === 'revoke_permission' || $action === 'lock_account')
+                ? 'Account locked successfully.'
+                : 'Account unlocked successfully.',
             'updated' => $affected > 0
         ]);
         exit;
@@ -1336,6 +1162,7 @@ try {
             $editAccessDisabledReason = amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $displayRole);
         }
         $canEditAccess = ($editAccessDisabledReason === '');
+        $workflow = ogw_sync_profile_workflow($conn, (string)($row['official_id'] ?? ''));
 
         $rows[] = [
             'official_id' => (string)($row['official_id'] ?? ''),
@@ -1354,6 +1181,9 @@ try {
             'account_status' => (string)($row['account_status'] ?? ''),
             'permission_state' => permissionStateFromAccountStatus((string)($row['account_status'] ?? '')),
             'profile_approval_state' => profileApprovalStateFromInvite((string)($row['invite_status'] ?? ''), $role),
+            'profile_stage' => (string)($workflow['profile_stage'] ?? 'Draft'),
+            'ready_for_invite' => !empty($workflow['ready_for_invite']),
+            'onboarding_status' => (string)($workflow['onboarding_status'] ?? 'NotInvited'),
             'protected_code' => $protectedCode,
             'protected_label' => amp_get_protected_label($protectedCode),
             'module_count' => count($permissionMap),

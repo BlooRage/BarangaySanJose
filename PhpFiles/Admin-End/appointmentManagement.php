@@ -5,7 +5,7 @@ require_once __DIR__ . "/../General/appointmentCouncilMembers.php";
 require_once __DIR__ . "/../General/appointmentSettings.php";
 require_once __DIR__ . "/../General/appointmentTimeSlots.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 verifyCsrfToken(false);
 
 function am_redirect_with_message(string $type, string $message, array $extra = []): void

@@ -526,7 +526,7 @@ function normalizeRoleName(string $role): string
     $map = [
         'officials' => 'official',
         'admin' => 'official',
-        'employee' => 'official',
+        'employee' => 'personnel',
         'personnels' => 'personnel',
     ];
     return $map[$role] ?? $role;

@@ -6,7 +6,7 @@ require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/caseUserAccountForeignKeys.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 
 cuafk_ensure_case_useraccount_foreign_keys($conn, true);
 

@@ -5,7 +5,7 @@ require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/security.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 header('Content-Type: application/json; charset=utf-8');

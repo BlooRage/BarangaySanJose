@@ -45,21 +45,52 @@
     return res.json();
   }
 
+  async function requestSecureConfirmation(secureAction, payload = {}, actionLabel = 'this action') {
+    const actorPassword = window.prompt(`Enter your current password to continue with ${actionLabel}:`);
+    if (actorPassword === null) return null;
+    if (!String(actorPassword).trim()) {
+      throw new Error('Password confirmation is required.');
+    }
+
+    const requestPayload = {
+      action: 'request_secure_action_otp',
+      secure_action: secureAction,
+      actor_password: actorPassword,
+      ...payload,
+    };
+    const otpRequest = await apiFetch(requestPayload, 'POST');
+    if (!otpRequest?.success) {
+      throw new Error(otpRequest?.message || 'Unable to send OTP.');
+    }
+
+    const deliveryLabel = String(otpRequest.delivery_label || '').trim();
+    const otpCode = window.prompt(
+      deliveryLabel
+        ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
+        : 'Enter the 6-digit OTP sent to your verified contact:'
+    );
+    if (otpCode === null) return null;
+
+    return {
+      challenge_key: String(otpRequest.challenge_key || ''),
+      otp_code: String(otpCode || '').trim(),
+    };
+  }
+
   const pageTool = document.body?.dataset.otTool || 'current_term';
   const autoStart = document.body?.dataset.otAutostart || '';
   const emptyQueueMessage = pageTool === 'create_new_term'
-    ? 'No term encoding records yet. Create the term first, then encode the elected winners and appointed officials.'
+    ? 'No governance cycle records yet. Create the cycle first, then encode the elected winners and appointed officials.'
     : 'No transitions found.';
 
   // ── Status badge ──────────────────────────────────────────────────────────
   function statusBadge(status) {
     const map = {
-      Open:              ['badge-ot-open',      'Open'],
-      CandidateEncoding: ['badge-ot-encoding',  'Access Setup'],
-      PendingDecision:   ['badge-ot-pending',   'Pending Access'],
-      Decided:           ['badge-ot-decided',   'Access Ready'],
-      Completed:         ['badge-ot-completed', 'Completed'],
-      Cancelled:         ['badge-ot-cancelled', 'Cancelled'],
+      PendingSuperAdminApproval: ['badge-ot-pending',   'Pending Review'],
+      PendingAccessReview:       ['badge-ot-encoding',  'Pending Access'],
+      Completed:                 ['badge-ot-completed', 'Completed'],
+      Cancelled:                 ['badge-ot-cancelled', 'Cancelled'],
+      Open:                      ['badge-ot-open',      'Open'],
     };
     const [cls, label] = map[status] || ['bg-secondary text-white', status];
     return `<span class="badge ${cls}">${label}</span>`;
@@ -133,15 +164,7 @@
       ].filter(Boolean);
       const outgoing = outgoingParts.join('');
       const batch = r.batch_label
-        ? `<div><span class="badge bg-secondary">${esc(r.batch_label)}</span></div>${
-            r.proclamation_date || r.next_election_date
-              ? `<div class="small text-muted mt-1">${
-                  r.proclamation_date ? `Proclaimed: ${fmtDate(r.proclamation_date)}` : ''
-                }${r.proclamation_date && r.next_election_date ? '<br>' : ''}${
-                  r.next_election_date ? `Next election: ${fmtDate(r.next_election_date)}` : ''
-                }</div>`
-              : ''
-          }`
+        ? `<div><span class="badge bg-secondary">${esc(r.batch_label)}</span></div>`
         : '<span class="text-muted small">—</span>';
       const effDate   = r.effective_date   ? fmtDate(r.effective_date) : '<span class="text-muted">—</span>';
       const actingTag = r.is_acting == 1   ? ' <span class="badge bg-info text-dark ms-1">Acting</span>' : '';
@@ -170,7 +193,7 @@
     const btns = [];
 
     if (s !== 'Completed' && s !== 'Cancelled') {
-      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Encode and complete transition"><i class="fas fa-user-plus me-1"></i>Set Access</button>`);
+      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Prepare incoming seat holder and complete turnover"><i class="fas fa-user-plus me-1"></i>Complete Turnover</button>`);
     }
     if (s !== 'Completed' && s !== 'Cancelled') {
       btns.push(`<button class="btn btn-xs btn-outline-danger py-0 px-2" onclick="otCancelTransition('${esc(tid)}')" title="Cancel"><i class="fas fa-times"></i></button>`);
@@ -229,12 +252,8 @@
   const ntCouncilId  = document.getElementById('ntCouncilId');
   const ntType       = document.getElementById('ntType');
   const ntBatchWrap  = document.getElementById('ntBatchLabelWrap');
-  const ntProclamationWrap = document.getElementById('ntProclamationDateWrap');
-  const ntNextElectionWrap = document.getElementById('ntNextElectionDateWrap');
   const ntReasonLbl  = document.getElementById('ntReasonLabel');
   const ntSeatWrap   = document.getElementById('ntSeatInfoWrap');
-  const ntProclamationDate = document.getElementById('ntProclamationDate');
-  const ntEffectiveDate = document.getElementById('ntEffectiveDate');
 
   // Transition type options per selection_method
   const ELECTED_TYPES = [
@@ -297,8 +316,6 @@
     // Reset dependent fields
     if (ntType) ntType.value = '';
     if (ntBatchWrap) ntBatchWrap.style.display = 'none';
-    if (ntProclamationWrap) ntProclamationWrap.style.display = 'none';
-    if (ntNextElectionWrap) ntNextElectionWrap.style.display = 'none';
     if (ntReasonLbl) ntReasonLbl.textContent = 'Reason';
   });
 
@@ -307,15 +324,7 @@
     const isElection = ['BarangayElection','SKElection'].includes(v);
     const isRemoval  = v === 'Removal';
     if (ntBatchWrap) ntBatchWrap.style.display = isElection ? '' : 'none';
-    if (ntProclamationWrap) ntProclamationWrap.style.display = isElection ? '' : 'none';
-    if (ntNextElectionWrap) ntNextElectionWrap.style.display = isElection ? '' : 'none';
     if (ntReasonLbl) ntReasonLbl.textContent   = isRemoval ? 'Reason *' : 'Reason';
-  });
-
-  ntProclamationDate?.addEventListener('change', () => {
-    if (ntEffectiveDate && ntType && ['BarangayElection', 'SKElection'].includes(ntType.value)) {
-      ntEffectiveDate.value = ntProclamationDate.value || '';
-    }
   });
 
   document.getElementById('formNewTransition')?.addEventListener('submit', async (e) => {
@@ -345,7 +354,7 @@
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // NEW BATCH MODAL
+  // NEW GOVERNANCE CYCLE MODAL
   // ══════════════════════════════════════════════════════════════════════════
   const batchSeatPreview = Array.isArray(window.OT_BATCH_SEAT_PREVIEW) ? window.OT_BATCH_SEAT_PREVIEW : [];
 
@@ -360,7 +369,7 @@
       emptyEl.classList.remove('d-none');
       emptyEl.textContent = 'No elected seats are configured in the council records yet.';
       wrapEl.classList.add('d-none');
-      bodyEl.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No elected seats are available for this batch.</td></tr>';
+      bodyEl.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No elected seats are available for this governance cycle.</td></tr>';
       return;
     }
 
@@ -401,17 +410,16 @@
     const body = new URLSearchParams();
     body.append('action', 'new_batch');
     body.append('batch_label', fd.get('batch_label') || '');
-    body.append('proclamation_date', fd.get('proclamation_date') || '');
-    body.append('next_election_date', fd.get('next_election_date') || '');
+    body.append('effective_date', fd.get('effective_date') || '');
 
     const res = await fetch(API, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
     const data = await res.json();
 
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-layer-group me-1"></i> Create Term';
+    btn.innerHTML = '<i class="fas fa-layer-group me-1"></i> Create Governance Cycle';
 
     if (data.success) {
-      showToast(data.message || 'Term created.');
+      showToast(data.message || 'Governance cycle created.');
       getModal('modalNewBatch')?.hide();
       e.target.reset();
       renderBatchSeatPreview();
@@ -424,7 +432,7 @@
   document.getElementById('modalNewBatch')?.addEventListener('shown.bs.modal', renderBatchSeatPreview);
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ADD ELECTION DATE
+  // EDIT GOVERNANCE CYCLE LABEL
   // ══════════════════════════════════════════════════════════════════════════
   const editSchedule = window.OT_EDIT_SCHEDULE && typeof window.OT_EDIT_SCHEDULE === 'object'
     ? window.OT_EDIT_SCHEDULE
@@ -432,71 +440,31 @@
   const formAddElection = document.getElementById('formAddElection');
   const aeBatchLabel = document.getElementById('aeBatchLabel');
   const aeOriginalBatchLabel = document.getElementById('aeOriginalBatchLabel');
-  const aeProclamationDate = document.getElementById('aeProclamationDate');
-  const aeProclamationDateHidden = document.getElementById('aeProclamationDateHidden');
-  const aeNextElectionDate = document.getElementById('aeNextElectionDate');
-  const aeNextElectionHelp = document.getElementById('aeNextElectionHelp');
   const aeNoEditableScheduleAlert = document.getElementById('aeNoEditableScheduleAlert');
   const btnSubmitEditTermDetails = document.getElementById('btnSubmitEditTermDetails');
 
   function configureEditTermForm() {
-    if (!formAddElection || !aeBatchLabel || !aeProclamationDate || !aeNextElectionDate) return;
+    if (!formAddElection || !aeBatchLabel) return;
 
     const batchLabel = String(editSchedule?.batch_label || '').trim();
-    const proclamationDate = String(editSchedule?.proclamation_date || '').trim();
-    const nextElectionDate = String(editSchedule?.next_election_date || '').trim();
 
     aeBatchLabel.value = batchLabel;
-    aeProclamationDate.value = proclamationDate;
-    aeNextElectionDate.value = nextElectionDate;
     if (aeOriginalBatchLabel) aeOriginalBatchLabel.value = batchLabel;
-    if (aeProclamationDateHidden) aeProclamationDateHidden.value = proclamationDate;
 
-    if (!batchLabel || !nextElectionDate) {
-      aeNextElectionDate.disabled = true;
-      aeNextElectionDate.removeAttribute('min');
-      aeNextElectionDate.removeAttribute('max');
-      delete aeNextElectionDate.dataset.lockedYear;
-      delete aeNextElectionDate.dataset.originalValue;
+    if (!batchLabel) {
       aeNoEditableScheduleAlert?.classList.remove('d-none');
       if (btnSubmitEditTermDetails) btnSubmitEditTermDetails.disabled = true;
       return;
     }
 
-    aeNextElectionDate.disabled = false;
     aeNoEditableScheduleAlert?.classList.add('d-none');
     if (btnSubmitEditTermDetails) btnSubmitEditTermDetails.disabled = false;
-
-    const lockedYear = nextElectionDate.slice(0, 4);
-    aeNextElectionDate.min = `${lockedYear}-01-01`;
-    aeNextElectionDate.max = `${lockedYear}-12-31`;
-    aeNextElectionDate.dataset.lockedYear = lockedYear;
-    aeNextElectionDate.dataset.originalValue = nextElectionDate;
-    if (aeNextElectionHelp) {
-      aeNextElectionHelp.textContent = `You can adjust the month and day, but the election year stays locked to ${lockedYear}.`;
-    }
-  }
-
-  function enforceEditTermYearLock() {
-    if (!aeNextElectionDate) return true;
-    const lockedYear = aeNextElectionDate.dataset.lockedYear || '';
-    const value = aeNextElectionDate.value || '';
-    if (!lockedYear || !value) return true;
-    if (!value.startsWith(`${lockedYear}-`)) {
-      showToast(`Next election year is locked to ${lockedYear}.`, 'warning');
-      aeNextElectionDate.value = aeNextElectionDate.dataset.originalValue || '';
-      return false;
-    }
-    aeNextElectionDate.dataset.originalValue = value;
-    return true;
   }
 
   document.getElementById('modalAddElection')?.addEventListener('show.bs.modal', configureEditTermForm);
-  aeNextElectionDate?.addEventListener('change', enforceEditTermYearLock);
 
   formAddElection?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!enforceEditTermYearLock()) return;
     const fd = new FormData(e.target);
     fd.append('action', 'update_election_date');
     const params = {};
@@ -1101,36 +1069,49 @@
       candidate_email:      draft.candidate_email || '',
       candidate_mobile:     draft.candidate_mobile || '',
     };
-    const data = await apiFetch(params, 'POST');
+    try {
+      const secureConfirmation = await requestSecureConfirmation(
+        'complete_transition',
+        { transition_id: transitionId },
+        'complete this official turnover'
+      );
+      if (!secureConfirmation) {
+        return;
+      }
+      Object.assign(params, secureConfirmation);
 
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete and Notify';
-
-    if (data.success) {
-      const inviteEmailFailed = data.invite_email_sent === false;
-      const inviteSmsFailed = data.invite_sms_sent === false;
-      const inviteEmailError = String(data.invite_email_error || '').trim();
-      const inviteSmsError = String(data.invite_sms_error || '').trim();
-      const deliveryHadIssue = inviteEmailFailed || inviteSmsFailed;
-      transitionDrafts.delete(String(transitionId || ''));
-      showToast(data.message || 'Access setup completed.', deliveryHadIssue ? 'warning' : 'success');
-      if (data.invite_link && inviteEmailFailed) {
-        if (inviteEmailError) {
-          showToast(`Invite email failed: ${inviteEmailError}`, 'warning');
+      const data = await apiFetch(params, 'POST');
+      if (data.success) {
+        const inviteEmailFailed = data.invite_email_sent === false;
+        const inviteSmsFailed = data.invite_sms_sent === false;
+        const inviteEmailError = String(data.invite_email_error || '').trim();
+        const inviteSmsError = String(data.invite_sms_error || '').trim();
+        const deliveryHadIssue = inviteEmailFailed || inviteSmsFailed;
+        transitionDrafts.delete(String(transitionId || ''));
+        showToast(data.message || 'Access setup completed.', deliveryHadIssue ? 'warning' : 'success');
+        if (data.invite_link && inviteEmailFailed) {
+          if (inviteEmailError) {
+            showToast(`Invite email failed: ${inviteEmailError}`, 'warning');
+          }
+          window.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link));
         }
-        window.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link));
+        if (inviteSmsFailed) {
+          showToast(
+            inviteSmsError ? `Invite SMS failed: ${inviteSmsError}` : 'Invite SMS was not sent automatically.',
+            'warning'
+          );
+        }
+        getModal('modalSelectWinner')?.hide();
+        loadTransitions();
+        updateStats();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
       }
-      if (inviteSmsFailed) {
-        showToast(
-          inviteSmsError ? `Invite SMS failed: ${inviteSmsError}` : 'Invite SMS was not sent automatically.',
-          'warning'
-        );
-      }
-      getModal('modalSelectWinner')?.hide();
-      loadTransitions();
-      updateStats();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete and Notify';
     }
   });
 
@@ -1138,16 +1119,31 @@
   // CANCEL TRANSITION
   // ══════════════════════════════════════════════════════════════════════════
   window.otCancelTransition = async function (transitionId) {
-    const reason = prompt(`Cancel transition ${transitionId}?\n\nOptional reason:`);
-    if (reason === null) return; // user dismissed
-    const data = await apiFetch({ action: 'cancel_transition', transition_id: transitionId, reason: reason || '' }, 'POST');
-    if (data.success) {
-      transitionDrafts.delete(String(transitionId || ''));
-      showToast('Transition cancelled.');
-      loadTransitions();
-      updateStats();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+    try {
+      const reason = prompt(`Cancel transition ${transitionId}?\n\nOptional reason:`);
+      if (reason === null) return;
+      const secureConfirmation = await requestSecureConfirmation(
+        'cancel_transition',
+        { transition_id: transitionId },
+        'cancel this transition'
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({
+        action: 'cancel_transition',
+        transition_id: transitionId,
+        reason: reason || '',
+        ...secureConfirmation,
+      }, 'POST');
+      if (data.success) {
+        transitionDrafts.delete(String(transitionId || ''));
+        showToast('Transition cancelled.');
+        loadTransitions();
+        updateStats();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
     }
   };
 
@@ -1246,15 +1242,25 @@
   });
 
   window.otRestoreOfficial = async function (officialId, name) {
-    if (!confirm(`Restore access for ${name}?`)) return;
-    const data = await apiFetch({ action: 'restore_access', official_id: officialId }, 'POST');
-    if (data.success) {
-      showToast(data.message || 'Access restored.');
-      loadInactiveOfficials();
-      loadPastOfficials(document.getElementById('otPastOfficialsSearch')?.value.trim() || '');
-      loadTransitions();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+    try {
+      if (!confirm(`Restore access for ${name}?`)) return;
+      const secureConfirmation = await requestSecureConfirmation(
+        'restore_access',
+        { official_id: officialId },
+        `restore access for ${name}`
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({ action: 'restore_access', official_id: officialId, ...secureConfirmation }, 'POST');
+      if (data.success) {
+        showToast(data.message || 'Access restored.');
+        loadInactiveOfficials();
+        loadPastOfficials(document.getElementById('otPastOfficialsSearch')?.value.trim() || '');
+        loadTransitions();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
     }
   };
 
@@ -1308,19 +1314,29 @@
     const email         = document.getElementById('credEmail').value.trim();
     const phone         = document.getElementById('credPhone').value.trim();
     const forceReset    = document.getElementById('credForcePasswordReset').checked ? 1 : 0;
+    try {
+      const secureConfirmation = await requestSecureConfirmation(
+        'change_credentials',
+        { official_id: officialId },
+        'change these official credentials'
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({
+        action: 'change_credentials',
+        official_id: officialId,
+        email, phone,
+        force_password_reset: forceReset,
+        ...secureConfirmation,
+      }, 'POST');
 
-    const data = await apiFetch({
-      action: 'change_credentials',
-      official_id: officialId,
-      email, phone,
-      force_password_reset: forceReset,
-    }, 'POST');
-
-    if (data.success) {
-      showToast(data.message || 'Credentials updated.');
-      getModal('modalChangeCredentials')?.hide();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+      if (data.success) {
+        showToast(data.message || 'Credentials updated.');
+        getModal('modalChangeCredentials')?.hide();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
     }
   });
 
@@ -1338,38 +1354,101 @@
     const idx = parseInt(choice) - 1;
     if (isNaN(idx) || !actingOfficials[idx]) { showToast('Invalid selection.', 'warning'); return; }
     const picked = actingOfficials[idx];
-    if (!confirm(`End acting assignment for ${picked.lastname}, ${picked.firstname}?`)) return;
-    const data = await apiFetch({ action: 'end_acting', acting_official_id: picked.official_id }, 'POST');
-    if (data.success) {
-      showToast(data.message || 'Acting assignment ended.');
-      loadTransitions();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+    try {
+      if (!confirm(`End acting assignment for ${picked.lastname}, ${picked.firstname}?`)) return;
+      const secureConfirmation = await requestSecureConfirmation(
+        'end_acting',
+        { acting_official_id: picked.official_id },
+        `end acting assignment for ${picked.lastname}, ${picked.firstname}`
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({ action: 'end_acting', acting_official_id: picked.official_id, ...secureConfirmation }, 'POST');
+      if (data.success) {
+        showToast(data.message || 'Acting assignment ended.');
+        loadTransitions();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
     }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // RESEND NOTIFICATION
-  // ══════════════════════════════════════════════════════════════════════════
-  window.otResendNotif = async function (batchLabel, electionDate) {
-    if (!confirm(`Reset notification flags for batch "${batchLabel}"?\n\nThe cron will re-evaluate and send pending notifications on its next run.`)) return;
-    const data = await apiFetch({ action: 'resend_notification', batch_label: batchLabel, election_date: electionDate }, 'POST');
-    if (data.success) {
-      showToast(data.message || 'Flags reset.');
-      location.reload();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+  window.otDeleteSchedule = async function (batchLabel) {
+    try {
+      if (!confirm(`Delete governance cycle "${batchLabel}"?\n\nThis will remove the schedule and all linked transition rows for that cycle.`)) return;
+      const secureConfirmation = await requestSecureConfirmation(
+        'delete_schedule',
+        { batch_label: batchLabel },
+        `delete governance cycle ${batchLabel}`
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({ action: 'delete_schedule', batch_label: batchLabel, ...secureConfirmation }, 'POST');
+      if (data.success) {
+        showToast(data.message || 'Schedule deleted.');
+        location.reload();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
     }
   };
 
-  window.otDeleteSchedule = async function (batchLabel, electionDate) {
-    if (!confirm(`Delete schedule "${batchLabel}" on ${electionDate}?\n\nThis will remove the schedule and all linked transition rows for that batch.`)) return;
-    const data = await apiFetch({ action: 'delete_schedule', batch_label: batchLabel, election_date: electionDate }, 'POST');
-    if (data.success) {
-      showToast(data.message || 'Schedule deleted.');
-      location.reload();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
+  window.otDemoteOfficial = async function (officialId, name) {
+    try {
+      const reason = prompt(`Demote ${name}?\n\nOptional reason:`);
+      if (reason === null) return;
+      const secureConfirmation = await requestSecureConfirmation(
+        'demote_official',
+        { official_id: officialId },
+        `demote ${name}`
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({
+        action: 'demote_official',
+        official_id: officialId,
+        reason: reason || '',
+        ...secureConfirmation,
+      }, 'POST');
+      if (data.success) {
+        showToast(data.message || 'Official demoted.');
+        loadTransitions();
+        updateStats();
+        location.reload();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
+    }
+  };
+
+  window.otDemoteBatch = async function (batchLabel) {
+    try {
+      if (!confirm(`Demote all outgoing officials for governance cycle "${batchLabel}"?\n\nThis is intended for governance-cycle turnover.`)) return;
+      const reason = prompt(`Optional reason for demoting governance cycle "${batchLabel}":`) ?? '';
+      const secureConfirmation = await requestSecureConfirmation(
+        'demote_batch',
+        { batch_label: batchLabel },
+        `demote all outgoing officials in ${batchLabel}`
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({
+        action: 'demote_batch',
+        batch_label: batchLabel,
+        reason,
+        ...secureConfirmation,
+      }, 'POST');
+      if (data.success) {
+        showToast(data.message || 'Governance cycle processed.');
+        location.reload();
+      } else {
+        showToast(data.message || 'Failed.', 'error');
+      }
+    } catch (error) {
+      showToast(error?.message || 'Failed.', 'error');
     }
   };
 

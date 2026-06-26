@@ -97,7 +97,7 @@ if ($officialAreaRes instanceof mysqli_result) {
     }
   }
 }
-$audienceRoleGroupOptions = ['Officials', 'Employees', 'Residents'];
+$audienceRoleGroupOptions = ['Officials', 'Personnel', 'Residents'];
 
 function ann_content_parse_csv_values(?string $value): array
 {
@@ -183,7 +183,7 @@ function ann_creator_display_from_user_id(mysqli $conn, string $userId, string $
     'SuperAdmin' => 'SuperAdmin',
     'Official' => 'Official',
     'Personnel' => 'Personnel',
-    'Employee' => 'Employee'
+    'Employee' => 'Personnel'
   ];
   $position = $positionMap[$rawPosition] ?? $rawPosition;
 
@@ -3014,7 +3014,6 @@ function ann_decode_faq_items(?string $json): array
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 </body>
 </html>
-
 
 
 

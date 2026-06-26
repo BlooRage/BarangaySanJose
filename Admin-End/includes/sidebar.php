@@ -23,8 +23,6 @@ if ($officialTransitionTool === '' || in_array($officialTransitionTool, ['tracke
     $officialTransitionTool = 'current_term';
 } elseif ($officialTransitionTool === 'create_new_term') {
     $officialTransitionTool = 'create_new_term';
-} elseif ($officialTransitionTool === 'settings') {
-    $officialTransitionTool = 'settings';
 } else {
     $officialTransitionTool = 'current_term';
 }
@@ -1415,7 +1413,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>"
                  class="link-dark rounded <?= $current == 'PersonnelRoleAccess.php' ? 'active' : '' ?>">
-                Role Based Permissions
+                Access Control
               </a>
             </li>
           </ul>
@@ -1432,7 +1430,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
       <?php endif; ?>
       <?php if ($sbCan('officials_management') || $sbCan('official_transition')): ?>
-      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Barangay Official Management</li>
+      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Barangay Official Governance</li>
       <?php if ($sbCan('officials_management')): ?>
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
@@ -1457,19 +1455,13 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' ? 'active' : '' ?>">
-                Current Term
+                Seat Assignment
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=create_new_term')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'create_new_term' ? 'active' : '' ?>">
-                Create New Term
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=settings')) ?>"
-                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'settings' ? 'active' : '' ?>">
-                Settings
+                Governance Cycle
               </a>
             </li>
           </ul>

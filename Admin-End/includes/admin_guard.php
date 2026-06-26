@@ -10,7 +10,7 @@ header("Expires: 0");
 require_once __DIR__ . "/../../PhpFiles/General/officialInviteCommon.php";
 
 // Enforce auth + 30-min inactivity timeout for admin-panel pages.
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 
 if (isset($conn) && $conn instanceof mysqli) {
     amp_ensure_permission_storage($conn);
@@ -20,7 +20,7 @@ $roleNorm = strtolower(trim((string)($_SESSION['role'] ?? '')));
 if ($roleNorm === 'officials') $roleNorm = 'official';
 if ($roleNorm === 'personnels') $roleNorm = 'personnel';
 if ($roleNorm === 'admin') $roleNorm = 'official';
-if ($roleNorm === 'employee') $roleNorm = 'official';
+if ($roleNorm === 'employee') $roleNorm = 'personnel';
 
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
 $currentOfficialAccount = null;

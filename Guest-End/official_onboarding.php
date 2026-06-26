@@ -126,6 +126,24 @@ function oi_get_account(mysqli $conn, string $userId): ?array
     return $row ? (pii_decrypt_useraccount_row($row) ?? $row) : null;
 }
 
+function oi_is_staff_portal_role(string $role): bool
+{
+    $normalized = normalizeRoleName($role);
+    return in_array($normalized, ['official', 'personnel', 'superadmin'], true);
+}
+
+function oi_normalize_invite_role(?string $role): string
+{
+    $normalized = normalizeRoleName((string)$role);
+    if ($normalized === 'superadmin') {
+        return 'SuperAdmin';
+    }
+    if ($normalized === 'personnel') {
+        return 'Personnel';
+    }
+    return 'Official';
+}
+
 function oi_send_email_otp(string $email, string $otp): bool
 {
     $smtpConfig = require __DIR__ . "/../PhpFiles/General/mailConfigurations.php";
@@ -439,7 +457,7 @@ $sessionInvite = null;
 $account = null;
 $officialInfo = null;
 
-if ($loggedUserId !== '' && in_array($loggedRole, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
+if ($loggedUserId !== '' && oi_is_staff_portal_role($loggedRole)) {
     $sessionInvite = oi_find_active_invite_by_user($conn, $loggedUserId);
     $account = oi_get_account($conn, $loggedUserId);
     $officialInfo = oi_get_official_info($conn, $loggedUserId);
@@ -470,9 +488,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email = (string)$invite['invite_email'];
             $phone10 = oi_normalize_phone10((string)$invite['invite_phone']);
             $preparedContacts = pii_prepare_useraccount_contacts($email, $phone10);
-            $roleAccess = in_array((string)$invite['role_access'], ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)
-                ? (string)$invite['role_access']
-                : 'Official';
+            $roleAccess = oi_normalize_invite_role((string)($invite['role_access'] ?? 'Official'));
             $linkedUserId = trim((string)($invite['user_id'] ?? ''));
 
             if ($linkedUserId !== '') {
@@ -1152,7 +1168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // refresh state after POST
     $loggedUserId = (string)($_SESSION['user_id'] ?? '');
     $loggedRole = (string)($_SESSION['role'] ?? '');
-    if ($loggedUserId !== '' && in_array($loggedRole, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
+    if ($loggedUserId !== '' && oi_is_staff_portal_role($loggedRole)) {
         $sessionInvite = oi_find_active_invite_by_user($conn, $loggedUserId);
         $account = oi_get_account($conn, $loggedUserId);
         $officialInfo = oi_get_official_info($conn, $loggedUserId);
@@ -1160,7 +1176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $mode = 'invalid';
-if ($loggedUserId !== '' && $sessionInvite && $account && in_array($loggedRole, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
+if ($loggedUserId !== '' && $sessionInvite && $account && oi_is_staff_portal_role($loggedRole)) {
     $mode = 'resume';
 } elseif ($tokenInvite && empty($tokenInvite['token_used_at'])) {
     $mode = 'password';

@@ -7,7 +7,7 @@ require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/uploadLimits.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 verifyCsrfToken(false);
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 

@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../General/connection.php';
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], true);
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 if ($userId === '') {

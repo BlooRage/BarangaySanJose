@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/security.php';
+require_once __DIR__ . '/appointmentCouncilMembers.php';
 
 if (!function_exists('cms_content_pages_table')) {
     function cms_content_pages_table(): string
@@ -564,40 +565,281 @@ if (!function_exists('cms_content_payload_with_context')) {
         }
 
         $payload = cms_content_normalize_payload($pageKey, $payload);
+        if ($pageKey === 'government') {
+            return cms_content_apply_governance_public_payload(
+                $payload,
+                cms_content_governance_public_payload($conn, $payload)
+            );
+        }
+
         if ($pageKey !== 'home') {
             return $payload;
         }
 
         $government = cms_content_page($conn, 'government');
+        $government = cms_content_apply_governance_public_payload(
+            $government,
+            cms_content_governance_public_payload($conn, $government)
+        );
         $council = [];
-        $punongName = cms_content_clean_text((string)($government['punong_barangay_name_html'] ?? ''));
-        $punongPosition = cms_content_clean_text((string)($government['punong_barangay_position_html'] ?? 'Punong Barangay'));
-        $punongImage = trim((string)($government['punong_barangay_image'] ?? ''));
-        if ($punongName !== '') {
-            $council[] = [
-                'name' => $punongName,
-                'position' => $punongPosition,
-                'image' => $punongImage,
-            ];
-        }
-        foreach ((array)($government['officials'] ?? []) as $official) {
-            if (!is_array($official)) {
-                continue;
+        if (is_array($government['council_members'] ?? null) && $government['council_members'] !== []) {
+            foreach ((array)$government['council_members'] as $member) {
+                if (!is_array($member)) {
+                    continue;
+                }
+                $name = cms_content_clean_text((string)($member['name'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $council[] = [
+                    'name' => $name,
+                    'position' => cms_content_clean_text((string)($member['position'] ?? '')),
+                    'image' => trim((string)($member['image'] ?? '')),
+                ];
             }
-            $name = cms_content_clean_text((string)($official['name_html'] ?? ''));
-            $position = cms_content_clean_text((string)($official['position_html'] ?? ''));
-            $image = trim((string)($official['image'] ?? ''));
-            if ($name === '') {
-                continue;
+        } else {
+            $punongName = cms_content_clean_text((string)($government['punong_barangay_name_html'] ?? ''));
+            $punongPosition = cms_content_clean_text((string)($government['punong_barangay_position_html'] ?? 'Punong Barangay'));
+            $punongImage = trim((string)($government['punong_barangay_image'] ?? ''));
+            if ($punongName !== '') {
+                $council[] = [
+                    'name' => $punongName,
+                    'position' => $punongPosition,
+                    'image' => $punongImage,
+                ];
             }
-            $council[] = [
-                'name' => $name,
-                'position' => $position,
-                'image' => $image,
-            ];
+            foreach ((array)($government['officials'] ?? []) as $official) {
+                if (!is_array($official)) {
+                    continue;
+                }
+                $name = cms_content_clean_text((string)($official['name_html'] ?? ''));
+                $position = cms_content_clean_text((string)($official['position_html'] ?? ''));
+                $image = trim((string)($official['image'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $council[] = [
+                    'name' => $name,
+                    'position' => $position,
+                    'image' => $image,
+                ];
+            }
         }
         $payload['council_members'] = $council;
         return $payload;
+    }
+}
+
+if (!function_exists('cms_content_governance_status_allows_public_display')) {
+    function cms_content_governance_status_allows_public_display(string $statusName): bool
+    {
+        $normalized = strtolower(trim($statusName));
+        if ($normalized === '') {
+            return true;
+        }
+
+        return !preg_match('/inactive|revoked|disabled|demoted|archived/', $normalized);
+    }
+}
+
+if (!function_exists('cms_content_governance_full_name')) {
+    function cms_content_governance_full_name(array $row): string
+    {
+        $row = pii_decrypt_official_row($row) ?? $row;
+        $parts = array_filter([
+            trim((string)($row['firstname'] ?? '')),
+            trim((string)($row['middlename'] ?? '')),
+            trim((string)($row['lastname'] ?? '')),
+            trim((string)($row['suffix'] ?? '')),
+        ], static fn($value): bool => $value !== '');
+
+        return trim(implode(' ', $parts));
+    }
+}
+
+if (!function_exists('cms_content_governance_match_image')) {
+    function cms_content_governance_match_image(array $governmentPayload, string $name, bool $isPunong = false): string
+    {
+        $placeholder = 'Images/Placeholder_Portrait.jpg';
+        if ($isPunong) {
+            $punongImage = trim((string)($governmentPayload['punong_barangay_image'] ?? ''));
+            return $punongImage !== '' ? $punongImage : $placeholder;
+        }
+
+        $needle = strtolower(trim(preg_replace('/\s+/', ' ', $name) ?? $name));
+        if ($needle === '') {
+            return $placeholder;
+        }
+
+        foreach ((array)($governmentPayload['officials'] ?? []) as $official) {
+            if (!is_array($official)) {
+                continue;
+            }
+            $candidateName = strtolower(trim(preg_replace('/\s+/', ' ', cms_content_clean_text((string)($official['name_html'] ?? ''))) ?? ''));
+            $candidateImage = trim((string)($official['image'] ?? ''));
+            if ($candidateName !== '' && $candidateName === $needle && $candidateImage !== '') {
+                return $candidateImage;
+            }
+        }
+
+        return $placeholder;
+    }
+}
+
+if (!function_exists('cms_content_governance_seat_meta_html')) {
+    function cms_content_governance_seat_meta_html(string $seatName, string $selectionMethod, string $seatGroup, bool $isFilled): string
+    {
+        $meta = array_values(array_filter([
+            trim($selectionMethod),
+            trim($seatGroup),
+            $isFilled ? '' : 'Assignment pending',
+        ], static fn($value): bool => $value !== ''));
+
+        $seatLabel = htmlspecialchars(trim($seatName), ENT_QUOTES, 'UTF-8');
+        if ($meta === []) {
+            return $seatLabel;
+        }
+
+        return $seatLabel . '<br><span class="text-muted small">' . htmlspecialchars(implode(' | ', $meta), ENT_QUOTES, 'UTF-8') . '</span>';
+    }
+}
+
+if (!function_exists('cms_content_governance_public_payload')) {
+    function cms_content_governance_public_payload(mysqli $conn, array $governmentPayload): array
+    {
+        if (
+            !apcm_table_exists($conn, 'barangaycounciltbl')
+            || !apcm_table_exists($conn, 'officialinformationtbl')
+        ) {
+            return [];
+        }
+
+        $statusJoin = '';
+        $accountStatusSelect = "'' AS account_status";
+        if (apcm_table_exists($conn, 'useraccountstbl') && apcm_table_exists($conn, 'statuslookuptbl')) {
+            $statusJoin = "
+                LEFT JOIN useraccountstbl ua
+                    ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+                LEFT JOIN statuslookuptbl sa
+                    ON sa.status_id = ua.status_id_account
+            ";
+            $accountStatusSelect = "COALESCE(sa.status_name, '') AS account_status";
+        }
+
+        $positionSelect = apcm_column_exists($conn, 'officialinformationtbl', 'position_access')
+            ? 'COALESCE(oi.position_access, oi.role_access) AS position_access'
+            : "oi.role_access AS position_access";
+
+        $sql = "
+            SELECT
+                bc.council_id,
+                bc.seat_name,
+                bc.seat_group,
+                bc.selection_method,
+                bc.sort_order,
+                bc.current_official_id,
+                oi.official_id,
+                oi.firstname,
+                oi.middlename,
+                oi.lastname,
+                oi.suffix,
+                {$positionSelect},
+                {$accountStatusSelect}
+            FROM barangaycounciltbl bc
+            LEFT JOIN officialinformationtbl oi
+                ON oi.official_id = bc.current_official_id
+            {$statusJoin}
+            WHERE bc.is_active = 1
+            ORDER BY bc.sort_order, bc.council_id
+        ";
+
+        $result = $conn->query($sql);
+        if (!($result instanceof mysqli_result)) {
+            return [];
+        }
+
+        $officialCards = [];
+        $councilMembers = [];
+        $punong = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $seatName = trim((string)($row['seat_name'] ?? ''));
+            if ($seatName === '') {
+                continue;
+            }
+
+            $fullName = cms_content_governance_full_name($row);
+            $statusName = trim((string)($row['account_status'] ?? ''));
+            $isFilled = trim((string)($row['official_id'] ?? '')) !== ''
+                && $fullName !== ''
+                && cms_content_governance_status_allows_public_display($statusName);
+            $displayName = $isFilled ? $fullName : 'Vacant';
+            $isPunong = stripos($seatName, 'Punong Barangay') === 0;
+            $image = cms_content_governance_match_image($governmentPayload, $fullName, $isPunong);
+
+            if ($isPunong) {
+                $punong = [
+                    'punong_barangay_name_html' => htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'),
+                    'punong_barangay_position_html' => htmlspecialchars($seatName, ENT_QUOTES, 'UTF-8'),
+                    'punong_barangay_image' => $image,
+                ];
+
+                if ($isFilled) {
+                    $councilMembers[] = [
+                        'name' => $fullName,
+                        'position' => $seatName,
+                        'image' => $image,
+                    ];
+                }
+                continue;
+            }
+
+            $officialCards[] = [
+                'name_html' => htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'),
+                'position_html' => cms_content_governance_seat_meta_html(
+                    $seatName,
+                    trim((string)($row['selection_method'] ?? '')),
+                    trim((string)($row['seat_group'] ?? '')),
+                    $isFilled
+                ),
+                'image' => $image,
+            ];
+
+            if ($isFilled) {
+                $councilMembers[] = [
+                    'name' => $fullName,
+                    'position' => $seatName,
+                    'image' => $image,
+                ];
+            }
+        }
+        $result->free();
+
+        if ($officialCards === [] && $punong === []) {
+            return [];
+        }
+
+        return $punong + [
+            'officials' => $officialCards,
+            'council_members' => $councilMembers,
+        ];
+    }
+}
+
+if (!function_exists('cms_content_apply_governance_public_payload')) {
+    function cms_content_apply_governance_public_payload(array $governmentPayload, array $governancePayload): array
+    {
+        if ($governancePayload === []) {
+            return $governmentPayload;
+        }
+
+        foreach (['punong_barangay_name_html', 'punong_barangay_position_html', 'punong_barangay_image', 'officials', 'council_members'] as $field) {
+            if (array_key_exists($field, $governancePayload)) {
+                $governmentPayload[$field] = $governancePayload[$field];
+            }
+        }
+
+        return $governmentPayload;
     }
 }
 

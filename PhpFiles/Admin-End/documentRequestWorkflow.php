@@ -7,7 +7,7 @@ require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/audit.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], true);
 
 $action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
 if ($action === '') {
@@ -155,7 +155,7 @@ if ($action === 'bulk_regenerate_issued') {
 }
 
 $currentUserId   = (string)($_SESSION['user_id'] ?? '');
-$currentUserRole = (string)($_SESSION['role'] ?? 'Employee');
+$currentUserRole = (string)($_SESSION['role'] ?? 'Personnel');
 
 function dra_is_finance_user(mysqli $conn, string $userId): bool {
     $userId = trim($userId);
@@ -186,7 +186,6 @@ function dra_is_finance_user(mysqli $conn, string $userId): bool {
         strpos($department, 'finance') !== false
         || strpos($position, 'cashier') !== false
         || strpos($position, 'finance') !== false
-        || ($role === 'employee' && strpos($department, 'finance') !== false)
     );
 }
 
@@ -224,6 +223,90 @@ function dra_resolve_official_display_name(mysqli $conn, string $userId): string
     ], static fn($value) => trim((string)$value) !== ''))));
     $cache[$userId] = $fullName !== '' ? $fullName : $userId;
     return $cache[$userId];
+}
+
+function dra_current_barangay_signatories(mysqli $conn): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+
+    $fallback = [
+        'punong' => [
+            'name' => 'HON. GLENN S. EVANGELISTA',
+            'title' => 'Punong Barangay',
+        ],
+        'secretary' => [
+            'name' => 'MINERVA D. QUITA',
+            'title' => 'Barangay Secretary',
+        ],
+    ];
+
+    if (!dr_table_exists($conn, 'barangaycounciltbl') || !dr_table_exists($conn, 'officialinformationtbl')) {
+        $cache = $fallback;
+        return $cache;
+    }
+
+    $result = $conn->query("
+        SELECT bc.seat_name, oi.firstname, oi.middlename, oi.lastname, oi.suffix
+        FROM barangaycounciltbl bc
+        LEFT JOIN officialinformationtbl oi
+            ON oi.official_id = bc.current_official_id
+        WHERE bc.is_active = 1
+          AND bc.current_official_id IS NOT NULL
+        ORDER BY bc.sort_order, bc.council_id
+    ");
+    if (!($result instanceof mysqli_result)) {
+        $cache = $fallback;
+        return $cache;
+    }
+
+    $resolved = $fallback;
+    while ($row = $result->fetch_assoc()) {
+        $row = pii_decrypt_official_row($row) ?? $row;
+        $seatName = trim((string)($row['seat_name'] ?? ''));
+        if ($seatName === '') {
+            continue;
+        }
+
+        $fullName = trim(implode(' ', array_values(array_filter([
+            trim((string)($row['firstname'] ?? '')),
+            trim((string)($row['middlename'] ?? '')),
+            trim((string)($row['lastname'] ?? '')),
+            trim((string)($row['suffix'] ?? '')),
+        ], static fn($value): bool => $value !== ''))));
+        if ($fullName === '') {
+            continue;
+        }
+
+        $seatLower = strtolower($seatName);
+        if (
+            strpos($seatLower, 'punong barangay') !== false
+            || strpos($seatLower, 'barangay captain') !== false
+            || $seatLower === 'barangay chairman'
+        ) {
+            $displayName = strtoupper($fullName);
+            if (!preg_match('/^HON\\.?\\s/i', $displayName)) {
+                $displayName = 'HON. ' . $displayName;
+            }
+            $resolved['punong'] = [
+                'name' => $displayName,
+                'title' => 'Punong Barangay',
+            ];
+            continue;
+        }
+
+        if ($seatLower === 'barangay secretary') {
+            $resolved['secretary'] = [
+                'name' => strtoupper($fullName),
+                'title' => 'Barangay Secretary',
+            ];
+        }
+    }
+    $result->free();
+
+    $cache = $resolved;
+    return $cache;
 }
 
 function dra_resolve_resident_display_name(mysqli $conn, string $residentUserId, string $residentId): string {
@@ -2145,6 +2228,17 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
 
 function dra_generate_issued_document(array $requestRow): ?string {
     global $conn;
+
+    $signatories = ($conn instanceof mysqli)
+        ? dra_current_barangay_signatories($conn)
+        : [
+            'punong' => ['name' => 'HON. GLENN S. EVANGELISTA', 'title' => 'Punong Barangay'],
+            'secretary' => ['name' => 'MINERVA D. QUITA', 'title' => 'Barangay Secretary'],
+        ];
+    $punongSignatoryName = trim((string)($signatories['punong']['name'] ?? 'HON. GLENN S. EVANGELISTA'));
+    $punongSignatoryTitle = trim((string)($signatories['punong']['title'] ?? 'Punong Barangay'));
+    $secretarySignatoryName = trim((string)($signatories['secretary']['name'] ?? 'MINERVA D. QUITA'));
+    $secretarySignatoryTitle = trim((string)($signatories['secretary']['title'] ?? 'Barangay Secretary'));
 
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
@@ -5293,10 +5387,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->Line($signX, $signBaseY, $signX + $signW, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 10);
             $pdf->SetXY($signX, $signBaseY + 1.5);
-            $pdf->Cell($signW, 5, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
+            $pdf->Cell($signW, 5, $punongSignatoryName, 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'I', 9);
             $pdf->SetXY($signX, $signBaseY + 6.5);
-            $pdf->Cell($signW, 4.5, 'Punong Barangay', 0, 1, 'C');
+            $pdf->Cell($signW, 4.5, $punongSignatoryTitle, 0, 1, 'C');
             $pdf->Line($signX + 8, $signBaseY + 17, $signX + $signW - 8, $signBaseY + 17);
             $pdf->SetFont($indigencyFont, 'B', 9);
             $pdf->SetXY($signX, $signBaseY + 18.5);
@@ -5310,10 +5404,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->Line($signX, $witnessBaseY, $signX + $signW, $witnessBaseY);
             $pdf->SetFont($indigencyFont, 'B', 10);
             $pdf->SetXY($signX, $witnessBaseY + 1.5);
-            $pdf->Cell($signW, 5, 'MINERVA D. QUITA', 0, 1, 'C');
+            $pdf->Cell($signW, 5, $secretarySignatoryName, 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'I', 9);
             $pdf->SetXY($signX, $witnessBaseY + 6.5);
-            $pdf->Cell($signW, 4.5, 'Barangay Secretary', 0, 1, 'C');
+            $pdf->Cell($signW, 4.5, $secretarySignatoryTitle, 0, 1, 'C');
             $pdf->Line($signX + 8, $witnessBaseY + 17, $signX + $signW - 8, $witnessBaseY + 17);
             $pdf->SetFont($indigencyFont, 'B', 9);
             $pdf->SetXY($signX, $witnessBaseY + 18.5);
@@ -5345,19 +5439,19 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY(26, $issuedByY);
             $pdf->Cell(20, 6, 'Issued by:', 0, 0, 'L');
             $pdf->SetFont($indigencyFont, 'B', 11);
-            $pdf->Cell(54, 6, 'MINERVA D. QUITA', 0, 1, 'L');
+            $pdf->Cell(54, 6, $secretarySignatoryName, 0, 1, 'L');
             $pdf->SetFont($indigencyFont, 'I', 11);
             $pdf->SetXY(46, $issuedByTitleY);
-            $pdf->Cell(44, 6, 'Barangay Secretary', 0, 1, 'C');
+            $pdf->Cell(44, 6, $secretarySignatoryTitle, 0, 1, 'C');
 
             // Punong Barangay signature block (lower-right)
             $pdf->Line(124, $signBaseY, 194, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 11);
             $pdf->SetXY(124, $signBaseY + 2);
-            $pdf->Cell(70, 6, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
+            $pdf->Cell(70, 6, $punongSignatoryName, 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'I', 11);
             $pdf->SetXY(124, $signBaseY + 8);
-            $pdf->Cell(70, 6, 'Punong Barangay', 0, 1, 'C');
+            $pdf->Cell(70, 6, $punongSignatoryTitle, 0, 1, 'C');
 
             // Footer note in a centered constrained width area.
             $pdf->SetFont($indigencyFont, 'I', 8);
@@ -5415,9 +5509,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $pdf->SetY(250);
     $pdf->Line(18, 250, 88, 250);
     $pdf->SetFont($fontFace, 'B', 11);
-    $pdf->Cell(70, 7, 'HON. GLENN S. EVANGELISTA', 0, 1, 'L');
+    $pdf->Cell(70, 7, $punongSignatoryName, 0, 1, 'L');
     $pdf->SetFont($fontFace, '', 11);
-    $pdf->Cell(70, 6, 'Punong Barangay', 0, 1, 'L');
+    $pdf->Cell(70, 6, $punongSignatoryTitle, 0, 1, 'L');
 
     $pdf->Output('F', $diskPath);
 

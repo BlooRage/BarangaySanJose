@@ -158,14 +158,14 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           <ul>
             <li>Encryption of sensitive data.</li>
             <li>Secure authentication and role-based access control.</li>
-            <li>Restricted access limited to authorized barangay officials and employees.</li>
+            <li>Restricted access limited to authorized barangay officials and personnel.</li>
             <li>System logging and regular backups.</li>
           </ul>
 
           <h4>5. Data Sharing and Disclosure</h4>
           <p>Personal data may only be disclosed to:</p>
           <ul>
-            <li>Authorized barangay officials and employees.</li>
+            <li>Authorized barangay officials and personnel.</li>
             <li>Relevant government units for official transactions.</li>
             <li>Law enforcement or authorities when required by law.</li>
           </ul>

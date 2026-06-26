@@ -144,7 +144,7 @@ function pra_load_saved_profile_maps(mysqli $conn): array
 
     $profileRes = $conn->query("
         SELECT department_key, position_key, department_label, position_label, updated_at
-        FROM personnelroleaccessprofiletbl
+        FROM officialaccessroleprofiletbl
         WHERE permissions_initialized = 1
     ");
     if ($profileRes instanceof mysqli_result) {
@@ -164,7 +164,7 @@ function pra_load_saved_profile_maps(mysqli $conn): array
 
     $permissionRes = $conn->query("
         SELECT department_key, position_key, department_label, position_label, permission_key
-        FROM personnelrolemodulepermissionstbl
+        FROM officialaccessrolepermissiontbl
         WHERE is_allowed = 1
     ");
     if ($permissionRes instanceof mysqli_result) {
@@ -466,20 +466,20 @@ try {
             $conn,
             $actorUserId,
             $actorRole,
-            'Personnel Role Based Permissions',
+            'Access Control',
             'PersonnelRoleAccessProfile',
             pra_profile_target_id($department, $positionAccess),
             'PERSONNEL_ROLE_ACCESS_SAVE',
             'module_permissions',
             pra_permission_summary($oldPermissionMap),
             pra_permission_summary($permissionMap),
-            'Updated personnel role-based permission profile.',
+            'Updated access control profile.',
             null
         );
 
         echo json_encode([
             'success' => true,
-            'message' => 'Role-based permissions saved successfully.',
+            'message' => 'Access control profile saved successfully.',
         ]);
         exit;
     }
@@ -516,20 +516,20 @@ try {
             $conn,
             $actorUserId,
             $actorRole,
-            'Personnel Role Based Permissions',
+            'Access Control',
             'PersonnelRoleAccessProfile',
             pra_profile_target_id($department, $positionAccess),
             'PERSONNEL_ROLE_ACCESS_RESET',
             'module_permissions',
             pra_permission_summary($oldPermissionMap),
             pra_permission_summary($defaultPermissionMap),
-            'Reset personnel role-based permission profile to default permissions.',
+            'Reset access control profile to default permissions.',
             null
         );
 
         echo json_encode([
             'success' => true,
-            'message' => 'Role-based permissions reset to defaults.',
+            'message' => 'Access control profile reset to defaults.',
         ]);
         exit;
     }
@@ -546,6 +546,6 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Unable to process role-based permissions.',
+        'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Unable to process access control changes.',
     ]);
 }

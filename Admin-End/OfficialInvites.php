@@ -793,7 +793,7 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
                                 <td><?= htmlspecialchars((string)((trim((string)($r['invite_code'] ?? '')) !== '') ? $r['invite_code'] : (string)((int)$r['invite_id'])), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td>
-                                    <?= htmlspecialchars((string)$r['role_access'], ENT_QUOTES, 'UTF-8') ?>
+                                    <?= htmlspecialchars(ucfirst(normalizeRoleName((string)$r['role_access'])), ENT_QUOTES, 'UTF-8') ?>
                                     -
                                     <?= htmlspecialchars((string)($r['position_access'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
                                 </td>

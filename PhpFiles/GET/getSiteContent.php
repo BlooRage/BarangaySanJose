@@ -23,9 +23,7 @@ if ($pageKey === '') {
     exit;
 }
 
-$payload = $pageKey === 'home'
-    ? cms_content_page_with_context($conn, $pageKey)
-    : cms_content_page($conn, $pageKey);
+$payload = cms_content_page_with_context($conn, $pageKey);
 
 echo json_encode([
     'success' => true,

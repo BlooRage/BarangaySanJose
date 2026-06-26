@@ -4,7 +4,7 @@ require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/adminModulePermissions.php';
 require_once __DIR__ . '/../General/siteContent.php';
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . appUrl('/Admin-End/Contents/ContentManagement.php'));
