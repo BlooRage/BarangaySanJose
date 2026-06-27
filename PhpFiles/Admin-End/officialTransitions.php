@@ -827,8 +827,7 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
     if (!$accountStmt) {
         throw new RuntimeException('Failed to prepare incoming official account creation.');
     }
-    $accountStmt->bind_param(
-        'ssssssss',
+    otBindStringParams($accountStmt, [
         $userId,
         $accountContact['phone_number'],
         $accountContact['phone_lookup_hash'],
@@ -837,7 +836,7 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
         $passwordHash,
         $activeStatusId,
         $assignment['account_role']
-    );
+    ]);
     if (!$accountStmt->execute()) {
         $error = $accountStmt->error;
         $accountStmt->close();
@@ -881,8 +880,7 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
     if (!$officialStmt) {
         throw new RuntimeException('Failed to prepare the incoming official profile.');
     }
-    $officialStmt->bind_param(
-        'ssssssssssssssssssssis',
+    otBindStringParams($officialStmt, [
         $officialId,
         $userId,
         $officialIdentity['lastname'],
@@ -905,7 +903,7 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
         $assignment['position_access'],
         $employmentStatusId,
         $effectiveDate
-    );
+    ]);
     if (!$officialStmt->execute()) {
         $error = $officialStmt->error;
         $officialStmt->close();
@@ -1069,8 +1067,7 @@ if (!function_exists('ot_governance_create_shell')) {
             throw new RuntimeException('Failed to prepare incoming official account creation.');
         }
         $inactiveStatusValue = (string)$inactiveStatusId;
-        $accountStmt->bind_param(
-            'ssssssss',
+        otBindStringParams($accountStmt, [
             $userId,
             $accountContact['phone_number'],
             $accountContact['phone_lookup_hash'],
@@ -1079,7 +1076,7 @@ if (!function_exists('ot_governance_create_shell')) {
             $passwordHash,
             $inactiveStatusValue,
             $assignment['account_role']
-        );
+        ]);
         if (!$accountStmt->execute()) {
             $error = $accountStmt->error;
             $accountStmt->close();
@@ -1124,8 +1121,7 @@ if (!function_exists('ot_governance_create_shell')) {
         }
         $selectionMethod = (string)$assignment['selection_method'];
         $batchLabel = trim((string)($transition['batch_label'] ?? ''));
-        $officialStmt->bind_param(
-            'ssssssssssssssssssssis',
+        otBindStringParams($officialStmt, [
             $officialId,
             $userId,
             $officialIdentity['lastname'],
@@ -1147,7 +1143,7 @@ if (!function_exists('ot_governance_create_shell')) {
             $assignment['position_access'],
             $employmentStatusId,
             $effectiveDate
-        );
+        ]);
         if (!$officialStmt->execute()) {
             $error = $officialStmt->error;
             $officialStmt->close();
@@ -1369,7 +1365,19 @@ if ($action === 'new_transition') {
     $department = (string)($seat['department'] ?? '');
     $areaNumber = (string)($seat['area_number'] ?? '');
     $outgoingId = (string)($seat['current_official_id'] ?? '');
-    $stmt->bind_param('sisssssssss', $transitionId, $councilId, $batchLabel, $transType, $seatName, $department, $areaNumber, $outgoingId, $effectiveDate, $reason, $actorId);
+    otBindStringParams($stmt, [
+        $transitionId,
+        $councilId,
+        $batchLabel,
+        $transType,
+        $seatName,
+        $department,
+        $areaNumber,
+        $outgoingId,
+        $effectiveDate,
+        $reason,
+        $actorId
+    ]);
     if (!$stmt->execute()) otError('Failed to create transition: ' . $stmt->error);
     $stmt->close();
     insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Transition', 'transition', $transitionId, 'create_transition', 'transition_type', null, $transType, 'Created transition draft.');
@@ -1406,7 +1414,18 @@ if ($action === 'new_batch') {
         $department = (string)($seat['department'] ?? '');
         $areaNumber = (string)($seat['area_number'] ?? '');
         $outgoingId = (string)($seat['current_official_id'] ?? '');
-        $stmt->bind_param('sissssssss', $transitionId, $seat['council_id'], $batchLabel, $transitionType, $seatName, $department, $areaNumber, $outgoingId, $effectiveDate, $actorId);
+        otBindStringParams($stmt, [
+            $transitionId,
+            $seat['council_id'],
+            $batchLabel,
+            $transitionType,
+            $seatName,
+            $department,
+            $areaNumber,
+            $outgoingId,
+            $effectiveDate,
+            $actorId
+        ]);
         if ($stmt->execute()) {
             $created[] = $transitionId;
         }
@@ -1543,7 +1562,16 @@ if ($action === 'complete_transition') {
             ");
             if ($upOfficial) {
                 $batchLabel = trim((string)($transition['batch_label'] ?? ''));
-                $upOfficial->bind_param('ssssssss', $assignment['official_role'], $assignment['position_access'], $assignment['department'], $assignment['area_number'], $assignment['selection_method'], $effectiveDate, $batchLabel, $incomingOfficialId);
+                otBindStringParams($upOfficial, [
+                    $assignment['official_role'],
+                    $assignment['position_access'],
+                    $assignment['department'],
+                    $assignment['area_number'],
+                    $assignment['selection_method'],
+                    $effectiveDate,
+                    $batchLabel,
+                    $incomingOfficialId
+                ]);
                 $upOfficial->execute();
                 $upOfficial->close();
             }
@@ -1568,7 +1596,13 @@ if ($action === 'complete_transition') {
             ");
             if ($upProfile) {
                 $coverage = trim((string)($assignment['area_number'] ?? ''));
-                $upProfile->bind_param('sssss', $assignment['account_role'], $assignment['area_number'], $coverage, $actorId, $incomingOfficialId);
+                otBindStringParams($upProfile, [
+                    $assignment['account_role'],
+                    $assignment['area_number'],
+                    $coverage,
+                    $actorId,
+                    $incomingOfficialId
+                ]);
                 $upProfile->execute();
                 $upProfile->close();
             }
@@ -1609,7 +1643,14 @@ if ($action === 'complete_transition') {
         if (!$completeStmt) {
             throw new RuntimeException('Failed to finalize transition.');
         }
-        $completeStmt->bind_param('ssssss', $incomingOfficialId, $notes, $outcome, $outcome, $actorId, $transitionId);
+        otBindStringParams($completeStmt, [
+            $incomingOfficialId,
+            $notes,
+            $outcome,
+            $outcome,
+            $actorId,
+            $transitionId
+        ]);
         $completeStmt->execute();
         $completeStmt->close();
 

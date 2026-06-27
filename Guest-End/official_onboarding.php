@@ -542,8 +542,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!$upUser) {
                                 throw new RuntimeException('Failed to prepare account update.');
                             }
-                            $upUser->bind_param(
-                                "sssssss",
+                            oi_bind_string_params($upUser, [
                                 $preparedContacts['phone_number'],
                                 $preparedContacts['phone_lookup_hash'],
                                 $preparedContacts['email'],
@@ -551,7 +550,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $passwordHash,
                                 $roleAccess,
                                 $linkedUserId
-                            );
+                            ]);
                             if (!$upUser->execute()) {
                                 $upUser->close();
                                 throw new RuntimeException('Failed to update account.');
@@ -661,8 +660,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     (?, ?, ?, 0, ?, ?, 0, ?, ?, NOW(), ?)
                             ");
                             if (!$ins) throw new RuntimeException('Failed to prepare account creation.');
-                            $ins->bind_param(
-                                "sssssssi",
+                            oi_bind_string_params($ins, [
                                 $userId,
                                 $preparedContacts['phone_number'],
                                 $preparedContacts['phone_lookup_hash'],
@@ -671,7 +669,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $passwordHash,
                                 $roleAccess,
                                 $activeStatusId
-                            );
+                            ]);
                             if (!$ins->execute()) {
                                 $ins->close();
                                 throw new RuntimeException('Failed to create account.');
@@ -1030,8 +1028,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$stmt) {
                     throw new RuntimeException('Failed to save address.');
                 }
-                $stmt->bind_param(
-                    "ssssssssss",
+                oi_bind_string_params($stmt, [
                     $addressEncrypted['address_mode'],
                     $addressEncrypted['house_number'],
                     $addressEncrypted['street_name'],
@@ -1042,7 +1039,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $addressEncrypted['municipality_city'],
                     $addressEncrypted['province'],
                     $loggedUserId
-                );
+                ]);
                 if (!$stmt->execute()) {
                     $stmt->close();
                     throw new RuntimeException('Failed to save address.');

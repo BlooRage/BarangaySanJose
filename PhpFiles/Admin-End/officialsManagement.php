@@ -799,14 +799,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (!$updateAccount) {
                     throw new Exception('Failed to prepare user account update.');
                 }
-                $updateAccount->bind_param(
-                    'sssss',
+                oi_bind_string_params($updateAccount, [
                     $preparedContacts['email'],
                     $preparedContacts['email_lookup_hash'],
                     $preparedContacts['phone_number'],
                     $preparedContacts['phone_lookup_hash'],
                     $userId
-                );
+                ]);
                 $updateAccount->execute();
                 $updateAccount->close();
 
@@ -841,8 +840,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (!$updateOfficial) {
                     throw new Exception('Failed to prepare profile update.');
                 }
-                $updateOfficial->bind_param(
-                    'sssssssssssssssssssssss',
+                oi_bind_string_params($updateOfficial, [
                     $encryptedOfficial['lastname'],
                     $encryptedOfficial['firstname'],
                     $encryptedOfficial['middlename'],
@@ -866,7 +864,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $encryptedOfficial['municipality_city'],
                     $encryptedOfficial['province'],
                     $officialId
-                );
+                ]);
                 $updateOfficial->execute();
                 $updateOfficial->close();
 
