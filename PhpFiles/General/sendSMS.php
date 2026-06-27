@@ -7,13 +7,22 @@ require_once __DIR__ . '/runtimeConfig.php';
 $defaultSemaphoreApiKey = 'ee267d0fbd5c2159bea7d72878c9d4cb';
 $defaultSemaphoreSender = 'BrgySanJose';
 
-$SEMAPHORE_API_KEY = trim((string)runtime_env(
-    'SMS_SEMAPHORE_API_KEY',
-    runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', $defaultSemaphoreApiKey))
-));
-$SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', $defaultSemaphoreSender)));
-$SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages')));
-$SEMAPHORE_OTP_ENDPOINT = trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp')));
+if (!function_exists('smsRuntimeConfig')) {
+    function smsRuntimeConfig(): array
+    {
+        global $defaultSemaphoreApiKey, $defaultSemaphoreSender;
+
+        return [
+            'api_key' => trim((string)runtime_env(
+                'SMS_SEMAPHORE_API_KEY',
+                runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', $defaultSemaphoreApiKey))
+            )),
+            'sender' => trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', $defaultSemaphoreSender))),
+            'endpoint' => trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages'))),
+            'otp_endpoint' => trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp'))),
+        ];
+    }
+}
 
 if (!array_key_exists('LAST_SMS_ERROR', $GLOBALS)) {
     $GLOBALS['LAST_SMS_ERROR'] = '';
@@ -245,12 +254,11 @@ if (!function_exists('smsSendRequest')) {
  */
 function sendSMS(string $recipient, string $message, string $otpCode = null): bool
 {
-    global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT, $SEMAPHORE_OTP_ENDPOINT;
-
-    $apiKey = trim((string)($SEMAPHORE_API_KEY ?? ''));
-    $sender = trim((string)($SEMAPHORE_SENDER ?? ''));
-    $messagesEndpoint = trim((string)($SEMAPHORE_ENDPOINT ?? ''));
-    $otpEndpoint = trim((string)($SEMAPHORE_OTP_ENDPOINT ?? ''));
+    $config = smsRuntimeConfig();
+    $apiKey = (string)($config['api_key'] ?? '');
+    $sender = (string)($config['sender'] ?? '');
+    $messagesEndpoint = (string)($config['endpoint'] ?? '');
+    $otpEndpoint = (string)($config['otp_endpoint'] ?? '');
 
     setLastSmsError('');
 
