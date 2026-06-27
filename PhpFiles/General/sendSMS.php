@@ -10,14 +10,15 @@ $defaultSemaphoreSender = 'BrgySanJose';
 if (!function_exists('smsRuntimeConfig')) {
     function smsRuntimeConfig(): array
     {
-        global $defaultSemaphoreApiKey, $defaultSemaphoreSender;
+        $defaultApiKey = 'ee267d0fbd5c2159bea7d72878c9d4cb';
+        $defaultSender = 'BrgySanJose';
 
         return [
             'api_key' => trim((string)runtime_env(
                 'SMS_SEMAPHORE_API_KEY',
-                runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', $defaultSemaphoreApiKey))
+                runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', $defaultApiKey))
             )),
-            'sender' => trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', $defaultSemaphoreSender))),
+            'sender' => trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', $defaultSender))),
             'endpoint' => trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages'))),
             'otp_endpoint' => trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp'))),
         ];
