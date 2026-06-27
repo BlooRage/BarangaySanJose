@@ -676,6 +676,7 @@
   const linkedSelectedEl = document.getElementById('linkedOfficialSelected');
   const formerOfficialModeEl = document.getElementById('formerOfficialMode');
   const newOfficialFieldsWrap = document.getElementById('newOfficialFieldsWrap');
+  const existingOfficialIdentityHintEl = document.getElementById('existingOfficialIdentityHint');
   const lastNameEl    = document.getElementById('newCandidateLastName');
   const firstNameEl   = document.getElementById('newCandidateFirstName');
   const middleNameEl  = document.getElementById('newCandidateMiddleName');
@@ -688,6 +689,21 @@
   const linkedOfficialCache = new Map();
   let linkedSearchTimer = null;
 
+  function setExistingOfficialIdentityLock(locked) {
+    [lastNameEl, firstNameEl, middleNameEl].forEach((el) => {
+      if (!el) return;
+      el.readOnly = locked;
+      el.classList.toggle('bg-light', locked);
+    });
+    if (suffixEl) {
+      suffixEl.disabled = locked;
+      suffixEl.classList.toggle('bg-light', locked);
+    }
+    if (existingOfficialIdentityHintEl) {
+      existingOfficialIdentityHintEl.classList.toggle('d-none', !locked);
+    }
+  }
+
   function getTransitionMeta(transitionId) {
     return transitionMetaCache.get(String(transitionId || '')) || {};
   }
@@ -696,7 +712,7 @@
     if (mode === 'active') {
       return {
         label: 'Search Active Officials',
-        help: 'Search an active official record to move or temporarily assign that account to this position.',
+        help: 'Search an active official record to move or temporarily assign that account to this position. You can still review and change the email and mobile below before completing the turnover.',
         placeholder: 'Search active official by name, ID, or position',
         selectedPrefix: 'Active official selected',
       };
@@ -704,7 +720,7 @@
 
     return {
       label: 'Search Former Officials',
-      help: 'Search a former official record to auto-fill the details and reactivate the previous account.',
+      help: 'Search a former official record to auto-fill the details and reactivate the previous account. You can still review and change the email and mobile below before completing the turnover.',
       placeholder: 'Search former official by name, ID, or position',
       selectedPrefix: 'Former official selected',
     };
@@ -747,9 +763,10 @@
   function setFormerOfficialMode(mode = '') {
     if (formerOfficialModeEl) formerOfficialModeEl.value = mode;
     const usesExistingRecord = usesExistingOfficialMode(mode);
-    const isNew = mode === 'new';
+    const shouldShowFields = mode !== '';
     if (linkedIdWrap) linkedIdWrap.style.display = usesExistingRecord ? '' : 'none';
-    if (newOfficialFieldsWrap) newOfficialFieldsWrap.style.display = isNew ? '' : 'none';
+    if (newOfficialFieldsWrap) newOfficialFieldsWrap.style.display = shouldShowFields ? '' : 'none';
+    setExistingOfficialIdentityLock(usesExistingRecord);
     if (usesExistingRecord) {
       const cfg = getExistingOfficialModeConfig(mode);
       if (linkedIdLabel) linkedIdLabel.textContent = cfg.label;

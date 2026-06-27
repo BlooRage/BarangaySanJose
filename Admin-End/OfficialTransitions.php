@@ -1819,23 +1819,26 @@ if ($hasCouncilTbl) {
               </select>
               <div class="small text-muted mt-2">Choose an existing record if this person already has a system profile. Pick a new official only for first-time onboarding.</div>
             </div>
-            <div class="col-12" id="linkedIdWrap" style="display:none;">
-              <label for="linkedOfficialSearch" class="form-label small fw-semibold mb-1" id="linkedIdLabel">Search Official Records</label>
-              <div class="small text-muted mb-2" id="linkedIdHelp">Search an existing official record to auto-fill the identity and account details.</div>
-              <input type="hidden" id="newCandidateLinkedId" value="">
-              <input type="text" class="form-control form-control-sm" id="linkedOfficialSearch"
+	            <div class="col-12" id="linkedIdWrap" style="display:none;">
+	              <label for="linkedOfficialSearch" class="form-label small fw-semibold mb-1" id="linkedIdLabel">Search Official Records</label>
+	              <div class="small text-muted mb-2" id="linkedIdHelp">Search an existing official record to auto-fill the identity and account details.</div>
+	              <input type="hidden" id="newCandidateLinkedId" value="">
+	              <input type="text" class="form-control form-control-sm" id="linkedOfficialSearch"
                      placeholder="Search official by name, ID, or position">
               <div id="linkedOfficialSelected" class="small text-success fw-semibold mt-2 d-none"></div>
               <div id="linkedOfficialSearchResults" class="border rounded mt-2 bg-white d-none" style="max-height: 220px; overflow-y: auto;"></div>
             </div>
           </div>
 
-          <div id="newOfficialFieldsWrap" style="display:none;">
-            <div class="small text-danger fw-semibold mb-3">* Required fields</div>
+	          <div id="newOfficialFieldsWrap" style="display:none;">
+	            <div class="small text-danger fw-semibold mb-3">* Required fields</div>
 
-            <div class="border rounded p-3 mb-3">
-              <div class="fw-semibold text-muted mb-3">Identity</div>
-              <div class="row g-2">
+	            <div class="border rounded p-3 mb-3">
+	              <div class="fw-semibold text-muted mb-3">Identity</div>
+	              <div id="existingOfficialIdentityHint" class="small text-muted mb-3 d-none">
+	                This official record will be reused. Identity fields stay tied to the selected profile, while email and mobile below can still be updated before completing the turnover.
+	              </div>
+	              <div class="row g-2">
                 <div class="col-12 col-md-3">
                   <label for="newCandidateLastName" class="form-label small fw-semibold mb-1">Last Name <span class="text-danger">*</span></label>
                   <input type="text" class="form-control form-control-sm" id="newCandidateLastName"
@@ -2123,7 +2126,7 @@ if ($hasCouncilTbl) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260627-04"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260628-01"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};

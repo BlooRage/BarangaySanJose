@@ -587,6 +587,70 @@ function otAssertContactIsAvailable(mysqli $conn, string $email, string $phone10
     }
 }
 
+function otUpdateOfficialContacts(mysqli $conn, string $officialId, string $userId, string $email, string $phone10): void {
+    $officialId = trim($officialId);
+    $userId = trim($userId);
+    $email = strtolower(trim($email));
+    $phone10 = oi_normalize_phone10($phone10);
+
+    if ($officialId === '' || $userId === '') {
+        throw new RuntimeException('Official contact update requires linked official and user records.');
+    }
+
+    otAssertContactIsAvailable($conn, $email, $phone10, $userId);
+
+    $accountContact = pii_prepare_useraccount_contacts($email, $phone10);
+    $accountStmt = $conn->prepare("
+        UPDATE useraccountstbl
+        SET email = ?,
+            email_lookup_hash = ?,
+            phone_number = ?,
+            phone_lookup_hash = ?,
+            updated_at = NOW()
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if (!$accountStmt) {
+        throw new RuntimeException('Failed to prepare incoming official contact update.');
+    }
+    otBindStringParams($accountStmt, [
+        $accountContact['email'],
+        $accountContact['email_lookup_hash'],
+        $accountContact['phone_number'],
+        $accountContact['phone_lookup_hash'],
+        $userId
+    ]);
+    if (!$accountStmt->execute()) {
+        $error = $accountStmt->error;
+        $accountStmt->close();
+        throw new RuntimeException('Failed to update official account contacts: ' . $error);
+    }
+    $accountStmt->close();
+
+    $officialStmt = $conn->prepare("
+        UPDATE officialinformationtbl
+        SET contact_number = ?,
+            email = ?,
+            last_updated = CURRENT_TIMESTAMP
+        WHERE official_id = ?
+        LIMIT 1
+    ");
+    if (!$officialStmt) {
+        throw new RuntimeException('Failed to prepare official profile contact update.');
+    }
+    otBindStringParams($officialStmt, [
+        pii_encrypt_string($phone10),
+        pii_encrypt_string($email),
+        $officialId
+    ]);
+    if (!$officialStmt->execute()) {
+        $error = $officialStmt->error;
+        $officialStmt->close();
+        throw new RuntimeException('Failed to update official profile contacts: ' . $error);
+    }
+    $officialStmt->close();
+}
+
 function otResolveIncomingAccessProfile(array $transition): array {
     $position = trim((string)($transition['position'] ?? ''));
     $positionLower = strtolower($position);
@@ -1523,6 +1587,18 @@ if ($action === 'complete_transition') {
             $incomingOfficialId = $outgoingId;
             $existing = $incomingOfficialId !== '' ? otGetOfficialUser($conn, $incomingOfficialId) : null;
             $incomingUserId = (string)($existing['user_id'] ?? '');
+            if ($incomingOfficialId !== '' && $incomingUserId !== '' && ($candidate['candidate_email'] !== '' || $candidate['candidate_mobile'] !== '')) {
+                $contactEmail = $candidate['candidate_email'] !== ''
+                    ? $candidate['candidate_email']
+                    : strtolower(trim((string)($existing['email'] ?? '')));
+                $contactPhone10 = $candidate['candidate_mobile'] !== ''
+                    ? oi_normalize_phone10($candidate['candidate_mobile'])
+                    : oi_normalize_phone10((string)($existing['phone_number'] ?? ''));
+
+                if ($contactEmail !== '' && $contactPhone10 !== '') {
+                    otUpdateOfficialContacts($conn, $incomingOfficialId, $incomingUserId, $contactEmail, $contactPhone10);
+                }
+            }
         } elseif ($outcome !== 'NoSuccessor') {
             if ($linkedOfficialId !== '') {
                 $existing = otGetOfficialUser($conn, $linkedOfficialId);
@@ -1538,6 +1614,19 @@ if ($action === 'complete_transition') {
                 $shell = ot_governance_create_shell($conn, $transition, $candidate, $actorId, (int)$inactiveStatusId);
                 $incomingOfficialId = (string)($shell['official_id'] ?? '');
                 $incomingUserId = (string)($shell['user_id'] ?? '');
+            }
+
+            if ($linkedOfficialId !== '' && $incomingOfficialId !== '' && $incomingUserId !== '') {
+                $contactEmail = $candidate['candidate_email'] !== ''
+                    ? $candidate['candidate_email']
+                    : strtolower(trim((string)($existing['email'] ?? '')));
+                $contactPhone10 = $candidate['candidate_mobile'] !== ''
+                    ? oi_normalize_phone10($candidate['candidate_mobile'])
+                    : oi_normalize_phone10((string)($existing['phone_number'] ?? ''));
+
+                if ($contactEmail !== '' && $contactPhone10 !== '') {
+                    otUpdateOfficialContacts($conn, $incomingOfficialId, $incomingUserId, $contactEmail, $contactPhone10);
+                }
             }
 
             $assignment = otResolveIncomingAccessProfile([
