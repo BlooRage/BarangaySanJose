@@ -35,6 +35,23 @@ function otJson(array $payload, int $code = 200): never {
     exit;
 }
 
+function otBindStringParams(mysqli_stmt $stmt, array $values): void {
+    if ($values === []) {
+        return;
+    }
+
+    $types = str_repeat('s', count($values));
+    $refs = [$types];
+    foreach ($values as $idx => $value) {
+        $values[$idx] = (string)$value;
+        $refs[] = &$values[$idx];
+    }
+
+    if (!call_user_func_array([$stmt, 'bind_param'], $refs)) {
+        throw new RuntimeException('Failed to bind SQL parameters.');
+    }
+}
+
 function otError(string $message, int $code = 400): never {
     otJson(['success' => false, 'message' => $message], $code);
 }
@@ -535,7 +552,6 @@ function otAssertContactIsAvailable(mysqli $conn, string $email, string $phone10
     $email = strtolower(trim($email));
     $phone10 = oi_normalize_phone10($phone10);
     $excludeUserId = trim($excludeUserId);
-    $prepared = pii_prepare_useraccount_contacts($email, $phone10);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('A valid email address is required.');
@@ -544,36 +560,30 @@ function otAssertContactIsAvailable(mysqli $conn, string $email, string $phone10
         throw new RuntimeException('Mobile number must be a valid 10-digit Philippine mobile number.');
     }
 
-    if ($excludeUserId !== '') {
-        $stmt = $conn->prepare("
-            SELECT user_id
-            FROM useraccountstbl
-            WHERE (email_lookup_hash = ? OR phone_lookup_hash = ?)
-              AND user_id <> ?
-            LIMIT 1
-        ");
-        if (!$stmt) {
-            throw new RuntimeException('Unable to validate email and mobile number.');
-        }
-        $stmt->bind_param('sss', $prepared['email_lookup_hash'], $prepared['phone_lookup_hash'], $excludeUserId);
-    } else {
-        $stmt = $conn->prepare("
-            SELECT user_id
-            FROM useraccountstbl
-            WHERE email_lookup_hash = ? OR phone_lookup_hash = ?
-            LIMIT 1
-        ");
-        if (!$stmt) {
-            throw new RuntimeException('Unable to validate email and mobile number.');
-        }
-        $stmt->bind_param('ss', $prepared['email_lookup_hash'], $prepared['phone_lookup_hash']);
+    $emailMatch = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'email_lookup_hash',
+        pii_lookup_hash_candidates($email, 'useraccount.email'),
+        ['user_id', 'role_access']
+    );
+    if ($emailMatch && trim((string)($emailMatch['user_id'] ?? '')) !== $excludeUserId) {
+        $userId = trim((string)($emailMatch['user_id'] ?? ''));
+        $role = trim((string)($emailMatch['role_access'] ?? ''));
+        $suffix = $userId !== '' ? " (User ID: {$userId}" . ($role !== '' ? ", Role: {$role}" : '') . ')' : '';
+        throw new RuntimeException('Email address is already tied to another account' . $suffix . '.');
     }
 
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if ($row) {
-        throw new RuntimeException('Email or mobile number is already tied to another account.');
+    $phoneMatch = pii_select_first_useraccount_by_lookup_hashes(
+        $conn,
+        'phone_lookup_hash',
+        pii_lookup_hash_candidates($phone10, 'useraccount.phone'),
+        ['user_id', 'role_access']
+    );
+    if ($phoneMatch && trim((string)($phoneMatch['user_id'] ?? '')) !== $excludeUserId) {
+        $userId = trim((string)($phoneMatch['user_id'] ?? ''));
+        $role = trim((string)($phoneMatch['role_access'] ?? ''));
+        $suffix = $userId !== '' ? " (User ID: {$userId}" . ($role !== '' ? ", Role: {$role}" : '') . ')' : '';
+        throw new RuntimeException('Mobile number is already tied to another account' . $suffix . '.');
     }
 }
 
@@ -714,8 +724,7 @@ function otCreateOfficialInvite(mysqli $conn, array $invitePayload, string $acto
     if (!$stmt) {
         throw new RuntimeException('Failed to create onboarding invite.');
     }
-    $stmt->bind_param(
-        'ssssssssssssssssss',
+    otBindStringParams($stmt, [
         $inviteCode,
         $token['hash'],
         $inviteContact['invite_email'],
@@ -734,7 +743,7 @@ function otCreateOfficialInvite(mysqli $conn, array $invitePayload, string $acto
         $actorUserId,
         $userId,
         $expiresAt
-    );
+    ]);
     if (!$stmt->execute()) {
         $error = $stmt->error;
         $stmt->close();
