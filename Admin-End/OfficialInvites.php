@@ -370,8 +370,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'lastname' => $lastName,
                 'suffix' => $suffix,
             ]);
-            $stmt->bind_param(
-                "sssssssssssssssss",
+            oi_bind_string_params($stmt, [
                 $inviteCode,
                 $token['hash'],
                 $inviteContact['invite_email'],
@@ -389,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $areaNumber,
                 $actorUserId,
                 $expiresAt
-            );
+            ]);
             $ok = $stmt->execute();
             $inviteId = (int)$stmt->insert_id;
             $errNo = (int)$stmt->errno;

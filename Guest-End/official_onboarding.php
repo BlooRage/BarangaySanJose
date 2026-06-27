@@ -898,8 +898,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$stmt) {
                     throw new RuntimeException('Failed to save official profile.');
                 }
-                $stmt->bind_param(
-                    "sssssssssssssssissss",
+                oi_bind_string_params($stmt, [
                     $officialId,
                     $loggedUserId,
                     $officialEncrypted['lastname'],
@@ -920,7 +919,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $officialEncrypted['emergency_contact_relationship'],
                     $officialEncrypted['emergency_contact_phone'],
                     $officialEncrypted['emergency_contact_address']
-                );
+                ]);
                 if (!$stmt->execute()) {
                     $stmt->close();
                     throw new RuntimeException('Failed to save official profile.');

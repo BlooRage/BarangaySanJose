@@ -50,6 +50,26 @@ if (!function_exists('oi_app_base_url')) {
     }
 }
 
+if (!function_exists('oi_bind_string_params')) {
+    function oi_bind_string_params(mysqli_stmt $stmt, array $values): void
+    {
+        if ($values === []) {
+            return;
+        }
+
+        $types = str_repeat('s', count($values));
+        $refs = [$types];
+        foreach ($values as $idx => $value) {
+            $values[$idx] = (string)$value;
+            $refs[] = &$values[$idx];
+        }
+
+        if (!call_user_func_array([$stmt, 'bind_param'], $refs)) {
+            throw new RuntimeException('Failed to bind SQL parameters.');
+        }
+    }
+}
+
 if (!function_exists('oi_parse_full_name')) {
     function oi_parse_full_name(string $fullName): array
     {

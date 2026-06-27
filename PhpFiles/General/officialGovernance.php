@@ -369,8 +369,7 @@ if (!function_exists('ogw_prepare_invite_delivery')) {
         if (!$stmt) {
             throw new RuntimeException('Failed to prepare onboarding invite.');
         }
-        $stmt->bind_param(
-            'sssssssssssssssss',
+        oi_bind_string_params($stmt, [
             $inviteCode,
             $token['hash'],
             $inviteEmailData['invite_email'],
@@ -388,7 +387,7 @@ if (!function_exists('ogw_prepare_invite_delivery')) {
             $actorUserId,
             $expiresAt,
             $row['user_id']
-        );
+        ]);
         if (!$stmt->execute()) {
             $error = $stmt->error;
             $stmt->close();
