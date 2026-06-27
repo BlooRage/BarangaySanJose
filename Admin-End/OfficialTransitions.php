@@ -898,6 +898,141 @@ if ($hasCouncilTbl) {
       font-size: .8rem;
       line-height: 1.3;
     }
+    .ot-sec-steps {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .75rem;
+    }
+    .ot-sec-step {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      padding: .8rem .95rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      background: #f8fafc;
+      color: #64748b;
+      font-size: .85rem;
+      font-weight: 700;
+    }
+    .ot-sec-step.is-active {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      color: #1d4ed8;
+      box-shadow: inset 0 0 0 1px rgba(59, 130, 246, .08);
+    }
+    .ot-sec-step.is-complete {
+      border-color: #bbf7d0;
+      background: #ecfdf5;
+      color: #166534;
+      box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .08);
+    }
+    .ot-sec-step-index {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #334155;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      font-size: .9rem;
+      font-weight: 800;
+    }
+    .ot-sec-step.is-active .ot-sec-step-index {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .ot-sec-step.is-complete .ot-sec-step-index {
+      background: #22c55e;
+      color: #fff;
+    }
+    .ot-sec-panel {
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+      padding: 1rem;
+    }
+    .ot-sec-panel-head {
+      display: flex;
+      align-items: flex-start;
+      gap: .85rem;
+      margin-bottom: 1rem;
+    }
+    .ot-sec-panel-icon {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: .9rem;
+      background: #eff6ff;
+      color: #2563eb;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      font-size: 1.05rem;
+    }
+    .ot-sec-panel-title {
+      font-size: .98rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: .15rem;
+    }
+    .ot-sec-panel-copy {
+      color: #64748b;
+      font-size: .84rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .ot-sec-delivery {
+      margin-bottom: .85rem;
+      padding: .8rem .9rem;
+      border: 1px solid #e2e8f0;
+      border-radius: .9rem;
+      background: #f8fafc;
+      color: #334155;
+      font-size: .84rem;
+      line-height: 1.5;
+    }
+    .ot-sec-preview {
+      margin-top: .85rem;
+      padding: .85rem 1rem;
+      border: 1px dashed #f59e0b;
+      border-radius: .9rem;
+      background: #fffbeb;
+    }
+    .ot-sec-preview-label {
+      font-size: .72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #92400e;
+    }
+    .ot-sec-preview-code {
+      margin-top: .3rem;
+      font-size: 1.18rem;
+      font-weight: 800;
+      letter-spacing: .38em;
+      color: #7c2d12;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .ot-sec-otp-input {
+      text-align: center;
+      letter-spacing: .38em;
+      font-size: 1.1rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    @media (max-width: 575.98px) {
+      .ot-sec-steps {
+        grid-template-columns: 1fr;
+      }
+      .ot-sec-preview-code,
+      .ot-sec-otp-input {
+        letter-spacing: .24em;
+      }
+    }
   </style>
 </head>
 <body data-ot-tool="<?= htmlspecialchars($transitionTool, ENT_QUOTES, 'UTF-8') ?>"
@@ -1971,6 +2106,78 @@ if ($hasCouncilTbl) {
   </div>
 </div>
 
+<div class="modal fade" id="modalSecureConfirmation" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <div class="text-uppercase small fw-semibold text-primary mb-1">Secure Confirmation</div>
+          <h5 class="modal-title mb-1">Password and OTP Verification</h5>
+          <p class="text-muted small mb-0" id="secureConfirmActionText">Verify your identity before the turnover action continues.</p>
+        </div>
+        <button type="button" class="btn-close" id="secureConfirmCloseBtn" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div class="ot-sec-steps mb-3">
+          <div class="ot-sec-step is-active" id="secureConfirmStepPassword">
+            <span class="ot-sec-step-index">1</span>
+            <span>Password Check</span>
+          </div>
+          <div class="ot-sec-step" id="secureConfirmStepOtp">
+            <span class="ot-sec-step-index">2</span>
+            <span>OTP Verification</span>
+          </div>
+        </div>
+
+        <div id="secureConfirmAlert" class="alert d-none py-2 px-3 small mb-3" role="alert"></div>
+
+        <div class="ot-sec-panel" id="secureConfirmPasswordPanel">
+          <div class="ot-sec-panel-head">
+            <div class="ot-sec-panel-icon">
+              <i class="fas fa-lock"></i>
+            </div>
+            <div>
+              <div class="ot-sec-panel-title">Confirm your current password</div>
+              <p class="ot-sec-panel-copy">Use your logged-in SuperAdmin password first. Once verified, the system will send a one-time code to your registered delivery contact.</p>
+            </div>
+          </div>
+          <label for="secureConfirmPassword" class="form-label small fw-semibold mb-1">Current Password</label>
+          <input type="password" class="form-control" id="secureConfirmPassword" autocomplete="current-password" placeholder="Enter current password">
+        </div>
+
+        <div class="ot-sec-panel d-none" id="secureConfirmOtpPanel">
+          <div class="ot-sec-panel-head">
+            <div class="ot-sec-panel-icon">
+              <i class="fas fa-shield-alt"></i>
+            </div>
+            <div>
+              <div class="ot-sec-panel-title">Enter the one-time password</div>
+              <p class="ot-sec-panel-copy">Use the 6-digit code sent for this secure action. The code expires quickly, so enter it before continuing.</p>
+            </div>
+          </div>
+          <div class="ot-sec-delivery" id="secureConfirmDeliveryText">A 6-digit OTP will appear here after your password is verified.</div>
+          <label for="secureConfirmOtp" class="form-label small fw-semibold mb-1">One-Time Password</label>
+          <input type="text" class="form-control ot-sec-otp-input" id="secureConfirmOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+          <div class="form-text" id="secureConfirmOtpHint">Enter the 6-digit code from your email or SMS.</div>
+          <div class="ot-sec-preview d-none" id="secureConfirmPreviewWrap">
+            <div class="ot-sec-preview-label">Local Preview Code</div>
+            <div class="ot-sec-preview-code" id="secureConfirmPreviewCode"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" id="secureConfirmCancelBtn" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="secureConfirmSendBtn">
+          <i class="fas fa-paper-plane me-1"></i> Send OTP
+        </button>
+        <button type="button" class="btn btn-success d-none" id="secureConfirmVerifyBtn">
+          <i class="fas fa-check-circle me-1"></i> Verify and Continue
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════════════════
      MODAL: Quick Actions
 ══════════════════════════════════════════════════════════════════════════ -->
@@ -2126,7 +2333,7 @@ if ($hasCouncilTbl) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260628-01"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260628-02"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};

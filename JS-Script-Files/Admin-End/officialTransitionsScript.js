@@ -23,6 +23,98 @@
     return modalInstances[id] || null;
   }
 
+  const secureConfirmModalEl = document.getElementById('modalSecureConfirmation');
+  const secureConfirmActionTextEl = document.getElementById('secureConfirmActionText');
+  const secureConfirmAlertEl = document.getElementById('secureConfirmAlert');
+  const secureConfirmPasswordStepEl = document.getElementById('secureConfirmStepPassword');
+  const secureConfirmOtpStepEl = document.getElementById('secureConfirmStepOtp');
+  const secureConfirmPasswordPanelEl = document.getElementById('secureConfirmPasswordPanel');
+  const secureConfirmOtpPanelEl = document.getElementById('secureConfirmOtpPanel');
+  const secureConfirmPasswordEl = document.getElementById('secureConfirmPassword');
+  const secureConfirmOtpEl = document.getElementById('secureConfirmOtp');
+  const secureConfirmDeliveryTextEl = document.getElementById('secureConfirmDeliveryText');
+  const secureConfirmOtpHintEl = document.getElementById('secureConfirmOtpHint');
+  const secureConfirmPreviewWrapEl = document.getElementById('secureConfirmPreviewWrap');
+  const secureConfirmPreviewCodeEl = document.getElementById('secureConfirmPreviewCode');
+  const secureConfirmCloseBtn = document.getElementById('secureConfirmCloseBtn');
+  const secureConfirmCancelBtn = document.getElementById('secureConfirmCancelBtn');
+  const secureConfirmSendBtn = document.getElementById('secureConfirmSendBtn');
+  const secureConfirmVerifyBtn = document.getElementById('secureConfirmVerifyBtn');
+
+  function setSecureConfirmAlert(message = '', tone = 'danger') {
+    if (!secureConfirmAlertEl) return;
+    const normalizedTone = tone === 'warning' ? 'warning' : tone === 'success' ? 'success' : 'danger';
+    secureConfirmAlertEl.textContent = String(message || '').trim();
+    secureConfirmAlertEl.className = `alert alert-${normalizedTone} py-2 px-3 small mb-3`;
+    secureConfirmAlertEl.classList.toggle('d-none', !secureConfirmAlertEl.textContent);
+  }
+
+  function setSecureConfirmStep(step = 'password') {
+    const isOtpStep = step === 'otp';
+    if (secureConfirmPasswordPanelEl) {
+      secureConfirmPasswordPanelEl.classList.toggle('d-none', isOtpStep);
+    }
+    if (secureConfirmOtpPanelEl) {
+      secureConfirmOtpPanelEl.classList.toggle('d-none', !isOtpStep);
+    }
+    if (secureConfirmPasswordStepEl) {
+      secureConfirmPasswordStepEl.classList.toggle('is-active', !isOtpStep);
+      secureConfirmPasswordStepEl.classList.toggle('is-complete', isOtpStep);
+    }
+    if (secureConfirmOtpStepEl) {
+      secureConfirmOtpStepEl.classList.toggle('is-active', isOtpStep);
+      secureConfirmOtpStepEl.classList.toggle('is-complete', false);
+    }
+    if (secureConfirmSendBtn) {
+      secureConfirmSendBtn.classList.toggle('d-none', isOtpStep);
+    }
+    if (secureConfirmVerifyBtn) {
+      secureConfirmVerifyBtn.classList.toggle('d-none', !isOtpStep);
+    }
+  }
+
+  function resetSecureConfirmationModal(actionLabel = 'this action') {
+    if (secureConfirmActionTextEl) {
+      secureConfirmActionTextEl.textContent = `Verify your current password, then enter the one-time code to ${actionLabel}.`;
+    }
+    if (secureConfirmPasswordEl) {
+      secureConfirmPasswordEl.value = '';
+      secureConfirmPasswordEl.disabled = false;
+    }
+    if (secureConfirmOtpEl) {
+      secureConfirmOtpEl.value = '';
+      secureConfirmOtpEl.disabled = false;
+    }
+    if (secureConfirmDeliveryTextEl) {
+      secureConfirmDeliveryTextEl.textContent = 'A 6-digit OTP will appear here after your password is verified.';
+    }
+    if (secureConfirmOtpHintEl) {
+      secureConfirmOtpHintEl.textContent = 'Enter the 6-digit code from your email or SMS.';
+    }
+    if (secureConfirmPreviewCodeEl) {
+      secureConfirmPreviewCodeEl.textContent = '';
+    }
+    if (secureConfirmPreviewWrapEl) {
+      secureConfirmPreviewWrapEl.classList.add('d-none');
+    }
+    if (secureConfirmSendBtn) {
+      secureConfirmSendBtn.disabled = false;
+      secureConfirmSendBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Send OTP';
+    }
+    if (secureConfirmVerifyBtn) {
+      secureConfirmVerifyBtn.disabled = false;
+      secureConfirmVerifyBtn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Verify and Continue';
+    }
+    if (secureConfirmCancelBtn) {
+      secureConfirmCancelBtn.disabled = false;
+    }
+    if (secureConfirmCloseBtn) {
+      secureConfirmCloseBtn.disabled = false;
+    }
+    setSecureConfirmAlert('');
+    setSecureConfirmStep('password');
+  }
+
   // ── Toast ──────────────────────────────────────────────────────────────────
   function showToast(message, type = 'success') {
     const el = document.getElementById('otToast');
@@ -94,47 +186,183 @@
   }
 
   async function requestSecureConfirmation(secureAction, payload = {}, actionLabel = 'this action') {
-    const actorPassword = window.prompt(`Enter your current password to continue with ${actionLabel}:`);
-    if (actorPassword === null) return null;
-    if (!String(actorPassword).trim()) {
-      throw new Error('Password confirmation is required.');
+    if (!secureConfirmModalEl) {
+      throw new Error('Secure confirmation modal is unavailable on this page.');
     }
 
-    const requestPayload = {
-      action: 'request_secure_action_otp',
-      secure_action: secureAction,
-      actor_password: actorPassword,
-      ...payload,
-    };
-    let otpRequest;
-    try {
-      otpRequest = await apiFetch(requestPayload, 'POST');
-    } catch (error) {
-      throw new Error(describeRequestFailure(error, 'Secure confirmation could not start'));
-    }
-    if (!otpRequest?.success) {
-      throw new Error(otpRequest?.message || otpRequest?.error || 'Unable to send OTP.');
+    const modal = getModal('modalSecureConfirmation');
+    if (!modal) {
+      throw new Error('Secure confirmation modal could not be opened.');
     }
 
-    const deliveryLabel = String(otpRequest.delivery_label || '').trim();
-    const otpPreview = String(otpRequest.otp_preview || '').trim();
-    const deliveryWarning = String(otpRequest.delivery_warning || '').trim();
-    if (deliveryWarning) {
-      showToast(deliveryWarning, 'warning');
-    }
-    const otpCode = window.prompt(
-      otpPreview
-        ? `Enter the 6-digit OTP for ${deliveryLabel || 'this action'}:\n\nLocal preview code: ${otpPreview}`
-        : deliveryLabel
-          ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
-          : 'Enter the 6-digit OTP sent to your verified contact:'
-    );
-    if (otpCode === null) return null;
+    resetSecureConfirmationModal(actionLabel);
 
-    return {
-      challenge_key: String(otpRequest.challenge_key || ''),
-      otp_code: String(otpCode || '').trim(),
-    };
+    return new Promise((resolve) => {
+      let finished = false;
+      let challengeKey = '';
+      let currentStep = 'password';
+      let closeResult = null;
+
+      const cleanup = () => {
+        secureConfirmModalEl.removeEventListener('hidden.bs.modal', onHidden);
+        secureConfirmSendBtn?.removeEventListener('click', onSendOtp);
+        secureConfirmVerifyBtn?.removeEventListener('click', onVerify);
+        secureConfirmPasswordEl?.removeEventListener('keydown', onPasswordKeydown);
+        secureConfirmOtpEl?.removeEventListener('keydown', onOtpKeydown);
+        secureConfirmOtpEl?.removeEventListener('input', onOtpInput);
+        resetSecureConfirmationModal(actionLabel);
+      };
+
+      const finish = (value) => {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        resolve(value);
+      };
+
+      const setBusy = (busy, step = currentStep) => {
+        if (secureConfirmCancelBtn) secureConfirmCancelBtn.disabled = !!busy;
+        if (secureConfirmCloseBtn) secureConfirmCloseBtn.disabled = !!busy;
+        if (step === 'password') {
+          if (secureConfirmPasswordEl) secureConfirmPasswordEl.disabled = !!busy;
+          if (secureConfirmSendBtn) {
+            secureConfirmSendBtn.disabled = !!busy;
+            secureConfirmSendBtn.innerHTML = busy
+              ? '<i class="fas fa-spinner fa-spin me-1"></i> Sending OTP...'
+              : '<i class="fas fa-paper-plane me-1"></i> Send OTP';
+          }
+        } else {
+          if (secureConfirmOtpEl) secureConfirmOtpEl.disabled = !!busy;
+          if (secureConfirmVerifyBtn) {
+            secureConfirmVerifyBtn.disabled = !!busy;
+            secureConfirmVerifyBtn.innerHTML = busy
+              ? '<i class="fas fa-spinner fa-spin me-1"></i> Verifying...'
+              : '<i class="fas fa-check-circle me-1"></i> Verify and Continue';
+          }
+        }
+      };
+
+      const onHidden = () => finish(closeResult);
+
+      const onPasswordKeydown = (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onSendOtp();
+      };
+
+      const onOtpInput = () => {
+        if (!secureConfirmOtpEl) return;
+        secureConfirmOtpEl.value = String(secureConfirmOtpEl.value || '').replace(/\D+/g, '').slice(0, 6);
+      };
+
+      const onOtpKeydown = (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onVerify();
+      };
+
+      const onSendOtp = async () => {
+        const actorPassword = String(secureConfirmPasswordEl?.value || '');
+        if (!actorPassword.trim()) {
+          setSecureConfirmAlert('Enter your current password to continue.', 'warning');
+          secureConfirmPasswordEl?.focus();
+          return;
+        }
+
+        setSecureConfirmAlert('');
+        currentStep = 'password';
+        setBusy(true, 'password');
+
+        const requestPayload = {
+          action: 'request_secure_action_otp',
+          secure_action: secureAction,
+          actor_password: actorPassword,
+          ...payload,
+        };
+
+        let otpRequest;
+        try {
+          otpRequest = await apiFetch(requestPayload, 'POST');
+        } catch (error) {
+          if (finished) return;
+          setSecureConfirmAlert(describeRequestFailure(error, 'Secure confirmation could not start'), 'danger');
+          setBusy(false, 'password');
+          secureConfirmPasswordEl?.focus();
+          return;
+        }
+
+        if (finished) return;
+
+        if (!otpRequest?.success) {
+          setSecureConfirmAlert(otpRequest?.message || otpRequest?.error || 'Unable to send OTP.', 'danger');
+          setBusy(false, 'password');
+          secureConfirmPasswordEl?.focus();
+          return;
+        }
+
+        challengeKey = String(otpRequest.challenge_key || '').trim();
+        const deliveryLabel = String(otpRequest.delivery_label || '').trim();
+        const otpPreview = String(otpRequest.otp_preview || '').trim();
+        const deliveryWarning = String(otpRequest.delivery_warning || '').trim();
+
+        if (secureConfirmDeliveryTextEl) {
+          secureConfirmDeliveryTextEl.textContent = otpPreview
+            ? `A local preview code is available below${deliveryLabel ? ` and the system also targeted ${deliveryLabel}` : ''}.`
+            : deliveryLabel
+              ? `Enter the 6-digit code sent to ${deliveryLabel}.`
+              : 'Enter the 6-digit code sent to your verified contact.';
+        }
+        if (secureConfirmOtpHintEl) {
+          secureConfirmOtpHintEl.textContent = otpPreview
+            ? 'Use the preview code below for local testing, or enter the delivered OTP if the channel is available.'
+            : 'Enter the 6-digit code exactly as received.';
+        }
+        if (secureConfirmPreviewWrapEl) {
+          secureConfirmPreviewWrapEl.classList.toggle('d-none', !otpPreview);
+        }
+        if (secureConfirmPreviewCodeEl) {
+          secureConfirmPreviewCodeEl.textContent = otpPreview;
+        }
+
+        setSecureConfirmAlert(deliveryWarning || '', deliveryWarning ? 'warning' : 'success');
+        currentStep = 'otp';
+        setSecureConfirmStep('otp');
+        setBusy(false, 'otp');
+        secureConfirmOtpEl?.focus();
+      };
+
+      const onVerify = () => {
+        const otpCode = String(secureConfirmOtpEl?.value || '').replace(/\D+/g, '').trim();
+        if (challengeKey === '') {
+          setSecureConfirmAlert('Request an OTP first before continuing.', 'warning');
+          currentStep = 'password';
+          setSecureConfirmStep('password');
+          secureConfirmPasswordEl?.focus();
+          return;
+        }
+        if (!/^\d{6}$/.test(otpCode)) {
+          setSecureConfirmAlert('Enter the 6-digit OTP to continue.', 'warning');
+          secureConfirmOtpEl?.focus();
+          return;
+        }
+
+        closeResult = {
+          challenge_key: challengeKey,
+          otp_code: otpCode,
+        };
+        modal.hide();
+      };
+
+      secureConfirmModalEl.addEventListener('hidden.bs.modal', onHidden);
+      secureConfirmSendBtn?.addEventListener('click', onSendOtp);
+      secureConfirmVerifyBtn?.addEventListener('click', onVerify);
+      secureConfirmPasswordEl?.addEventListener('keydown', onPasswordKeydown);
+      secureConfirmOtpEl?.addEventListener('keydown', onOtpKeydown);
+      secureConfirmOtpEl?.addEventListener('input', onOtpInput);
+
+      modal.show();
+      secureConfirmPasswordEl?.focus();
+    });
   }
 
   const pageTool = document.body?.dataset.otTool || 'current_term';
