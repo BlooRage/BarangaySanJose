@@ -234,6 +234,10 @@ $contentCreateType = strtolower(trim((string)($_GET['type'] ?? 'page')));
 if (!in_array($contentCreateType, ['page', 'news', 'delivery', 'faq'], true)) {
     $contentCreateType = 'page';
 }
+$sidebarContentTypeFilter = strtolower(trim((string)($_GET['type_filter'] ?? 'all')));
+if (!in_array($sidebarContentTypeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
+    $sidebarContentTypeFilter = 'all';
+}
 $contentToolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if ($contentToolView !== 'tracker') {
     $contentToolView = 'tracker';
@@ -247,9 +251,10 @@ if (!in_array($contentRequestsView, ['my_requests', 'review_queue', 'archived_re
     $contentRequestsView = 'my_requests';
 }
 $isContentCreateSectionActive = in_array($current, ['CreateContent.php', 'CreateNews.php'], true);
-$isContentToolsSectionActive = $current === 'Contents.php';
+$isContentToolsSectionActive = $current === 'Contents.php' && $sidebarContentTypeFilter !== 'news';
 $isContentFaqCreateActive = $current === 'CreateContent.php' && $contentCreateType === 'faq';
 $isContentNewsCreateActive = $current === 'CreateNews.php';
+$isNewsManagementActive = ($current === 'Contents.php' && $sidebarContentTypeFilter === 'news');
 $isContentNavigatorActive = $current === 'ContentManagement.php' || $isContentFaqCreateActive;
 $isContentChangeRequestActive = $current === 'ContentManagement.php'
     && $contentManagementModule === 'requests';
@@ -1538,28 +1543,33 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php if ($sbHasAny(array_merge($sbAnnouncementKeys, $sbReportKeys))): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
+      <?php if ($sbCan('announcements_tracker')): ?>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news&amp;news_scope=all#tracker-card"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isNewsManagementActive ? 'active' : '' ?>">
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-newspaper"></i>
+          </span>
+          <span class="sidebar-button-label">News</span>
+        </a>
+      </li>
+      <?php endif; ?>
       <?php if ($sbHasAny($sbAnnouncementKeys)): ?>
       <li class="mb-2">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentMgmtActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= ($isContentMgmtActive && !$isNewsManagementActive) ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#announcements-collapse"
                 aria-controls="announcements-collapse"
-                aria-expanded="<?= $isContentMgmtActive ? 'true' : 'false' ?>">
+                aria-expanded="<?= ($isContentMgmtActive && !$isNewsManagementActive) ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-bullhorn"></i>
           </span>
           <span class="sidebar-button-label">Announcements</span>
         </button>
-        <div class="collapse <?= $isContentMgmtActive ? 'show' : '' ?>" id="announcements-collapse">
+        <div class="collapse <?= ($isContentMgmtActive && !$isNewsManagementActive) ? 'show' : '' ?>" id="announcements-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('announcements_page')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateNews.php')) ?>"
-                 class="link-dark rounded <?= $isContentNewsCreateActive ? 'active' : '' ?>">
-                Create News
-              </a>
-            </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
                  class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">

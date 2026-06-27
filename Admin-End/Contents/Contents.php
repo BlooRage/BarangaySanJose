@@ -22,6 +22,10 @@ $typeFilter = strtolower(trim((string)($_GET['type_filter'] ?? 'all')));
 if (!in_array($typeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $typeFilter = 'all';
 }
+$newsScope = strtolower(trim((string)($_GET['news_scope'] ?? 'all')));
+if (!in_array($newsScope, ['all', 'scheduled', 'draft', 'archived'], true)) {
+  $newsScope = 'all';
+}
 
 $searchTerm = trim((string)($_GET['q'] ?? ''));
 $queueSearchTerm = trim((string)($_GET['queue_q'] ?? ''));
@@ -56,7 +60,8 @@ $statusLabels = [
   'approved' => 'Approved',
   'pending' => 'Pending',
   'draft' => 'Draft',
-  'denied' => 'Denied'
+  'denied' => 'Denied',
+  'archived' => 'Archived',
 ];
 
 $audienceAreaOptions = [
@@ -255,6 +260,12 @@ function ann_placements_from_channels(array $channels): array
 }
 
 $currentUserDisplayLabel = ann_creator_display_from_user_id($conn, $currentUserId, $currentUserId);
+$isNewsManagementView = $typeFilter === 'news';
+$canCreateNews = false;
+if ($currentUserId !== '' && isset($conn) && $conn instanceof mysqli && function_exists('amp_get_allowed_permission_keys') && function_exists('amp_permission_key_allowed')) {
+  $allowedPermissions = amp_get_allowed_permission_keys($conn, $currentUserId, (string)($_SESSION['role'] ?? ''));
+  $canCreateNews = amp_permission_key_allowed($allowedPermissions, 'announcements_page');
+}
 $audienceAreaOptions = [
   'Barangay Wide',
   'Area 01',
@@ -372,15 +383,54 @@ foreach ($filteredByChannel as $item) {
   }
 }
 
-$visibleRows = array_values(array_filter($filteredByChannel, function ($item) use ($statusFilter, $typeFilter, $searchTerm, $channelLabels, $statusLabels, $typeLabels, $currentUserId, $currentUserDisplayLabel) {
+$newsRows = array_values(array_filter($filteredByChannel, function ($item): bool {
+  return strtolower((string)($item['content_type'] ?? 'page')) === 'news';
+}));
+$newsCounts = ['all' => 0, 'scheduled' => 0, 'draft' => 0, 'archived' => 0];
+$nowTs = time();
+foreach ($newsRows as $item) {
   $displayStatus = ann_display_status($item, $currentUserId, $currentUserDisplayLabel);
-  if ($statusFilter !== 'all' && $displayStatus !== $statusFilter) {
-    return false;
+  $publishDateRaw = trim((string)($item['publish_date'] ?? ''));
+  $publishTs = ($publishDateRaw !== '' && $publishDateRaw !== '-') ? strtotime($publishDateRaw) : false;
+  $isScheduled = $publishTs !== false && $publishTs > $nowTs && in_array($displayStatus, ['approved', 'pending'], true);
+
+  $newsCounts['all']++;
+  if ($isScheduled) {
+    $newsCounts['scheduled']++;
   }
+  if ($displayStatus === 'draft') {
+    $newsCounts['draft']++;
+  }
+  if ($displayStatus === 'archived') {
+    $newsCounts['archived']++;
+  }
+}
+
+$visibleRows = array_values(array_filter($filteredByChannel, function ($item) use ($statusFilter, $typeFilter, $searchTerm, $channelLabels, $statusLabels, $typeLabels, $currentUserId, $currentUserDisplayLabel, $isNewsManagementView, $newsScope, $nowTs) {
+  $displayStatus = ann_display_status($item, $currentUserId, $currentUserDisplayLabel);
   $contentType = strtolower((string)($item['content_type'] ?? 'page'));
   if ($typeFilter !== 'all' && $contentType !== $typeFilter) {
     return false;
   }
+
+  if ($isNewsManagementView) {
+    $publishDateRaw = trim((string)($item['publish_date'] ?? ''));
+    $publishTs = ($publishDateRaw !== '' && $publishDateRaw !== '-') ? strtotime($publishDateRaw) : false;
+    $isScheduled = $publishTs !== false && $publishTs > $nowTs && in_array($displayStatus, ['approved', 'pending'], true);
+
+    if ($newsScope === 'scheduled' && !$isScheduled) {
+      return false;
+    }
+    if ($newsScope === 'draft' && $displayStatus !== 'draft') {
+      return false;
+    }
+    if ($newsScope === 'archived' && $displayStatus !== 'archived') {
+      return false;
+    }
+  } elseif ($statusFilter !== 'all' && $displayStatus !== $statusFilter) {
+    return false;
+  }
+
   if ($searchTerm === '') {
     return true;
   }
@@ -471,7 +521,7 @@ foreach ($announcementRows as $row) {
   ];
 }
 
-function buildAnnouncementsUrl(string $channel, string $status, string $searchTerm = '', string $typeFilterValue = 'all'): string
+function buildAnnouncementsUrl(string $channel, string $status, string $searchTerm = '', string $typeFilterValue = 'all', string $newsScopeValue = 'all'): string
 {
   global $queueSearchTerm, $queueChannelFilter, $queueTypeFilter;
   $query = ['channel' => $channel, 'status' => $status];
@@ -480,6 +530,9 @@ function buildAnnouncementsUrl(string $channel, string $status, string $searchTe
   }
   if ($typeFilterValue !== 'all') {
     $query['type_filter'] = $typeFilterValue;
+  }
+  if ($typeFilterValue === 'news' && $newsScopeValue !== 'all') {
+    $query['news_scope'] = $newsScopeValue;
   }
   if ($queueSearchTerm !== '') {
     $query['queue_q'] = $queueSearchTerm;
@@ -551,6 +604,11 @@ function ann_decode_faq_items(?string $json): array
     return $item['question'] !== '' || $item['answer'] !== '';
   }));
 }
+
+$contentToolsTitle = $isNewsManagementView ? 'News' : 'Content Tools';
+$contentToolsDescription = $isNewsManagementView
+  ? 'Manage posted, scheduled, draft, and archived news articles in one place.'
+  : 'Track and manage public content, delivery announcements, and FAQ entries.';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -624,6 +682,87 @@ function ann_decode_faq_items(?string $json): array
       color: #fff;
       background-color: #dc3545;
       border-color: #dc3545;
+    }
+
+    .announcement-shell .admin-list-toolbar--newswide {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 16px;
+    }
+
+    .announcement-shell .admin-list-toolbar--newswide .admin-list-toolbar-start {
+      width: 100%;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-right: 0;
+    }
+
+    .announcement-shell .admin-list-toolbar--newswide .admin-list-toolbar-end {
+      width: 100%;
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+
+    .announcement-shell .admin-list-toolbar--newswide .admin-list-tabs {
+      flex: 1 1 auto;
+    }
+
+    .announcement-shell .news-toolbar-create {
+      flex: 0 0 auto;
+      margin-left: auto;
+    }
+
+    .announcement-shell .admin-list-actions--newswide {
+      width: 100%;
+      gap: 10px;
+    }
+
+    .announcement-shell .admin-list-actions--newswide .announcement-search-form {
+      flex: 1 1 auto;
+      min-width: 260px;
+    }
+
+    .announcement-shell .admin-list-actions--newswide .admin-search {
+      width: 100%;
+      max-width: none;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout {
+      width: 100%;
+      min-width: 100%;
+      table-layout: fixed;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout thead th,
+    .announcement-shell .compact-admin-table--news-layout tbody td {
+      min-width: 0;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout th:nth-child(1),
+    .announcement-shell .compact-admin-table--news-layout td:nth-child(1) {
+      width: 48%;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout th:nth-child(2),
+    .announcement-shell .compact-admin-table--news-layout td:nth-child(2) {
+      width: 20%;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout th:nth-child(3),
+    .announcement-shell .compact-admin-table--news-layout td:nth-child(3) {
+      width: 14%;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout th:nth-child(4),
+    .announcement-shell .compact-admin-table--news-layout td:nth-child(4) {
+      width: 18%;
     }
 
     .content-filter-modal .modal-content {
@@ -701,6 +840,43 @@ function ann_decode_faq_items(?string $json): array
         flex: 1 1 100%;
       }
     }
+
+    @media (max-width: 992px) {
+      .announcement-shell .admin-list-toolbar--newswide .admin-list-toolbar-start,
+      .announcement-shell .admin-list-toolbar--newswide .admin-list-toolbar-end {
+        flex: 1 1 100%;
+        padding-right: 0;
+      }
+
+      .announcement-shell .admin-list-toolbar--newswide .admin-list-toolbar-start {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+
+      .announcement-shell .news-toolbar-create {
+        margin-left: 0;
+      }
+
+      .announcement-shell .admin-list-actions--newswide .announcement-search-form {
+        flex: 1 1 100%;
+      }
+
+      .announcement-shell .compact-admin-table--news-layout {
+        table-layout: auto;
+        min-width: 760px;
+      }
+
+      .announcement-shell .compact-admin-table--news-layout th:nth-child(1),
+      .announcement-shell .compact-admin-table--news-layout td:nth-child(1),
+      .announcement-shell .compact-admin-table--news-layout th:nth-child(2),
+      .announcement-shell .compact-admin-table--news-layout td:nth-child(2),
+      .announcement-shell .compact-admin-table--news-layout th:nth-child(3),
+      .announcement-shell .compact-admin-table--news-layout td:nth-child(3),
+      .announcement-shell .compact-admin-table--news-layout th:nth-child(4),
+      .announcement-shell .compact-admin-table--news-layout td:nth-child(4) {
+        width: auto;
+      }
+    }
   </style>
 </head>
 <body>
@@ -709,11 +885,12 @@ function ann_decode_faq_items(?string $json): array
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-        Content Tools
+        <?= htmlspecialchars($contentToolsTitle) ?>
       </h2>
+      <p class="text-muted mb-0" style="margin-top:-1rem; max-width:72ch;"><?= htmlspecialchars($contentToolsDescription) ?></p>
       <hr><br>
 
-      <?php if ($isSuperAdmin): ?>
+      <?php if ($isSuperAdmin && !$isNewsManagementView): ?>
         <div id="review-queue-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
           <div class="review-queue-top d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
             <div class="review-queue-title-wrap">
@@ -800,6 +977,7 @@ function ann_decode_faq_items(?string $json): array
                             <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                             <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                             <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+                            <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
                             <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
                             <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
                             <input type="hidden" name="queue_type" value="<?= htmlspecialchars($queueTypeFilter) ?>">
@@ -813,6 +991,7 @@ function ann_decode_faq_items(?string $json): array
                             <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                             <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                             <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+                            <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
                             <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
                             <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
                             <input type="hidden" name="queue_type" value="<?= htmlspecialchars($queueTypeFilter) ?>">
@@ -841,41 +1020,63 @@ function ann_decode_faq_items(?string $json): array
       <?php endif; ?>
       <div id="tracker-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
 
-        <div class="admin-list-toolbar mb-3 pt-2">
+        <div class="admin-list-toolbar mb-3 pt-2 <?= $isNewsManagementView ? 'admin-list-toolbar--newswide' : '' ?>">
           <div class="admin-list-toolbar-start">
             <div class="admin-list-tabs">
-              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, $typeFilter)) ?>" data-filter="ALL" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'all' ? 'active' : '' ?>">
-                &nbsp;&nbsp;All&nbsp;&nbsp;
-              </a>
-              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'approved', $searchTerm, $typeFilter)) ?>" data-filter="Approved" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'approved' ? 'active' : '' ?>">
-                &nbsp;&nbsp;Approved&nbsp;&nbsp;
-              </a>
-              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'denied', $searchTerm, $typeFilter)) ?>" data-filter="Denied" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'denied' ? 'active' : '' ?>">
-                &nbsp;&nbsp;Denied&nbsp;&nbsp;
-              </a>
-              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'draft', $searchTerm, $typeFilter)) ?>" data-filter="Draft" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'draft' ? 'active' : '' ?>">
-                &nbsp;&nbsp;Draft&nbsp;&nbsp;
-              </a>
-              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'pending', $searchTerm, $typeFilter)) ?>" data-filter="Pending" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif <?= $statusFilter === 'pending' ? 'active' : '' ?>">
-                &nbsp;&nbsp;Pending
-                <?php if ($statusCounts['pending'] > 0): ?>
-                  <span class="pending-count-badge"><?= (int)$statusCounts['pending'] ?></span>
-                <?php endif; ?>
-              </a>
+              <?php if ($isNewsManagementView): ?>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'all')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'all' ? 'active' : '' ?>">
+                  Active News
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'scheduled')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'scheduled' ? 'active' : '' ?>">
+                  Scheduled News
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'draft')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'draft' ? 'active' : '' ?>">
+                  Draft
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'archived')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'archived' ? 'active' : '' ?>">
+                  Archived
+                </a>
+              <?php else: ?>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, $typeFilter)) ?>" data-filter="ALL" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'all' ? 'active' : '' ?>">
+                  &nbsp;&nbsp;All&nbsp;&nbsp;
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'approved', $searchTerm, $typeFilter)) ?>" data-filter="Approved" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'approved' ? 'active' : '' ?>">
+                  &nbsp;&nbsp;Approved&nbsp;&nbsp;
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'denied', $searchTerm, $typeFilter)) ?>" data-filter="Denied" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'denied' ? 'active' : '' ?>">
+                  &nbsp;&nbsp;Denied&nbsp;&nbsp;
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'draft', $searchTerm, $typeFilter)) ?>" data-filter="Draft" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'draft' ? 'active' : '' ?>">
+                  &nbsp;&nbsp;Draft&nbsp;&nbsp;
+                </a>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'pending', $searchTerm, $typeFilter)) ?>" data-filter="Pending" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif <?= $statusFilter === 'pending' ? 'active' : '' ?>">
+                  &nbsp;&nbsp;Pending
+                  <?php if ($statusCounts['pending'] > 0): ?>
+                    <span class="pending-count-badge"><?= (int)$statusCounts['pending'] ?></span>
+                  <?php endif; ?>
+                </a>
+              <?php endif; ?>
             </div>
+            <?php if ($isNewsManagementView && $canCreateNews): ?>
+            <a href="<?= htmlspecialchars(appUrl('/Admin-End/Contents/CreateNews.php')) ?>" class="btn btn-primary btn-linear-control news-toolbar-create">
+              <i class="fas fa-plus"></i>
+              <span>Create News</span>
+            </a>
+            <?php endif; ?>
           </div>
 
           <div class="admin-list-toolbar-end">
-            <div class="admin-list-actions">
+            <div class="admin-list-actions <?= $isNewsManagementView ? 'admin-list-actions--newswide' : '' ?>">
               <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                 <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+                <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
                 <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
                 <input type="hidden" name="queue_type" value="<?= htmlspecialchars($queueTypeFilter) ?>">
                 <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
                 <div class="input-group admin-search">
-                  <input type="text" id="searchInput" name="q" class="form-control" placeholder="Search title, audience, creator" value="<?= htmlspecialchars($searchTerm) ?>">
+                  <input type="text" id="searchInput" name="q" class="form-control" placeholder="<?= htmlspecialchars($isNewsManagementView ? 'Search headline, creator, or schedule' : 'Search title, audience, creator') ?>" value="<?= htmlspecialchars($searchTerm) ?>">
                   <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                 </div>
               </form>
@@ -888,7 +1089,7 @@ function ann_decode_faq_items(?string $json): array
                 <i class="fa-solid fa-sliders"></i>
                 <span class="visually-hidden">Columns</span>
               </button>
-              <a class="btn btn-outline-secondary btn-icon admin-refresh" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter, '', $typeFilter)) ?>" title="Refresh table" aria-label="Refresh table">
+              <a class="btn btn-outline-secondary btn-icon admin-refresh" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter, '', $typeFilter, $newsScope)) ?>" title="Refresh table" aria-label="Refresh table">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 <span class="visually-hidden">Refresh</span>
               </a>
@@ -897,14 +1098,16 @@ function ann_decode_faq_items(?string $json): array
         </div>
 
         <div class="table-responsive compact-admin-table-shell">
-          <table id="table-appData" class="table align-middle mb-0 compact-admin-table compact-admin-table--wide compact-admin-table--content">
+          <table id="table-appData" class="table align-middle mb-0 compact-admin-table compact-admin-table--wide compact-admin-table--content <?= $isNewsManagementView ? 'compact-admin-table--news-layout' : '' ?>">
             <thead>
               <tr class="table-light">
                 <th>Title</th>
+                <?php if (!$isNewsManagementView): ?>
                 <th>Content Type</th>
                 <th>Audience</th>
                 <th>Channels</th>
                 <th>Created By</th>
+                <?php endif; ?>
                 <th>Publish Date</th>
                 <th class="announcement-status-col">Status</th>
                 <th class="text-end announcement-action-col">Actions</th>
@@ -913,7 +1116,7 @@ function ann_decode_faq_items(?string $json): array
             <tbody id="tableBody">
               <?php if (!$visibleRows): ?>
                 <tr>
-                  <td colspan="9" class="text-center text-muted py-4">No content items match the current filters.</td>
+                  <td colspan="<?= $isNewsManagementView ? '4' : '8' ?>" class="text-center text-muted py-4"><?= htmlspecialchars($isNewsManagementView ? 'No news articles match the current tab and filters.' : 'No content items match the current filters.') ?></td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($visibleRows as $item): ?>
@@ -928,21 +1131,51 @@ function ann_decode_faq_items(?string $json): array
                       ? 'approved'
                       : ($displayStatus === 'pending'
                         ? 'pending'
-                        : ($displayStatus === 'denied' ? 'denied' : 'archived'));
+                        : ($displayStatus === 'denied'
+                          ? 'denied'
+                          : ($displayStatus === 'archived' ? 'archived' : 'archived')));
                     $orderedChannels = announcement_ordered_channels((array)$item['channels']);
                     $channelsText = implode(', ', array_map(function ($ch) use ($channelLabels) {
                       return $channelLabels[$ch] ?? strtoupper($ch);
                     }, $orderedChannels));
+                    $canArchiveNews = $isNewsManagementView
+                      && $displayStatus !== 'archived'
+                      && ($isSuperAdmin || $isOwnedByCurrentUser);
                   ?>
                   <tr>
                     <td><?= htmlspecialchars($item['title']) ?></td>
+                    <?php if (!$isNewsManagementView): ?>
                     <td><?= htmlspecialchars($typeLabels[$item['content_type']] ?? 'Page Announcement') ?></td>
                     <td><?= htmlspecialchars($item['audience']) ?></td>
                     <td><?= htmlspecialchars($channelsText) ?></td>
                     <td><?= htmlspecialchars($item['created_by']) ?></td>
+                    <?php endif; ?>
                     <td><?= htmlspecialchars($item['publish_date']) ?></td>
                     <td class="announcement-status-col"><span class="status-pill <?= htmlspecialchars($statusClass) ?>"><?= htmlspecialchars($statusLabels[$displayStatus] ?? $displayStatus) ?></span></td>
                     <td class="text-end announcement-action-col">
+                      <?php if ($isNewsManagementView): ?>
+                        <div class="announcement-primary-actions justify-content-end">
+                          <button
+                            class="btn btn-primary btn-sm text-white btn-view-announcement"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalViewAnnouncement"
+                            data-id="<?= htmlspecialchars($item['id']) ?>">
+                            View Info
+                          </button>
+                          <?php if ($canArchiveNews): ?>
+                            <button
+                              class="btn btn-outline-secondary btn-sm"
+                              type="button"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalArchiveAnnouncement"
+                              data-id="<?= htmlspecialchars($item['id']) ?>"
+                              data-title="<?= htmlspecialchars($item['title']) ?>">
+                              Archive
+                            </button>
+                          <?php endif; ?>
+                        </div>
+                      <?php else: ?>
                       <div class="announcement-row-actions">
                         <div class="announcement-primary-actions">
                           <button
@@ -983,6 +1216,8 @@ function ann_decode_faq_items(?string $json): array
                               <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
                               <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                               <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                              <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+                              <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
                               <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
                               <button class="btn btn-success btn-sm" type="submit">Approve</button>
                             </form>
@@ -992,12 +1227,15 @@ function ann_decode_faq_items(?string $json): array
                               <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
                               <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                               <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                              <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+                              <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
                               <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
                               <button class="btn btn-danger btn-sm" type="submit">Deny</button>
                             </form>
                           </div>
                         <?php endif; ?>
                       </div>
+                      <?php endif; ?>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -1019,7 +1257,7 @@ function ann_decode_faq_items(?string $json): array
             />
             <?php if ($isSuperAdmin): ?>
               <span id="announcementsVisibleCountBadge" class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
-                Showing <?= (int)count($visibleRows) ?> of <?= (int)count($filteredByChannel) ?>
+                Showing <?= (int)count($visibleRows) ?> of <?= (int)($isNewsManagementView ? count($newsRows) : count($filteredByChannel)) ?>
               </span>
             <?php endif; ?>
           </div>
@@ -1031,6 +1269,7 @@ function ann_decode_faq_items(?string $json): array
         <div class="modal fade content-filter-modal" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
           <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
+              <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
               <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
               <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
               <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
@@ -1131,7 +1370,7 @@ function ann_decode_faq_items(?string $json): array
                 <div class="content-filter-actions">
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                   <button type="submit" class="btn btn-primary">Apply Filter</button>
-                  <a href="<?= htmlspecialchars(buildAnnouncementsUrl('all', 'all', '', 'all')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
+                  <a href="<?= htmlspecialchars($isNewsManagementView ? buildAnnouncementsUrl('all', 'all', '', 'news', 'all') : buildAnnouncementsUrl('all', 'all', '', 'all')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
                 </div>
               </div>
             </form>
@@ -1166,6 +1405,7 @@ function ann_decode_faq_items(?string $json): array
         <input type="hidden" id="deleteChannelInput" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <input type="hidden" id="deleteStatusInput" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
         <input type="hidden" id="deleteTypeFilterInput" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+        <input type="hidden" id="deleteNewsScopeInput" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
         <input type="hidden" id="deleteQueryInput" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
         <input type="hidden" id="deleteQueueChannelInput" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
         <input type="hidden" id="deleteQueueTypeInput" name="queue_type" value="<?= htmlspecialchars($queueTypeFilter) ?>">
@@ -1189,12 +1429,44 @@ function ann_decode_faq_items(?string $json): array
     </div>
   </div>
 
+  <div class="modal fade" id="modalArchiveAnnouncement" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content p-3" id="archiveAnnouncementForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php">
+        <?= csrfTokenField() ?>
+        <input type="hidden" id="archiveAnnouncementIdInput" name="announcement_id" value="">
+        <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
+        <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+        <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+        <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
+        <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
+        <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
+        <input type="hidden" name="queue_type" value="<?= htmlspecialchars($queueTypeFilter) ?>">
+        <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
+        <input type="hidden" name="action" value="archive">
+        <div class="modal-header justify-content-center border-0 pb-0">
+          <h5 class="modal-title fw-bold text-center w-100">Archive News</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <hr class="my-2">
+        <div class="modal-body text-center">
+          <p class="mb-2">Are you sure you want to archive this news article?</p>
+          <p class="fw-semibold mb-0" id="archiveAnnouncementTitle">-</p>
+        </div>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning text-dark flex-fill">Archive</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal fade content-filter-modal" id="modalReviewQueueFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
         <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
         <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+        <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
         <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
         <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
 
@@ -1388,6 +1660,7 @@ function ann_decode_faq_items(?string $json): array
         <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
         <input type="hidden" name="type_filter" value="<?= htmlspecialchars($typeFilter) ?>">
+        <input type="hidden" name="news_scope" value="<?= htmlspecialchars($newsScope) ?>">
         <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
         <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
         <input type="hidden" name="queue_type" value="<?= htmlspecialchars($queueTypeFilter) ?>">
@@ -1743,7 +2016,7 @@ function ann_decode_faq_items(?string $json): array
       modalId: "modalTableColumns",
       listId: "tableColumnsList",
       resetBtnId: "btnTableColumnsReset",
-      storageKey: "admin_cols_announcements_v2",
+      storageKey: <?= json_encode($isNewsManagementView ? 'admin_cols_news_v1' : 'admin_cols_announcements_v2', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       defaultHiddenIdxs: []
     };
 
@@ -1777,6 +2050,23 @@ function ann_decode_faq_items(?string $json): array
         queueChannelEl.value = queueChannel;
         queueQueryEl.value = queueQ;
         titleEl.textContent = title;
+      });
+    })();
+
+    (function () {
+      const modalEl = document.getElementById("modalArchiveAnnouncement");
+      const titleEl = document.getElementById("archiveAnnouncementTitle");
+      const idEl = document.getElementById("archiveAnnouncementIdInput");
+      if (!modalEl || !titleEl || !idEl) return;
+
+      modalEl.addEventListener("show.bs.modal", function (event) {
+        const triggerBtn = event.relatedTarget;
+        if (!triggerBtn) {
+          return;
+        }
+
+        idEl.value = triggerBtn.getAttribute("data-id") || "";
+        titleEl.textContent = triggerBtn.getAttribute("data-title") || "-";
       });
     })();
 
@@ -1951,6 +2241,7 @@ function ann_decode_faq_items(?string $json): array
         if (v === "draft" && review === "denied" && isOwner) return "Denied";
         if (v === "approved") return "Approved";
         if (v === "pending") return "Pending";
+        if (v === "archived") return "Archived";
         return "Draft";
       }
 
@@ -2131,7 +2422,7 @@ function ann_decode_faq_items(?string $json): array
       function applyStatusHighlight(el, status, reviewResult = "", isOwner = false) {
         if (!el) return;
         const effectiveStatus = statusText(status, reviewResult, isOwner).toLowerCase();
-        el.classList.remove("status-approved", "status-pending", "status-denied", "status-draft");
+        el.classList.remove("status-approved", "status-pending", "status-denied", "status-draft", "status-archived");
         if (effectiveStatus === "approved") {
           el.classList.add("status-approved");
           return;
@@ -2142,6 +2433,10 @@ function ann_decode_faq_items(?string $json): array
         }
         if (effectiveStatus === "denied") {
           el.classList.add("status-denied");
+          return;
+        }
+        if (effectiveStatus === "archived") {
+          el.classList.add("status-archived");
           return;
         }
         el.classList.add("status-draft");
@@ -3014,6 +3309,3 @@ function ann_decode_faq_items(?string $json): array
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 </body>
 </html>
-
-
-

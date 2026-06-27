@@ -98,7 +98,7 @@ function announcements_prepare_row(array $row): array
     'channels' => array_values(array_unique(array_filter((array)($row['channels'] ?? []), static function ($item): bool {
       return is_string($item) && $item !== '';
     }))),
-    'status' => in_array((string)($row['status'] ?? 'draft'), ['draft', 'pending', 'approved'], true)
+    'status' => in_array((string)($row['status'] ?? 'draft'), ['draft', 'pending', 'approved', 'archived'], true)
       ? (string)$row['status']
       : 'draft',
     'publish_date' => trim((string)($row['publish_date'] ?? '-')) ?: '-',
@@ -434,7 +434,6 @@ function announcement_generate_id(): string
     return 'ann_' . date('YmdHis') . '_' . mt_rand(1000, 9999);
   }
 }
-
 
 
 

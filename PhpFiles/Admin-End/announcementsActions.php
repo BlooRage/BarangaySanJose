@@ -16,10 +16,13 @@ verifyCsrfToken(false);
 
 function ann_action_redirect(string $channel, string $status, string $q, string $queueQ, string $queueChannel, string $type, string $message): void
 {
-  global $typeFilter, $queueType;
+  global $typeFilter, $queueType, $newsScope;
   $query = ['channel' => $channel, 'status' => $status];
   if ($typeFilter !== 'all') {
     $query['type_filter'] = $typeFilter;
+  }
+  if ($typeFilter === 'news' && $newsScope !== 'all') {
+    $query['news_scope'] = $newsScope;
   }
   if ($q !== '') {
     $query['q'] = $q;
@@ -134,6 +137,7 @@ $announcementId = trim((string)($_POST['announcement_id'] ?? ''));
 $channel = strtolower(trim((string)($_POST['channel'] ?? 'all')));
 $status = strtolower(trim((string)($_POST['status'] ?? 'all')));
 $typeFilter = strtolower(trim((string)($_POST['type_filter'] ?? 'all')));
+$newsScope = strtolower(trim((string)($_POST['news_scope'] ?? 'all')));
 $q = trim((string)($_POST['q'] ?? ''));
 $queueQ = trim((string)($_POST['queue_q'] ?? ''));
 $queueChannel = strtolower(trim((string)($_POST['queue_channel'] ?? 'all')));
@@ -148,13 +152,16 @@ if (!in_array($status, ['all', 'approved', 'denied', 'pending', 'draft'], true))
 if (!in_array($typeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $typeFilter = 'all';
 }
+if (!in_array($newsScope, ['all', 'scheduled', 'draft', 'archived'], true)) {
+  $newsScope = 'all';
+}
 if (!in_array($queueChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $queueChannel = 'all';
 }
 if (!in_array($queueType, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $queueType = 'all';
 }
-if ($announcementId === '' || !in_array($action, ['approve', 'deny', 'delete', 'update', 'submit_review'], true)) {
+if ($announcementId === '' || !in_array($action, ['approve', 'deny', 'delete', 'archive', 'update', 'submit_review'], true)) {
   ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Invalid content action.');
 }
 
@@ -520,6 +527,30 @@ foreach ($rows as $idx => $item) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to delete content item.');
     }
     ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content deleted.');
+  }
+
+  if ($action === 'archive') {
+    $contentType = strtolower(trim((string)($item['content_type'] ?? 'page')));
+    if ($contentType !== 'news') {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only news articles can be archived.');
+    }
+    if (!$isSuperAdmin && !$isOwnedByCurrentUser) {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the content creator or SuperAdmin can archive this news article.');
+    }
+    if ($currentStatus === 'archived') {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'This news article is already archived.');
+    }
+
+    $rows[$idx]['status'] = 'archived';
+    $rows[$idx]['updated_at'] = date('Y-m-d H:i:s');
+    $rows[$idx]['updated_by'] = $currentUserDisplayLabel !== '' ? $currentUserDisplayLabel : (string)($_SESSION['user_id'] ?? 'Admin');
+    $rows[$idx]['review_result'] = '';
+    $rows[$idx]['review_note'] = '';
+
+    if (!announcements_save_all($rows)) {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to archive news article.');
+    }
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'News article archived.');
   }
 }
 

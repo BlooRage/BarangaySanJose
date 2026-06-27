@@ -23,30 +23,271 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       align-items: start;
     }
 
-    .news-create-card,
-    .news-preview-card {
+    .news-page-heading {
+      max-width: 96ch;
+    }
+
+    .news-form-shell {
+      max-width: 1340px;
+      margin: 0 auto;
+      border: 1px solid #e5e7eb;
       border-radius: 24px;
+      background: #ffffff;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+    }
+
+    .news-form-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .news-form-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #fff3e6;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      font-size: 0.85rem;
+      font-weight: 700;
+      white-space: nowrap;
     }
 
     .news-create-subtitle {
       max-width: 72ch;
       color: #667085;
-      font-size: 0.98rem;
-      line-height: 1.75;
+      font-size: 0.82rem;
+      line-height: 1.55;
     }
 
     .news-upload-shell,
-    .news-builder-section,
     .news-preview-panel {
-      border: 1px solid rgba(222, 113, 12, 0.14);
-      border-radius: 20px;
-      background: linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
-      box-shadow: 0 16px 40px rgba(18, 18, 18, 0.05);
+      border: 1px solid #edf1f5;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: none;
     }
 
-    .news-upload-shell,
-    .news-builder-section {
+    .news-upload-shell {
       padding: 1.1rem;
+    }
+
+    .news-upload-shell--inline {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      cursor: default;
+    }
+
+    .news-form-section {
+      padding: 0;
+    }
+
+    .news-form-divider,
+    .news-builder-divider {
+      margin: 1.8rem 0;
+      border: 0;
+      border-top: 1px solid #e5e7eb;
+      opacity: 1;
+    }
+
+    .news-builder-divider {
+      margin: 1.4rem 0;
+    }
+
+    .news-builder-entry:first-child .news-builder-divider {
+      display: none;
+    }
+
+    .news-builder-section {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .news-upload-shell {
+      cursor: pointer;
+      transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .news-upload-shell:not(.has-image):hover,
+    .news-upload-shell:not(.has-image).drag-over {
+      border-color: #de710c;
+      background: #fffaf5;
+      box-shadow: 0 0 0 4px rgba(222, 113, 12, 0.08);
+    }
+
+    .news-upload-shell:not(.has-image):hover .news-upload-dropzone,
+    .news-upload-shell:not(.has-image).drag-over .news-upload-dropzone,
+    .news-upload-shell:not(.has-image):hover .news-upload-preview,
+    .news-upload-shell:not(.has-image).drag-over .news-upload-preview {
+      border-color: #de710c;
+      background: #fff7ef;
+    }
+
+    .news-upload-shell--inline:not(.has-image):hover,
+    .news-upload-shell--inline:not(.has-image).drag-over {
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .news-upload-shell--inline:not(.has-image):hover .news-upload-dropzone,
+    .news-upload-shell--inline:not(.has-image).drag-over .news-upload-dropzone,
+    .news-upload-shell--inline:not(.has-image):hover .news-upload-preview,
+    .news-upload-shell--inline:not(.has-image).drag-over .news-upload-preview {
+      border-color: #de710c;
+      background: #fff7ef;
+    }
+
+    .news-upload-dropzone {
+      min-height: 156px;
+      border: 1.5px dashed #c8c8c8;
+      border-radius: 16px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 18px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .news-upload-dropzone:not(.has-image):hover,
+    .news-upload-dropzone:not(.has-image).drag-over {
+      border-color: #de710c;
+      background: #fff7ef;
+      box-shadow: 0 0 0 4px rgba(222, 113, 12, 0.08);
+    }
+
+    .news-upload-dropzone-icon {
+      font-size: 1.35rem;
+      color: #de710c;
+      margin-bottom: 8px;
+    }
+
+    .news-upload-dropzone-text {
+      font-size: 0.96rem;
+      color: #333;
+      margin-bottom: 2px;
+      font-weight: 600;
+    }
+
+    .news-upload-dropzone-subtext {
+      font-size: 0.82rem;
+      color: #6c757d;
+    }
+
+    .news-upload-dropzone-input {
+      display: none;
+    }
+
+    .news-banner-dropzone {
+      position: relative;
+      min-height: 290px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .news-banner-dropzone-copy {
+      position: relative;
+      z-index: 1;
+      transition: opacity 0.2s ease;
+    }
+
+    .news-banner-dropzone.has-image {
+      padding: 0;
+      border-style: solid;
+      border-color: #d7dee7;
+      background: #0f172a;
+      cursor: default;
+    }
+
+    .news-banner-dropzone.has-image::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.38);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 2;
+    }
+
+    .news-banner-dropzone.has-image:hover::after,
+    .news-banner-dropzone.has-image:focus-within::after {
+      opacity: 1;
+    }
+
+    .news-banner-dropzone.has-image .news-banner-dropzone-copy {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .news-banner-preview-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .news-banner-dropzone.has-image .news-banner-preview-image {
+      display: block;
+    }
+
+    .news-section-inline-upload {
+      margin-top: 0.35rem;
+    }
+
+    .news-section-inline-upload .news-banner-dropzone {
+      min-height: 250px;
+    }
+
+    .news-upload-delete-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.96);
+      z-index: 3;
+      width: 58px;
+      height: 58px;
+      border: 0;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.96);
+      color: #b42318;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .news-banner-dropzone.has-image:hover .news-upload-delete-btn,
+    .news-banner-dropzone.has-image:focus-within .news-upload-delete-btn {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .news-upload-delete-btn:hover,
+    .news-upload-delete-btn:focus {
+      background: #ffffff;
+      color: #912018;
     }
 
     .news-upload-preview,
@@ -57,9 +298,9 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       overflow: hidden;
       border-radius: 18px;
       background:
-        radial-gradient(circle at 20% 20%, rgba(222, 113, 12, 0.16), transparent 24%),
-        linear-gradient(135deg, #efe5d9 0%, #faf6f0 100%);
-      color: #7c746c;
+        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px dashed #d7dee7;
+      color: #6b7280;
       text-align: center;
       font-size: 0.95rem;
     }
@@ -80,13 +321,62 @@ $isSuperAdmin = $sessionRole === 'superadmin';
     .news-section-stack {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0;
     }
 
-    .news-section-toolbar {
+    .news-section-actions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
+      flex-direction: column;
+      gap: 0.7rem;
+      margin-top: 0.85rem;
+      width: 100%;
+    }
+
+    .news-section-action-btn {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      border: 0;
+      border-radius: 12px;
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+    }
+
+    .news-section-action-btn:hover,
+    .news-section-action-btn:focus,
+    .news-section-action-btn:active {
+      transform: none;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+    }
+
+    .news-section-action-btn--text {
+      background: #e8f0ff;
+      color: #1d4ed8;
+      border: 1px solid #c7d7fe;
+    }
+
+    .news-section-action-btn--text:hover,
+    .news-section-action-btn--text:focus,
+    .news-section-action-btn--text:active {
+      background: #dbe8ff;
+      color: #1e40af;
+    }
+
+    .news-section-action-btn--image {
+      background: #fff1db;
+      color: #b45309;
+      border: 1px solid #f5d7a6;
+    }
+
+    .news-section-action-btn--image:hover,
+    .news-section-action-btn--image:focus,
+    .news-section-action-btn--image:active {
+      background: #ffe8c2;
+      color: #92400e;
     }
 
     .news-builder-section-head {
@@ -99,20 +389,54 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 
     .news-builder-section-kicker {
       margin: 0;
-      color: #de710c;
+      color: #475467;
       font-size: 0.78rem;
       font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      text-transform: none;
     }
 
-    .news-preview-column {
-      position: sticky;
-      top: 1.5rem;
+    .news-form-card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .news-form-card-title h6 {
+      margin: 0;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .news-form-card-title span {
+      color: #6b7280;
+      font-size: 0.82rem;
     }
 
     .news-preview-panel {
       padding: 1.2rem;
+    }
+
+    .news-modal-stage[hidden] {
+      display: none !important;
+    }
+
+    .news-modal-preview-shell .modal-content {
+      border: 0;
+      border-radius: 28px;
+      overflow: hidden;
+    }
+
+    .news-modal-preview-shell .modal-header,
+    .news-modal-preview-shell .modal-footer {
+      border-color: rgba(18, 18, 18, 0.06);
+    }
+
+    .news-modal-preview-shell .modal-body {
+      background: linear-gradient(180deg, #fffdf9 0%, #fff8ef 100%);
     }
 
     .news-preview-meta {
@@ -141,7 +465,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
     .news-tile-preview {
       overflow: hidden;
       margin-bottom: 1.1rem;
-      border: 1px solid rgba(0, 0, 0, 0.06);
+      border: 1px solid #e5e7eb;
       border-radius: 22px;
       background: #ffffff;
     }
@@ -151,9 +475,8 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       place-items: center;
       min-height: 180px;
       background:
-        radial-gradient(circle at 20% 20%, rgba(222, 113, 12, 0.18), transparent 25%),
-        linear-gradient(135deg, #ece3d7 0%, #faf5ee 100%);
-      color: #7c746c;
+        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      color: #6b7280;
       text-align: center;
     }
 
@@ -190,7 +513,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 
     .news-article-preview {
       overflow: hidden;
-      border: 1px solid rgba(0, 0, 0, 0.06);
+      border: 1px solid #e5e7eb;
       border-radius: 24px;
       background: #ffffff;
     }
@@ -220,8 +543,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       margin: 1.35rem 0 1.4rem;
       border-radius: 22px;
       background:
-        radial-gradient(circle at 20% 20%, rgba(222, 113, 12, 0.18), transparent 25%),
-        linear-gradient(135deg, #ece3d7 0%, #faf5ee 100%);
+        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     }
 
     .news-article-hero img {
@@ -288,13 +610,25 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       line-height: 1.7;
     }
 
-    @media (max-width: 1199px) {
-      .news-preview-column {
-        position: static;
-      }
+    .news-form-shell .announcement-sticky-actions {
+      border-top: 0;
+      padding-top: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .news-form-shell .announcement-modal-footer-start {
+      width: 100%;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
 
     @media (max-width: 767px) {
+      .news-form-header {
+        margin-bottom: 1.1rem;
+      }
+
       .news-upload-preview,
       .news-section-image-preview {
         min-height: 180px;
@@ -316,176 +650,233 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div>
+        <div class="news-page-heading">
           <h2 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Create News</h2>
-          <p class="text-muted mb-0">Publish a full news article with its own headline image, body, extra sections, and a public-page preview.</p>
+          <p class="text-muted mb-0">Build a public news article in stages, then use the modal preview to save as draft, post now, or schedule it for later.</p>
         </div>
       </div>
       <hr><br>
 
-      <section class="announcement-create-guide mb-4">
-        <div class="announcement-create-guide-copy">
-          <div class="announcement-create-guide-kicker">News Workflow</div>
-          <h5 class="announcement-section-title mb-1">Build The Story First</h5>
-          <p class="announcement-compose-subtitle mb-2">This news form is separate from page announcements so articles can have a cleaner image-led layout.</p>
-          <p class="announcement-create-guide-text mb-0">Start with the headline image and main story, then add extra text or image sections. Use the preview to see how the article and tile will appear once posted.</p>
-        </div>
-        <div class="announcement-create-guide-grid">
-          <div class="announcement-guide-block">
-            <h6 class="announcement-guide-title">Suggested Flow</h6>
-            <ul class="announcement-guide-list">
-              <li>Upload the headline image first</li>
-              <li>Add the news heading and main body</li>
-              <li>Insert extra text or image sections only when needed</li>
-            </ul>
-          </div>
-          <div class="announcement-guide-block">
-            <h6 class="announcement-guide-title">Before Posting</h6>
-            <ul class="announcement-guide-list">
-              <li>Check the tile preview and full article preview</li>
-              <li>Use clear section breaks and short paragraphs</li>
-              <li>Schedule the publish date only if the story should go live later</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <form class="announcement-create-shell p-3 p-md-4 shadow-sm" id="newsCreateForm" action="../../PhpFiles/Admin-End/announcementsCreation.php" method="post">
+      <form class="announcement-create-shell news-form-shell p-3 p-md-4 p-xl-4" id="newsCreateForm" action="../../PhpFiles/Admin-End/announcementsCreation.php" method="post">
         <input type="hidden" name="channel_context" value="public_news">
         <input type="hidden" name="content_type" value="news">
         <input type="hidden" name="channels[]" value="public_news">
+        <input type="hidden" name="submit_action" id="newsSubmitActionInput" value="">
         <input type="hidden" name="headline_image_url" id="headlineImageUrlInput" value="">
         <input type="hidden" name="news_body_html" id="newsBodyHtmlInput" value="">
         <input type="hidden" name="news_sections_json" id="newsSectionsJsonInput" value="">
         <input type="hidden" name="content_html" id="newsComposedHtmlInput" value="">
+        <input type="hidden" id="newsScheduleDateInput" name="schedule_date" value="">
+        <input type="hidden" id="newsScheduleTimeInput" name="schedule_time" value="">
+
+        <div class="news-form-header">
+          <div>
+            <h5 class="fw-bold mb-1">Public News Publishing Form</h5>
+            <p class="text-muted mb-0">Encode the article details here, then preview the public tile and article layout before you save, post, or schedule it.</p>
+          </div>
+          <div class="news-form-badge">
+            <i class="fas fa-newspaper"></i>
+            Public News Workflow
+          </div>
+        </div>
 
         <div class="row g-4 news-compose-layout">
-          <div class="col-xl-7">
-            <section class="announcement-section-card news-create-card mb-4">
-              <h5 class="announcement-section-title">Headline Image</h5>
-              <p class="news-create-subtitle mb-3">This becomes the lead image for the article and the tile preview on the public news page.</p>
-              <div class="news-upload-shell">
-                <div class="row g-3 align-items-start">
-                  <div class="col-lg-5">
-                    <label for="headlineImageFile" class="form-label fw-semibold">Upload Headline Image</label>
-                    <input type="file" class="form-control" id="headlineImageFile" accept="image/jpeg,image/png,image/webp,image/gif">
-                    <div class="form-text">Accepted: JPG, PNG, WEBP, GIF. Maximum 50MB.</div>
-                    <div class="news-upload-status mt-3" id="headlineImageStatus">No headline image uploaded yet.</div>
-                  </div>
-                  <div class="col-lg-7">
-                    <div class="news-upload-preview" id="headlineImagePreview">
-                      <span>Headline image preview will appear here.</span>
-                    </div>
-                  </div>
-                </div>
+          <div class="col-12">
+            <section class="news-form-section">
+              <div class="news-form-card-title">
+                <h6>Header Title</h6>
+                <span>This headline appears on the news card and inside the full article preview.</span>
+              </div>
+              <div class="mb-0">
+                <label for="newsHeadingInput" class="form-label fw-semibold small">Header Title</label>
+                <input type="text" class="form-control announcement-primary-title-input" id="newsHeadingInput" name="title" placeholder="Enter the header title" required>
               </div>
             </section>
+            <hr class="news-form-divider">
 
-            <section class="announcement-section-card news-create-card mb-4">
-              <h5 class="announcement-section-title">Story Details</h5>
-              <p class="news-create-subtitle mb-3">Write the main story first. This becomes the opening section of the article.</p>
-              <div class="mb-3">
-                <label for="newsHeadingInput" class="form-label fw-semibold">Heading</label>
-                <input type="text" class="form-control announcement-primary-title-input" id="newsHeadingInput" name="title" placeholder="Enter the news headline" required>
+            <section class="news-form-section">
+              <div class="news-form-card-title">
+                <h6>News Banner</h6>
+                <span>Upload the lead image that will appear in the public tile preview and article hero.</span>
               </div>
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label for="newsScheduleDateInput" class="form-label fw-semibold">Schedule Date (optional)</label>
-                  <input type="date" class="form-control" id="newsScheduleDateInput" name="schedule_date">
+              <div class="news-upload-shell news-upload-shell--inline" id="headlineImageShell">
+                <label class="form-label fw-semibold small">Upload News Banner</label>
+                <div class="news-upload-dropzone news-banner-dropzone" id="headlineImagePreview" role="button" tabindex="0" aria-controls="headlineImageFile" aria-label="Upload news banner">
+                  <img src="" alt="News banner preview" class="news-banner-preview-image" id="headlineImagePreviewImage">
+                  <div class="news-banner-dropzone-copy" id="headlineImagePrompt">
+                    <div class="news-upload-dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div class="news-upload-dropzone-text">Drag and drop image here</div>
+                    <div class="news-upload-dropzone-subtext">or click to choose manually</div>
+                    <div class="news-upload-dropzone-subtext mt-1">Accepted: JPG, PNG, WEBP, GIF. Maximum 50MB.</div>
+                  </div>
+                  <button type="button" class="news-upload-delete-btn" id="btnRemoveHeadlineImage" aria-label="Delete news banner">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <input type="file" class="news-upload-dropzone-input" id="headlineImageFile" accept="image/jpeg,image/png,image/webp,image/gif">
                 </div>
-                <div class="col-md-6">
-                  <label for="newsScheduleTimeInput" class="form-label fw-semibold">Schedule Time (optional)</label>
-                  <input type="time" class="form-control" id="newsScheduleTimeInput" name="schedule_time">
-                </div>
+                <div class="news-upload-status mt-3" id="headlineImageStatus">No news banner uploaded yet.</div>
+              </div>
+            </section>
+            <hr class="news-form-divider">
+
+            <section class="news-form-section">
+              <div class="news-form-card-title">
+                <h6>News Description</h6>
+                <span>Write the main story body here. This becomes the opening article content.</span>
               </div>
               <div class="announcement-editor-panel">
                 <div class="announcement-editor-panel-head">
                   <div>
-                    <label class="form-label fw-semibold mb-1">Main Body</label>
-                    <p class="announcement-editor-helper mb-0">Use the main body for the opening article text. You can still format, link, and insert inline images if needed.</p>
+                    <label class="form-label fw-semibold small mb-1">News Description</label>
+                    <p class="announcement-editor-helper mb-0">Use this space for the story description. You can still format text, add links, and insert inline images if needed.</p>
                   </div>
                 </div>
                 <div id="newsBodyEditor"></div>
               </div>
             </section>
+            <hr class="news-form-divider">
 
-            <section class="announcement-section-card news-create-card">
-              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                <div>
-                  <h5 class="announcement-section-title mb-1">Additional Sections</h5>
-                  <p class="news-create-subtitle mb-0">Add extra text blocks or supporting images after the main story.</p>
-                </div>
-                <div class="news-section-toolbar">
-                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTextSection">
-                    <i class="fas fa-align-left"></i>&nbsp;Add Text Section
-                  </button>
-                  <button type="button" class="btn btn-outline-warning btn-sm" id="btnAddImageSection">
-                    <i class="fas fa-image"></i>&nbsp;Add Image Section
-                  </button>
-                </div>
+            <section class="news-form-section">
+              <div class="news-form-card-title">
+                <h6>Additional Sections</h6>
+                <span>Add optional follow-up content blocks only when the article needs more detail.</span>
               </div>
               <div class="news-section-stack" id="newsSectionsContainer"></div>
               <div class="news-placeholder-copy mt-3" id="newsSectionsEmptyState">No additional sections yet. Add one only if the story needs more text or a supporting image.</div>
+              <div class="news-section-actions">
+                <button type="button" class="btn news-section-action-btn news-section-action-btn--text" id="btnAddTextSection">
+                  <i class="fas fa-align-left"></i>&nbsp;Add Text Section
+                </button>
+                <button type="button" class="btn news-section-action-btn news-section-action-btn--image" id="btnAddImageSection">
+                  <i class="fas fa-image"></i>&nbsp;Add Image Section
+                </button>
+              </div>
             </section>
-          </div>
-
-          <div class="col-xl-5">
-            <aside class="news-preview-column">
-              <section class="announcement-section-card news-preview-card">
-                <div class="news-preview-meta">
-                  <div>
-                    <p class="news-preview-kicker">Live Preview</p>
-                    <h5 class="announcement-section-title mb-1">Posted Page View</h5>
-                  </div>
-                  <div class="news-preview-sync" id="newsPreviewSyncLabel">Updates automatically</div>
-                </div>
-
-                <div class="news-preview-panel mb-3">
-                  <h6 class="announcement-card-title mb-3">News Tile Preview</h6>
-                  <div class="news-tile-preview">
-                    <div class="news-tile-media" id="newsTilePreviewMedia"></div>
-                    <div class="news-tile-body">
-                      <span class="news-preview-date" id="newsTilePreviewDate">Preview only</span>
-                      <h4 class="news-tile-title" id="newsTilePreviewTitle">Your news headline will appear here.</h4>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="news-preview-panel">
-                  <h6 class="announcement-card-title mb-3">Article Preview</h6>
-                  <article class="news-article-preview">
-                    <div class="news-article-copy">
-                      <p class="news-article-tag">Community Update</p>
-                      <h2 class="news-article-title" id="newsPreviewHeadline">Your news headline will appear here.</h2>
-                      <span class="news-preview-date" id="newsPreviewDate">Preview only</span>
-                      <div class="news-article-hero" id="newsPreviewHero">
-                        <div class="news-upload-preview" style="min-height: 240px;">
-                          <span>Upload a headline image to preview the article hero.</span>
-                        </div>
-                      </div>
-                      <div class="news-article-body" id="newsPreviewBody">
-                        <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
-                      </div>
-                    </div>
-                  </article>
-                </div>
-              </section>
-            </aside>
           </div>
         </div>
 
         <div class="announcement-sticky-actions mt-4">
           <div class="announcement-modal-footer-start">
-            <button type="button" class="btn btn-outline-secondary" id="btnScrollPreview">Preview Story</button>
-            <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark" data-news-submit>Save as Draft</button>
-            <?php if ($isSuperAdmin): ?>
-              <button type="submit" id="btnPostNews" name="submit_action" value="approved" class="btn btn-primary text-white" data-news-submit>Post News</button>
-            <?php else: ?>
-              <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white" data-news-submit>Submit for Review</button>
-            <?php endif; ?>
+            <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news&amp;news_scope=all#tracker-card" class="btn btn-outline-secondary">Manage News</a>
+            <button type="button" class="btn btn-primary text-white" id="btnOpenPreviewModalFooter">Next: Preview</button>
           </div>
         </div>
       </form>
+
+      <div class="modal fade news-modal-preview-shell" id="newsPreviewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header px-4 py-3">
+              <div>
+                <p class="news-preview-kicker mb-1">Final Step</p>
+                <h5 class="modal-title mb-0" id="newsPreviewModalLabel">Preview News Article</h5>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-3 p-md-4">
+              <div class="news-modal-stage" id="newsPreviewStage">
+                <div class="row g-4">
+                  <div class="col-lg-4">
+                    <div class="news-preview-panel h-100">
+                      <h6 class="announcement-card-title mb-3">News Tile Preview</h6>
+                      <div class="news-tile-preview mb-0">
+                        <div class="news-tile-media" id="newsModalTilePreviewMedia"></div>
+                        <div class="news-tile-body">
+                          <span class="news-preview-date" id="newsModalTilePreviewDate">Preview only</span>
+                          <h4 class="news-tile-title" id="newsModalTilePreviewTitle">Your news headline will appear here.</h4>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-8">
+                    <div class="news-preview-panel h-100">
+                      <h6 class="announcement-card-title mb-3">Article Preview</h6>
+                      <article class="news-article-preview">
+                        <div class="news-article-copy">
+                          <p class="news-article-tag">Community Update</p>
+                          <h2 class="news-article-title" id="newsModalPreviewHeadline">Your news headline will appear here.</h2>
+                          <span class="news-preview-date" id="newsModalPreviewDate">Preview only</span>
+                          <div class="news-article-hero" id="newsModalPreviewHero">
+                            <div class="news-upload-preview" style="min-height: 240px;">
+                              <span>Upload a news banner to preview the article hero.</span>
+                            </div>
+                          </div>
+                          <div class="news-article-body" id="newsModalPreviewBody">
+                            <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="news-modal-stage" id="newsScheduleStage" hidden>
+                <div class="row g-4 align-items-start">
+                  <div class="col-lg-5">
+                    <div class="news-preview-panel h-100">
+                      <h6 class="announcement-card-title mb-3">Scheduled Post</h6>
+                      <p class="text-muted mb-3">Choose when this news article should become available.</p>
+                      <div class="mb-3">
+                        <label for="modalNewsScheduleDateInput" class="form-label fw-semibold">Date</label>
+                        <input type="date" class="form-control" id="modalNewsScheduleDateInput">
+                      </div>
+                      <div class="mb-0">
+                        <label for="modalNewsScheduleTimeInput" class="form-label fw-semibold">Time</label>
+                        <input type="time" class="form-control" id="modalNewsScheduleTimeInput">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-7">
+                    <div class="news-preview-panel h-100">
+                      <h6 class="announcement-card-title mb-3">Schedule Preview</h6>
+                      <article class="news-article-preview">
+                        <div class="news-article-copy">
+                          <p class="news-article-tag">Community Update</p>
+                          <h2 class="news-article-title" id="newsModalScheduleHeadline">Your news headline will appear here.</h2>
+                          <span class="news-preview-date" id="newsModalScheduleDate">Preview only</span>
+                          <div class="news-article-hero" id="newsModalScheduleHero">
+                            <div class="news-upload-preview" style="min-height: 240px;">
+                              <span>Upload a news banner to preview the article hero.</span>
+                            </div>
+                          </div>
+                          <div class="news-article-body" id="newsModalScheduleBody">
+                            <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer px-4 py-3 justify-content-between" id="newsPreviewFooter">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Return to Editing</button>
+              <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <button type="button" class="btn btn-warning text-dark" id="btnSaveNewsDraft" data-news-action>Save as Draft</button>
+                <?php if ($isSuperAdmin): ?>
+                  <button type="button" class="btn btn-primary text-white" id="btnPostNewsNow" data-news-action>Post Now</button>
+                  <button type="button" class="btn btn-outline-primary" id="btnOpenScheduleStage" data-news-action>Scheduled Post</button>
+                <?php else: ?>
+                  <button type="button" class="btn btn-primary text-white" id="btnPostNewsNow" data-news-action>Submit for Review</button>
+                  <button type="button" class="btn btn-outline-primary" id="btnOpenScheduleStage" data-news-action>Schedule Submission</button>
+                <?php endif; ?>
+              </div>
+            </div>
+
+            <div class="modal-footer px-4 py-3 justify-content-between" id="newsScheduleFooter" hidden>
+              <button type="button" class="btn btn-outline-secondary" id="btnReturnToPreviewStage">Return</button>
+              <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <button type="button" class="btn btn-primary text-white" id="btnScheduleNewsAction" data-news-action><?= $isSuperAdmin ? 'Schedule Post' : 'Schedule Submission' ?></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -499,12 +890,17 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 
       const formEl = document.getElementById("newsCreateForm");
       const headingInput = document.getElementById("newsHeadingInput");
+      const submitActionInput = document.getElementById("newsSubmitActionInput");
       const scheduleDateInput = document.getElementById("newsScheduleDateInput");
       const scheduleTimeInput = document.getElementById("newsScheduleTimeInput");
+      const headlineImageShell = document.getElementById("headlineImageShell");
       const headlineImageFileInput = document.getElementById("headlineImageFile");
       const headlineImageUrlInput = document.getElementById("headlineImageUrlInput");
       const headlineImageStatus = document.getElementById("headlineImageStatus");
       const headlineImagePreview = document.getElementById("headlineImagePreview");
+      const headlineImagePreviewImage = document.getElementById("headlineImagePreviewImage");
+      const headlineImagePrompt = document.getElementById("headlineImagePrompt");
+      const removeHeadlineImageBtn = document.getElementById("btnRemoveHeadlineImage");
       const newsBodyHtmlInput = document.getElementById("newsBodyHtmlInput");
       const newsSectionsJsonInput = document.getElementById("newsSectionsJsonInput");
       const newsComposedHtmlInput = document.getElementById("newsComposedHtmlInput");
@@ -519,10 +915,39 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       const previewBody = document.getElementById("newsPreviewBody");
       const previewSyncLabel = document.getElementById("newsPreviewSyncLabel");
       const bodyEditorEl = $("#newsBodyEditor");
-      const submitButtons = Array.from(document.querySelectorAll("[data-news-submit]"));
+      const submitButtons = Array.from(document.querySelectorAll("[data-news-action]"));
+      const openPreviewModalButtons = [
+        document.getElementById("btnOpenPreviewModal"),
+        document.getElementById("btnOpenPreviewModalFooter")
+      ].filter(Boolean);
+      const previewModalEl = document.getElementById("newsPreviewModal");
+      const previewStageEl = document.getElementById("newsPreviewStage");
+      const scheduleStageEl = document.getElementById("newsScheduleStage");
+      const previewFooterEl = document.getElementById("newsPreviewFooter");
+      const scheduleFooterEl = document.getElementById("newsScheduleFooter");
+      const modalScheduleDateInput = document.getElementById("modalNewsScheduleDateInput");
+      const modalScheduleTimeInput = document.getElementById("modalNewsScheduleTimeInput");
+      const saveDraftBtn = document.getElementById("btnSaveNewsDraft");
+      const postNowBtn = document.getElementById("btnPostNewsNow");
+      const openScheduleStageBtn = document.getElementById("btnOpenScheduleStage");
+      const returnToPreviewStageBtn = document.getElementById("btnReturnToPreviewStage");
+      const scheduleNewsActionBtn = document.getElementById("btnScheduleNewsAction");
+      const modalTilePreviewMedia = document.getElementById("newsModalTilePreviewMedia");
+      const modalTilePreviewDate = document.getElementById("newsModalTilePreviewDate");
+      const modalTilePreviewTitle = document.getElementById("newsModalTilePreviewTitle");
+      const modalPreviewHeadline = document.getElementById("newsModalPreviewHeadline");
+      const modalPreviewDate = document.getElementById("newsModalPreviewDate");
+      const modalPreviewHero = document.getElementById("newsModalPreviewHero");
+      const modalPreviewBody = document.getElementById("newsModalPreviewBody");
+      const modalScheduleHeadline = document.getElementById("newsModalScheduleHeadline");
+      const modalScheduleDate = document.getElementById("newsModalScheduleDate");
+      const modalScheduleHero = document.getElementById("newsModalScheduleHero");
+      const modalScheduleBody = document.getElementById("newsModalScheduleBody");
 
       let sectionCounter = 0;
       let activeUploads = 0;
+      let previewModal = null;
+      let requireScheduleBeforeSubmit = false;
 
       function escapeHtml(value) {
         return String(value || "")
@@ -623,6 +1048,104 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         editorInstance.summernote(buildEditorConfig(editorInstance, placeholderText));
       }
 
+      function bindDropzone(dropzoneEl, inputEl, onFileSelected, options = {}) {
+        if (!dropzoneEl || !inputEl || typeof onFileSelected !== "function") {
+          return;
+        }
+
+        const shouldOpenPicker = typeof options.shouldOpenPicker === "function"
+          ? options.shouldOpenPicker
+          : function () {
+            return true;
+          };
+
+        dropzoneEl.addEventListener("click", function () {
+          if (!shouldOpenPicker()) {
+            return;
+          }
+          inputEl.click();
+        });
+
+        dropzoneEl.addEventListener("keydown", function (event) {
+          if (!shouldOpenPicker()) {
+            return;
+          }
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            inputEl.click();
+          }
+        });
+
+        ["dragenter", "dragover"].forEach(function (eventName) {
+          dropzoneEl.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            if (!shouldOpenPicker()) {
+              return;
+            }
+            dropzoneEl.classList.add("drag-over");
+          });
+        });
+
+        ["dragleave", "dragend", "drop"].forEach(function (eventName) {
+          dropzoneEl.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            dropzoneEl.classList.remove("drag-over");
+          });
+        });
+
+        dropzoneEl.addEventListener("drop", function (event) {
+          if (!shouldOpenPicker()) {
+            return;
+          }
+          const droppedFiles = event.dataTransfer ? event.dataTransfer.files : null;
+          if (!droppedFiles || !droppedFiles.length) {
+            return;
+          }
+          onFileSelected(droppedFiles[0]);
+        });
+
+        inputEl.addEventListener("change", function () {
+          const file = inputEl.files && inputEl.files[0] ? inputEl.files[0] : null;
+          if (!file) {
+            return;
+          }
+          onFileSelected(file);
+        });
+      }
+
+      function setHeadlineImagePreview(imageUrl) {
+        const safeUrl = String(imageUrl || "").trim();
+        const hasImage = safeUrl !== "";
+
+        if (headlineImagePreview) {
+          headlineImagePreview.classList.toggle("has-image", hasImage);
+          headlineImagePreview.setAttribute("aria-label", hasImage ? "Uploaded news banner" : "Upload news banner");
+        }
+        if (headlineImageShell) {
+          headlineImageShell.classList.toggle("has-image", hasImage);
+        }
+        if (headlineImagePreviewImage) {
+          headlineImagePreviewImage.src = hasImage ? safeUrl : "";
+        }
+        if (headlineImagePrompt) {
+          headlineImagePrompt.setAttribute("aria-hidden", hasImage ? "true" : "false");
+        }
+      }
+
+      function clearHeadlineImage() {
+        if (headlineImageUrlInput) {
+          headlineImageUrlInput.value = "";
+        }
+        if (headlineImageFileInput) {
+          headlineImageFileInput.value = "";
+        }
+        if (headlineImageStatus) {
+          headlineImageStatus.textContent = "News banner removed. Upload another image.";
+        }
+        setHeadlineImagePreview("");
+        renderPreview();
+      }
+
       function formatPreviewDate() {
         const scheduleDate = String(scheduleDateInput?.value || "").trim();
         const scheduleTime = String(scheduleTimeInput?.value || "").trim();
@@ -640,6 +1163,65 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         return "Preview only";
       }
 
+      function setScheduleFields(dateValue, timeValue) {
+        if (scheduleDateInput) {
+          scheduleDateInput.value = String(dateValue || "").trim();
+        }
+        if (scheduleTimeInput) {
+          scheduleTimeInput.value = String(timeValue || "").trim();
+        }
+      }
+
+      function clearScheduleFields() {
+        setScheduleFields("", "");
+        if (modalScheduleDateInput) {
+          modalScheduleDateInput.value = "";
+        }
+        if (modalScheduleTimeInput) {
+          modalScheduleTimeInput.value = "";
+        }
+      }
+
+      function syncScheduleModalInputsFromHidden() {
+        if (modalScheduleDateInput) {
+          modalScheduleDateInput.value = String(scheduleDateInput?.value || "").trim();
+        }
+        if (modalScheduleTimeInput) {
+          modalScheduleTimeInput.value = String(scheduleTimeInput?.value || "").trim();
+        }
+      }
+
+      function showPreviewStage() {
+        if (previewStageEl) {
+          previewStageEl.hidden = false;
+        }
+        if (scheduleStageEl) {
+          scheduleStageEl.hidden = true;
+        }
+        if (previewFooterEl) {
+          previewFooterEl.hidden = false;
+        }
+        if (scheduleFooterEl) {
+          scheduleFooterEl.hidden = true;
+        }
+      }
+
+      function showScheduleStage() {
+        syncScheduleModalInputsFromHidden();
+        if (previewStageEl) {
+          previewStageEl.hidden = true;
+        }
+        if (scheduleStageEl) {
+          scheduleStageEl.hidden = false;
+        }
+        if (previewFooterEl) {
+          previewFooterEl.hidden = true;
+        }
+        if (scheduleFooterEl) {
+          scheduleFooterEl.hidden = false;
+        }
+      }
+
       function setMediaPreview(container, imageUrl, placeholderText) {
         if (!container) {
           return;
@@ -653,45 +1235,58 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 
       function buildTextSectionMarkup(sectionId) {
         return `
-          <article class="news-builder-section" data-section-id="${sectionId}" data-section-type="text">
-            <div class="news-builder-section-head">
-              <div>
-                <p class="news-builder-section-kicker">Text Section</p>
-                <h6 class="announcement-card-title mb-0">Additional Story Block</h6>
+          <div class="news-builder-entry" data-section-id="${sectionId}" data-section-type="text">
+            <hr class="news-builder-divider">
+            <article class="news-builder-section">
+              <div class="news-builder-section-head">
+                <div>
+                  <p class="news-builder-section-kicker">Text Section</p>
+                  <h6 class="announcement-card-title mb-0">Additional Story Block</h6>
+                </div>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-section>Remove</button>
               </div>
-              <button type="button" class="btn btn-outline-danger btn-sm" data-remove-section>Remove</button>
-            </div>
-            <div data-section-editor></div>
-          </article>
+              <div data-section-editor></div>
+            </article>
+          </div>
         `;
       }
 
       function buildImageSectionMarkup(sectionId) {
         return `
-          <article class="news-builder-section" data-section-id="${sectionId}" data-section-type="image">
-            <div class="news-builder-section-head">
-              <div>
-                <p class="news-builder-section-kicker">Image Section</p>
-                <h6 class="announcement-card-title mb-0">Supporting Image</h6>
+          <div class="news-builder-entry" data-section-id="${sectionId}" data-section-type="image">
+            <hr class="news-builder-divider">
+            <article class="news-builder-section">
+              <div class="news-builder-section-head">
+                <div>
+                  <p class="news-builder-section-kicker">Image Section</p>
+                  <h6 class="announcement-card-title mb-0">Supporting Image</h6>
+                </div>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-section>Remove</button>
               </div>
-              <button type="button" class="btn btn-outline-danger btn-sm" data-remove-section>Remove</button>
-            </div>
-            <div class="row g-3 align-items-start">
-              <div class="col-lg-5">
-                <label class="form-label fw-semibold">Upload Image</label>
-                <input type="file" class="form-control" data-section-image-file accept="image/jpeg,image/png,image/webp,image/gif">
-                <input type="hidden" data-section-image-url value="">
-                <label class="form-label fw-semibold mt-3">Caption (optional)</label>
+              <div class="news-section-inline-upload">
+                <label class="form-label fw-semibold small">Upload Image</label>
+                <div class="news-upload-shell news-upload-shell--inline" data-section-image-shell>
+                  <div class="news-upload-dropzone news-banner-dropzone" data-section-image-dropzone role="button" tabindex="0" aria-label="Upload supporting image">
+                    <img src="" alt="Supporting image preview" class="news-banner-preview-image" data-section-image-preview-image>
+                    <div class="news-banner-dropzone-copy" data-section-image-prompt>
+                      <div class="news-upload-dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                      <div class="news-upload-dropzone-text">Drag and drop image here</div>
+                      <div class="news-upload-dropzone-subtext">or click to choose manually</div>
+                      <div class="news-upload-dropzone-subtext mt-1">Accepted: JPG, PNG, WEBP, GIF. Maximum 50MB.</div>
+                    </div>
+                    <button type="button" class="news-upload-delete-btn" data-section-image-delete aria-label="Delete supporting image">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                    <input type="file" class="news-upload-dropzone-input" data-section-image-file accept="image/jpeg,image/png,image/webp,image/gif">
+                  </div>
+                  <input type="hidden" data-section-image-url value="">
+                </div>
+                <label class="form-label fw-semibold small mt-3">Caption (optional)</label>
                 <input type="text" class="form-control" data-section-image-caption placeholder="Add a short caption">
                 <div class="news-upload-status mt-3" data-section-image-status>No image uploaded for this section yet.</div>
               </div>
-              <div class="col-lg-7">
-                <div class="news-section-image-preview" data-section-image-preview>
-                  <span>Supporting image preview will appear here.</span>
-                </div>
-              </div>
-            </div>
-          </article>
+            </article>
+          </div>
         `;
       }
 
@@ -726,18 +1321,52 @@ $isSuperAdmin = $sessionRole === 'superadmin';
           return;
         }
 
+        const imageDropzone = sectionEl.querySelector("[data-section-image-dropzone]");
+        const imageShell = sectionEl.querySelector("[data-section-image-shell]");
         const imageFileInput = sectionEl.querySelector("[data-section-image-file]");
         const imageUrlInput = sectionEl.querySelector("[data-section-image-url]");
         const imageCaptionInput = sectionEl.querySelector("[data-section-image-caption]");
         const imageStatusEl = sectionEl.querySelector("[data-section-image-status]");
-        const imagePreviewEl = sectionEl.querySelector("[data-section-image-preview]");
+        const imagePreviewImageEl = sectionEl.querySelector("[data-section-image-preview-image]");
+        const imagePromptEl = sectionEl.querySelector("[data-section-image-prompt]");
+        const imageDeleteBtn = sectionEl.querySelector("[data-section-image-delete]");
 
-        if (imageFileInput && imageUrlInput && imageStatusEl && imagePreviewEl) {
-          imageFileInput.addEventListener("change", async function () {
-            const file = imageFileInput.files && imageFileInput.files[0] ? imageFileInput.files[0] : null;
-            if (!file) {
-              return;
-            }
+        function setSectionImagePreview(imageUrl) {
+          const safeUrl = String(imageUrl || "").trim();
+          const hasImage = safeUrl !== "";
+
+          if (imageDropzone) {
+            imageDropzone.classList.toggle("has-image", hasImage);
+            imageDropzone.setAttribute("aria-label", hasImage ? "Uploaded supporting image" : "Upload supporting image");
+          }
+          if (imageShell) {
+            imageShell.classList.toggle("has-image", hasImage);
+          }
+          if (imagePreviewImageEl) {
+            imagePreviewImageEl.src = hasImage ? safeUrl : "";
+          }
+          if (imagePromptEl) {
+            imagePromptEl.setAttribute("aria-hidden", hasImage ? "true" : "false");
+          }
+        }
+
+        function clearSectionImage() {
+          if (imageUrlInput) {
+            imageUrlInput.value = "";
+          }
+          if (imageFileInput) {
+            imageFileInput.value = "";
+          }
+          if (imageStatusEl) {
+            imageStatusEl.textContent = "Supporting image removed. Upload another image.";
+          }
+          setSectionImagePreview("");
+          renderPreview();
+        }
+
+        if (imageDropzone && imageFileInput && imageUrlInput && imageStatusEl) {
+          setSectionImagePreview(String(imageUrlInput.value || "").trim());
+          bindDropzone(imageDropzone, imageFileInput, async function (file) {
             if (file.size > MAX_IMAGE_SIZE_BYTES) {
               window.alert("Image must be 50MB or less.");
               imageFileInput.value = "";
@@ -750,17 +1379,29 @@ $isSuperAdmin = $sessionRole === 'superadmin';
               const imageUrl = await uploadImageFile(file);
               imageUrlInput.value = imageUrl;
               imageStatusEl.textContent = "Supporting image uploaded.";
-              setMediaPreview(imagePreviewEl, imageUrl, "Supporting image preview will appear here.");
+              setSectionImagePreview(imageUrl);
               renderPreview();
             } catch (error) {
               imageUrlInput.value = "";
               imageStatusEl.textContent = "Unable to upload supporting image.";
-              setMediaPreview(imagePreviewEl, "", "Supporting image preview will appear here.");
+              setSectionImagePreview("");
               window.alert(error.message || "Unable to upload image.");
             } finally {
               setUploading(false);
               imageFileInput.value = "";
             }
+          }, {
+            shouldOpenPicker: function () {
+              return String(imageUrlInput.value || "").trim() === "";
+            }
+          });
+        }
+
+        if (imageDeleteBtn) {
+          imageDeleteBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            clearSectionImage();
           });
         }
 
@@ -897,35 +1538,99 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         const previewBodyHtml = buildPreviewBodyHtml(payload.sections, payload.bodyHtml, payload.title);
         const composedPlain = stripHtml(previewBodyHtml);
 
-        if (tilePreviewDate) {
-          tilePreviewDate.textContent = publishDateText;
-        }
-        if (previewDate) {
-          previewDate.textContent = publishDateText;
-        }
-        if (tilePreviewTitle) {
-          tilePreviewTitle.textContent = payload.title || "Your news headline will appear here.";
-        }
-        if (previewHeadline) {
-          previewHeadline.textContent = payload.title || "Your news headline will appear here.";
-        }
+        [tilePreviewDate, modalTilePreviewDate].forEach(function (el) {
+          if (el) {
+            el.textContent = publishDateText;
+          }
+        });
+        [previewDate, modalPreviewDate, modalScheduleDate].forEach(function (el) {
+          if (el) {
+            el.textContent = publishDateText;
+          }
+        });
+        [tilePreviewTitle, modalTilePreviewTitle].forEach(function (el) {
+          if (el) {
+            el.textContent = payload.title || "Your news headline will appear here.";
+          }
+        });
+        [previewHeadline, modalPreviewHeadline, modalScheduleHeadline].forEach(function (el) {
+          if (el) {
+            el.textContent = payload.title || "Your news headline will appear here.";
+          }
+        });
 
-        setMediaPreview(tilePreviewMedia, payload.headlineImageUrl, "Upload a headline image to preview the tile.");
-        if (previewHero) {
-          previewHero.innerHTML = payload.headlineImageUrl
-            ? `<img src="${escapeHtml(payload.headlineImageUrl)}" alt="${escapeHtml(payload.title || 'Headline image')}">`
-            : `<div class="news-upload-preview" style="min-height: 240px;"><span>Upload a headline image to preview the article hero.</span></div>`;
-        }
+        [tilePreviewMedia, modalTilePreviewMedia].forEach(function (el) {
+          setMediaPreview(el, payload.headlineImageUrl, "Upload a news banner to preview the tile.");
+        });
+        [previewHero, modalPreviewHero, modalScheduleHero].forEach(function (el) {
+          if (!el) {
+            return;
+          }
+          el.innerHTML = payload.headlineImageUrl
+            ? `<img src="${escapeHtml(payload.headlineImageUrl)}" alt="${escapeHtml(payload.title || 'News banner')}">`
+            : `<div class="news-upload-preview" style="min-height: 240px;"><span>Upload a news banner to preview the article hero.</span></div>`;
+        });
 
-        if (previewBody) {
-          previewBody.innerHTML = composedPlain !== ""
+        [previewBody, modalPreviewBody, modalScheduleBody].forEach(function (el) {
+          if (!el) {
+            return;
+          }
+          el.innerHTML = composedPlain !== ""
             ? previewBodyHtml
             : `<p class="news-placeholder-copy">Write the story body to preview the article layout.</p>`;
-        }
+        });
       }
 
-      async function handleHeadlineImageUpload() {
-        const file = headlineImageFileInput?.files && headlineImageFileInput.files[0] ? headlineImageFileInput.files[0] : null;
+      function validateNewsPayload(options = {}) {
+        const payload = syncHiddenInputs();
+        if (activeUploads > 0) {
+          window.alert("Wait for the current image upload to finish before continuing.");
+          return null;
+        }
+        if (payload.title === "") {
+          window.alert("Enter the header title before continuing.");
+          return null;
+        }
+        if (payload.headlineImageUrl === "") {
+          window.alert("Upload the news banner before continuing.");
+          return null;
+        }
+        if (stripHtml(payload.bodyHtml) === "") {
+          window.alert("Write the news description before continuing.");
+          return null;
+        }
+        if (options.requireSchedule) {
+          const scheduleDate = String(scheduleDateInput?.value || "").trim();
+          const scheduleTime = String(scheduleTimeInput?.value || "").trim();
+          if (scheduleDate === "" || scheduleTime === "") {
+            window.alert("Choose both the schedule date and time before saving.");
+            return null;
+          }
+        }
+        return payload;
+      }
+
+      function submitNewsForm(action, options = {}) {
+        if (options.clearSchedule) {
+          clearScheduleFields();
+          renderPreview();
+        }
+        if (submitActionInput) {
+          submitActionInput.value = action;
+        }
+        requireScheduleBeforeSubmit = !!options.requireSchedule;
+        const payload = validateNewsPayload({ requireSchedule: requireScheduleBeforeSubmit });
+        if (!payload || !formEl) {
+          requireScheduleBeforeSubmit = false;
+          if (submitActionInput) {
+            submitActionInput.value = "";
+          }
+          return;
+        }
+        formEl.requestSubmit();
+      }
+
+      async function handleHeadlineImageUpload(file) {
         if (!file) {
           return;
         }
@@ -936,7 +1641,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         }
 
         if (headlineImageStatus) {
-          headlineImageStatus.textContent = "Uploading headline image...";
+          headlineImageStatus.textContent = "Uploading news banner...";
         }
         try {
           setUploading(true);
@@ -945,18 +1650,18 @@ $isSuperAdmin = $sessionRole === 'superadmin';
             headlineImageUrlInput.value = imageUrl;
           }
           if (headlineImageStatus) {
-            headlineImageStatus.textContent = "Headline image uploaded.";
+            headlineImageStatus.textContent = "News banner uploaded.";
           }
-          setMediaPreview(headlineImagePreview, imageUrl, "Headline image preview will appear here.");
+          setHeadlineImagePreview(imageUrl);
           renderPreview();
         } catch (error) {
           if (headlineImageUrlInput) {
             headlineImageUrlInput.value = "";
           }
           if (headlineImageStatus) {
-            headlineImageStatus.textContent = "Unable to upload headline image.";
+            headlineImageStatus.textContent = "Unable to upload news banner.";
           }
-          setMediaPreview(headlineImagePreview, "", "Headline image preview will appear here.");
+          setHeadlineImagePreview("");
           window.alert(error.message || "Unable to upload image.");
         } finally {
           setUploading(false);
@@ -964,13 +1669,26 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         }
       }
 
-      initEditor(bodyEditorEl, "Write the opening news story here...");
+      initEditor(bodyEditorEl, "Write the main news description here...");
       updateSectionsEmptyState();
+      setHeadlineImagePreview(String(headlineImageUrlInput?.value || "").trim());
       renderPreview();
+      showPreviewStage();
 
-      if (headlineImageFileInput) {
-        headlineImageFileInput.addEventListener("change", handleHeadlineImageUpload);
+      if (previewModalEl && window.bootstrap?.Modal) {
+        previewModal = new bootstrap.Modal(previewModalEl);
       }
+
+      bindDropzone(headlineImagePreview, headlineImageFileInput, handleHeadlineImageUpload, {
+        shouldOpenPicker: function () {
+          return String(headlineImageUrlInput?.value || "").trim() === "";
+        }
+      });
+      removeHeadlineImageBtn?.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearHeadlineImage();
+      });
       if (headingInput) {
         headingInput.addEventListener("input", renderPreview);
       }
@@ -987,12 +1705,61 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       document.getElementById("btnAddImageSection")?.addEventListener("click", function () {
         addSection("image");
       });
-      document.getElementById("btnScrollPreview")?.addEventListener("click", function () {
-        document.querySelector(".news-preview-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      openPreviewModalButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          const payload = validateNewsPayload();
+          if (!payload) {
+            return;
+          }
+          showPreviewStage();
+          renderPreview();
+          previewModal?.show();
+        });
+      });
+
+      openScheduleStageBtn?.addEventListener("click", function () {
+        const payload = validateNewsPayload();
+        if (!payload) {
+          return;
+        }
+        showScheduleStage();
+      });
+
+      returnToPreviewStageBtn?.addEventListener("click", function () {
+        showPreviewStage();
+      });
+
+      modalScheduleDateInput?.addEventListener("change", function () {
+        setScheduleFields(modalScheduleDateInput.value, modalScheduleTimeInput?.value || "");
+        renderPreview();
+      });
+      modalScheduleTimeInput?.addEventListener("change", function () {
+        setScheduleFields(modalScheduleDateInput?.value || "", modalScheduleTimeInput.value);
+        renderPreview();
+      });
+
+      saveDraftBtn?.addEventListener("click", function () {
+        submitNewsForm("draft", { clearSchedule: true });
+      });
+
+      postNowBtn?.addEventListener("click", function () {
+        submitNewsForm(isSuperAdmin ? "approved" : "pending", { clearSchedule: true });
+      });
+
+      scheduleNewsActionBtn?.addEventListener("click", function () {
+        setScheduleFields(modalScheduleDateInput?.value || "", modalScheduleTimeInput?.value || "");
+        renderPreview();
+        submitNewsForm(isSuperAdmin ? "approved" : "pending", { requireSchedule: true });
       });
 
       if (formEl) {
         formEl.addEventListener("submit", function (event) {
+          const submitAction = String(submitActionInput?.value || "").trim();
+          if (submitAction === "") {
+            event.preventDefault();
+            return;
+          }
           const payload = syncHiddenInputs();
           if (activeUploads > 0) {
             event.preventDefault();
@@ -1001,28 +1768,30 @@ $isSuperAdmin = $sessionRole === 'superadmin';
           }
           if (payload.title === "") {
             event.preventDefault();
-            window.alert("Enter the news heading before saving.");
+            window.alert("Enter the header title before saving.");
             return;
           }
           if (payload.headlineImageUrl === "") {
             event.preventDefault();
-            window.alert("Upload the headline image before saving.");
+            window.alert("Upload the news banner before saving.");
             return;
           }
           if (stripHtml(payload.bodyHtml) === "") {
             event.preventDefault();
-            window.alert("Write the main news body before saving.");
+            window.alert("Write the news description before saving.");
             return;
           }
-        });
-      }
-
-      const postBtn = document.getElementById("btnPostNews");
-      if (isSuperAdmin && postBtn) {
-        postBtn.addEventListener("click", function (event) {
-          if (!window.confirm("Are you sure this news article is ready to post?")) {
-            event.preventDefault();
+          if (requireScheduleBeforeSubmit) {
+            const scheduleDate = String(scheduleDateInput?.value || "").trim();
+            const scheduleTime = String(scheduleTimeInput?.value || "").trim();
+            if (scheduleDate === "" || scheduleTime === "") {
+              event.preventDefault();
+              window.alert("Choose both the schedule date and time before saving.");
+              requireScheduleBeforeSubmit = false;
+              return;
+            }
           }
+          requireScheduleBeforeSubmit = false;
         });
       }
     })();

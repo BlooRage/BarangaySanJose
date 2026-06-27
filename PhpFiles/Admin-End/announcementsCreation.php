@@ -207,6 +207,9 @@ if (!in_array($channelContext, ["all", "website", "public", "public_news", "sms"
 
 $redirectBase = appUrl('/Admin-End/Contents/Contents.php');
 $redirectUrl = $channelContext === "all" ? $redirectBase : ($redirectBase . "?channel=" . urlencode($channelContext));
+if ($contentType === 'news') {
+  $redirectUrl = $redirectBase . '?type_filter=news&news_scope=all';
+}
 
 $plainContent = trim(strip_tags($contentHtml));
 $faqItemsJson = '';
