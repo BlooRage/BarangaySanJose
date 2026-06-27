@@ -775,8 +775,18 @@ $contentToolsDescription = $isNewsManagementView
     .announcement-shell .compact-admin-table--news-layout th:nth-child(1),
     .announcement-shell .compact-admin-table--news-layout td:nth-child(1) {
       width: 48%;
-      white-space: normal;
-      word-break: break-word;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout .announcement-title-cell {
+      white-space: nowrap;
+    }
+
+    .announcement-shell .compact-admin-table--news-layout .announcement-title-text {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .announcement-shell .compact-admin-table--news-layout th:nth-child(2),
@@ -1176,7 +1186,13 @@ $contentToolsDescription = $isNewsManagementView
                       && ($isSuperAdmin || $isOwnedByCurrentUser);
                   ?>
                   <tr>
-                    <td><?= htmlspecialchars($item['title']) ?></td>
+                    <td class="<?= $isNewsManagementView ? 'announcement-title-cell' : '' ?>">
+                      <?php if ($isNewsManagementView): ?>
+                        <span class="announcement-title-text" title="<?= htmlspecialchars($item['title']) ?>"><?= htmlspecialchars($item['title']) ?></span>
+                      <?php else: ?>
+                        <?= htmlspecialchars($item['title']) ?>
+                      <?php endif; ?>
+                    </td>
                     <?php if (!$isNewsManagementView): ?>
                     <td><?= htmlspecialchars($typeLabels[$item['content_type']] ?? 'Page Announcement') ?></td>
                     <td><?= htmlspecialchars($item['audience']) ?></td>
