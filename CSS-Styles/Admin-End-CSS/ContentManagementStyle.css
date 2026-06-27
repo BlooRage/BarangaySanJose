@@ -1308,6 +1308,56 @@ body .dropdown-menu.note-check {
   border-radius: 12px;
   background: #f8fafc;
   padding: 1rem;
+  overflow: hidden;
+}
+
+.announcement-content-surface img,
+.announcement-content-surface video,
+.announcement-content-surface iframe,
+.announcement-content-surface table {
+  max-width: 100%;
+}
+
+.announcement-content-surface img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 14px;
+}
+
+.announcement-content-surface .news-headline-figure,
+.announcement-content-surface .news-extra-block--image,
+.announcement-content-surface figure {
+  margin: 0 0 1rem;
+}
+
+.announcement-content-surface .news-headline-figure:last-child,
+.announcement-content-surface .news-extra-block--image:last-child,
+.announcement-content-surface figure:last-child {
+  margin-bottom: 0;
+}
+
+.announcement-content-surface .news-headline-figure img {
+  width: 100%;
+  max-height: min(48vh, 420px);
+  object-fit: cover;
+}
+
+.announcement-content-surface .news-extra-block--image img,
+.announcement-content-surface figure img {
+  max-height: min(44vh, 360px);
+  object-fit: contain;
+  background: #fff;
+}
+
+.announcement-content-surface figcaption {
+  margin-top: 0.65rem;
+  color: #6c757d;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .announcement-status-select.status-approved {

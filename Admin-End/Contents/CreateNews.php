@@ -534,55 +534,6 @@ if ($editingAnnouncementId !== '') {
       font-weight: 600;
     }
 
-    .news-tile-preview {
-      overflow: hidden;
-      margin-bottom: 1.1rem;
-      border: 1px solid #e5e7eb;
-      border-radius: 22px;
-      background: #ffffff;
-    }
-
-    .news-tile-media {
-      display: grid;
-      place-items: center;
-      min-height: 180px;
-      background:
-        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-      color: #6b7280;
-      text-align: center;
-    }
-
-    .news-tile-media img {
-      width: 100%;
-      height: 180px;
-      display: block;
-      object-fit: cover;
-    }
-
-    .news-tile-body {
-      padding: 1rem 1rem 1.1rem;
-    }
-
-    .news-preview-date {
-      display: inline-flex;
-      align-items: center;
-      min-height: 32px;
-      padding: 5px 10px;
-      border-radius: 10px;
-      background: #f3f4f6;
-      color: #4b5563;
-      font-size: 0.82rem;
-      font-weight: 600;
-    }
-
-    .news-tile-title {
-      margin: 0.85rem 0 0;
-      color: #111827;
-      font-size: 1.08rem;
-      font-weight: 700;
-      line-height: 1.35;
-    }
-
     .news-site-preview {
       --preview-news-ink: #1f2937;
       --preview-news-copy: #4b5563;
@@ -623,6 +574,21 @@ if ($editingAnnouncementId !== '') {
       border-radius: 28px;
       background: #ffffff;
       box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+    }
+
+    .news-preview-panel--article {
+      padding: clamp(1rem, 1.6vw, 1.35rem);
+    }
+
+    .news-schedule-panel {
+      padding: 1.25rem;
+    }
+
+    .news-schedule-panel-copy {
+      color: #667085;
+      font-size: 0.98rem;
+      line-height: 1.65;
+      margin-bottom: 1.2rem;
     }
 
     .news-site-preview .articleTag {
@@ -1060,108 +1026,38 @@ if ($editingAnnouncementId !== '') {
             </div>
 
             <div class="modal-body p-3 p-md-4">
-              <div class="news-modal-stage" id="newsPreviewStage">
-                <div class="row g-4">
-                  <div class="col-lg-3">
-                    <div class="news-preview-panel h-100">
-                      <h6 class="announcement-card-title mb-3">News Tile Preview</h6>
-                      <div class="news-tile-preview mb-0">
-                        <div class="news-tile-media" id="newsModalTilePreviewMedia"></div>
-                        <div class="news-tile-body">
-                          <span class="news-preview-date" id="newsModalTilePreviewDate">Preview only</span>
-                          <h4 class="news-tile-title" id="newsModalTilePreviewTitle">Your news headline will appear here.</h4>
+              <div class="news-preview-panel news-preview-panel--article h-100">
+                <h6 class="announcement-card-title mb-3">Article Preview</h6>
+                <div class="news-site-preview">
+                  <div class="newsStoryPrimary">
+                    <div class="newsStoryToolbar">
+                      <span class="newsBackButton" aria-hidden="true">
+                        <i class="fa-solid fa-arrow-left-long" aria-hidden="true"></i>
+                        <span>Return to all news</span>
+                      </span>
+                    </div>
+
+                    <article class="newsArticleCard">
+                      <p class="articleTag">Community Update</p>
+                      <h2 class="articleHeadline" id="newsModalPreviewHeadline">Your news headline will appear here.</h2>
+                      <div class="articleMetaStrip">
+                        <span class="articleDateBadge" id="newsModalPreviewDate">Preview only</span>
+                      </div>
+                      <div class="articleImageWrapper articleHeroWrapper" id="newsModalPreviewHero">
+                        <div class="placeholderImage news-preview-placeholder-image">
+                          <span>Upload a news banner to preview the article hero.</span>
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <div class="col-lg-9">
-                    <div class="news-preview-panel h-100">
-                      <h6 class="announcement-card-title mb-3">Article Preview</h6>
-                      <div class="news-site-preview">
-                        <div class="newsStoryPrimary">
-                          <div class="newsStoryToolbar">
-                            <span class="newsBackButton" aria-hidden="true">
-                              <i class="fa-solid fa-arrow-left-long" aria-hidden="true"></i>
-                              <span>Return to all news</span>
-                            </span>
-                          </div>
-
-                          <article class="newsArticleCard">
-                            <p class="articleTag">Community Update</p>
-                            <h2 class="articleHeadline" id="newsModalPreviewHeadline">Your news headline will appear here.</h2>
-                            <div class="articleMetaStrip">
-                              <span class="articleDateBadge" id="newsModalPreviewDate">Preview only</span>
-                            </div>
-                            <div class="articleImageWrapper articleHeroWrapper" id="newsModalPreviewHero">
-                              <div class="placeholderImage news-preview-placeholder-image">
-                                <span>Upload a news banner to preview the article hero.</span>
-                              </div>
-                            </div>
-                            <div class="articleBody articleRichContent" id="newsModalPreviewBody">
-                              <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
-                            </div>
-                          </article>
-                        </div>
+                      <div class="articleBody articleRichContent" id="newsModalPreviewBody">
+                        <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="news-modal-stage" id="newsScheduleStage" hidden>
-                <div class="row g-4 align-items-start">
-                  <div class="col-lg-5">
-                    <div class="news-preview-panel h-100">
-                      <h6 class="announcement-card-title mb-3">Scheduled Post</h6>
-                      <p class="text-muted mb-3">Choose when this news article should become available.</p>
-                      <div class="mb-3">
-                        <label for="modalNewsScheduleDateInput" class="form-label fw-semibold">Date</label>
-                        <input type="date" class="form-control" id="modalNewsScheduleDateInput">
-                      </div>
-                      <div class="mb-0">
-                        <label for="modalNewsScheduleTimeInput" class="form-label fw-semibold">Time</label>
-                        <input type="time" class="form-control" id="modalNewsScheduleTimeInput">
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-lg-7">
-                    <div class="news-preview-panel h-100">
-                      <h6 class="announcement-card-title mb-3">Schedule Preview</h6>
-                      <div class="news-site-preview">
-                        <div class="newsStoryPrimary">
-                          <div class="newsStoryToolbar">
-                            <span class="newsBackButton" aria-hidden="true">
-                              <i class="fa-solid fa-arrow-left-long" aria-hidden="true"></i>
-                              <span>Return to all news</span>
-                            </span>
-                          </div>
-
-                          <article class="newsArticleCard">
-                            <p class="articleTag">Community Update</p>
-                            <h2 class="articleHeadline" id="newsModalScheduleHeadline">Your news headline will appear here.</h2>
-                            <div class="articleMetaStrip">
-                              <span class="articleDateBadge" id="newsModalScheduleDate">Preview only</span>
-                            </div>
-                            <div class="articleImageWrapper articleHeroWrapper" id="newsModalScheduleHero">
-                              <div class="placeholderImage news-preview-placeholder-image">
-                                <span>Upload a news banner to preview the article hero.</span>
-                              </div>
-                            </div>
-                            <div class="articleBody articleRichContent" id="newsModalScheduleBody">
-                              <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
-                            </div>
-                          </article>
-                        </div>
-                      </div>
-                    </div>
+                    </article>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="modal-footer px-4 py-3 justify-content-between" id="newsPreviewFooter">
+            <div class="modal-footer px-4 py-3 justify-content-between">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Return to Editing</button>
               <div class="d-flex flex-wrap gap-2 justify-content-end">
                 <button type="button" class="btn btn-warning text-dark" id="btnSaveNewsDraft" data-news-action>Save as Draft</button>
@@ -1174,9 +1070,38 @@ if ($editingAnnouncementId !== '') {
                 <?php endif; ?>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div class="modal-footer px-4 py-3 justify-content-between" id="newsScheduleFooter" hidden>
-              <button type="button" class="btn btn-outline-secondary" id="btnReturnToPreviewStage">Return</button>
+      <div class="modal fade news-modal-preview-shell" id="newsScheduleModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header px-4 py-3">
+              <div>
+                <p class="news-preview-kicker mb-1">Schedule Post</p>
+                <h5 class="modal-title mb-0">Choose Publish Time</h5>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-3 p-md-4">
+              <div class="news-preview-panel news-schedule-panel">
+                <h6 class="announcement-card-title mb-3">Scheduled Post</h6>
+                <p class="news-schedule-panel-copy">Choose when this news article should become available.</p>
+                <div class="mb-3">
+                  <label for="modalNewsScheduleDateInput" class="form-label fw-semibold">Date</label>
+                  <input type="date" class="form-control" id="modalNewsScheduleDateInput">
+                </div>
+                <div class="mb-0">
+                  <label for="modalNewsScheduleTimeInput" class="form-label fw-semibold">Time</label>
+                  <input type="time" class="form-control" id="modalNewsScheduleTimeInput">
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer px-4 py-3 justify-content-between">
+              <button type="button" class="btn btn-outline-secondary" id="btnReturnToPreviewStage">Return to Preview</button>
               <div class="d-flex flex-wrap gap-2 justify-content-end">
                 <button type="button" class="btn btn-primary text-white" id="btnScheduleNewsAction" data-news-action><?= $isSuperAdmin ? 'Schedule Post' : 'Schedule Submission' ?></button>
               </div>
@@ -1215,9 +1140,6 @@ if ($editingAnnouncementId !== '') {
       const newsComposedHtmlInput = document.getElementById("newsComposedHtmlInput");
       const sectionsContainer = document.getElementById("newsSectionsContainer");
       const sectionsEmptyState = document.getElementById("newsSectionsEmptyState");
-      const tilePreviewMedia = document.getElementById("newsTilePreviewMedia");
-      const tilePreviewDate = document.getElementById("newsTilePreviewDate");
-      const tilePreviewTitle = document.getElementById("newsTilePreviewTitle");
       const previewHeadline = document.getElementById("newsPreviewHeadline");
       const previewDate = document.getElementById("newsPreviewDate");
       const previewHero = document.getElementById("newsPreviewHero");
@@ -1230,10 +1152,7 @@ if ($editingAnnouncementId !== '') {
         document.getElementById("btnOpenPreviewModalFooter")
       ].filter(Boolean);
       const previewModalEl = document.getElementById("newsPreviewModal");
-      const previewStageEl = document.getElementById("newsPreviewStage");
-      const scheduleStageEl = document.getElementById("newsScheduleStage");
-      const previewFooterEl = document.getElementById("newsPreviewFooter");
-      const scheduleFooterEl = document.getElementById("newsScheduleFooter");
+      const scheduleModalEl = document.getElementById("newsScheduleModal");
       const modalScheduleDateInput = document.getElementById("modalNewsScheduleDateInput");
       const modalScheduleTimeInput = document.getElementById("modalNewsScheduleTimeInput");
       const saveDraftBtn = document.getElementById("btnSaveNewsDraft");
@@ -1241,21 +1160,15 @@ if ($editingAnnouncementId !== '') {
       const openScheduleStageBtn = document.getElementById("btnOpenScheduleStage");
       const returnToPreviewStageBtn = document.getElementById("btnReturnToPreviewStage");
       const scheduleNewsActionBtn = document.getElementById("btnScheduleNewsAction");
-      const modalTilePreviewMedia = document.getElementById("newsModalTilePreviewMedia");
-      const modalTilePreviewDate = document.getElementById("newsModalTilePreviewDate");
-      const modalTilePreviewTitle = document.getElementById("newsModalTilePreviewTitle");
       const modalPreviewHeadline = document.getElementById("newsModalPreviewHeadline");
       const modalPreviewDate = document.getElementById("newsModalPreviewDate");
       const modalPreviewHero = document.getElementById("newsModalPreviewHero");
       const modalPreviewBody = document.getElementById("newsModalPreviewBody");
-      const modalScheduleHeadline = document.getElementById("newsModalScheduleHeadline");
-      const modalScheduleDate = document.getElementById("newsModalScheduleDate");
-      const modalScheduleHero = document.getElementById("newsModalScheduleHero");
-      const modalScheduleBody = document.getElementById("newsModalScheduleBody");
 
       let sectionCounter = 0;
       let activeUploads = 0;
       let previewModal = null;
+      let scheduleModal = null;
       let requireScheduleBeforeSubmit = false;
 
       function escapeHtml(value) {
@@ -1500,35 +1413,28 @@ if ($editingAnnouncementId !== '') {
         }
       }
 
-      function showPreviewStage() {
-        if (previewStageEl) {
-          previewStageEl.hidden = false;
+      function swapModal(currentModal, nextModal) {
+        if (!nextModal) {
+          currentModal?.hide();
+          return;
         }
-        if (scheduleStageEl) {
-          scheduleStageEl.hidden = true;
+        if (!currentModal) {
+          nextModal.show();
+          return;
         }
-        if (previewFooterEl) {
-          previewFooterEl.hidden = false;
-        }
-        if (scheduleFooterEl) {
-          scheduleFooterEl.hidden = true;
-        }
-      }
 
-      function showScheduleStage() {
-        syncScheduleModalInputsFromHidden();
-        if (previewStageEl) {
-          previewStageEl.hidden = true;
+        const currentModalNode = currentModal._element;
+        if (!currentModalNode) {
+          currentModal.hide();
+          nextModal.show();
+          return;
         }
-        if (scheduleStageEl) {
-          scheduleStageEl.hidden = false;
-        }
-        if (previewFooterEl) {
-          previewFooterEl.hidden = true;
-        }
-        if (scheduleFooterEl) {
-          scheduleFooterEl.hidden = false;
-        }
+
+        currentModalNode.addEventListener("hidden.bs.modal", function handleHidden() {
+          currentModalNode.removeEventListener("hidden.bs.modal", handleHidden);
+          nextModal.show();
+        });
+        currentModal.hide();
       }
 
       function setMediaPreview(container, imageUrl, placeholderText) {
@@ -1900,31 +1806,18 @@ if ($editingAnnouncementId !== '') {
         const previewBodyHtml = buildPreviewBodyHtml(payload.sections, payload.bodyHtml, payload.title);
         const composedPlain = stripHtml(previewBodyHtml);
 
-        [tilePreviewDate, modalTilePreviewDate].forEach(function (el) {
+        [previewDate, modalPreviewDate].forEach(function (el) {
           if (el) {
             el.textContent = publishDateText;
           }
         });
-        [previewDate, modalPreviewDate, modalScheduleDate].forEach(function (el) {
-          if (el) {
-            el.textContent = publishDateText;
-          }
-        });
-        [tilePreviewTitle, modalTilePreviewTitle].forEach(function (el) {
-          if (el) {
-            el.textContent = payload.title || "Your news headline will appear here.";
-          }
-        });
-        [previewHeadline, modalPreviewHeadline, modalScheduleHeadline].forEach(function (el) {
+        [previewHeadline, modalPreviewHeadline].forEach(function (el) {
           if (el) {
             el.textContent = payload.title || "Your news headline will appear here.";
           }
         });
 
-        [tilePreviewMedia, modalTilePreviewMedia].forEach(function (el) {
-          setMediaPreview(el, payload.headlineImageUrl, "Upload a news banner to preview the tile.");
-        });
-        [previewHero, modalPreviewHero, modalScheduleHero].forEach(function (el) {
+        [previewHero, modalPreviewHero].forEach(function (el) {
           if (!el) {
             return;
           }
@@ -1933,7 +1826,7 @@ if ($editingAnnouncementId !== '') {
             : `<div class="placeholderImage news-preview-placeholder-image"><span>Upload a news banner to preview the article hero.</span></div>`;
         });
 
-        [previewBody, modalPreviewBody, modalScheduleBody].forEach(function (el) {
+        [previewBody, modalPreviewBody].forEach(function (el) {
           if (!el) {
             return;
           }
@@ -2036,10 +1929,12 @@ if ($editingAnnouncementId !== '') {
       updateSectionsEmptyState();
       setHeadlineImagePreview(String(headlineImageUrlInput?.value || "").trim());
       renderPreview();
-      showPreviewStage();
 
       if (previewModalEl && window.bootstrap?.Modal) {
         previewModal = new bootstrap.Modal(previewModalEl);
+      }
+      if (scheduleModalEl && window.bootstrap?.Modal) {
+        scheduleModal = new bootstrap.Modal(scheduleModalEl);
       }
 
       bindDropzone(headlineImagePreview, headlineImageFileInput, handleHeadlineImageUpload, {
@@ -2075,7 +1970,6 @@ if ($editingAnnouncementId !== '') {
           if (!payload) {
             return;
           }
-          showPreviewStage();
           renderPreview();
           previewModal?.show();
         });
@@ -2086,20 +1980,19 @@ if ($editingAnnouncementId !== '') {
         if (!payload) {
           return;
         }
-        showScheduleStage();
+        syncScheduleModalInputsFromHidden();
+        swapModal(previewModal, scheduleModal);
       });
 
       returnToPreviewStageBtn?.addEventListener("click", function () {
-        showPreviewStage();
+        swapModal(scheduleModal, previewModal);
       });
 
       modalScheduleDateInput?.addEventListener("change", function () {
         setScheduleFields(modalScheduleDateInput.value, modalScheduleTimeInput?.value || "");
-        renderPreview();
       });
       modalScheduleTimeInput?.addEventListener("change", function () {
         setScheduleFields(modalScheduleDateInput?.value || "", modalScheduleTimeInput.value);
-        renderPreview();
       });
 
       saveDraftBtn?.addEventListener("click", function () {
@@ -2112,7 +2005,6 @@ if ($editingAnnouncementId !== '') {
 
       scheduleNewsActionBtn?.addEventListener("click", function () {
         setScheduleFields(modalScheduleDateInput?.value || "", modalScheduleTimeInput?.value || "");
-        renderPreview();
         submitNewsForm(isSuperAdmin ? "approved" : "pending", { requireSchedule: true });
       });
 
@@ -2164,7 +2056,6 @@ if ($editingAnnouncementId !== '') {
           if (!payload) {
             return;
           }
-          showPreviewStage();
           renderPreview();
           previewModal?.show();
         }, 150);
