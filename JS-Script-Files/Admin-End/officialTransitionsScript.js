@@ -47,6 +47,15 @@
     return target;
   }
 
+  function describeRequestFailure(error, fallbackLabel = 'Request failed') {
+    const name = String(error?.name || '').trim();
+    const message = String(error?.message || '').trim();
+    if (name && message) {
+      return `${fallbackLabel}: ${name} - ${message}`;
+    }
+    return `${fallbackLabel}: ${message || 'Unknown error.'}`;
+  }
+
   async function apiFetch(params = {}, method = 'GET') {
     const normalizedMethod = String(method || 'GET').toUpperCase();
     let url = API_URL;
@@ -59,11 +68,26 @@
       body = appendRequestEntries(new FormData(), params);
     }
 
-    const res = await fetch(url, {
-      method: normalizedMethod,
-      ...(body ? { body } : {})
-    });
-    return res.json();
+    let res;
+    try {
+      res = await fetch(url, {
+        method: normalizedMethod,
+        ...(body ? { body } : {})
+      });
+    } catch (error) {
+      throw new Error(describeRequestFailure(error, `Request to ${params?.action || 'official transitions'} failed before reaching the server`));
+    }
+
+    const rawText = await res.text();
+    try {
+      return rawText ? JSON.parse(rawText) : {};
+    } catch (error) {
+      const preview = rawText.trim().slice(0, 180);
+      throw new Error(
+        `Server returned an unreadable response for ${params?.action || 'official transitions'} ` +
+        `(HTTP ${res.status}).${preview ? ` Response preview: ${preview}` : ''}`
+      );
+    }
   }
 
   async function requestSecureConfirmation(secureAction, payload = {}, actionLabel = 'this action') {
@@ -79,7 +103,12 @@
       actor_password: actorPassword,
       ...payload,
     };
-    const otpRequest = await apiFetch(requestPayload, 'POST');
+    let otpRequest;
+    try {
+      otpRequest = await apiFetch(requestPayload, 'POST');
+    } catch (error) {
+      throw new Error(describeRequestFailure(error, 'Secure confirmation could not start'));
+    }
     if (!otpRequest?.success) {
       throw new Error(otpRequest?.message || 'Unable to send OTP.');
     }

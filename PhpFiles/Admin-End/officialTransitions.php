@@ -19,6 +19,16 @@ header('Content-Type: application/json; charset=utf-8');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function otSecureDebugLog(string $message, array $context = []): void {
+    $logFile = sys_get_temp_dir() . '/official_transition_secure_debug.log';
+    $payload = [
+        'time' => date('c'),
+        'message' => $message,
+        'context' => $context,
+    ];
+    @file_put_contents($logFile, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+}
+
 function otJson(array $payload, int $code = 200): never {
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -1147,6 +1157,14 @@ if (!function_exists('ot_governance_create_shell')) {
 
 if ($action === 'request_secure_action_otp') {
     $secureAction = trim((string)($_POST['secure_action'] ?? ''));
+    otSecureDebugLog('request_secure_action_otp:start', [
+        'actor_id' => $actorId,
+        'secure_action' => $secureAction,
+        'transition_id' => trim((string)($_POST['transition_id'] ?? '')),
+        'official_id' => trim((string)($_POST['official_id'] ?? $_POST['acting_official_id'] ?? '')),
+        'batch_label' => trim((string)($_POST['batch_label'] ?? '')),
+        'has_actor_password' => trim((string)($_POST['actor_password'] ?? '')) !== '',
+    ]);
     $allowedSecureActions = [
         'complete_transition',
         'cancel_transition',
@@ -1180,14 +1198,30 @@ if ($action === 'request_secure_action_otp') {
         $targetLabel = 'governance cycle ' . $batchLabel;
     }
 
-    $challenge = ogw_issue_secure_action_otp(
-        $conn,
-        $actorId,
-        (string)($_POST['actor_password'] ?? ''),
-        $otSecureModuleKey,
-        $secureAction,
-        $targetLabel
-    );
+    try {
+        $challenge = ogw_issue_secure_action_otp(
+            $conn,
+            $actorId,
+            (string)($_POST['actor_password'] ?? ''),
+            $otSecureModuleKey,
+            $secureAction,
+            $targetLabel
+        );
+    } catch (Throwable $e) {
+        otSecureDebugLog('request_secure_action_otp:error', [
+            'actor_id' => $actorId,
+            'secure_action' => $secureAction,
+            'error' => $e->getMessage(),
+        ]);
+        throw $e;
+    }
+
+    otSecureDebugLog('request_secure_action_otp:success', [
+        'actor_id' => $actorId,
+        'secure_action' => $secureAction,
+        'delivery_label' => (string)($challenge['delivery_label'] ?? ''),
+        'challenge_key_prefix' => substr((string)($challenge['challenge_key'] ?? ''), 0, 8),
+    ]);
 
     otJson([
         'success' => true,
