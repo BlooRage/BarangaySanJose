@@ -22,9 +22,9 @@ $typeFilter = strtolower(trim((string)($_GET['type_filter'] ?? 'all')));
 if (!in_array($typeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $typeFilter = 'all';
 }
-$newsScope = strtolower(trim((string)($_GET['news_scope'] ?? 'all')));
-if (!in_array($newsScope, ['all', 'scheduled', 'draft', 'archived'], true)) {
-  $newsScope = 'all';
+$newsScope = strtolower(trim((string)($_GET['news_scope'] ?? 'active')));
+if (!in_array($newsScope, ['active', 'scheduled', 'draft', 'archived'], true)) {
+  $newsScope = 'active';
 }
 
 $searchTerm = trim((string)($_GET['q'] ?? ''));
@@ -247,6 +247,30 @@ function ann_display_status(array $item, string $currentUserId, string $currentU
   return $status;
 }
 
+function ann_is_active_news_item(array $item, string $currentUserId, string $currentUserDisplay, int $nowTs): bool
+{
+  if (strtolower((string)($item['content_type'] ?? 'page')) !== 'news') {
+    return false;
+  }
+
+  if (!in_array('public_news', (array)($item['channels'] ?? []), true)) {
+    return false;
+  }
+
+  $displayStatus = ann_display_status($item, $currentUserId, $currentUserDisplay);
+  if ($displayStatus !== 'approved') {
+    return false;
+  }
+
+  $publishDateRaw = trim((string)($item['publish_date'] ?? ''));
+  if ($publishDateRaw === '' || $publishDateRaw === '-') {
+    return true;
+  }
+
+  $publishTs = strtotime($publishDateRaw);
+  return $publishTs === false || $publishTs <= $nowTs;
+}
+
 function ann_placements_from_channels(array $channels): array
 {
   $placements = [];
@@ -386,7 +410,7 @@ foreach ($filteredByChannel as $item) {
 $newsRows = array_values(array_filter($filteredByChannel, function ($item): bool {
   return strtolower((string)($item['content_type'] ?? 'page')) === 'news';
 }));
-$newsCounts = ['all' => 0, 'scheduled' => 0, 'draft' => 0, 'archived' => 0];
+$newsCounts = ['active' => 0, 'scheduled' => 0, 'draft' => 0, 'archived' => 0];
 $nowTs = time();
 foreach ($newsRows as $item) {
   $displayStatus = ann_display_status($item, $currentUserId, $currentUserDisplayLabel);
@@ -394,7 +418,9 @@ foreach ($newsRows as $item) {
   $publishTs = ($publishDateRaw !== '' && $publishDateRaw !== '-') ? strtotime($publishDateRaw) : false;
   $isScheduled = $publishTs !== false && $publishTs > $nowTs && in_array($displayStatus, ['approved', 'pending'], true);
 
-  $newsCounts['all']++;
+  if (ann_is_active_news_item($item, $currentUserId, $currentUserDisplayLabel, $nowTs)) {
+    $newsCounts['active']++;
+  }
   if ($isScheduled) {
     $newsCounts['scheduled']++;
   }
@@ -418,6 +444,9 @@ $visibleRows = array_values(array_filter($filteredByChannel, function ($item) us
     $publishTs = ($publishDateRaw !== '' && $publishDateRaw !== '-') ? strtotime($publishDateRaw) : false;
     $isScheduled = $publishTs !== false && $publishTs > $nowTs && in_array($displayStatus, ['approved', 'pending'], true);
 
+    if ($newsScope === 'active' && !ann_is_active_news_item($item, $currentUserId, $currentUserDisplayLabel, $nowTs)) {
+      return false;
+    }
     if ($newsScope === 'scheduled' && !$isScheduled) {
       return false;
     }
@@ -521,7 +550,7 @@ foreach ($announcementRows as $row) {
   ];
 }
 
-function buildAnnouncementsUrl(string $channel, string $status, string $searchTerm = '', string $typeFilterValue = 'all', string $newsScopeValue = 'all'): string
+function buildAnnouncementsUrl(string $channel, string $status, string $searchTerm = '', string $typeFilterValue = 'all', string $newsScopeValue = 'active'): string
 {
   global $queueSearchTerm, $queueChannelFilter, $queueTypeFilter;
   $query = ['channel' => $channel, 'status' => $status];
@@ -531,7 +560,7 @@ function buildAnnouncementsUrl(string $channel, string $status, string $searchTe
   if ($typeFilterValue !== 'all') {
     $query['type_filter'] = $typeFilterValue;
   }
-  if ($typeFilterValue === 'news' && $newsScopeValue !== 'all') {
+  if ($typeFilterValue === 'news' && $newsScopeValue !== 'active') {
     $query['news_scope'] = $newsScopeValue;
   }
   if ($queueSearchTerm !== '') {
@@ -1024,7 +1053,7 @@ $contentToolsDescription = $isNewsManagementView
           <div class="admin-list-toolbar-start">
             <div class="admin-list-tabs">
               <?php if ($isNewsManagementView): ?>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'all')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'all' ? 'active' : '' ?>">
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'active')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'active' ? 'active' : '' ?>">
                   Active News
                 </a>
                 <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'scheduled')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'scheduled' ? 'active' : '' ?>">
@@ -1138,8 +1167,12 @@ $contentToolsDescription = $isNewsManagementView
                     $channelsText = implode(', ', array_map(function ($ch) use ($channelLabels) {
                       return $channelLabels[$ch] ?? strtoupper($ch);
                     }, $orderedChannels));
+                    $canPreviewNewsDraft = $isNewsManagementView
+                      && $displayStatus === 'draft'
+                      && ($isSuperAdmin || $isOwnedByCurrentUser);
                     $canArchiveNews = $isNewsManagementView
                       && $displayStatus !== 'archived'
+                      && $displayStatus !== 'draft'
                       && ($isSuperAdmin || $isOwnedByCurrentUser);
                   ?>
                   <tr>
@@ -1163,6 +1196,13 @@ $contentToolsDescription = $isNewsManagementView
                             data-id="<?= htmlspecialchars($item['id']) ?>">
                             View Info
                           </button>
+                          <?php if ($canPreviewNewsDraft): ?>
+                            <a
+                              class="btn btn-outline-primary btn-sm btn-preview-news-draft"
+                              href="<?= htmlspecialchars(appUrl('/Admin-End/Contents/CreateNews.php')) . '?announcement_id=' . urlencode((string)$item['id']) . '&open_preview=1' ?>">
+                              Preview
+                            </a>
+                          <?php endif; ?>
                           <?php if ($canArchiveNews): ?>
                             <button
                               class="btn btn-outline-secondary btn-sm"
@@ -1257,7 +1297,7 @@ $contentToolsDescription = $isNewsManagementView
             />
             <?php if ($isSuperAdmin): ?>
               <span id="announcementsVisibleCountBadge" class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
-                Showing <?= (int)count($visibleRows) ?> of <?= (int)($isNewsManagementView ? count($newsRows) : count($filteredByChannel)) ?>
+                Showing <?= (int)count($visibleRows) ?> of <?= (int)($isNewsManagementView ? ($newsCounts[$newsScope] ?? count($newsRows)) : count($filteredByChannel)) ?>
               </span>
             <?php endif; ?>
           </div>

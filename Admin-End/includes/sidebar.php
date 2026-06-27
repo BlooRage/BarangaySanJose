@@ -1545,7 +1545,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
       <?php if ($sbCan('announcements_tracker')): ?>
       <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news&amp;news_scope=all#tracker-card"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news#tracker-card"
            class="btn btn-toggle sidebar-direct-link rounded <?= $isNewsManagementActive ? 'active' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-newspaper"></i>

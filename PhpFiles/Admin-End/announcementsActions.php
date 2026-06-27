@@ -21,7 +21,7 @@ function ann_action_redirect(string $channel, string $status, string $q, string 
   if ($typeFilter !== 'all') {
     $query['type_filter'] = $typeFilter;
   }
-  if ($typeFilter === 'news' && $newsScope !== 'all') {
+  if ($typeFilter === 'news' && $newsScope !== 'active') {
     $query['news_scope'] = $newsScope;
   }
   if ($q !== '') {
@@ -137,7 +137,7 @@ $announcementId = trim((string)($_POST['announcement_id'] ?? ''));
 $channel = strtolower(trim((string)($_POST['channel'] ?? 'all')));
 $status = strtolower(trim((string)($_POST['status'] ?? 'all')));
 $typeFilter = strtolower(trim((string)($_POST['type_filter'] ?? 'all')));
-$newsScope = strtolower(trim((string)($_POST['news_scope'] ?? 'all')));
+$newsScope = strtolower(trim((string)($_POST['news_scope'] ?? 'active')));
 $q = trim((string)($_POST['q'] ?? ''));
 $queueQ = trim((string)($_POST['queue_q'] ?? ''));
 $queueChannel = strtolower(trim((string)($_POST['queue_channel'] ?? 'all')));
@@ -152,8 +152,8 @@ if (!in_array($status, ['all', 'approved', 'denied', 'pending', 'draft'], true))
 if (!in_array($typeFilter, ['all', 'page', 'news', 'delivery', 'faq'], true)) {
   $typeFilter = 'all';
 }
-if (!in_array($newsScope, ['all', 'scheduled', 'draft', 'archived'], true)) {
-  $newsScope = 'all';
+if (!in_array($newsScope, ['active', 'scheduled', 'draft', 'archived'], true)) {
+  $newsScope = 'active';
 }
 if (!in_array($queueChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $queueChannel = 'all';

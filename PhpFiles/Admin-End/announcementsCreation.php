@@ -173,6 +173,7 @@ if (!in_array($contentType, ['page', 'news', 'delivery', 'faq'], true)) {
 }
 
 $title = trim((string)($_POST["title"] ?? ""));
+$announcementId = trim((string)($_POST["announcement_id"] ?? ""));
 $contentHtml = trim((string)($_POST["content_html"] ?? ""));
 $publicNewsTitle = trim((string)($_POST["public_news_title"] ?? ""));
 $publicNewsContentHtml = trim((string)($_POST["public_news_content_html"] ?? ""));
@@ -208,7 +209,13 @@ if (!in_array($channelContext, ["all", "website", "public", "public_news", "sms"
 $redirectBase = appUrl('/Admin-End/Contents/Contents.php');
 $redirectUrl = $channelContext === "all" ? $redirectBase : ($redirectBase . "?channel=" . urlencode($channelContext));
 if ($contentType === 'news') {
-  $redirectUrl = $redirectBase . '?type_filter=news&news_scope=all';
+  if ($submitAction === 'draft') {
+    $redirectUrl = $redirectBase . '?type_filter=news&news_scope=draft';
+  } elseif ($scheduleDate !== '' && $scheduleTime !== '') {
+    $redirectUrl = $redirectBase . '?type_filter=news&news_scope=scheduled';
+  } else {
+    $redirectUrl = $redirectBase . '?type_filter=news';
+  }
 }
 
 $plainContent = trim(strip_tags($contentHtml));
@@ -397,7 +404,7 @@ $createdByRole = trim((string)($_SESSION["role"] ?? "Admin"));
 $createdByDisplay = ann_creator_display_label($conn, $createdByUserId, $createdByRole);
 
 $record = [
-  "id" => announcement_generate_id(),
+  "id" => $announcementId !== '' ? $announcementId : announcement_generate_id(),
   "title" => $title,
   "content_type" => $contentType,
   "audience" => $audience,
@@ -423,7 +430,53 @@ $record = [
 $record = array_merge($record, ann_delivery_compose_fields($record, $emailSubjectInput, $smsMessageInput));
 
 $all = announcements_load_all();
-array_unshift($all, $record);
+$existingRecord = null;
+$existingIndex = null;
+if ($announcementId !== '') {
+  foreach ($all as $idx => $item) {
+    if ((string)($item['id'] ?? '') !== $announcementId) {
+      continue;
+    }
+    $existingRecord = $item;
+    $existingIndex = $idx;
+    break;
+  }
+}
+
+if ($existingRecord !== null) {
+  $existingContentType = strtolower(trim((string)($existingRecord['content_type'] ?? 'page')));
+  $existingStatus = strtolower(trim((string)($existingRecord['status'] ?? 'draft')));
+  $existingOwnerUserId = trim((string)($existingRecord['created_by_user_id'] ?? ''));
+  $fallbackOwnerUserId = trim((string)($existingRecord['created_by'] ?? ''));
+  if ($existingOwnerUserId === '' && strpos($fallbackOwnerUserId, ' - ') === false) {
+    $existingOwnerUserId = $fallbackOwnerUserId;
+  }
+  $isOwnedByCurrentUser = $createdByUserId !== '' && $existingOwnerUserId !== '' && $existingOwnerUserId === $createdByUserId;
+
+  if ($existingContentType !== 'news') {
+    ann_redirect_with_flash($redirectUrl, "danger", "Only news drafts can be updated from this page.");
+  }
+  if (!$isSuperAdmin && !$isOwnedByCurrentUser) {
+    ann_redirect_with_flash($redirectUrl, "danger", "Only the content creator or SuperAdmin can update this news draft.");
+  }
+  if ($existingStatus === 'archived') {
+    ann_redirect_with_flash($redirectUrl, "warning", "Archived news articles cannot be updated from this page.");
+  }
+
+  $record['created_at'] = (string)($existingRecord['created_at'] ?? date("Y-m-d H:i:s"));
+  $record['created_by'] = (string)($existingRecord['created_by'] ?? $createdByDisplay);
+  $record['created_by_user_id'] = (string)($existingRecord['created_by_user_id'] ?? $createdByUserId);
+  $record['created_by_role'] = (string)($existingRecord['created_by_role'] ?? $createdByRole);
+  $record['updated_at'] = date("Y-m-d H:i:s");
+  $record['updated_by'] = $createdByUserId !== '' ? $createdByUserId : $createdByDisplay;
+  $record['review_result'] = $status === "approved" ? "approved" : (($status === "draft") ? (string)($existingRecord['review_result'] ?? '') : '');
+  $record['review_note'] = $status === "draft" ? (string)($existingRecord['review_note'] ?? '') : '';
+  $record['reviewed_at'] = $status === "approved" ? date("Y-m-d H:i:s") : (string)($existingRecord['reviewed_at'] ?? '');
+  $record['reviewed_by'] = $status === "approved" ? $createdByUserId : (string)($existingRecord['reviewed_by'] ?? '');
+  $all[$existingIndex] = array_merge($existingRecord, $record);
+} else {
+  array_unshift($all, $record);
+}
 if (!announcements_save_all($all)) {
   ann_redirect_with_flash($redirectUrl, "danger", "Unable to save content item.");
 }
@@ -440,12 +493,23 @@ if ($status === "pending") {
   $msg = ucfirst($itemLabel) . " submitted for review.";
 }
 if ($status === "approved") {
-  if (ann_should_send_delivery_for_record($all[0])) {
-    $deliveryResult = ann_delivery_send($conn, $all[0]);
+  $savedRecord = $existingRecord !== null && $existingIndex !== null ? $all[$existingIndex] : $all[0];
+  if (ann_should_send_delivery_for_record($savedRecord)) {
+    $deliveryResult = ann_delivery_send($conn, $savedRecord);
     announcements_save_all($all);
     $msg = ucfirst($itemLabel) . " posted successfully." . ann_delivery_message_suffix($deliveryResult);
   } else {
     $msg = ucfirst($itemLabel) . " posted successfully.";
+  }
+}
+
+if ($contentType === 'news') {
+  if ($status === 'draft') {
+    $redirectUrl = $redirectBase . '?type_filter=news&news_scope=draft';
+  } elseif ($scheduleDate !== '' && $scheduleTime !== '') {
+    $redirectUrl = $redirectBase . '?type_filter=news&news_scope=scheduled';
+  } else {
+    $redirectUrl = $redirectBase . '?type_filter=news';
   }
 }
 ann_redirect_with_flash($redirectUrl, "success", $msg);

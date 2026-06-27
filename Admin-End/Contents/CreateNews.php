@@ -1,9 +1,81 @@
 <?php
 require_once __DIR__ . "/../includes/admin_guard.php";
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
+require_once __DIR__ . "/../../PhpFiles/Admin-End/contentStore.php";
+require_once __DIR__ . "/../../PhpFiles/Admin-End/newsContent.php";
 
+$currentUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
 $isSuperAdmin = $sessionRole === 'superadmin';
+$editingAnnouncementId = trim((string)($_GET['announcement_id'] ?? ''));
+$autoOpenPreview = in_array(strtolower(trim((string)($_GET['open_preview'] ?? ''))), ['1', 'true', 'yes'], true);
+$draftInitialState = [
+  'announcement_id' => '',
+  'title' => '',
+  'headline_image_url' => '',
+  'body_html' => '',
+  'sections' => [],
+  'schedule_date' => '',
+  'schedule_time' => '',
+];
+
+if ($editingAnnouncementId !== '') {
+  foreach (announcements_load_all() as $item) {
+    if ((string)($item['id'] ?? '') !== $editingAnnouncementId) {
+      continue;
+    }
+
+    $recordContentType = strtolower(trim((string)($item['content_type'] ?? 'page')));
+    $recordStatus = strtolower(trim((string)($item['status'] ?? 'draft')));
+    $recordOwnerUserId = trim((string)($item['created_by_user_id'] ?? ''));
+    $fallbackOwnerUserId = trim((string)($item['created_by'] ?? ''));
+    if ($recordOwnerUserId === '' && strpos($fallbackOwnerUserId, ' - ') === false) {
+      $recordOwnerUserId = $fallbackOwnerUserId;
+    }
+    $isOwnedByCurrentUser = $currentUserId !== '' && $recordOwnerUserId !== '' && $recordOwnerUserId === $currentUserId;
+
+    if ($recordContentType !== 'news' || (!$isSuperAdmin && !$isOwnedByCurrentUser) || $recordStatus === 'archived') {
+      break;
+    }
+
+    $composedHtml = trim((string)($item['public_news_content_html'] ?? ''));
+    if ($composedHtml === '') {
+      $composedHtml = trim((string)($item['content_html'] ?? ''));
+    }
+    $decomposed = ann_news_decompose_html($composedHtml);
+    $sections = ann_news_decode_sections_json((string)($item['news_sections_json'] ?? ''));
+    if ($sections === [] && !empty($decomposed['sections']) && is_array($decomposed['sections'])) {
+      $sections = $decomposed['sections'];
+    }
+
+    $headlineImageUrl = trim((string)($item['news_headline_image_url'] ?? ''));
+    if ($headlineImageUrl === '') {
+      $headlineImageUrl = trim((string)($decomposed['headline_image_url'] ?? ''));
+    }
+
+    $publishDateRaw = trim((string)($item['publish_date'] ?? ''));
+    $scheduleDate = '';
+    $scheduleTime = '';
+    if ($publishDateRaw !== '' && $publishDateRaw !== '-') {
+      $publishTs = strtotime($publishDateRaw);
+      if ($publishTs !== false) {
+        $scheduleDate = date('Y-m-d', $publishTs);
+        $scheduleTime = date('H:i', $publishTs);
+      }
+    }
+
+    $draftInitialState = [
+      'announcement_id' => (string)($item['id'] ?? ''),
+      'title' => (string)($item['title'] ?? ''),
+      'headline_image_url' => $headlineImageUrl,
+      'body_html' => (string)($decomposed['body_html'] ?? ''),
+      'sections' => $sections,
+      'schedule_date' => $scheduleDate,
+      'schedule_time' => $scheduleTime,
+    ];
+    break;
+  }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -436,7 +508,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
     }
 
     .news-modal-preview-shell .modal-body {
-      background: linear-gradient(180deg, #fffdf9 0%, #fff8ef 100%);
+      background: linear-gradient(180deg, #fffdf9 0%, #fcf8f1 100%);
     }
 
     .news-preview-meta {
@@ -511,97 +583,303 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       line-height: 1.35;
     }
 
-    .news-article-preview {
-      overflow: hidden;
-      border: 1px solid #e5e7eb;
-      border-radius: 24px;
+    .news-site-preview {
+      --preview-news-ink: #1f2937;
+      --preview-news-copy: #4b5563;
+      --preview-news-muted: #667085;
+      --preview-news-accent: #de710c;
+      --preview-news-accent-deep: #b96416;
+      min-height: 100%;
+    }
+
+    .news-site-preview .newsStoryPrimary {
+      min-width: 0;
+      max-width: none;
+    }
+
+    .news-site-preview .newsStoryToolbar {
+      margin-bottom: 22px;
+    }
+
+    .news-site-preview .newsBackButton {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: #f7efe3;
+      color: var(--preview-news-accent-deep);
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .news-site-preview .newsArticleCard {
+      padding: clamp(1.2rem, 2vw, 1.85rem);
+      border: 1px solid #ece4d8;
+      border-radius: 28px;
       background: #ffffff;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
     }
 
-    .news-article-copy {
-      padding: 1.35rem;
-    }
-
-    .news-article-tag {
-      margin: 0 0 0.85rem;
-      color: #111827;
-      font-size: 0.96rem;
+    .news-site-preview .articleTag {
+      margin: 0 0 18px;
+      color: #1f1f1f;
+      font-size: 0.98rem;
       font-weight: 600;
     }
 
-    .news-article-title {
-      margin: 0 0 1rem;
-      color: #101828;
-      font-size: clamp(2rem, 3vw, 3rem);
-      font-weight: 700;
-      line-height: 1.02;
-      letter-spacing: -0.04em;
-    }
-
-    .news-article-hero {
-      overflow: hidden;
-      margin: 1.35rem 0 1.4rem;
-      border-radius: 22px;
-      background:
-        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    }
-
-    .news-article-hero img {
+    .news-site-preview .articleHeadline {
+      margin: 0 0 16px;
       width: 100%;
-      max-height: 460px;
-      display: block;
-      object-fit: cover;
+      max-width: none;
+      color: var(--preview-news-ink);
+      font-size: clamp(2rem, 3.4vw, 3.35rem);
+      font-weight: 700;
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+      text-wrap: balance;
     }
 
-    .news-article-body {
-      color: #475467;
-      line-height: 1.82;
+    .news-site-preview .articleMetaStrip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .news-site-preview .articleDateBadge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: #f1f1f1;
+      color: #4b4b4b;
+      font-size: 0.92rem;
+      font-weight: 500;
+    }
+
+    .news-site-preview .articleImageWrapper {
+      width: 100%;
+    }
+
+    .news-site-preview .articleHeroWrapper {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 32px;
+      border-radius: 22px;
+      background: #f4f1ec;
+      aspect-ratio: 16 / 9;
+      min-height: 320px;
+    }
+
+    .news-site-preview .articleHeroWrapper > * {
+      width: 100%;
+      height: 100%;
+    }
+
+    .news-site-preview .articleHeroWrapper img,
+    .news-site-preview .articleHeroWrapper video,
+    .news-site-preview .articleHeroWrapper iframe,
+    .news-site-preview .articleHeroWrapper picture {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .news-site-preview .articleHeroWrapper img,
+    .news-site-preview .articleHeroWrapper video {
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .news-site-preview .articleHeroWrapper iframe {
+      border: 0;
+    }
+
+    .news-site-preview .placeholderImage {
+      min-height: 320px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255, 153, 51, 0.16), transparent 22%),
+        linear-gradient(135deg, #efe7db 0%, #f8f4ee 100%);
+    }
+
+    .news-site-preview .news-preview-placeholder-image {
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+      color: var(--preview-news-muted);
+      text-align: center;
+      font-size: 0.94rem;
+      line-height: 1.6;
+    }
+
+    .news-site-preview .articleBody {
+      color: var(--preview-news-copy);
+      max-width: none;
+      text-align: justify;
+      text-justify: inter-word;
+    }
+
+    .news-site-preview .articleRichContent {
       word-break: break-word;
     }
 
-    .news-article-body > :first-child {
+    .news-site-preview .articleRichContent > :first-child {
       margin-top: 0 !important;
     }
 
-    .news-article-body > :last-child {
+    .news-site-preview .articleRichContent > :last-child {
       margin-bottom: 0 !important;
     }
 
-    .news-article-body img {
+    .news-site-preview .articleRichContent :where(p, ul, ol, li, td, th, span, strong, em, b, i, small) {
+      color: var(--preview-news-copy) !important;
+      background: transparent !important;
+    }
+
+    .news-site-preview .articleRichContent :where(h1, h2, h3, h4, h5, h6) {
+      margin-top: 1.45em !important;
+      margin-bottom: 0.68em !important;
+      color: var(--preview-news-ink) !important;
+      font-weight: 700 !important;
+      line-height: 1.14 !important;
+      letter-spacing: -0.03em;
+    }
+
+    .news-site-preview .articleRichContent h1 {
+      font-size: 2.1rem !important;
+    }
+
+    .news-site-preview .articleRichContent h2 {
+      font-size: 1.85rem !important;
+    }
+
+    .news-site-preview .articleRichContent h3 {
+      font-size: 1.55rem !important;
+    }
+
+    .news-site-preview .articleRichContent h4,
+    .news-site-preview .articleRichContent h5,
+    .news-site-preview .articleRichContent h6 {
+      font-size: 1.24rem !important;
+    }
+
+    .news-site-preview .articleRichContent p,
+    .news-site-preview .articleRichContent li {
+      font-size: 1.04rem !important;
+      line-height: 1.88 !important;
+      text-align: justify;
+      text-justify: inter-word;
+    }
+
+    .news-site-preview .articleRichContent p {
+      margin: 0 0 1.2rem !important;
+    }
+
+    .news-site-preview .articleRichContent ul,
+    .news-site-preview .articleRichContent ol {
+      margin: 0 0 1.25rem !important;
+      padding-left: 1.45rem !important;
+    }
+
+    .news-site-preview .articleRichContent li {
+      margin-bottom: 0.42rem !important;
+    }
+
+    .news-site-preview .articleRichContent li::marker {
+      color: var(--preview-news-accent-deep);
+    }
+
+    .news-site-preview .articleRichContent blockquote {
+      margin: 1.6rem 0 !important;
+      padding: 1.15rem 1.35rem !important;
+      border-left: 4px solid var(--preview-news-accent);
+      border-radius: 0 18px 18px 0;
+      background: #fff8ef;
+      color: var(--preview-news-ink);
+    }
+
+    .news-site-preview .articleRichContent a {
+      color: var(--preview-news-accent-deep) !important;
+      text-decoration-color: rgba(185, 100, 22, 0.35);
+      text-underline-offset: 3px;
+    }
+
+    .news-site-preview .articleRichContent hr {
+      margin: 2rem 0 !important;
+      border: 0;
+      border-top: 1px solid rgba(0, 0, 0, 0.09);
+    }
+
+    .news-site-preview .articleRichContent img,
+    .news-site-preview .articleRichContent video,
+    .news-site-preview .articleRichContent iframe,
+    .news-site-preview .articleRichContent picture,
+    .news-site-preview .articleRichContent table {
+      max-width: 100%;
+    }
+
+    .news-site-preview .articleRichContent img,
+    .news-site-preview .articleRichContent video {
+      display: block;
       width: 100%;
       height: auto;
-      display: block;
-      margin: 1.2rem 0;
+      margin: 1.6rem auto;
       border-radius: 18px;
     }
 
-    .news-article-body figure {
-      margin: 1.3rem 0;
+    .news-site-preview .articleRichContent figure {
+      margin: 1.7rem 0 !important;
     }
 
-    .news-article-body figcaption {
-      margin-top: 0.6rem;
-      color: #667085;
-      font-size: 0.9rem;
+    .news-site-preview .articleRichContent figure img {
+      margin: 0 auto;
+    }
+
+    .news-site-preview .articleRichContent figure figcaption {
+      margin-top: 0.75rem;
+      color: var(--preview-news-muted) !important;
+      font-size: 0.92rem !important;
+      line-height: 1.55 !important;
       text-align: center;
     }
 
-    .news-article-body h1,
-    .news-article-body h2,
-    .news-article-body h3,
-    .news-article-body h4,
-    .news-article-body h5,
-    .news-article-body h6 {
-      margin-top: 1.3rem;
-      margin-bottom: 0.6rem;
-      color: #111827;
-      line-height: 1.18;
+    .news-site-preview .articleRichContent iframe {
+      display: block;
+      width: 100%;
+      min-height: 360px;
+      margin: 1.5rem 0;
+      border: 0;
+      border-radius: 18px;
     }
 
-    .news-article-body p,
-    .news-article-body li {
-      color: #475467;
-      line-height: 1.82;
+    .news-site-preview .articleRichContent table {
+      width: 100% !important;
+      display: block;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      border-collapse: collapse;
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    }
+
+    .news-site-preview .articleRichContent th,
+    .news-site-preview .articleRichContent td {
+      padding: 12px 14px !important;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      text-align: left;
+    }
+
+    .news-site-preview .articleRichContent th {
+      background: #fff3e4 !important;
+      color: var(--preview-news-ink) !important;
+      font-weight: 700;
     }
 
     .news-placeholder-copy {
@@ -634,12 +912,18 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         min-height: 180px;
       }
 
-      .news-article-copy {
+      .news-site-preview .newsArticleCard {
         padding: 1rem;
+        border-radius: 22px;
       }
 
-      .news-article-title {
+      .news-site-preview .articleHeadline {
         font-size: clamp(1.7rem, 8vw, 2.4rem);
+      }
+
+      .news-site-preview .articleHeroWrapper,
+      .news-site-preview .placeholderImage {
+        min-height: 220px;
       }
     }
   </style>
@@ -651,13 +935,14 @@ $isSuperAdmin = $sessionRole === 'superadmin';
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div class="news-page-heading">
-          <h2 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Create News</h2>
+          <h2 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;"><?= $draftInitialState['announcement_id'] !== '' ? 'Edit Draft News' : 'Create News' ?></h2>
           <p class="text-muted mb-0">Build a public news article in stages, then use the modal preview to save as draft, post now, or schedule it for later.</p>
         </div>
       </div>
       <hr><br>
 
       <form class="announcement-create-shell news-form-shell p-3 p-md-4 p-xl-4" id="newsCreateForm" action="../../PhpFiles/Admin-End/announcementsCreation.php" method="post">
+        <input type="hidden" name="announcement_id" id="newsAnnouncementIdInput" value="<?= htmlspecialchars((string)$draftInitialState['announcement_id'], ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="channel_context" value="public_news">
         <input type="hidden" name="content_type" value="news">
         <input type="hidden" name="channels[]" value="public_news">
@@ -757,7 +1042,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 
         <div class="announcement-sticky-actions mt-4">
           <div class="announcement-modal-footer-start">
-            <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news&amp;news_scope=all#tracker-card" class="btn btn-outline-secondary">Manage News</a>
+            <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news#tracker-card" class="btn btn-outline-secondary">Manage News</a>
             <button type="button" class="btn btn-primary text-white" id="btnOpenPreviewModalFooter">Next: Preview</button>
           </div>
         </div>
@@ -777,7 +1062,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
             <div class="modal-body p-3 p-md-4">
               <div class="news-modal-stage" id="newsPreviewStage">
                 <div class="row g-4">
-                  <div class="col-lg-4">
+                  <div class="col-lg-3">
                     <div class="news-preview-panel h-100">
                       <h6 class="announcement-card-title mb-3">News Tile Preview</h6>
                       <div class="news-tile-preview mb-0">
@@ -790,24 +1075,35 @@ $isSuperAdmin = $sessionRole === 'superadmin';
                     </div>
                   </div>
 
-                  <div class="col-lg-8">
+                  <div class="col-lg-9">
                     <div class="news-preview-panel h-100">
                       <h6 class="announcement-card-title mb-3">Article Preview</h6>
-                      <article class="news-article-preview">
-                        <div class="news-article-copy">
-                          <p class="news-article-tag">Community Update</p>
-                          <h2 class="news-article-title" id="newsModalPreviewHeadline">Your news headline will appear here.</h2>
-                          <span class="news-preview-date" id="newsModalPreviewDate">Preview only</span>
-                          <div class="news-article-hero" id="newsModalPreviewHero">
-                            <div class="news-upload-preview" style="min-height: 240px;">
-                              <span>Upload a news banner to preview the article hero.</span>
+                      <div class="news-site-preview">
+                        <div class="newsStoryPrimary">
+                          <div class="newsStoryToolbar">
+                            <span class="newsBackButton" aria-hidden="true">
+                              <i class="fa-solid fa-arrow-left-long" aria-hidden="true"></i>
+                              <span>Return to all news</span>
+                            </span>
+                          </div>
+
+                          <article class="newsArticleCard">
+                            <p class="articleTag">Community Update</p>
+                            <h2 class="articleHeadline" id="newsModalPreviewHeadline">Your news headline will appear here.</h2>
+                            <div class="articleMetaStrip">
+                              <span class="articleDateBadge" id="newsModalPreviewDate">Preview only</span>
                             </div>
-                          </div>
-                          <div class="news-article-body" id="newsModalPreviewBody">
-                            <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
-                          </div>
+                            <div class="articleImageWrapper articleHeroWrapper" id="newsModalPreviewHero">
+                              <div class="placeholderImage news-preview-placeholder-image">
+                                <span>Upload a news banner to preview the article hero.</span>
+                              </div>
+                            </div>
+                            <div class="articleBody articleRichContent" id="newsModalPreviewBody">
+                              <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
+                            </div>
+                          </article>
                         </div>
-                      </article>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -833,21 +1129,32 @@ $isSuperAdmin = $sessionRole === 'superadmin';
                   <div class="col-lg-7">
                     <div class="news-preview-panel h-100">
                       <h6 class="announcement-card-title mb-3">Schedule Preview</h6>
-                      <article class="news-article-preview">
-                        <div class="news-article-copy">
-                          <p class="news-article-tag">Community Update</p>
-                          <h2 class="news-article-title" id="newsModalScheduleHeadline">Your news headline will appear here.</h2>
-                          <span class="news-preview-date" id="newsModalScheduleDate">Preview only</span>
-                          <div class="news-article-hero" id="newsModalScheduleHero">
-                            <div class="news-upload-preview" style="min-height: 240px;">
-                              <span>Upload a news banner to preview the article hero.</span>
+                      <div class="news-site-preview">
+                        <div class="newsStoryPrimary">
+                          <div class="newsStoryToolbar">
+                            <span class="newsBackButton" aria-hidden="true">
+                              <i class="fa-solid fa-arrow-left-long" aria-hidden="true"></i>
+                              <span>Return to all news</span>
+                            </span>
+                          </div>
+
+                          <article class="newsArticleCard">
+                            <p class="articleTag">Community Update</p>
+                            <h2 class="articleHeadline" id="newsModalScheduleHeadline">Your news headline will appear here.</h2>
+                            <div class="articleMetaStrip">
+                              <span class="articleDateBadge" id="newsModalScheduleDate">Preview only</span>
                             </div>
-                          </div>
-                          <div class="news-article-body" id="newsModalScheduleBody">
-                            <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
-                          </div>
+                            <div class="articleImageWrapper articleHeroWrapper" id="newsModalScheduleHero">
+                              <div class="placeholderImage news-preview-placeholder-image">
+                                <span>Upload a news banner to preview the article hero.</span>
+                              </div>
+                            </div>
+                            <div class="articleBody articleRichContent" id="newsModalScheduleBody">
+                              <p class="news-placeholder-copy">Write the story body to preview the article layout.</p>
+                            </div>
+                          </article>
                         </div>
-                      </article>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -887,6 +1194,8 @@ $isSuperAdmin = $sessionRole === 'superadmin';
     (function () {
       const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
       const isSuperAdmin = <?= $isSuperAdmin ? 'true' : 'false' ?>;
+      const initialDraftState = <?= json_encode($draftInitialState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+      const shouldAutoOpenPreview = <?= $autoOpenPreview ? 'true' : 'false' ?>;
 
       const formEl = document.getElementById("newsCreateForm");
       const headingInput = document.getElementById("newsHeadingInput");
@@ -1410,7 +1719,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         }
       }
 
-      function addSection(type) {
+      function addSection(type, initialData = null) {
         if (!sectionsContainer) {
           return;
         }
@@ -1420,11 +1729,64 @@ $isSuperAdmin = $sessionRole === 'superadmin';
           : buildTextSectionMarkup(sectionCounter);
         sectionsContainer.insertAdjacentHTML("beforeend", markup);
         const sectionEl = sectionsContainer.lastElementChild;
+        if (sectionEl && initialData && type === "image") {
+          const imageUrlInput = sectionEl.querySelector("[data-section-image-url]");
+          const imageCaptionInput = sectionEl.querySelector("[data-section-image-caption]");
+          const imageStatusEl = sectionEl.querySelector("[data-section-image-status]");
+          if (imageUrlInput) {
+            imageUrlInput.value = String(initialData.image_url || "").trim();
+          }
+          if (imageCaptionInput) {
+            imageCaptionInput.value = String(initialData.caption || "").trim();
+          }
+          if (imageStatusEl && String(initialData.image_url || "").trim() !== "") {
+            imageStatusEl.textContent = "Supporting image uploaded.";
+          }
+        }
         if (sectionEl) {
           attachSectionEvents(sectionEl);
+          if (initialData && type === "text") {
+            const editorEl = sectionEl.querySelector("[data-section-editor]");
+            if (editorEl && editorEl.dataset.initialized === "true") {
+              $(editorEl).summernote("code", String(initialData.body_html || ""));
+            }
+          }
         }
         updateSectionsEmptyState();
         renderPreview();
+      }
+
+      function loadInitialDraftState() {
+        if (!initialDraftState || String(initialDraftState.announcement_id || "").trim() === "") {
+          return;
+        }
+
+        if (headingInput) {
+          headingInput.value = String(initialDraftState.title || "").trim();
+        }
+        if (headlineImageUrlInput) {
+          headlineImageUrlInput.value = String(initialDraftState.headline_image_url || "").trim();
+        }
+        if (headlineImageStatus) {
+          headlineImageStatus.textContent = String(initialDraftState.headline_image_url || "").trim() !== ""
+            ? "Draft news banner loaded."
+            : "No news banner uploaded yet.";
+        }
+        setScheduleFields(
+          String(initialDraftState.schedule_date || "").trim(),
+          String(initialDraftState.schedule_time || "").trim()
+        );
+        if (bodyEditorEl.length) {
+          bodyEditorEl.summernote("code", String(initialDraftState.body_html || ""));
+        }
+
+        const sections = Array.isArray(initialDraftState.sections) ? initialDraftState.sections : [];
+        sections.forEach(function (section) {
+          const sectionType = String(section?.type || "").toLowerCase();
+          if (sectionType === "text" || sectionType === "image") {
+            addSection(sectionType, section);
+          }
+        });
       }
 
       function collectSections() {
@@ -1568,7 +1930,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
           }
           el.innerHTML = payload.headlineImageUrl
             ? `<img src="${escapeHtml(payload.headlineImageUrl)}" alt="${escapeHtml(payload.title || 'News banner')}">`
-            : `<div class="news-upload-preview" style="min-height: 240px;"><span>Upload a news banner to preview the article hero.</span></div>`;
+            : `<div class="placeholderImage news-preview-placeholder-image"><span>Upload a news banner to preview the article hero.</span></div>`;
         });
 
         [previewBody, modalPreviewBody, modalScheduleBody].forEach(function (el) {
@@ -1670,6 +2032,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       }
 
       initEditor(bodyEditorEl, "Write the main news description here...");
+      loadInitialDraftState();
       updateSectionsEmptyState();
       setHeadlineImagePreview(String(headlineImageUrlInput?.value || "").trim());
       renderPreview();
@@ -1793,6 +2156,18 @@ $isSuperAdmin = $sessionRole === 'superadmin';
           }
           requireScheduleBeforeSubmit = false;
         });
+      }
+
+      if (shouldAutoOpenPreview) {
+        window.setTimeout(function () {
+          const payload = validateNewsPayload();
+          if (!payload) {
+            return;
+          }
+          showPreviewStage();
+          renderPreview();
+          previewModal?.show();
+        }, 150);
       }
     })();
   </script>
