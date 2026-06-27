@@ -6,6 +6,7 @@ header('Content-Type: application/json; charset=UTF-8');
 
 $items = announcements_load_all();
 $publicNewsItems = [];
+$nowTs = time();
 
 foreach ($items as $item) {
     $channels = array_values(array_filter((array)($item['channels'] ?? []), function ($ch) {
@@ -28,6 +29,9 @@ foreach ($items as $item) {
     $postedDate = '-';
     $sortTimestamp = 0;
     $ts = strtotime($rawPosted);
+    if ($ts !== false && $ts > $nowTs) {
+        continue;
+    }
     if ($ts !== false) {
         $postedDate = date('F d, Y', $ts);
         $sortTimestamp = $ts;

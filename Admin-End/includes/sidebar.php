@@ -631,7 +631,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 <style>
   :root {
-    --admin-sidebar-expanded: 280px;
+    --admin-sidebar-expanded: 252px;
     --admin-sidebar-collapsed: 92px;
   }
 

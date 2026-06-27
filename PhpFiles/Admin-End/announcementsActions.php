@@ -550,6 +550,7 @@ foreach ($rows as $idx => $item) {
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to archive news article.');
     }
+    $newsScope = 'archived';
     ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'News article archived.');
   }
 }

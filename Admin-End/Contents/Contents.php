@@ -336,7 +336,7 @@ foreach ($storedAnnouncements as $item) {
     return in_array($ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
   }));
   $status = strtolower((string)($item['status'] ?? 'draft'));
-  if (!in_array($status, ['approved', 'pending', 'draft'], true)) {
+  if (!in_array($status, ['approved', 'pending', 'draft', 'archived'], true)) {
     $status = 'draft';
   }
 

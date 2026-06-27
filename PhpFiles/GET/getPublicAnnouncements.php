@@ -6,6 +6,7 @@ header('Content-Type: application/json; charset=UTF-8');
 
 $items = announcements_load_all();
 $publicAnnouncements = [];
+$nowTs = time();
 
 foreach ($items as $item) {
     $channels = array_values(array_filter((array)($item['channels'] ?? []), function ($ch) {
@@ -26,9 +27,14 @@ foreach ($items as $item) {
     }
 
     $postedDate = '-';
+    $sortTimestamp = 0;
     $ts = strtotime($rawPosted);
+    if ($ts !== false && $ts > $nowTs) {
+        continue;
+    }
     if ($ts !== false) {
         $postedDate = date('F d, Y', $ts);
+        $sortTimestamp = $ts;
     }
 
     $title = (string)($item['public_title'] ?? '');
@@ -51,11 +57,19 @@ foreach ($items as $item) {
         'title' => $title,
         'content_html' => $contentHtml,
         'posted_date' => $postedDate,
-        'image_url' => $imageUrl
+        'image_url' => $imageUrl,
+        'sort_ts' => $sortTimestamp
     ];
 }
 
+usort($publicAnnouncements, static function (array $a, array $b): int {
+    return ((int)($b['sort_ts'] ?? 0)) <=> ((int)($a['sort_ts'] ?? 0));
+});
+
 echo json_encode([
     'success' => true,
-    'items' => array_slice($publicAnnouncements, 0, 6)
+    'items' => array_map(static function (array $item): array {
+        unset($item['sort_ts']);
+        return $item;
+    }, array_slice($publicAnnouncements, 0, 6))
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
