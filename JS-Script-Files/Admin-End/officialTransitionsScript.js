@@ -5,6 +5,13 @@
   'use strict';
 
   const API = '../PhpFiles/Admin-End/officialTransitions.php';
+  const API_URL = (() => {
+    try {
+      return new URL(API, window.location.href).toString();
+    } catch (_) {
+      return API;
+    }
+  })();
 
   // ── Bootstrap instances ────────────────────────────────────────────────────
   const modalInstances = {};
@@ -29,18 +36,32 @@
   }
 
   // ── Generic fetch ──────────────────────────────────────────────────────────
+  function appendRequestEntries(target, params = {}) {
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((entry) => target.append(key, entry == null ? '' : String(entry)));
+        return;
+      }
+      target.append(key, value == null ? '' : String(value));
+    });
+    return target;
+  }
+
   async function apiFetch(params = {}, method = 'GET') {
-    let url = API;
+    const normalizedMethod = String(method || 'GET').toUpperCase();
+    let url = API_URL;
     let body = null;
-    if (method === 'GET') {
-      const qs = new URLSearchParams(params).toString();
-      if (qs) url += '?' + qs;
+
+    if (normalizedMethod === 'GET') {
+      const qs = appendRequestEntries(new URLSearchParams(), params).toString();
+      if (qs) url += (url.includes('?') ? '&' : '?') + qs;
     } else {
-      body = new URLSearchParams(params);
+      body = appendRequestEntries(new FormData(), params);
     }
+
     const res = await fetch(url, {
-      method,
-      ...(body ? { body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } } : {})
+      method: normalizedMethod,
+      ...(body ? { body } : {})
     });
     return res.json();
   }
