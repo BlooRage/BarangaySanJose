@@ -247,9 +247,14 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
 {
     global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT, $SEMAPHORE_OTP_ENDPOINT;
 
+    $apiKey = trim((string)($SEMAPHORE_API_KEY ?? ''));
+    $sender = trim((string)($SEMAPHORE_SENDER ?? ''));
+    $messagesEndpoint = trim((string)($SEMAPHORE_ENDPOINT ?? ''));
+    $otpEndpoint = trim((string)($SEMAPHORE_OTP_ENDPOINT ?? ''));
+
     setLastSmsError('');
 
-    if ($SEMAPHORE_API_KEY === '' || $SEMAPHORE_SENDER === '') {
+    if ($apiKey === '' || $sender === '') {
         $error = 'SMS sending unavailable: Semaphore API key or sender is missing.';
         setLastSmsError($error);
         error_log('[sendSMS] ' . $error);
@@ -273,18 +278,18 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
     }
 
     $parameters = [
-        'apikey' => $SEMAPHORE_API_KEY,
+        'apikey' => $apiKey,
         'number' => $recipient,
         'message' => $message,
-        'sendername' => $SEMAPHORE_SENDER,
+        'sendername' => $sender,
     ];
 
-    $endpoint = $SEMAPHORE_ENDPOINT !== '' ? $SEMAPHORE_ENDPOINT : 'https://api.semaphore.co/api/v4/messages';
+    $endpoint = $messagesEndpoint !== '' ? $messagesEndpoint : 'https://api.semaphore.co/api/v4/messages';
     if ($otpCode !== null && $otpCode !== '') {
         $otpParameters = $parameters;
         $otpParameters['message'] = smsMessageWithOtpPlaceholder($message, $otpCode);
         $otpParameters['code'] = $otpCode;
-        $otpEndpoint = $SEMAPHORE_OTP_ENDPOINT !== '' ? $SEMAPHORE_OTP_ENDPOINT : 'https://api.semaphore.co/api/v4/otp';
+        $otpEndpoint = $otpEndpoint !== '' ? $otpEndpoint : 'https://api.semaphore.co/api/v4/otp';
 
         $otpAttempt = smsSendRequest($otpEndpoint, $otpParameters);
         if ($otpAttempt['success']) {
