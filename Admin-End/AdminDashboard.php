@@ -286,10 +286,12 @@ $dashboardCharts = [
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard</title>
 
-  <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://kit.fontawesome.com" crossorigin>
+  <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
 </head>
 
 <body>
@@ -451,28 +453,33 @@ $dashboardCharts = [
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  document.body.classList.add('dashboard-preload');
-  window.addEventListener('load', () => {
-    window.requestAnimationFrame(() => {
-      document.body.classList.add('dashboard-loaded');
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.classList.add('dashboard-preload');
+    window.addEventListener('load', () => {
+      window.requestAnimationFrame(() => {
+        document.body.classList.add('dashboard-loaded');
+      });
     });
-  });
+  
+    const dashboardCharts = <?php echo json_encode($dashboardCharts, JSON_UNESCAPED_SLASHES); ?>;
+    const chartPalette = {
+      orange: '#de710c',
+      amber: '#f59f00',
+      sky: '#1c7ed6',
+      emerald: '#2f9e44',
+      rose: '#e03131',
+      slate: '#6c757d',
+      grid: 'rgba(32, 35, 41, 0.08)'
+    };
 
-  const dashboardCharts = <?php echo json_encode($dashboardCharts, JSON_UNESCAPED_SLASHES); ?>;
-  const chartPalette = {
-    orange: '#de710c',
-    amber: '#f59f00',
-    sky: '#1c7ed6',
-    emerald: '#2f9e44',
-    rose: '#e03131',
-    slate: '#6c757d',
-    grid: 'rgba(32, 35, 41, 0.08)'
-  };
+    if (typeof Chart === 'undefined') {
+      return;
+    }
 
-  Chart.defaults.font.family = "'Geist', sans-serif";
-  Chart.defaults.color = '#495057';
+    Chart.defaults.font.family = "'Geist', sans-serif";
+    Chart.defaults.color = '#495057';
 
-  new Chart(document.getElementById('sectorMembershipChart'), {
+    new Chart(document.getElementById('sectorMembershipChart'), {
     type: 'bar',
     data: {
       labels: dashboardCharts.sectorMembership.labels,
@@ -502,7 +509,7 @@ $dashboardCharts = [
     }
   });
 
-  new Chart(document.getElementById('genderPopulationChart'), {
+    new Chart(document.getElementById('genderPopulationChart'), {
     type: 'doughnut',
     data: {
       labels: dashboardCharts.genderPopulation.labels,
@@ -529,7 +536,7 @@ $dashboardCharts = [
     }
   });
 
-  new Chart(document.getElementById('householdsPerAreaChart'), {
+    new Chart(document.getElementById('householdsPerAreaChart'), {
     type: 'bar',
     data: {
       labels: dashboardCharts.householdsPerArea.labels,
@@ -559,7 +566,7 @@ $dashboardCharts = [
     }
   });
 
-  new Chart(document.getElementById('ageDistributionChart'), {
+    new Chart(document.getElementById('ageDistributionChart'), {
     type: 'bar',
     data: {
       labels: dashboardCharts.ageDistribution.labels,
@@ -589,7 +596,7 @@ $dashboardCharts = [
     }
   });
 
-  new Chart(document.getElementById('residentsPerAreaChart'), {
+    new Chart(document.getElementById('residentsPerAreaChart'), {
     type: 'bar',
     data: {
       labels: dashboardCharts.residentsPerArea.labels,
@@ -662,6 +669,7 @@ $dashboardCharts = [
         }
       }
     }
+  });
   });
 </script>
 </body>

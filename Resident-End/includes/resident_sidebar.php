@@ -565,6 +565,83 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    const prefetchedUrls = new Set();
+    const sameOrigin = window.location.origin;
+    const currentUrl = new URL(window.location.href);
+    currentUrl.hash = "";
+
+    const toPrefetchableUrl = (href) => {
+      try {
+        const url = new URL(String(href || ""), window.location.href);
+        if (url.origin !== sameOrigin) {
+          return null;
+        }
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+          return null;
+        }
+        url.hash = "";
+        if (url.toString() === currentUrl.toString()) {
+          return null;
+        }
+        return url.toString();
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const warmUrl = (href) => {
+      const normalizedUrl = toPrefetchableUrl(href);
+      if (!normalizedUrl || prefetchedUrls.has(normalizedUrl)) {
+        return;
+      }
+
+      prefetchedUrls.add(normalizedUrl);
+
+      const prefetchLink = document.createElement("link");
+      prefetchLink.rel = "prefetch";
+      prefetchLink.as = "document";
+      prefetchLink.href = normalizedUrl;
+      document.head.appendChild(prefetchLink);
+    };
+
+    const navLinks = Array.from(document.querySelectorAll(
+      "#nav-sidebarLinks a[href], #resident-transactions-collapse a[href], .sidebar-actions a[href]"
+    )).filter((link) => {
+      if (!link || !link.href) {
+        return false;
+      }
+      const href = String(link.getAttribute("href") || "");
+      return href !== "" && href !== "#";
+    });
+
+    navLinks.forEach((link) => {
+      const warm = () => warmUrl(link.href);
+      link.addEventListener("mouseenter", warm, { passive: true });
+      link.addEventListener("focus", warm, { passive: true });
+      link.addEventListener("touchstart", warm, { passive: true });
+    });
+
+    const backgroundTargets = navLinks
+      .map((link) => link.href)
+      .filter((href, index, list) => list.indexOf(href) === index)
+      .slice(0, 8);
+
+    const warmInBackground = () => {
+      backgroundTargets.forEach((href, index) => {
+        window.setTimeout(() => warmUrl(href), 140 * index);
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(warmInBackground, { timeout: 1500 });
+    } else {
+      window.setTimeout(warmInBackground, 700);
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
     const links = document.querySelectorAll(".logout-link");
     if (!links.length) return;
 

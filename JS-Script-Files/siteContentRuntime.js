@@ -164,6 +164,150 @@
     }).join("");
   }
 
+  function buildGovernmentOfficialMarkup(official, useCarouselLayout) {
+    var imageUrl = resolveAssetUrl(document, official.image || "");
+    var nameHtml = official.name_html || "";
+    var positionHtml = official.position_html || "";
+    var altText = escapeHtml(stripHtml(official.name_html || "Official"));
+
+    if (useCarouselLayout) {
+      return [
+        '<figure class="figure council-card">',
+        '  <img src="' + escapeHtml(imageUrl) + '" id="carouselImg" class="img-fluid mx-5" alt="' + altText + '">',
+        '  <figcaption class="figure-caption">',
+        '    <h3 class="mt-3">' + nameHtml + "</h3>",
+        '    <p>' + positionHtml + "</p>",
+        "  </figcaption>",
+        "</figure>"
+      ].join("");
+    }
+
+    return [
+      '<div class="col">',
+      '  <div class="p-3">',
+      '    <figure class="figure">',
+      '      <img src="' + escapeHtml(imageUrl) + '" id="officialImg" class="img-fluid" alt="' + altText + '">',
+      '      <figcaption class="figure-caption">',
+      '        <h3 class="mt-1">' + nameHtml + "</h3>",
+      '        <p>' + positionHtml + "</p>",
+      "      </figcaption>",
+      "    </figure>",
+      "  </div>",
+      "</div>"
+    ].join("");
+  }
+
+  function initGovernmentCouncilSlider(root) {
+    var sliderRoot = query(root, "[data-cms-government-carousel-root]");
+    if (!sliderRoot) {
+      return;
+    }
+
+    if (sliderRoot.__cmsCouncilSliderState) {
+      var oldState = sliderRoot.__cmsCouncilSliderState;
+      if (oldState.timerId) {
+        window.clearInterval(oldState.timerId);
+      }
+      if (oldState.prevBtn && oldState.prevHandler) {
+        oldState.prevBtn.removeEventListener("click", oldState.prevHandler);
+      }
+      if (oldState.nextBtn && oldState.nextHandler) {
+        oldState.nextBtn.removeEventListener("click", oldState.nextHandler);
+      }
+      if (oldState.resizeHandler) {
+        window.removeEventListener("resize", oldState.resizeHandler);
+      }
+      sliderRoot.__cmsCouncilSliderState = null;
+    }
+
+    var track = query(sliderRoot, '[data-cms-government-carousel="officials"]');
+    var prevBtn = query(sliderRoot, "[data-cms-government-carousel-prev]");
+    var nextBtn = query(sliderRoot, "[data-cms-government-carousel-next]");
+    if (!track || !prevBtn || !nextBtn) {
+      return;
+    }
+
+    var animating = false;
+    var stepPercent = 33.333;
+    var visibleCount = 3;
+    var mediaQuery = window.matchMedia("(max-width: 992px)");
+
+    function updateStep() {
+      visibleCount = mediaQuery.matches ? 1 : 3;
+      stepPercent = mediaQuery.matches ? 100 : 33.333;
+      var canSlide = track.children.length > visibleCount;
+      prevBtn.hidden = !canSlide;
+      nextBtn.hidden = !canSlide;
+      prevBtn.disabled = !canSlide;
+      nextBtn.disabled = !canSlide;
+      if (!canSlide) {
+        track.style.transform = "translateX(0)";
+      }
+    }
+
+    function getSlideTransition() {
+      var styles = window.getComputedStyle(track);
+      var duration = styles.getPropertyValue("--council-slide-duration").trim() || "0.5s";
+      var easing = styles.getPropertyValue("--council-slide-ease").trim() || "ease";
+      return "transform " + duration + " " + easing;
+    }
+
+    function moveNext() {
+      if (animating || track.children.length <= visibleCount) {
+        return;
+      }
+
+      animating = true;
+      track.style.transform = "translateX(-" + stepPercent + "%)";
+      track.addEventListener("transitionend", function handler() {
+        track.removeEventListener("transitionend", handler);
+        track.appendChild(track.firstElementChild);
+        track.style.transition = "none";
+        track.style.transform = "translateX(0)";
+        track.offsetHeight;
+        track.style.transition = getSlideTransition();
+        animating = false;
+      });
+    }
+
+    function movePrev() {
+      if (animating || track.children.length <= visibleCount) {
+        return;
+      }
+
+      animating = true;
+      track.style.transition = "none";
+      track.insertBefore(track.lastElementChild, track.firstElementChild);
+      track.style.transform = "translateX(-" + stepPercent + "%)";
+      track.offsetHeight;
+      track.style.transition = getSlideTransition();
+      track.style.transform = "translateX(0)";
+      track.addEventListener("transitionend", function handler() {
+        track.removeEventListener("transitionend", handler);
+        animating = false;
+      });
+    }
+
+    var resizeHandler = function () {
+      updateStep();
+    };
+
+    track.style.transition = getSlideTransition();
+    updateStep();
+    prevBtn.addEventListener("click", movePrev);
+    nextBtn.addEventListener("click", moveNext);
+    window.addEventListener("resize", resizeHandler);
+
+    sliderRoot.__cmsCouncilSliderState = {
+      prevBtn: prevBtn,
+      nextBtn: nextBtn,
+      prevHandler: movePrev,
+      nextHandler: moveNext,
+      resizeHandler: resizeHandler,
+      timerId: track.children.length > visibleCount ? window.setInterval(moveNext, 10000) : 0
+    };
+  }
+
   function buildCouncilMembersFromGovernment(payload) {
     var members = [];
     if (!payload || typeof payload !== "object") {
@@ -205,25 +349,18 @@
     setInlineHtml(root, '[data-cms-government="punong-position"]', payload.punong_barangay_position_html || "");
     setHtml(root, '[data-cms-government="punong-message"]', payload.punong_barangay_welcome_message_html || "");
 
-    var officialsContainer = query(root, '[data-cms-government-list="officials"]');
+    var carouselTrack = query(root, '[data-cms-government-carousel="officials"]');
+    var officialsContainer = carouselTrack || query(root, '[data-cms-government-list="officials"]');
     if (officialsContainer) {
       var officials = Array.isArray(payload.officials) ? payload.officials : [];
+      var useCarouselLayout = !!carouselTrack;
       officialsContainer.innerHTML = officials.map(function (official) {
-        var imageUrl = resolveAssetUrl(root, official.image || "");
-        return [
-          '<div class="col">',
-          '  <div class="p-3">',
-          '    <figure class="figure">',
-          '      <img src="' + escapeHtml(imageUrl) + '" id="officialImg" class="img-fluid" alt="' + escapeHtml(stripHtml(official.name_html || "Official")) + '">',
-          '      <figcaption class="figure-caption">',
-          '        <h3 class="mt-1">' + (official.name_html || "") + "</h3>",
-          '        <p>' + (official.position_html || "") + "</p>",
-          "      </figcaption>",
-          "    </figure>",
-          "  </div>",
-          "</div>"
-        ].join("");
-      }).join("");
+          return buildGovernmentOfficialMarkup(official, useCarouselLayout);
+        }).join("");
+    }
+
+    if (carouselTrack && Array.isArray(payload.officials) && payload.officials.length) {
+      initGovernmentCouncilSlider(root);
     }
 
     var areasContainer = query(root, '[data-cms-government-list="areas"]');

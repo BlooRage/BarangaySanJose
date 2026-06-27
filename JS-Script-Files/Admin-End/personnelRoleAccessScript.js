@@ -2,6 +2,7 @@
   const opts = window.PERSONNEL_ROLE_ACCESS_OPTIONS || {};
   const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/personnelRoleAccess.php");
   const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
+  const defaultPermissionKeysFromOpts = Array.isArray(opts.defaultPermissionKeys) ? opts.defaultPermissionKeys.map(String) : [];
 
   const state = {
     rowsRaw: [],
@@ -137,7 +138,9 @@
   };
 
   const permissionMetaMap = buildPermissionMetaMap();
-  const defaultPermissionKeys = sortLabels(Object.keys(permissionMetaMap));
+  const defaultPermissionKeys = sortLabels(
+    defaultPermissionKeysFromOpts.length ? defaultPermissionKeysFromOpts : Object.keys(permissionMetaMap)
+  );
 
   const buildDefaultPermissionMap = () => {
     const map = {};

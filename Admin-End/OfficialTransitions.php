@@ -19,7 +19,8 @@ if (!function_exists('ot_filter_catalog_for_regular_officials')) {
                 if (!empty($item['children'])) {
                     $children = [];
                     foreach (($item['children'] ?? []) as $child) {
-                        if (!empty($child['admin_only']) || empty($child['path'])) {
+                        $key = trim((string)($child['key'] ?? ''));
+                        if ($key === '') {
                             continue;
                         }
                         $children[] = $child;
@@ -32,7 +33,8 @@ if (!function_exists('ot_filter_catalog_for_regular_officials')) {
                     continue;
                 }
 
-                if (!empty($item['admin_only']) || empty($item['path'])) {
+                $key = trim((string)($item['key'] ?? ''));
+                if ($key === '') {
                     continue;
                 }
                 $items[] = $item;
@@ -167,14 +169,53 @@ if (!function_exists('ot_page_format_official_name')) {
     }
 }
 
+if (!function_exists('ot_permission_summary')) {
+    function ot_permission_summary(array $permissionKeys, int $maxLabels = 3): string
+    {
+        if ($permissionKeys === []) {
+            return 'No modules';
+        }
+
+        $labels = [];
+        foreach ($permissionKeys as $permissionKey) {
+            $meta = amp_get_permission_meta((string)$permissionKey);
+            if (!$meta) {
+                continue;
+            }
+
+            $parentLabel = trim((string)($meta['parent_label'] ?? ''));
+            $label = trim((string)($meta['label'] ?? ''));
+            $labels[] = $parentLabel !== '' ? ($parentLabel . ' - ' . $label) : $label;
+        }
+
+        sort($labels);
+        $labels = array_values(array_unique(array_filter($labels, static fn ($value): bool => trim((string)$value) !== '')));
+        if ($labels === []) {
+            return 'No modules';
+        }
+
+        $visible = array_slice($labels, 0, $maxLabels);
+        $summary = implode(', ', $visible);
+        if (count($labels) > $maxLabels) {
+            $summary .= ' +' . (count($labels) - $maxLabels);
+        }
+
+        return $summary;
+    }
+}
+
 ot_ensure_transition_schema($conn);
 
 $transitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
+$transitionPanel = strtolower(trim((string)($_GET['panel'] ?? 'seat')));
 if ($transitionTool === '' || in_array($transitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
     $transitionTool = 'current_term';
 }
 if (!in_array($transitionTool, ['current_term', 'create_new_term'], true)) {
     $transitionTool = 'current_term';
+}
+if (!in_array($transitionPanel, ['seat', 'access'], true)) {
+    $transitionPanel = 'seat';
 }
 
 $autoOpenNewTermModal = false;
@@ -231,7 +272,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
             LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
             WHERE bc.is_active = 1
               AND bc.council_id = ?
-              AND bc.seat_name NOT LIKE 'Punong Barangay%'
             LIMIT 1
         ");
         if (!$stmt) {
@@ -252,7 +292,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
             $requestedPermissionKeys = [];
         }
 
-        $validKeys = array_fill_keys(amp_get_default_admin_permission_keys(), true);
+        $validKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
         $permissionMap = [];
         foreach ($requestedPermissionKeys as $permissionKey) {
             $permissionKey = trim((string)$permissionKey);
@@ -312,7 +352,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
         ];
     }
 
-    header('Location: OfficialTransitions.php?tool=current_term');
+    header('Location: OfficialTransitions.php?tool=current_term&panel=access#official-access-control');
     exit;
 }
 
@@ -515,7 +555,6 @@ if ($hasCouncilTbl) {
         LEFT JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
         LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
         WHERE bc.is_active = 1
-          AND bc.seat_name NOT LIKE 'Punong Barangay%'
         ORDER BY bc.sort_order, bc.council_id
     ");
     if ($kgStmt) {
@@ -555,6 +594,8 @@ if ($hasCouncilTbl) {
                 'has_saved_template' => amp_has_saved_seat_access_profile($conn, $councilId),
                 'permission_keys' => array_keys($permissionMap),
                 'permission_count' => count($permissionMap),
+                'permission_summary' => ot_permission_summary(array_keys($permissionMap)),
+                'access_source' => amp_has_saved_seat_access_profile($conn, $councilId) ? 'Custom Template' : 'Default Template',
                 'has_official' => $hasConfiguredTermSchedule && $officialId !== '',
             ];
         }
@@ -769,6 +810,94 @@ if ($hasCouncilTbl) {
       font-size: .88rem;
       color: #475569;
     }
+    .ot-access-source-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: .35rem .75rem;
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .ot-access-source-badge.is-custom {
+      background: #eaf6ec;
+      color: #1c6b3d;
+      border-color: #b7e0c0;
+    }
+    .ot-access-source-badge.is-default {
+      background: #eef2ff;
+      color: #3b4cca;
+      border-color: #cfd7ff;
+    }
+    .ot-access-groups {
+      display: grid;
+      gap: 14px;
+      max-height: 48vh;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .ot-access-group {
+      border: 1px solid #ececec;
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .ot-access-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f1f1;
+      background: #faf7f2;
+    }
+    .ot-access-group-title {
+      font-weight: 700;
+      color: #2f3640;
+    }
+    .ot-access-group-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .ot-access-items {
+      display: grid;
+      gap: 8px;
+      padding: 12px 14px 14px;
+    }
+    .ot-access-item {
+      border: 1px solid #edf0f4;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .ot-access-item.is-child {
+      margin-left: 18px;
+      background: #fcfcfd;
+    }
+    .ot-access-item label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .ot-access-item input[type="checkbox"] {
+      margin-top: .15rem;
+      flex: 0 0 auto;
+    }
+    .ot-access-item-main {
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.3;
+    }
+    .ot-access-item-sub {
+      display: block;
+      margin-top: 2px;
+      color: #6b7280;
+      font-size: .8rem;
+      line-height: 1.3;
+    }
   </style>
 </head>
 <body data-ot-tool="<?= htmlspecialchars($transitionTool, ENT_QUOTES, 'UTF-8') ?>"
@@ -795,6 +924,9 @@ if ($hasCouncilTbl) {
                 <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
           <i class="fas fa-bolt me-1"></i> Transition Actions
         </button>
+        <a class="btn btn-outline-secondary btn-sm" href="OfficialTransitions.php?tool=current_term&panel=access#official-access-control">
+          <i class="fas fa-shield-halved me-1"></i> Official Access Control
+        </a>
         <a class="btn btn-outline-primary btn-sm" href="OfficialTransitions.php?tool=create_new_term">
           <i class="fas fa-layer-group me-1"></i> Create Governance Cycle
         </a>
@@ -807,6 +939,21 @@ if ($hasCouncilTbl) {
       <?php endif; ?>
     </div>
     <hr class="mb-4">
+
+    <?php if ($transitionTool === 'current_term'): ?>
+    <nav class="ot-subnav" aria-label="Official governance sections">
+      <a class="ot-subnav-link <?= $transitionPanel === 'seat' ? 'active' : '' ?>"
+         href="OfficialTransitions.php?tool=current_term&panel=seat#seat-assignment">
+        <i class="fas fa-right-left"></i>
+        <span>Seat Assignment</span>
+      </a>
+      <a class="ot-subnav-link <?= $transitionPanel === 'access' ? 'active' : '' ?>"
+         href="OfficialTransitions.php?tool=current_term&panel=access#official-access-control">
+        <i class="fas fa-shield-halved"></i>
+        <span>Official Access Control</span>
+      </a>
+    </nav>
+    <?php endif; ?>
 
     <?php if (!empty($officialTransitionFlash['message'])): ?>
       <div class="alert alert-<?= htmlspecialchars((string)($officialTransitionFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> mb-4">
@@ -849,7 +996,7 @@ if ($hasCouncilTbl) {
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ TERM DETAILS -->
-    <div class="bg-white rounded-3 shadow-sm border mb-4">
+    <div class="bg-white rounded-3 shadow-sm border mb-4" id="seat-assignment">
       <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <i class="fas fa-calendar-alt text-primary"></i>
@@ -989,6 +1136,72 @@ if ($hasCouncilTbl) {
                       <?php else: ?>
                         <span class="text-muted small">—</span>
                       <?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm border mb-4" id="official-access-control">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-bottom">
+        <div>
+          <div class="fw-semibold">Official Access Control</div>
+          <div class="small text-muted">Manage seat-based module access templates for governance positions separately from personnel access profiles.</div>
+        </div>
+        <div class="small text-muted">
+          Templates apply to the current seat holder now and to future occupants after transition.
+        </div>
+      </div>
+      <div class="p-3">
+        <?php if (empty($seatAccessOfficials)): ?>
+          <div class="text-center text-muted py-4">No active governance seats are available for official access templates yet.</div>
+        <?php else: ?>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Seat</th>
+                  <th>Current Official</th>
+                  <th>Template Source</th>
+                  <th>Enabled Modules</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($seatAccessOfficials as $seatAccess): ?>
+                  <?php
+                    $sourceClass = !empty($seatAccess['has_saved_template']) ? 'is-custom' : 'is-default';
+                    $holderLabel = trim((string)($seatAccess['full_name'] ?? ''));
+                    if ($holderLabel === '') {
+                        $holderLabel = 'Vacant';
+                    }
+                  ?>
+                  <tr>
+                    <td>
+                      <div class="fw-semibold"><?= htmlspecialchars((string)($seatAccess['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small text-muted"><?= htmlspecialchars((string)($seatAccess['selection_method'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></div>
+                    </td>
+                    <td>
+                      <div><?= htmlspecialchars($holderLabel, ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small text-muted"><?= htmlspecialchars((string)($seatAccess['position_access'] ?? 'Pending assignment'), ENT_QUOTES, 'UTF-8') ?></div>
+                    </td>
+                    <td>
+                      <span class="ot-access-source-badge <?= htmlspecialchars($sourceClass, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars((string)($seatAccess['access_source'] ?? 'Default Template'), ENT_QUOTES, 'UTF-8') ?>
+                      </span>
+                    </td>
+                    <td><?= htmlspecialchars((string)($seatAccess['permission_summary'] ?? 'No modules'), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td class="text-end">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary ot-manage-access"
+                        data-seat-access="<?= htmlspecialchars(json_encode($seatAccess, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>">
+                        <i class="fas fa-shield-halved me-1"></i> Manage
+                      </button>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -1506,6 +1719,64 @@ if ($hasCouncilTbl) {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: Official Access Control
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalOfficialAccessControl" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" id="officialAccessControlForm">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="officialAccessControlModalTitle">Manage Official Access Control</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="action" value="save_official_permissions">
+          <input type="hidden" name="council_id" id="officialAccessControlCouncilId">
+
+          <div class="alert alert-info py-2 small mb-3">
+            <i class="fas fa-info-circle me-1"></i>
+            This governance template controls the modules granted to the current holder of the seat and to future officials assigned to the same position.
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-light-subtle">
+                <div class="small text-muted text-uppercase fw-semibold">Seat</div>
+                <div class="fw-semibold" id="officialAccessSeatName">—</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-light-subtle">
+                <div class="small text-muted text-uppercase fw-semibold">Current Holder</div>
+                <div class="fw-semibold" id="officialAccessHolderName">—</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-light-subtle">
+                <div class="small text-muted text-uppercase fw-semibold">Template Source</div>
+                <div id="officialAccessSourceBadgeWrap"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+            <div class="small text-muted" id="officialAccessModulesSummary">0 granted - No modules</div>
+            <input type="search" class="form-control form-control-sm" id="officialAccessSearch" placeholder="Search modules" style="max-width: 260px;">
+          </div>
+
+          <div class="ot-access-groups" id="officialAccessPermissionGroups"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary me-auto" id="btnOfficialAccessReset">Reset To Default Template</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Save Official Access</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
      MODAL: Official Access Setup
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalCandidates" tabindex="-1" aria-hidden="true">
@@ -1840,6 +2111,11 @@ if ($hasCouncilTbl) {
     departments: <?= json_encode($departmentOptions, JSON_UNESCAPED_UNICODE) ?>,
     areas: <?= json_encode($areaOptions, JSON_UNESCAPED_UNICODE) ?>
   };
+  window.OT_OFFICIAL_ACCESS_DATA = {
+    seats: <?= json_encode(array_values($seatAccessOfficials), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    catalog: <?= json_encode($officialPermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    defaultKeys: <?= json_encode(array_values($defaultOfficialPermissionKeys), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+  };
 </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1848,5 +2124,273 @@ if ($hasCouncilTbl) {
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
   <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260328-02"></script>
+  <script>
+    (function () {
+      const config = window.OT_OFFICIAL_ACCESS_DATA || {};
+      const modalEl = document.getElementById('modalOfficialAccessControl');
+      const formEl = document.getElementById('officialAccessControlForm');
+      if (!modalEl || !formEl || typeof bootstrap === 'undefined') {
+        return;
+      }
+
+      const seatNameEl = document.getElementById('officialAccessSeatName');
+      const holderNameEl = document.getElementById('officialAccessHolderName');
+      const sourceBadgeWrapEl = document.getElementById('officialAccessSourceBadgeWrap');
+      const councilIdInput = document.getElementById('officialAccessControlCouncilId');
+      const summaryEl = document.getElementById('officialAccessModulesSummary');
+      const groupsEl = document.getElementById('officialAccessPermissionGroups');
+      const searchEl = document.getElementById('officialAccessSearch');
+      const resetBtn = document.getElementById('btnOfficialAccessReset');
+      const manageButtons = Array.from(document.querySelectorAll('.ot-manage-access'));
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      const defaultKeys = Array.isArray(config.defaultKeys) ? config.defaultKeys.map(String) : [];
+      const catalog = Array.isArray(config.catalog) ? config.catalog : [];
+      const labelMap = new Map();
+      const state = {
+        seat: null,
+        permissionMap: {},
+        search: ''
+      };
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      catalog.forEach((section) => {
+        (section.items || []).forEach((item) => {
+          if (Array.isArray(item.children) && item.children.length) {
+            item.children.forEach((child) => {
+              if (child?.key) labelMap.set(String(child.key), `${section.section || ''} - ${child.label || child.key}`);
+            });
+            return;
+          }
+          if (item?.key) labelMap.set(String(item.key), `${section.section || ''} - ${item.label || item.key}`);
+        });
+      });
+
+      function permissionSummary(permissionMap, maxLabels = 3) {
+        const labels = Object.keys(permissionMap || {})
+          .filter((key) => permissionMap[key])
+          .map((key) => labelMap.get(String(key)) || String(key))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        if (!labels.length) return 'No modules';
+        const visible = labels.slice(0, maxLabels);
+        return labels.length > maxLabels
+          ? `${visible.join(', ')} +${labels.length - maxLabels}`
+          : visible.join(', ');
+      }
+
+      function renderSourceBadge(seat) {
+        if (!sourceBadgeWrapEl) return;
+        const isCustom = Boolean(seat?.has_saved_template);
+        const label = String(seat?.access_source || (isCustom ? 'Custom Template' : 'Default Template'));
+        sourceBadgeWrapEl.innerHTML = `<span class="ot-access-source-badge ${isCustom ? 'is-custom' : 'is-default'}">${escapeHtml(label)}</span>`;
+      }
+
+      function updateSummary() {
+        if (!summaryEl) return;
+        const count = Object.keys(state.permissionMap).filter((key) => state.permissionMap[key]).length;
+        summaryEl.textContent = `${count} granted - ${permissionSummary(state.permissionMap)}`;
+      }
+
+      function bindGroupEvents() {
+        groupsEl.querySelectorAll('.ot-access-child').forEach((checkbox) => {
+          checkbox.addEventListener('change', () => {
+            const key = String(checkbox.dataset.key || '').trim();
+            if (!key) return;
+            if (checkbox.checked) state.permissionMap[key] = true;
+            else delete state.permissionMap[key];
+            renderGroups();
+          });
+        });
+
+        groupsEl.querySelectorAll('.ot-access-parent').forEach((checkbox) => {
+          checkbox.addEventListener('change', () => {
+            const keys = String(checkbox.dataset.childKeys || '')
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean);
+            keys.forEach((key) => {
+              if (checkbox.checked) state.permissionMap[key] = true;
+              else delete state.permissionMap[key];
+            });
+            renderGroups();
+          });
+        });
+
+        groupsEl.querySelectorAll('.ot-access-section-toggle').forEach((button) => {
+          button.addEventListener('click', () => {
+            const mode = String(button.dataset.mode || '');
+            const keys = String(button.dataset.sectionKeys || '')
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean);
+            keys.forEach((key) => {
+              if (mode === 'on') state.permissionMap[key] = true;
+              else delete state.permissionMap[key];
+            });
+            renderGroups();
+          });
+        });
+      }
+
+      function renderGroups() {
+        if (!groupsEl) return;
+        const searchNeedle = String(state.search || '').trim().toLowerCase();
+        const groupsHtml = catalog.map((section) => {
+          const sectionLeafKeys = [];
+          const itemsHtml = (section.items || []).map((item) => {
+            if (Array.isArray(item.children) && item.children.length) {
+              const childKeys = item.children
+                .map((child) => String(child?.key || '').trim())
+                .filter(Boolean);
+              const selectedChildren = childKeys.filter((key) => Boolean(state.permissionMap[key]));
+              const childMarkup = item.children.map((child) => {
+                const key = String(child?.key || '').trim();
+                if (!key) return '';
+                sectionLeafKeys.push(key);
+                const label = String(child?.label || key);
+                const haystack = `${section.section || ''} ${item.label || ''} ${label}`.toLowerCase();
+                if (searchNeedle && !haystack.includes(searchNeedle)) return '';
+                return `
+                  <div class="ot-access-item is-child">
+                    <label>
+                      <input type="checkbox" class="ot-access-child" data-key="${escapeHtml(key)}" ${state.permissionMap[key] ? 'checked' : ''}>
+                      <span>
+                        <span class="ot-access-item-main">${escapeHtml(label)}</span>
+                        <span class="ot-access-item-sub">${escapeHtml(section.section || '')}</span>
+                      </span>
+                    </label>
+                  </div>
+                `;
+              }).join('');
+              if (!childMarkup && searchNeedle) return '';
+              const allSelected = childKeys.length > 0 && selectedChildren.length === childKeys.length;
+              const partial = selectedChildren.length > 0 && selectedChildren.length < childKeys.length;
+              return `
+                <div class="ot-access-item">
+                  <label>
+                    <input type="checkbox"
+                           class="ot-access-parent"
+                           data-child-keys="${escapeHtml(childKeys.join(','))}"
+                           ${allSelected ? 'checked' : ''}
+                           data-partial="${partial ? '1' : '0'}">
+                    <span>
+                      <span class="ot-access-item-main">${escapeHtml(item.label || 'Modules')}</span>
+                      <span class="ot-access-item-sub">Toggle all modules in this group.</span>
+                    </span>
+                  </label>
+                </div>
+                ${childMarkup}
+              `;
+            }
+
+            const key = String(item?.key || '').trim();
+            if (!key) return '';
+            sectionLeafKeys.push(key);
+            const label = String(item?.label || key);
+            const haystack = `${section.section || ''} ${label}`.toLowerCase();
+            if (searchNeedle && !haystack.includes(searchNeedle)) return '';
+            return `
+              <div class="ot-access-item">
+                <label>
+                  <input type="checkbox" class="ot-access-child" data-key="${escapeHtml(key)}" ${state.permissionMap[key] ? 'checked' : ''}>
+                  <span>
+                    <span class="ot-access-item-main">${escapeHtml(label)}</span>
+                    <span class="ot-access-item-sub">${escapeHtml(section.section || '')}</span>
+                  </span>
+                </label>
+              </div>
+            `;
+          }).join('');
+
+          if (!itemsHtml) return '';
+          return `
+            <div class="ot-access-group">
+              <div class="ot-access-group-head">
+                <div class="ot-access-group-title">${escapeHtml(section.section || 'Modules')}</div>
+                <div class="ot-access-group-actions">
+                  <button type="button" class="btn btn-sm btn-outline-secondary ot-access-section-toggle" data-mode="on" data-section-keys="${escapeHtml(sectionLeafKeys.join(','))}">Check all</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary ot-access-section-toggle" data-mode="off" data-section-keys="${escapeHtml(sectionLeafKeys.join(','))}">Clear</button>
+                </div>
+              </div>
+              <div class="ot-access-items">${itemsHtml}</div>
+            </div>
+          `;
+        }).filter(Boolean).join('');
+
+        groupsEl.innerHTML = groupsHtml || '<div class="text-center text-muted py-4">No permission modules match the current search.</div>';
+        groupsEl.querySelectorAll('.ot-access-parent[data-partial="1"]').forEach((input) => {
+          input.indeterminate = true;
+        });
+        bindGroupEvents();
+        updateSummary();
+      }
+
+      function openModal(seat) {
+        state.seat = seat || null;
+        state.search = '';
+        if (searchEl) searchEl.value = '';
+        state.permissionMap = {};
+        const selectedKeys = Array.isArray(seat?.permission_keys) && seat.permission_keys.length
+          ? seat.permission_keys.map(String)
+          : defaultKeys.slice();
+        selectedKeys.forEach((key) => {
+          state.permissionMap[String(key)] = true;
+        });
+
+        if (councilIdInput) councilIdInput.value = String(seat?.council_id || '');
+        if (seatNameEl) seatNameEl.textContent = String(seat?.seat_name || '—');
+        if (holderNameEl) holderNameEl.textContent = String(seat?.full_name || 'Vacant');
+        renderSourceBadge(seat);
+        renderGroups();
+        modal.show();
+      }
+
+      manageButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          try {
+            const seat = JSON.parse(String(button.dataset.seatAccess || '{}'));
+            openModal(seat);
+          } catch (error) {
+            console.error(error);
+          }
+        });
+      });
+
+      searchEl?.addEventListener('input', () => {
+        state.search = String(searchEl.value || '').trim();
+        renderGroups();
+      });
+
+      resetBtn?.addEventListener('click', () => {
+        if (!window.confirm('Reset this official access template back to the default modules?')) return;
+        state.permissionMap = {};
+        defaultKeys.forEach((key) => {
+          state.permissionMap[String(key)] = true;
+        });
+        renderGroups();
+      });
+
+      formEl.addEventListener('submit', () => {
+        formEl.querySelectorAll('input[name="permission_keys[]"]').forEach((input) => input.remove());
+        Object.keys(state.permissionMap)
+          .filter((key) => state.permissionMap[key])
+          .forEach((key) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'permission_keys[]';
+            input.value = key;
+            formEl.appendChild(input);
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -36,6 +36,10 @@ RewriteRule "(^|/)PhpFiles/PhpOffice/vendor/" - [F,L,NC]
 RewriteRule "(^|/).*\.(sql|bak|old|orig|ini|log|env)$" - [F,L,NC]
 
 # Keep legacy extensionless public paths working too.
+RewriteRule ^Guest-End/maintenance/?$ Guest-End/maintenance.php [L,NC]
+RewriteRule ^maintenance/?$ Guest-End/maintenance.php [L,NC]
+RewriteRule ^$ Guest-End/maintenance.php [L]
+RewriteRule ^(?:index(?:\.html)?|home|privacy(?:\.html)?|government|services|news|faq|contact|transactions|transaction-information|Guest-End/(?:government|services|news|faq|contact|TransactionInformation)(?:\.html)?)$ Guest-End/maintenance.php [L,NC]
 RewriteRule ^index/?$ index.html [L,NC]
 RewriteRule ^Guest-End/login/?$ Guest-End/login.php [L,NC]
 RewriteRule ^Guest-End/government/?$ Guest-End/government.html [L,NC]

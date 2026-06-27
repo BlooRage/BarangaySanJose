@@ -102,7 +102,7 @@ h1, h2, h3, h4, h5, h6 {
     margin: 0;
     padding: 0;
 }
-.brgyCaptainSection, .deptSection, .servicesSection {
+.brgyCaptainSection, .brgyOfficialSection, .deptSection, .servicesSection {
     margin-top: 60px;
 }
 .labelDivider {
@@ -123,6 +123,61 @@ h1, h2, h3, h4, h5, h6 {
     height: auto;
     object-fit: cover;
     box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.1);
+}
+.government-council-shell {
+    position: relative;
+}
+.council-slider {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.council-window {
+    overflow: hidden;
+    width: 100%;
+}
+.council-track {
+    display: flex;
+    align-items: center;
+    transition: transform var(--council-slide-duration, 0.5s) var(--council-slide-ease, ease);
+    will-change: transform;
+}
+.council-card {
+    flex: 0 0 33.333%;
+    max-width: 33.333%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.council-card img {
+    max-width: 260px;
+}
+.council-btn-prev,
+.council-btn-next {
+    width: 56px;
+    height: 56px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.council-btn-prev {
+    position: absolute;
+    left: -70px;
+}
+.council-btn-next {
+    position: absolute;
+    right: -70px;
+}
+#carouselImg {
+    width: auto;
+    height: 350px;
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.1);
+}
+.carouselBtn .carousel-control-prev-icon {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23FE993C' viewBox='0 0 8 8'%3E%3Cpath d='M5.25 0l-4 4 4 4 1.5-1.5-2.5-2.5 2.5-2.5-1.5-1.5z'/%3E%3C/svg%3E") !important;
+}
+.carouselBtn .carousel-control-next-icon {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23FE993C' viewBox='0 0 8 8'%3E%3Cpath d='M2.75 0l-1.5 1.5 2.5 2.5-2.5 2.5 1.5 1.5 4-4-4-4z'/%3E%3C/svg%3E") !important;
 }
 .deptBox, .servBox {
     border: #FE993C solid 2px;
@@ -335,6 +390,23 @@ h1, h2, h3, h4, h5, h6 {
 #kapDesign {
     box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.1);
 }
+
+@media (max-width: 1100px) {
+    .council-btn-prev {
+        left: -20px;
+    }
+    .council-btn-next {
+        right: -20px;
+    }
+}
+
+@media (max-width: 992px) {
+    .council-card {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
 @media (max-width: 768px) {
     .bannerImage {
         width: 100%;
@@ -366,7 +438,7 @@ h1, h2, h3, h4, h5, h6 {
     h4 {
         font-size: 16px;
     }
-    .brgyCaptainSection, .deptSection, .servicesSection {
+    .brgyCaptainSection, .brgyOfficialSection, .deptSection, .servicesSection {
         margin-top: 50px;
     }
     .brgyCaptainSection .col-md-8 {
@@ -377,6 +449,25 @@ h1, h2, h3, h4, h5, h6 {
     }
     #officialImg {
         max-width: 200px;
+    }
+    .council-track {
+        --council-slide-duration: 0.8s;
+        --council-slide-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+        min-height: 420px;
+    }
+    .council-card {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .council-btn-prev {
+        left: -10px;
+    }
+    .council-btn-next {
+        right: -10px;
+    }
+    #carouselImg {
+        width: 200px !important;
+        height: auto !important;
     }
     .deptBox, .servBox {
         padding: 10px;

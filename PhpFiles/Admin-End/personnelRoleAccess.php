@@ -354,12 +354,6 @@ function pra_fetch_personnel_role_profiles(mysqli $conn): array
             ? ($savedPermissionMap[$scopeKey] ?? [])
             : $defaultPermissionMap;
 
-        foreach (array_keys($effectivePermissionMap) as $key) {
-            if (amp_is_admin_only_permission($key)) {
-                unset($effectivePermissionMap[$key]);
-            }
-        }
-
         if ($hasSavedProfile) {
             $customProfiles += 1;
         }
@@ -441,7 +435,7 @@ try {
             $requestedPermissionKeys = [];
         }
 
-        $validPermissionKeys = array_fill_keys(amp_get_default_admin_permission_keys(), true);
+        $validPermissionKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
         $permissionMap = [];
         foreach ($requestedPermissionKeys as $permissionKey) {
             $permissionKey = trim((string)$permissionKey);

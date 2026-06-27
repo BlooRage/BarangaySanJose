@@ -14,11 +14,13 @@ $areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php', 'UserArchive.php'];
 $personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php'];
-$adminMgmtPages = ['UserMasterlist.php', 'UserArchive.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php'];
+$adminRecordsPages = ['AdminManagement.php'];
+$adminMgmtPages = ['UserMasterlist.php', 'UserArchive.php', 'AdminManagement.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php'];
 $barangayOfficialMgmtPages = ['OfficialsManagement.php', 'OfficialTransitions.php'];
 $officialTransitionPages = ['OfficialTransitions.php'];
 
 $officialTransitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
+$officialTransitionPanel = strtolower(trim((string)($_GET['panel'] ?? '')));
 if ($officialTransitionTool === '' || in_array($officialTransitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
     $officialTransitionTool = 'current_term';
 } elseif ($officialTransitionTool === 'create_new_term') {
@@ -83,6 +85,7 @@ $isComplaintActive = in_array($current, $complaintPages);
 $isContentMgmtActive = in_array($current, $contentMgmtPages);
 $isAreaManagementActive = in_array($current, $areaManagementPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
+$isAdminRecordsActive = in_array($current, $adminRecordsPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
 $isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);
@@ -272,20 +275,48 @@ $sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
 
 $sbSidebarUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $sbSidebarRole = trim((string)($_SESSION['role'] ?? ''));
+$sbSidebarCacheScope = md5($sbSidebarUserId . '|' . $sbSidebarRole);
+$sbCurrentOfficialAccount = (isset($currentOfficialAccount) && is_array($currentOfficialAccount))
+    ? $currentOfficialAccount
+    : null;
 $sbAppointmentAccess = [
     'can_access_tracker' => true,
     'can_access_settings' => true,
 ];
 if (isset($conn) && $conn instanceof mysqli && $sbSidebarUserId !== '') {
-    $sbAppointmentAccess = apcm_get_appointment_admin_scope($conn, $sbSidebarUserId, $sbSidebarRole);
+    $sbAppointmentAccessCacheKey = 'admin_sidebar_appointment_scope:' . $sbSidebarCacheScope;
+    $sbCachedAppointmentAccess = function_exists('amp_session_cache_get')
+        ? amp_session_cache_get($sbAppointmentAccessCacheKey, 300)
+        : null;
+
+    if (is_array($sbCachedAppointmentAccess)) {
+        $sbAppointmentAccess = array_replace($sbAppointmentAccess, $sbCachedAppointmentAccess);
+    } else {
+        $sbAppointmentAccess = apcm_get_appointment_admin_scope($conn, $sbSidebarUserId, $sbSidebarRole);
+        if (function_exists('amp_session_cache_put')) {
+            amp_session_cache_put($sbAppointmentAccessCacheKey, $sbAppointmentAccess);
+        }
+    }
 }
 $sbCanAccessAppointmentTracker = $sbCan('appointments') && !empty($sbAppointmentAccess['can_access_tracker']);
 $sbCanAccessAppointmentSettings = $sbCanAccessAppointmentTracker && !empty($sbAppointmentAccess['can_access_settings']);
-$sbCanReviewContent = false;
-if (isset($conn) && $conn instanceof mysqli && function_exists('cms_content_can_review')) {
-    $sbCanReviewContent = cms_content_can_review($conn, $sbSidebarUserId, $sbSidebarRole);
-} elseif (strtolower($sbSidebarRole) === 'superadmin') {
-    $sbCanReviewContent = true;
+$sbCanReviewContent = strtolower($sbSidebarRole) === 'superadmin';
+if (!$sbCanReviewContent && $sbCurrentOfficialAccount) {
+    $sbCanReviewContent = strtolower(trim((string)($sbCurrentOfficialAccount['position_access'] ?? ''))) === 'barangay secretary';
+} elseif (!$sbCanReviewContent && isset($conn) && $conn instanceof mysqli && function_exists('cms_content_can_review')) {
+    $sbCanReviewContentCacheKey = 'admin_sidebar_content_review:' . $sbSidebarCacheScope;
+    $sbCachedCanReview = function_exists('amp_session_cache_get')
+        ? amp_session_cache_get($sbCanReviewContentCacheKey, 300)
+        : null;
+
+    if (is_bool($sbCachedCanReview)) {
+        $sbCanReviewContent = $sbCachedCanReview;
+    } else {
+        $sbCanReviewContent = cms_content_can_review($conn, $sbSidebarUserId, $sbSidebarRole);
+        if (function_exists('amp_session_cache_put')) {
+            amp_session_cache_put($sbCanReviewContentCacheKey, $sbCanReviewContent);
+        }
+    }
 }
 $sbCanAccessContentNavigator = $sbCan('announcements_tracker');
 $sbCanAccessContentFaqEditor = $sbCan('announcements_faq');
@@ -298,7 +329,7 @@ $sbContentFaqActive = $sbCanAccessContentNavigator
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
 if (isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
-    $sbAttentionCounts = sbatt_get_counts($conn, 45);
+    $sbAttentionCounts = sbatt_get_counts($conn, 180);
 }
 if (!$sbCanReviewContent) {
     $sbAttentionCounts['content_change_request'] = 0;
@@ -381,7 +412,9 @@ $sbReportKeys = [
 ];
 $sbAdminKeys = [
     'user_masterlist',
+    'admin_management',
     'officials_management',
+    'official_records_management',
     'personnel_invite',
     'official_transition',
     'audit_logs',
@@ -478,72 +511,112 @@ if (!function_exists('sb_to_public_profile_path')) {
     }
 }
 
-if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
-    $hasPositionAccess = false;
-    $colRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
-    if ($colRes instanceof mysqli_result && $colRes->num_rows > 0) {
-        $hasPositionAccess = true;
-    }
-    $hasAreaNumber = false;
-    $areaColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
-    if ($areaColRes instanceof mysqli_result && $areaColRes->num_rows > 0) {
-        $hasAreaNumber = true;
-    }
-    $selectPosition = $hasPositionAccess ? "position_access" : "NULL AS position_access";
-    $selectAreaNumber = $hasAreaNumber ? "area_number" : "NULL AS area_number";
-    $stmtInfo = $conn->prepare("
-        SELECT firstname, middlename, lastname, suffix, role_access, {$selectPosition}, department, {$selectAreaNumber}
-        FROM officialinformationtbl
-        WHERE user_id = ?
-        LIMIT 1
-    ");
-    if ($stmtInfo) {
-        $stmtInfo->bind_param("s", $_SESSION['user_id']);
-        $stmtInfo->execute();
-        $info = $stmtInfo->get_result()->fetch_assoc();
-        $info = $info ? (pii_decrypt_official_row($info) ?? $info) : null;
-        if ($info) {
-            $fullName = trim(
-                $info['firstname'] . ' ' .
-                ($info['middlename'] ? $info['middlename'][0] . '. ' : '') .
-                $info['lastname'] .
-                ($info['suffix'] ? ' ' . $info['suffix'] : '')
-            );
-            if ($fullName !== '') {
-                $adminDisplayName = $fullName;
-            }
-            $adminPosition = sb_format_position_label(
-                (string)($info['role_access'] ?? ''),
-                (string)($info['position_access'] ?? ''),
-                (string)($info['department'] ?? ''),
-                (string)($info['area_number'] ?? '')
-            );
-        }
-        $stmtInfo->close();
-    }
+if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
+    $sbProfileCacheKey = 'admin_sidebar_profile:' . md5($sbSidebarUserId);
+    $sbCachedProfile = function_exists('amp_session_cache_get')
+        ? amp_session_cache_get($sbProfileCacheKey, 300)
+        : null;
 
-    $stmtAvatar = $conn->prepare("
-        SELECT uf.file_path
-        FROM unifiedfileattachmenttbl uf
-        INNER JOIN documenttypelookuptbl dt
-          ON dt.document_type_id = uf.document_type_id
-        WHERE uf.source_type = 'OFFICIAL_PROFILE'
-          AND uf.source_id = ?
-          AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
-          AND dt.document_category = 'OfficialProfiling'
-        ORDER BY COALESCE(uf.updated_at, uf.upload_timestamp) DESC, uf.attachment_id DESC
-        LIMIT 1
-    ");
-    if ($stmtAvatar) {
-        $stmtAvatar->bind_param("s", $_SESSION['user_id']);
-        $stmtAvatar->execute();
-        $avatar = $stmtAvatar->get_result()->fetch_assoc();
-        $stmtAvatar->close();
-        if ($avatar && !empty($avatar['file_path'])) {
-            $resolvedAvatarPath = sb_to_public_profile_path((string)$avatar['file_path']);
-            if ($resolvedAvatarPath !== '') {
-                $adminProfileImageUrl = $resolvedAvatarPath;
+    if (is_array($sbCachedProfile)) {
+        $adminDisplayName = trim((string)($sbCachedProfile['display_name'] ?? $adminDisplayName)) ?: $adminDisplayName;
+        $adminPosition = trim((string)($sbCachedProfile['position'] ?? $adminPosition)) ?: $adminPosition;
+        $adminProfileImageUrl = trim((string)($sbCachedProfile['image_url'] ?? $adminProfileImageUrl)) ?: $adminProfileImageUrl;
+    } else {
+        $sbSchemaCacheKey = 'admin_sidebar_officialinfo_schema_v1';
+        $sbOfficialInfoSchema = function_exists('amp_session_cache_get')
+            ? amp_session_cache_get($sbSchemaCacheKey, 1800)
+            : null;
+
+        if (!is_array($sbOfficialInfoSchema)) {
+            $sbOfficialInfoSchema = [
+                'has_position_access' => false,
+                'has_area_number' => false,
+            ];
+
+            $colRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+            if ($colRes instanceof mysqli_result) {
+                $sbOfficialInfoSchema['has_position_access'] = $colRes->num_rows > 0;
+                $colRes->free();
             }
+
+            $areaColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
+            if ($areaColRes instanceof mysqli_result) {
+                $sbOfficialInfoSchema['has_area_number'] = $areaColRes->num_rows > 0;
+                $areaColRes->free();
+            }
+
+            if (function_exists('amp_session_cache_put')) {
+                amp_session_cache_put($sbSchemaCacheKey, $sbOfficialInfoSchema);
+            }
+        }
+
+        $hasPositionAccess = !empty($sbOfficialInfoSchema['has_position_access']);
+        $hasAreaNumber = !empty($sbOfficialInfoSchema['has_area_number']);
+        $selectPosition = $hasPositionAccess ? "position_access" : "NULL AS position_access";
+        $selectAreaNumber = $hasAreaNumber ? "area_number" : "NULL AS area_number";
+
+        $stmtInfo = $conn->prepare("
+            SELECT firstname, middlename, lastname, suffix, role_access, {$selectPosition}, department, {$selectAreaNumber}
+            FROM officialinformationtbl
+            WHERE user_id = ?
+            LIMIT 1
+        ");
+        if ($stmtInfo) {
+            $stmtInfo->bind_param("s", $sbSidebarUserId);
+            $stmtInfo->execute();
+            $info = $stmtInfo->get_result()->fetch_assoc();
+            $info = $info ? (pii_decrypt_official_row($info) ?? $info) : null;
+            if ($info) {
+                $fullName = trim(
+                    $info['firstname'] . ' ' .
+                    ($info['middlename'] ? $info['middlename'][0] . '. ' : '') .
+                    $info['lastname'] .
+                    ($info['suffix'] ? ' ' . $info['suffix'] : '')
+                );
+                if ($fullName !== '') {
+                    $adminDisplayName = $fullName;
+                }
+                $adminPosition = sb_format_position_label(
+                    (string)($info['role_access'] ?? ''),
+                    (string)($info['position_access'] ?? ''),
+                    (string)($info['department'] ?? ''),
+                    (string)($info['area_number'] ?? '')
+                );
+            }
+            $stmtInfo->close();
+        }
+
+        $stmtAvatar = $conn->prepare("
+            SELECT uf.file_path
+            FROM unifiedfileattachmenttbl uf
+            INNER JOIN documenttypelookuptbl dt
+              ON dt.document_type_id = uf.document_type_id
+            WHERE uf.source_type = 'OFFICIAL_PROFILE'
+              AND uf.source_id = ?
+              AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+              AND dt.document_category = 'OfficialProfiling'
+            ORDER BY COALESCE(uf.updated_at, uf.upload_timestamp) DESC, uf.attachment_id DESC
+            LIMIT 1
+        ");
+        if ($stmtAvatar) {
+            $stmtAvatar->bind_param("s", $sbSidebarUserId);
+            $stmtAvatar->execute();
+            $avatar = $stmtAvatar->get_result()->fetch_assoc();
+            $stmtAvatar->close();
+            if ($avatar && !empty($avatar['file_path'])) {
+                $resolvedAvatarPath = sb_to_public_profile_path((string)$avatar['file_path']);
+                if ($resolvedAvatarPath !== '') {
+                    $adminProfileImageUrl = $resolvedAvatarPath;
+                }
+            }
+        }
+
+        if (function_exists('amp_session_cache_put')) {
+            amp_session_cache_put($sbProfileCacheKey, [
+                'display_name' => $adminDisplayName,
+                'position' => $adminPosition,
+                'image_url' => $adminProfileImageUrl,
+            ]);
         }
     }
 }
@@ -552,6 +625,80 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 
 <style>
+  :root {
+    --admin-sidebar-expanded: 280px;
+    --admin-sidebar-collapsed: 92px;
+  }
+
+  #dashboard-sidebar {
+    width: var(--admin-sidebar-expanded);
+    min-width: var(--admin-sidebar-expanded);
+    transition: width 0.24s ease, min-width 0.24s ease, padding 0.24s ease;
+  }
+
+  #dashboard-sidebar .sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #d7dde5;
+  }
+
+  #dashboard-sidebar .sidebar-edge-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    z-index: 16;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 50px;
+    height: 50px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(232, 190, 141, 0.82) !important;
+    background: linear-gradient(180deg, #fff9f2 0%, #ffe8c7 100%);
+    color: #9d5a13;
+    box-shadow:
+      0 14px 28px rgba(15, 23, 42, 0.12),
+      0 0 0 6px rgba(255, 247, 237, 0.94),
+      inset 0 1px 0 rgba(255, 255, 255, 0.96);
+    transform: translate(50%, -50%);
+    transition:
+      transform 0.22s ease,
+      background 0.22s ease,
+      color 0.22s ease,
+      box-shadow 0.22s ease,
+      border-color 0.22s ease;
+  }
+
+  #dashboard-sidebar .sidebar-edge-toggle:hover,
+  #dashboard-sidebar .sidebar-edge-toggle:focus-visible {
+    transform: translate(50%, -50%) scale(1.04);
+    background: linear-gradient(180deg, #fff7ee 0%, #ffdfb2 100%);
+    color: #7f4300;
+    border-color: rgba(223, 155, 82, 0.88) !important;
+    box-shadow:
+      0 18px 34px rgba(15, 23, 42, 0.16),
+      0 6px 18px rgba(254, 153, 60, 0.14),
+      0 0 0 7px rgba(255, 247, 237, 0.98),
+      inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  }
+
+  #dashboard-sidebar .sidebar-edge-toggle:focus-visible {
+    outline: 3px solid rgba(254, 153, 60, 0.22);
+    outline-offset: 3px;
+  }
+
+  #dashboard-sidebar .sidebar-edge-toggle i {
+    position: relative;
+    z-index: 1;
+    font-size: 1rem;
+    transition: transform 0.25s ease;
+  }
+
   #dashboard-sidebar .btn-toggle,
   #dashboard-sidebar .sidebar-direct-link {
     width: 100%;
@@ -616,6 +763,10 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     flex: 0 0 auto;
   }
 
+  #dashboard-sidebar .sidebar-icon-wrap > .sidebar-attention-badge {
+    display: none;
+  }
+
   #dashboard-sidebar .sidebar-subnav-link {
     display: flex;
     align-items: center;
@@ -624,9 +775,118 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   }
 
   #dashboard-sidebar .sidebar-direct-link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  #dashboard-sidebar .sidebar-profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar {
+    width: var(--admin-sidebar-collapsed);
+    min-width: var(--admin-sidebar-collapsed);
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-header {
+    justify-content: center;
+    padding-bottom: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-brand-link,
+  body.admin-sidebar-collapsed #dashboard-sidebar .btn-toggle,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-profile-trigger {
+    justify-content: center;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-profile-trigger img {
+    margin-right: 0 !important;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-brand-link,
+  body.admin-sidebar-collapsed #dashboard-sidebar .btn-toggle,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link {
+    gap: 0;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-brand-title,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-button-label,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-button-label--certificate,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-subnav-text,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-profile-copy,
+  body.admin-sidebar-collapsed #dashboard-sidebar li.text-muted.small.fw-semibold,
+  body.admin-sidebar-collapsed #dashboard-sidebar hr,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link > .sidebar-attention-badge,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-attention-dot,
+  body.admin-sidebar-collapsed #dashboard-sidebar .dropdown-toggle::after {
+    display: none !important;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-edge-toggle i {
+    transform: rotate(180deg);
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-edge-toggle {
+    width: 46px;
+    height: 46px;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-brand-logo {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-icon-wrap {
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .collapse {
+    display: none !important;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .btn-toggle,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link {
+    min-height: 3.1rem;
+    padding: 0.8rem 0.55rem;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .btn-toggle i,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link i,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-profile-trigger i {
+    width: 1.6rem;
+    font-size: 1.35rem;
+    line-height: 1;
+    text-align: center;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-icon-wrap > .sidebar-attention-badge,
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link[data-sidebar-has-badge="true"] > .sidebar-attention-badge {
+    display: inline-flex !important;
+    position: absolute;
+    top: -0.38rem;
+    right: -0.62rem;
+    margin-left: 0;
+    min-width: 1.18rem;
+    height: 1.18rem;
+    padding: 0 0.22rem;
+    font-size: 0.62rem;
+    box-shadow: 0 0 0 2px #fff;
+  }
+
+  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link[data-sidebar-has-badge="true"] > .sidebar-attention-badge {
+    right: 0.25rem;
+    top: 0.25rem;
   }
 
   #admin-mobile-header {
@@ -660,8 +920,18 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       transform: translateX(0);
     }
 
+    #dashboard-sidebar .sidebar-edge-toggle {
+      display: none;
+    }
+
     body {
       padding-top: 60px;
+    }
+  }
+
+  @media (min-width: 769px) {
+    #dashboard-sidebar {
+      overflow: visible;
     }
   }
 </style>
@@ -679,14 +949,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 </header>
 
 <div class="d-flex flex-column flex-shrink-0 p-3 bg-white shadow-sm"
-     style="width: 280px;"
      id="dashboard-sidebar">
 
-  <!-- LOGO -->
-  <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>" class="sidebar-brand-link pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="sidebar-brand-logo" alt="Barangay San Jose Logo">
-    <span class="sidebar-brand-title">Barangay San Jose</span>
-  </a>
+  <div class="sidebar-header">
+    <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>" class="sidebar-brand-link link-dark text-decoration-none">
+      <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="sidebar-brand-logo" alt="Barangay San Jose Logo">
+      <span class="sidebar-brand-title">Barangay San Jose</span>
+    </a>
+    <button type="button" class="sidebar-edge-toggle" id="btn-admin-sidebar-collapse" aria-label="Collapse navigation" aria-pressed="false" title="Collapse navigation" hidden>
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+  </div>
 
   <div class="sidebar-body d-flex flex-column flex-grow-1">
     <ul class="list-unstyled ps-0 flex-grow-1 mb-0">
@@ -695,9 +968,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Home</li>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isStatisticsActive ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isStatisticsActive ? 'active' : '' ?>"
            style="<?= $isStatisticsActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-house"></i> Dashboard
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-house"></i>
+          </span>
+          <span class="sidebar-button-label">Dashboard</span>
         </a>
       </li>
       <?php endif; ?>
@@ -714,6 +990,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-calendar-check"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('appointments')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('appointments')) ?>
           </span>
           <span class="sidebar-button-label">Appointments</span>
         </button>
@@ -752,6 +1029,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-user-group"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('resident_profiling')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('resident_profiling')) ?>
           </span>
           <span class="sidebar-button-label">Resident Profiling</span>
         </button>
@@ -813,6 +1091,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-house"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('household_profiling')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('household_profiling')) ?>
           </span>
           <span class="sidebar-button-label">Household Profiling</span>
         </button>
@@ -857,7 +1136,10 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-sidebar-target="#area-management-collapse"
                 aria-controls="area-management-collapse"
                 aria-expanded="<?= $isAreaManagementActive ? 'true' : 'false' ?>">
-          <i class="fas fa-map-location-dot"></i> Area Statistics
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-map-location-dot"></i>
+          </span>
+          <span class="sidebar-button-label">Area Statistics</span>
         </button>
         <div class="collapse <?= $isAreaManagementActive ? 'show' : '' ?>" id="area-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
@@ -937,6 +1219,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
            class="btn btn-toggle sidebar-direct-link sidebar-direct-link--certificate rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
+           data-sidebar-has-badge="<?= $sbCount('certificate_issuance') > 0 ? 'true' : 'false' ?>"
            style="<?= $isCertificateIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-file-circle-check"></i>
@@ -958,6 +1241,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-id-card"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('id_issuance')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('id_issuance')) ?>
           </span>
           <span class="sidebar-button-label">ID Issuance</span>
         </button>
@@ -993,6 +1277,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
            class="btn btn-toggle sidebar-direct-link rounded <?= $isClearanceIssuanceSectionActive ? 'active' : '' ?>"
+           data-sidebar-has-badge="<?= $sbCount('clearance_issuance') > 0 ? 'true' : 'false' ?>"
            style="<?= $isClearanceIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-stamp"></i>
@@ -1006,9 +1291,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('business_monitoring')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBusinessMonitoringActive ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isBusinessMonitoringActive ? 'active' : '' ?>"
            style="<?= $isBusinessMonitoringActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-store"></i> Business Monitoring
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-store"></i>
+          </span>
+          <span class="sidebar-button-label">Business Monitoring</span>
         </a>
       </li>
       <?php endif; ?>
@@ -1026,6 +1314,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-money-check-alt"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('finance_transactions')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('finance_transactions')) ?>
           </span>
           <span class="sidebar-button-label">Finance Transactions</span>
         </button>
@@ -1067,9 +1356,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('blotter_log_new_incident')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
            style="<?= $current == 'BlotterForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-file-pen"></i> Log New Incident
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-file-pen"></i>
+          </span>
+          <span class="sidebar-button-label">Log New Incident</span>
         </a>
       </li>
       <?php endif; ?>
@@ -1084,6 +1376,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-toolbox"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('blotter_tools')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('blotter_tools')) ?>
           </span>
           <span class="sidebar-button-label">e-Blotter Tools</span>
         </button>
@@ -1118,9 +1411,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('complaint_log_new_incident')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
            style="<?= $current == 'ComplaintForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-file-pen"></i> Log New Incident
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-file-pen"></i>
+          </span>
+          <span class="sidebar-button-label">Log New Incident</span>
         </a>
       </li>
       <?php endif; ?>
@@ -1135,6 +1431,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-comments"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('complaint_tools')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('complaint_tools')) ?>
           </span>
           <span class="sidebar-button-label">Complaint Tools</span>
         </button>
@@ -1166,6 +1463,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-sitemap"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('content_management')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('content_management')) ?>
           </span>
           <span class="sidebar-button-label">Content Management</span>
         </button>
@@ -1248,7 +1546,10 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-sidebar-target="#announcements-collapse"
                 aria-controls="announcements-collapse"
                 aria-expanded="<?= $isContentMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-bullhorn"></i> Announcements
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-bullhorn"></i>
+          </span>
+          <span class="sidebar-button-label">Announcements</span>
         </button>
         <div class="collapse <?= $isContentMgmtActive ? 'show' : '' ?>" id="announcements-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
@@ -1294,7 +1595,10 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-sidebar-target="#reports-collapse"
                 aria-controls="reports-collapse"
                 aria-expanded="<?= $isReportActive ? 'true' : 'false' ?>">
-          <i class="fas fa-chart-bar"></i> Reports
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-chart-bar"></i>
+          </span>
+          <span class="sidebar-button-label">Reports</span>
         </button>
         <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
@@ -1354,6 +1658,18 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <?php if ($isSuperAdminSidebar && $sbHasAny($sbAdminKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
+      <?php if ($sbCan('admin_management')): ?>
+      <li class="mb-1">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminManagement.php')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isAdminRecordsActive ? 'active' : '' ?>"
+           style="<?= $isAdminRecordsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-user-gear"></i>
+          </span>
+          <span class="sidebar-button-label">Admin Management</span>
+        </a>
+      </li>
+      <?php endif; ?>
       <?php if ($sbCan('user_masterlist') || $sbCan('user_archive')): ?>
       <li class="mb-1">
         <button type="button"
@@ -1362,7 +1678,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-sidebar-target="#usermanagement-collapse"
                 aria-controls="usermanagement-collapse"
                 aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-users-cog"></i> User Management
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-users-cog"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('user_management')) ?>
+            <?= $sbRenderAttentionBadge($sbModuleCount('user_management')) ?>
+          </span>
+          <span class="sidebar-button-label">User Management</span>
         </button>
         <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermanagement-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
@@ -1394,7 +1715,10 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-sidebar-target="#personnelmanagement-collapse"
                 aria-controls="personnelmanagement-collapse"
                 aria-expanded="<?= $isPersonnelMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-user-tie"></i> Personnel Management
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-user-tie"></i>
+          </span>
+          <span class="sidebar-button-label">Personnel Management</span>
         </button>
         <div class="collapse <?= $isPersonnelMgmtActive ? 'show' : '' ?>" id="personnelmanagement-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
@@ -1413,7 +1737,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>"
                  class="link-dark rounded <?= $current == 'PersonnelRoleAccess.php' ? 'active' : '' ?>">
-                Access Control
+                Personnel Access Control
               </a>
             </li>
           </ul>
@@ -1423,20 +1747,26 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('audit_logs')): ?>
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/AuditLogs.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AuditLogs.php' ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'AuditLogs.php' ? 'active' : '' ?>"
            style="<?= $current == 'AuditLogs.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-clipboard-list"></i> Audit Logs
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-clipboard-list"></i>
+          </span>
+          <span class="sidebar-button-label">Audit Logs</span>
         </a>
       </li>
       <?php endif; ?>
-      <?php if ($sbCan('officials_management') || $sbCan('official_transition')): ?>
+      <?php if ($sbCan('official_records_management') || $sbCan('official_transition')): ?>
       <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Barangay Official Governance</li>
-      <?php if ($sbCan('officials_management')): ?>
+      <?php if ($sbCan('official_records_management')): ?>
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>"
            style="<?= $current == 'OfficialsManagement.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-user-shield"></i> Official Management
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-user-shield"></i>
+          </span>
+          <span class="sidebar-button-label">Official Management</span>
         </a>
       </li>
       <?php endif; ?>
@@ -1448,14 +1778,23 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-sidebar-target="#officialtransition-collapse"
                 aria-controls="officialtransition-collapse"
                 aria-expanded="<?= $isOfficialTransitionActive ? 'true' : 'false' ?>">
-          <i class="fas fa-right-left"></i> Official Transition
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-right-left"></i>
+          </span>
+          <span class="sidebar-button-label">Official Transition</span>
         </button>
         <div class="collapse <?= $isOfficialTransitionActive ? 'show' : '' ?>" id="officialtransition-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term')) ?>"
-                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' ? 'active' : '' ?>">
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' && $officialTransitionPanel !== 'access' ? 'active' : '' ?>">
                 Seat Assignment
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=access#official-access-control')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' && $officialTransitionPanel === 'access' ? 'active' : '' ?>">
+                Official Access Control
               </a>
             </li>
             <li>
@@ -1477,7 +1816,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
     <div class="sidebar-actions">
       <div class="dropdown mb-2 w-100">
-        <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle w-100"
+        <a href="#" class="link-dark text-decoration-none dropdown-toggle w-100 sidebar-profile-trigger"
            data-bs-toggle="dropdown">
           <img src="<?= htmlspecialchars($adminProfileImageUrl, ENT_QUOTES, 'UTF-8') ?>"
                width="40"
@@ -1486,7 +1825,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                alt="<?= htmlspecialchars($adminDisplayName, ENT_QUOTES, 'UTF-8') ?>"
                style="object-fit: cover;"
                onerror="this.onerror=null;this.src='<?= htmlspecialchars(appUrl('Images/Profile-Placeholder.png'), ENT_QUOTES, 'UTF-8') ?>';">
-          <div class="flex-grow-1" style="min-width: 0;">
+          <div class="flex-grow-1 sidebar-profile-copy" style="min-width: 0;">
             <span class="d-block fw-bold text-truncate mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
             <small class="d-block text-muted text-truncate"><?= htmlspecialchars($adminPosition) ?></small>
           </div>
@@ -1504,10 +1843,106 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   (function () {
     const burgerBtn = document.getElementById("btn-admin-burger");
     const sidebar = document.getElementById("dashboard-sidebar");
+    const desktopToggleBtn = document.getElementById("btn-admin-sidebar-collapse");
     if (!burgerBtn || !sidebar) return;
     const collapseButtons = Array.from(sidebar.querySelectorAll('[data-sidebar-toggle="collapse"]'));
-
+    const topLevelItems = Array.from(sidebar.querySelectorAll(".btn-toggle, .sidebar-direct-link, .sidebar-profile-trigger"));
     const portraitMq = window.matchMedia("(orientation: portrait) and (max-width: 1024px)");
+    const desktopQuery = window.matchMedia("(min-width: 769px)");
+    const collapsedClass = "admin-sidebar-collapsed";
+    const storageKey = "adminSidebarCollapsed";
+
+    const mobileHeaderEl = document.getElementById("admin-mobile-header");
+    const isCollapsibleViewport = () => {
+      return desktopQuery.matches && (!mobileHeaderEl || window.getComputedStyle(mobileHeaderEl).display === "none");
+    };
+
+    const readStoredCollapsed = () => {
+      try {
+        return window.localStorage.getItem(storageKey) === "1";
+      } catch (error) {
+        return false;
+      }
+    };
+
+    const writeStoredCollapsed = (collapsed) => {
+      try {
+        window.localStorage.setItem(storageKey, collapsed ? "1" : "0");
+      } catch (error) {
+        // Ignore storage access issues.
+      }
+    };
+
+    const getFirstLink = (button) => {
+      const targetSelector = String(button.getAttribute("data-sidebar-target") || "").trim();
+      if (!targetSelector) {
+        return null;
+      }
+
+      const target = sidebar.querySelector(targetSelector);
+      if (!target) {
+        return null;
+      }
+
+      return target.querySelector("a[href]");
+    };
+
+    const getItemLabel = (element) => {
+      const preferred = element.querySelector(".sidebar-button-label, .sidebar-brand-title");
+      if (preferred) {
+        return String(preferred.textContent || "").trim();
+      }
+
+      const profileName = element.querySelector(".sidebar-profile-copy .fw-bold");
+      if (profileName) {
+        return String(profileName.textContent || "").trim();
+      }
+
+      return String(element.textContent || "").replace(/\s+/g, " ").trim();
+    };
+
+    const updateCollapsedTitles = () => {
+      const collapsed = isCollapsibleViewport() && document.body.classList.contains(collapsedClass);
+      topLevelItems.forEach((item) => {
+        const label = getItemLabel(item);
+        if (!label) {
+          return;
+        }
+
+        if (collapsed) {
+          item.setAttribute("title", label);
+          item.setAttribute("aria-label", label);
+        } else {
+          item.removeAttribute("title");
+        }
+      });
+    };
+
+    const updateDesktopToggle = () => {
+      if (!desktopToggleBtn) {
+        return;
+      }
+
+      const canCollapse = isCollapsibleViewport();
+      const collapsed = canCollapse && document.body.classList.contains(collapsedClass);
+      desktopToggleBtn.hidden = !canCollapse;
+      desktopToggleBtn.setAttribute("aria-pressed", collapsed ? "true" : "false");
+      desktopToggleBtn.setAttribute("aria-label", collapsed ? "Expand navigation" : "Collapse navigation");
+      desktopToggleBtn.title = collapsed ? "Expand navigation" : "Collapse navigation";
+    };
+
+    const setDesktopCollapsed = (collapsed, persist = true) => {
+      const shouldCollapse = isCollapsibleViewport() && collapsed;
+      document.body.classList.toggle(collapsedClass, shouldCollapse);
+      sidebar.classList.toggle("is-collapsed", shouldCollapse);
+
+      if (persist) {
+        writeStoredCollapsed(shouldCollapse);
+      }
+
+      updateDesktopToggle();
+      updateCollapsedTitles();
+    };
 
     const bindSidebarCollapse = (button) => {
       const targetSelector = String(button.getAttribute("data-sidebar-target") || "").trim();
@@ -1527,6 +1962,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       };
 
       button.addEventListener("click", (event) => {
+        if (isCollapsibleViewport() && document.body.classList.contains(collapsedClass)) {
+          const firstLink = getFirstLink(button);
+          if (firstLink) {
+            window.location.href = firstLink.href;
+            return;
+          }
+        }
+
         event.preventDefault();
         target.classList.toggle("show");
         syncState();
@@ -1538,13 +1981,31 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     const syncMode = () => {
       if (!portraitMq.matches) {
         sidebar.classList.remove("show");
+        setDesktopCollapsed(readStoredCollapsed(), false);
+      } else {
+        document.body.classList.remove(collapsedClass);
+        sidebar.classList.remove("is-collapsed");
       }
+
+      updateDesktopToggle();
+      updateCollapsedTitles();
     };
 
     burgerBtn.addEventListener("click", () => {
       if (!portraitMq.matches) return;
       sidebar.classList.toggle("show");
     });
+
+    if (desktopToggleBtn) {
+      desktopToggleBtn.addEventListener("click", () => {
+        if (!isCollapsibleViewport()) {
+          return;
+        }
+
+        const nextCollapsed = !document.body.classList.contains(collapsedClass);
+        setDesktopCollapsed(nextCollapsed, true);
+      });
+    }
 
     sidebar.querySelectorAll("a").forEach((link) => {
       link.addEventListener("click", () => {
@@ -1562,7 +2023,94 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       portraitMq.addListener(syncMode);
     }
 
+    if (typeof desktopQuery.addEventListener === "function") {
+      desktopQuery.addEventListener("change", syncMode);
+    } else if (typeof desktopQuery.addListener === "function") {
+      desktopQuery.addListener(syncMode);
+    }
+
     collapseButtons.forEach(bindSidebarCollapse);
+    window.addEventListener("resize", syncMode);
     syncMode();
   })();
+</script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const prefetchedUrls = new Set();
+    const sameOrigin = window.location.origin;
+    const currentUrl = new URL(window.location.href);
+    currentUrl.hash = "";
+
+    const toPrefetchableUrl = (href) => {
+      try {
+        const url = new URL(String(href || ""), window.location.href);
+        if (url.origin !== sameOrigin) {
+          return null;
+        }
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+          return null;
+        }
+        url.hash = "";
+        if (url.toString() === currentUrl.toString()) {
+          return null;
+        }
+        return url.toString();
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const warmUrl = (href) => {
+      const normalizedUrl = toPrefetchableUrl(href);
+      if (!normalizedUrl || prefetchedUrls.has(normalizedUrl)) {
+        return;
+      }
+
+      prefetchedUrls.add(normalizedUrl);
+
+      const prefetchLink = document.createElement("link");
+      prefetchLink.rel = "prefetch";
+      prefetchLink.as = "document";
+      prefetchLink.href = normalizedUrl;
+      document.head.appendChild(prefetchLink);
+    };
+
+    const navLinks = Array.from(document.querySelectorAll(
+      "#dashboard-sidebar a[href]"
+    )).filter((link) => {
+      if (!link || !link.href) {
+        return false;
+      }
+      if (String(link.getAttribute("data-bs-toggle") || "").toLowerCase() === "dropdown") {
+        return false;
+      }
+      const href = String(link.getAttribute("href") || "");
+      return href !== "" && href !== "#" && !link.classList.contains("logout-link");
+    });
+
+    navLinks.forEach((link) => {
+      const warm = () => warmUrl(link.href);
+      link.addEventListener("mouseenter", warm, { passive: true });
+      link.addEventListener("focus", warm, { passive: true });
+      link.addEventListener("touchstart", warm, { passive: true });
+    });
+
+    const backgroundTargets = navLinks
+      .map((link) => link.href)
+      .filter((href, index, list) => list.indexOf(href) === index)
+      .slice(0, 10);
+
+    const warmInBackground = () => {
+      backgroundTargets.forEach((href, index) => {
+        window.setTimeout(() => warmUrl(href), 120 * index);
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(warmInBackground, { timeout: 1500 });
+    } else {
+      window.setTimeout(warmInBackground, 700);
+    }
+  });
 </script>

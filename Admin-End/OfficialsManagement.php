@@ -6,35 +6,75 @@ require_once "../PhpFiles/General/adminModulePermissions.php";
 requireRoleSession(['SuperAdmin'], false);
 
 $managementMode = strtolower(trim((string)($managementMode ?? 'official')));
-if (!in_array($managementMode, ['official', 'personnel'], true)) {
+if (!in_array($managementMode, ['official', 'personnel', 'admin'], true)) {
   $managementMode = 'official';
 }
 $isPersonnelManagement = $managementMode === 'personnel';
-$managementShowLifecycleTabs = !$isPersonnelManagement;
+$isAdminManagement = $managementMode === 'admin';
+$supportsProfileManagement = $isPersonnelManagement || $isAdminManagement;
+$managementShowLifecycleTabs = $managementMode === 'official';
 
-$managementEntitySingular = $isPersonnelManagement ? 'Personnel' : 'Official';
-$managementEntityPlural = $isPersonnelManagement ? 'Personnel' : 'Officials';
-$managementPageTitle = $isPersonnelManagement ? 'Personnel Tracker' : 'Official Management';
-$managementDescription = $isPersonnelManagement
-  ? 'Maintain personnel profile records, check readiness for onboarding, and lock or unlock accounts without changing seat assignments.'
-  : 'Maintain official profile records, check invite readiness, and manage onboarding-safe account locking without changing seats or permissions here.';
-$managementCurrentLabel = $isPersonnelManagement ? 'Current Personnel' : 'Current Officials';
-$managementPastLabel = $isPersonnelManagement ? 'Past Personnel' : 'Past Officials';
-$managementSearchPlaceholder = $isPersonnelManagement
-  ? 'Search personnel ID / user ID / name / department'
-  : 'Search official ID / user ID / name / department';
-$managementIdLabel = $isPersonnelManagement ? 'Personnel ID' : 'Official ID';
-$managementFilterTitle = $isPersonnelManagement ? 'Filter Personnel Tracker' : 'Filter Official Management';
-$managementAccessTitle = $isPersonnelManagement ? 'Manage Personnel Access' : 'Manage Official Access';
+$managementEntitySingular = match ($managementMode) {
+  'personnel' => 'Personnel',
+  'admin' => 'Admin',
+  default => 'Official',
+};
+$managementEntityPlural = match ($managementMode) {
+  'personnel' => 'Personnel',
+  'admin' => 'Admins',
+  default => 'Officials',
+};
+$managementPageTitle = match ($managementMode) {
+  'personnel' => 'Personnel Tracker',
+  'admin' => 'Admin Management',
+  default => 'Official Management',
+};
+$managementDescription = match ($managementMode) {
+  'personnel' => 'Maintain personnel profile records, check readiness for onboarding, and lock or unlock accounts without changing seat assignments.',
+  'admin' => 'Maintain admin profile records separately from barangay officials, monitor onboarding readiness, and manage onboarding-safe account locking.',
+  default => 'Maintain official profile records, check invite readiness, and manage onboarding-safe account locking without changing seats or permissions here.',
+};
+$managementCurrentLabel = match ($managementMode) {
+  'personnel' => 'Current Personnel',
+  'admin' => 'Admin Records',
+  default => 'Current Officials',
+};
+$managementPastLabel = match ($managementMode) {
+  'personnel' => 'Past Personnel',
+  'admin' => 'Past Admins',
+  default => 'Past Officials',
+};
+$managementSearchPlaceholder = match ($managementMode) {
+  'personnel' => 'Search personnel ID / user ID / name / department',
+  'admin' => 'Search admin ID / user ID / name / department',
+  default => 'Search official ID / user ID / name / department',
+};
+$managementIdLabel = match ($managementMode) {
+  'personnel' => 'Personnel ID',
+  'admin' => 'Admin ID',
+  default => 'Official ID',
+};
+$managementFilterTitle = match ($managementMode) {
+  'personnel' => 'Filter Personnel Tracker',
+  'admin' => 'Filter Admin Management',
+  default => 'Filter Official Management',
+};
+$managementAccessTitle = match ($managementMode) {
+  'personnel' => 'Manage Personnel Access',
+  'admin' => 'Manage Admin Access',
+  default => 'Manage Official Access',
+};
 $managementPromoteTitle = $isPersonnelManagement ? 'Promote Personnel' : 'Promote Official';
 $managementSubjectLabel = $managementEntitySingular;
 $managementPromotionPathLabel = $isPersonnelManagement ? 'Position Change Path' : 'Promotion Path';
 $managementPromotionHelper = $isPersonnelManagement
   ? "This update changes the personnel's system role, position access, and assignment details."
   : "Promotion updates the official's system role, position access, and assignment details.";
-$managementColumnsStorageKey = $isPersonnelManagement
-  ? 'admin_cols_personnel_management_v2'
-  : 'admin_cols_officials_management_v2';
+$managementColumnsStorageKey = match ($managementMode) {
+  'personnel' => 'admin_cols_personnel_management_v2',
+  'admin' => 'admin_cols_admin_management_v1',
+  default => 'admin_cols_officials_management_v2',
+};
 $managementDefaultHiddenColumnIdxs = [1, 3, 8];
 $managementFilterRoleOptions = $isPersonnelManagement
   ? ['ALL' => 'All', 'Admin' => 'Admin', 'SuperAdmin' => 'SuperAdmin']
@@ -122,6 +162,14 @@ if ($isPersonnelManagement) {
     ['IT Administrator'],
     $basePositionsByRole['Personnel']
   )));
+} elseif ($isAdminManagement) {
+  $officialsMgmtPositionsByRole = [
+    'SuperAdmin' => $basePositionsByRole['SuperAdmin'],
+  ];
+  $officialsMgmtAreaRequiredPositions = [];
+  $officialsMgmtPositionsByDepartment = [
+    'Office of the Barangay' => $basePositionsByRole['SuperAdmin'],
+  ];
 } else {
   $officialsMgmtPositionsByRole = [
     'SuperAdmin' => $basePositionsByRole['SuperAdmin'],
@@ -856,12 +904,12 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     </div>
   </div>
 
-  <?php if ($isPersonnelManagement): ?>
+  <?php if ($supportsProfileManagement): ?>
   <div class="modal fade" id="modalOfficialsMgmtProfile" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable officials-profile-modal-dialog">
       <form class="modal-content border-0 rounded-2 p-4 officials-profile-modal-content" id="formOfficialsMgmtProfile">
         <div class="modal-header border-0">
-          <h5 class="modal-title">Personnel Details: <span id="officialsMgmtProfileDisplayId" class="text-warning"></span></h5>
+          <h5 class="modal-title"><?= htmlspecialchars($managementEntitySingular, ENT_QUOTES, 'UTF-8') ?> Details: <span id="officialsMgmtProfileDisplayId" class="text-warning"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
@@ -881,10 +929,10 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
                   <img
                     id="officialsMgmtProfileImage"
                     src="../Images/Profile-Placeholder.png"
-                    alt="Personnel profile image"
+                    alt="<?= htmlspecialchars($managementEntitySingular, ENT_QUOTES, 'UTF-8') ?> profile image"
                     class="img-fluid rounded-circle officials-profile-avatar"
                   >
-                  <div class="small text-muted mt-3 text-center" id="officialsMgmtProfileSummaryName">Personnel profile</div>
+                  <div class="small text-muted mt-3 text-center" id="officialsMgmtProfileSummaryName"><?= htmlspecialchars($managementEntitySingular, ENT_QUOTES, 'UTF-8') ?> profile</div>
                 </div>
 
                 <div class="col-md-9">
@@ -1101,6 +1149,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     window.OFFICIALS_MGMT_OPTIONS = {
       managementMode: <?= json_encode($managementMode, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       showLifecycleTabs: <?= json_encode($managementShowLifecycleTabs) ?>,
+      supportsProfileManagement: <?= json_encode($supportsProfileManagement) ?>,
       entitySingular: <?= json_encode($managementEntitySingular, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       entityPluralLower: <?= json_encode(strtolower($managementEntityPlural), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       apiUrl: "../PhpFiles/Admin-End/officialsManagement.php",

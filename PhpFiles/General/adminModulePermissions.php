@@ -337,14 +337,20 @@ if (!function_exists('amp_get_permission_catalog')) {
                         ],
                     ],
                     [
+                        'key' => 'admin_management',
+                        'label' => 'Admin Management',
+                        'path' => 'Admin-End/AdminManagement.php',
+                        'admin_only' => true,
+                    ],
+                    [
                         'key' => 'personnel_management',
                         'label' => 'Personnel Management',
                         'admin_only' => true,
                         'children' => [
                             [
                                 'key' => 'officials_management',
-                                'label' => 'Officials Management',
-                                'path' => 'Admin-End/OfficialsManagement.php',
+                                'label' => 'Personnel Tracker',
+                                'path' => 'Admin-End/PersonnelTracker.php',
                                 'admin_only' => true,
                             ],
                             [
@@ -356,15 +362,26 @@ if (!function_exists('amp_get_permission_catalog')) {
                         ],
                     ],
                     [
-                        'key' => 'official_transition',
-                        'label' => 'Official Transition',
-                        'path' => 'Admin-End/OfficialTransitions.php',
-                        'admin_only' => true,
-                    ],
-                    [
                         'key' => 'audit_logs',
                         'label' => 'Audit Logs',
                         'path' => 'Admin-End/AuditLogs.php',
+                        'admin_only' => true,
+                    ],
+                ],
+            ],
+            [
+                'section' => 'Barangay Official Governance',
+                'items' => [
+                    [
+                        'key' => 'official_records_management',
+                        'label' => 'Official Management',
+                        'path' => 'Admin-End/OfficialsManagement.php',
+                        'admin_only' => true,
+                    ],
+                    [
+                        'key' => 'official_transition',
+                        'label' => 'Official Transition',
+                        'path' => 'Admin-End/OfficialTransitions.php',
                         'admin_only' => true,
                     ],
                 ],
@@ -472,7 +489,9 @@ if (!function_exists('amp_get_it_superadmin_locked_permission_keys')) {
             'dashboard',
             'user_masterlist',
             'user_archive',
+            'admin_management',
             'officials_management',
+            'official_records_management',
             'personnel_invite',
             'official_transition',
             'audit_logs',
@@ -627,6 +646,63 @@ if (!function_exists('amp_column_exists')) {
     }
 }
 
+if (!function_exists('amp_session_cache_get')) {
+    function amp_session_cache_get(string $key, int $ttlSeconds)
+    {
+        if ($key === '' || $ttlSeconds <= 0) {
+            return null;
+        }
+
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return null;
+        }
+
+        $bucket = $_SESSION['amp_runtime_cache'] ?? null;
+        if (!is_array($bucket) || !isset($bucket[$key]) || !is_array($bucket[$key])) {
+            return null;
+        }
+
+        $entry = $bucket[$key];
+        $createdAt = (int)($entry['created_at'] ?? 0);
+        if ($createdAt <= 0 || (time() - $createdAt) > $ttlSeconds) {
+            unset($_SESSION['amp_runtime_cache'][$key]);
+            return null;
+        }
+
+        return $entry['value'] ?? null;
+    }
+}
+
+if (!function_exists('amp_session_cache_put')) {
+    function amp_session_cache_put(string $key, $value): void
+    {
+        if ($key === '') {
+            return;
+        }
+
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return;
+        }
+
+        if (!isset($_SESSION['amp_runtime_cache']) || !is_array($_SESSION['amp_runtime_cache'])) {
+            $_SESSION['amp_runtime_cache'] = [];
+        }
+
+        $_SESSION['amp_runtime_cache'][$key] = [
+            'created_at' => time(),
+            'value' => $value,
+        ];
+    }
+}
+
 if (!function_exists('amp_ensure_permission_storage')) {
     function amp_ensure_permission_storage(mysqli $conn): void
     {
@@ -634,6 +710,13 @@ if (!function_exists('amp_ensure_permission_storage')) {
         if ($done) {
             return;
         }
+
+        $sessionCacheKey = 'permission_storage_verified_v1';
+        if (amp_session_cache_get($sessionCacheKey, 900) === true) {
+            $done = true;
+            return;
+        }
+
         $done = true;
 
         if (!amp_column_exists($conn, 'officialinformationtbl', 'term_end')) {
@@ -780,6 +863,8 @@ if (!function_exists('amp_ensure_permission_storage')) {
         idg_ensure_numeric_generated_key($conn, 'officialaccessroleprofiletbl', 'role_access_profile_id', 'INT NOT NULL');
         idg_ensure_numeric_generated_key($conn, 'personnelrolemodulepermissionstbl', 'role_permission_id', 'INT NOT NULL');
         idg_ensure_numeric_generated_key($conn, 'personnelroleaccessprofiletbl', 'role_access_profile_id', 'INT NOT NULL');
+
+        amp_session_cache_put($sessionCacheKey, true);
     }
 }
 
@@ -822,6 +907,17 @@ if (!function_exists('amp_get_official_account_by_user_id')) {
     {
         amp_ensure_permission_storage($conn);
 
+        $userId = trim($userId);
+        if ($userId === '') {
+            return null;
+        }
+
+        $sessionCacheKey = 'official_account:' . md5($userId);
+        $cached = amp_session_cache_get($sessionCacheKey, 120);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         $hasPositionAccess = amp_column_exists($conn, 'officialinformationtbl', 'position_access');
         $positionField = $hasPositionAccess ? 'oi.position_access' : 'oi.role_access';
         $hasAreaNumber = amp_column_exists($conn, 'officialinformationtbl', 'area_number');
@@ -853,7 +949,11 @@ if (!function_exists('amp_get_official_account_by_user_id')) {
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        return $row ?: null;
+        $resolved = $row ?: null;
+        if (is_array($resolved)) {
+            amp_session_cache_put($sessionCacheKey, $resolved);
+        }
+        return $resolved;
     }
 }
 
@@ -1256,6 +1356,7 @@ if (!function_exists('amp_get_effective_permission_keys_for_personnel_role')) {
         amp_ensure_permission_storage($conn);
 
         $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
+        $hasSavedProfile = amp_has_saved_personnel_role_access_profile($conn, $department, $positionAccess);
         $permissions = [];
 
         $stmt = $conn->prepare("
@@ -1278,15 +1379,9 @@ if (!function_exists('amp_get_effective_permission_keys_for_personnel_role')) {
             $stmt->close();
         }
 
-        if (!$permissions && !amp_has_saved_personnel_role_access_profile($conn, $department, $positionAccess)) {
+        if (!$permissions && !$hasSavedProfile) {
             foreach (amp_get_default_admin_permission_keys() as $key) {
                 $permissions[$key] = true;
-            }
-        }
-
-        foreach (array_keys($permissions) as $key) {
-            if (amp_is_admin_only_permission($key)) {
-                unset($permissions[$key]);
             }
         }
 
@@ -1343,14 +1438,6 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
             }
         }
 
-        if ($displayRole !== 'SuperAdmin') {
-            foreach (array_keys($permissions) as $key) {
-                if (amp_is_admin_only_permission($key)) {
-                    unset($permissions[$key]);
-                }
-            }
-        }
-
         if ($protectedCode === 'IT_SUPERADMIN') {
             foreach (amp_get_it_superadmin_locked_permission_keys() as $key) {
                 $permissions[$key] = true;
@@ -1398,14 +1485,6 @@ if (!function_exists('amp_get_effective_permission_keys_for_council')) {
             }
         }
 
-        if (amp_storage_role_to_display_role($displayRole) !== 'SuperAdmin') {
-            foreach (array_keys($permissions) as $key) {
-                if (amp_is_admin_only_permission($key)) {
-                    unset($permissions[$key]);
-                }
-            }
-        }
-
         return $permissions;
     }
 }
@@ -1434,6 +1513,13 @@ if (!function_exists('amp_get_allowed_permission_keys')) {
             return $cache[$cacheKey];
         }
 
+        $sessionCacheKey = 'allowed_permissions:' . md5($cacheKey);
+        $sessionCached = amp_session_cache_get($sessionCacheKey, 120);
+        if (is_array($sessionCached)) {
+            $cache[$cacheKey] = $sessionCached;
+            return $sessionCached;
+        }
+
         $row = $userId !== '' ? amp_get_official_account_by_user_id($conn, $userId) : null;
         if (!$row) {
             $role = amp_storage_role_to_display_role($sessionRole);
@@ -1442,11 +1528,13 @@ if (!function_exists('amp_get_allowed_permission_keys')) {
                 : amp_get_default_admin_permission_keys();
             $allowed = array_fill_keys($keys, true);
             $cache[$cacheKey] = $allowed;
+            amp_session_cache_put($sessionCacheKey, $allowed);
             return $allowed;
         }
 
         $allowed = amp_get_effective_permission_keys_for_row($conn, $row);
         $cache[$cacheKey] = $allowed;
+        amp_session_cache_put($sessionCacheKey, $allowed);
         return $allowed;
     }
 }
@@ -1521,7 +1609,9 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             },
             'UserMasterlist.php' => 'user_masterlist',
             'UserArchive.php' => 'user_archive',
-            'OfficialsManagement.php' => 'officials_management',
+            'AdminManagement.php' => 'admin_management',
+            'PersonnelTracker.php' => 'officials_management',
+            'OfficialsManagement.php' => 'official_records_management',
             'OfficialInvites.php' => 'personnel_invite',
             'OfficialTransitions.php' => 'official_transition',
             'AuditLogs.php' => 'audit_logs',

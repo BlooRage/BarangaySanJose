@@ -5,6 +5,7 @@
   const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/officialsManagement.php");
   const managementMode = String(opts.managementMode || "official");
   const isPersonnelManagement = managementMode === "personnel";
+  const supportsProfileManagement = Boolean(opts.supportsProfileManagement ?? isPersonnelManagement);
   const showLifecycleTabs = Boolean(opts.showLifecycleTabs ?? (managementMode !== "personnel"));
   const entitySingular = String(opts.entitySingular || "Official");
   const entityPluralLower = String(opts.entityPluralLower || "officials");
@@ -314,7 +315,7 @@
     }
     if (profileOfficialIdInput) profileOfficialIdInput.value = "";
     setText(profileDisplayIdEl, "—");
-    setText(profileSummaryNameEl, "Personnel profile");
+    setText(profileSummaryNameEl, `${entitySingular} profile`);
     if (profileImageEl) {
       profileImageEl.src = "../Images/Profile-Placeholder.png";
     }
@@ -345,7 +346,7 @@
     state.profileModal.detail = detail;
     if (profileOfficialIdInput) profileOfficialIdInput.value = detail.official_id || "";
     setText(profileDisplayIdEl, detail.official_id ? `#${detail.official_id}` : "—");
-    setText(profileSummaryNameEl, detail.full_name || detail.user_id || "Personnel profile");
+    setText(profileSummaryNameEl, detail.full_name || detail.user_id || `${entitySingular} profile`);
     if (profileImageEl) {
       profileImageEl.src = "../Images/Profile-Placeholder.png";
     }
@@ -391,7 +392,7 @@
         profileReadonlyNoticeEl.textContent = "";
       } else {
         profileReadonlyNoticeEl.classList.remove("d-none");
-        profileReadonlyNoticeEl.textContent = safe(detail.edit_profile_disabled_reason || "This personnel record is view-only.");
+        profileReadonlyNoticeEl.textContent = safe(detail.edit_profile_disabled_reason || `This ${entitySingular.toLowerCase()} record is view-only.`);
       }
     }
 
@@ -409,13 +410,13 @@
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.success) {
-      throw new Error(data?.message || "Unable to load personnel profile.");
+      throw new Error(data?.message || `Unable to load ${entitySingular.toLowerCase()} profile.`);
     }
     return data.data || null;
   };
 
   const openProfileModal = async (officialId) => {
-    if (!profileModalEl || !isPersonnelManagement) return;
+    if (!profileModalEl || !supportsProfileManagement) return;
     const row = state.rowsRaw.find((entry) => String(entry.official_id) === String(officialId));
     if (!row) return;
     const requestedOfficialId = String(officialId);
@@ -426,9 +427,9 @@
 
     if (profileOfficialIdInput) profileOfficialIdInput.value = row.official_id || "";
     setText(profileDisplayIdEl, row.official_id ? `#${row.official_id}` : "—");
-    setText(profileSummaryNameEl, row.full_name || row.user_id || "Personnel profile");
+    setText(profileSummaryNameEl, row.full_name || row.user_id || `${entitySingular} profile`);
     clearProfileFeedback();
-    setProfileFeedback("info", "Loading personnel profile...");
+    setProfileFeedback("info", `Loading ${entitySingular.toLowerCase()} profile...`);
     setProfileFormDisabled(true);
 
     bootstrap.Modal.getOrCreateInstance(profileModalEl).show();
@@ -439,7 +440,7 @@
         return;
       }
       if (!detail) {
-        throw new Error("Personnel profile is unavailable.");
+        throw new Error(`${entitySingular} profile is unavailable.`);
       }
       populateProfileForm(detail);
     } catch (error) {
@@ -447,7 +448,7 @@
         return;
       }
       bootstrap.Modal.getInstance(profileModalEl)?.hide();
-      window.alert(error?.message || "Unable to load personnel profile.");
+      window.alert(error?.message || `Unable to load ${entitySingular.toLowerCase()} profile.`);
     } finally {
       if (String(profileOfficialIdInput?.value || "") !== requestedOfficialId) {
         return;
@@ -464,7 +465,7 @@
   const saveProfileInfo = async () => {
     const officialId = String(profileOfficialIdInput?.value || "");
     if (!officialId) {
-      throw new Error("Missing personnel record.");
+      throw new Error(`Missing ${entitySingular.toLowerCase()} record.`);
     }
 
     const body = new FormData();
@@ -501,7 +502,7 @@
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.success) {
-      throw new Error(data?.message || "Unable to save personnel profile.");
+      throw new Error(data?.message || `Unable to save ${entitySingular.toLowerCase()} profile.`);
     }
     return data;
   };
@@ -737,11 +738,11 @@
   };
 
   const actionButtonHtml = (row) => {
-    const profileButton = isPersonnelManagement
+    const profileButton = supportsProfileManagement
       ? `<button type="button" class="btn btn-sm btn-outline-primary officials-action-btn" data-action="view_profile" data-official-id="${escapeHtml(safe(row.official_id))}">${row.can_edit_access ? "View / Edit" : "View"}</button>`
       : "";
 
-    if (isPersonnelManagement) {
+    if (supportsProfileManagement) {
       if (!state.canManageActions) {
         return profileButton || '<span class="text-muted small">SuperAdmin only</span>';
       }
@@ -1309,7 +1310,7 @@
 
         if (action === "view_profile") {
           openProfileModal(officialId).catch((error) => {
-            window.alert(error?.message || "Unable to load personnel profile.");
+            window.alert(error?.message || `Unable to load ${entitySingular.toLowerCase()} profile.`);
           });
           return;
         }
@@ -1525,20 +1526,20 @@
 
       const canEditProfile = Boolean(state.profileModal.detail?.can_edit_profile);
       if (!canEditProfile) {
-        window.alert(state.profileModal.detail?.edit_profile_disabled_reason || "This personnel record is view-only.");
+        window.alert(state.profileModal.detail?.edit_profile_disabled_reason || `This ${entitySingular.toLowerCase()} record is view-only.`);
         return;
       }
 
       try {
         state.profileModal.busy = true;
         clearProfileFeedback();
-        setProfileFeedback("info", "Saving personnel profile...");
+        setProfileFeedback("info", `Saving ${entitySingular.toLowerCase()} profile...`);
         setProfileFormDisabled(false);
 
         const data = await saveProfileInfo();
         if (data?.data) {
           populateProfileForm(data.data);
-          setProfileFeedback("success", data.message || "Personnel profile updated successfully.");
+          setProfileFeedback("success", data.message || `${entitySingular} profile updated successfully.`);
         }
 
         const row = state.profileModal.row;
@@ -1553,7 +1554,7 @@
 
         await load();
       } catch (error) {
-        setProfileFeedback("danger", error?.message || "Unable to save personnel profile.");
+        setProfileFeedback("danger", error?.message || `Unable to save ${entitySingular.toLowerCase()} profile.`);
       } finally {
         state.profileModal.busy = false;
         const canEditProfile = Boolean(state.profileModal.detail?.can_edit_profile);

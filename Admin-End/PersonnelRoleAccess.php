@@ -8,7 +8,6 @@ requireRoleSession(['SuperAdmin'], false);
 if (!function_exists('pra_filter_catalog_for_personnel_roles')) {
   function pra_filter_catalog_for_personnel_roles(array $catalog): array
   {
-    $allowedKeys = array_fill_keys(amp_get_default_admin_permission_keys(), true);
     $filtered = [];
 
     foreach ($catalog as $section) {
@@ -19,7 +18,7 @@ if (!function_exists('pra_filter_catalog_for_personnel_roles')) {
           $filteredChildren = [];
           foreach ($children as $child) {
             $key = trim((string)($child['key'] ?? ''));
-            if ($key !== '' && isset($allowedKeys[$key])) {
+            if ($key !== '') {
               $filteredChildren[] = $child;
             }
           }
@@ -33,7 +32,7 @@ if (!function_exists('pra_filter_catalog_for_personnel_roles')) {
         }
 
         $key = trim((string)($item['key'] ?? ''));
-        if ($key !== '' && isset($allowedKeys[$key])) {
+        if ($key !== '') {
           $sectionItems[] = $item;
         }
       }
@@ -57,7 +56,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
   <meta charset="UTF-8" />
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Access Control</title>
+  <title>Personnel Access Control</title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -262,10 +261,10 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
       <div class="mb-4">
-        <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Access Control</h2>
+        <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Personnel Access Control</h2>
         <p class="text-muted mb-0">
-          Set the default module permissions for each department position and use these profiles as the approval baseline for incoming access.
-          This module is the final gate for permission assignment, while Official Management keeps profile data and Official Transition handles seats and turnover.
+          Set the default module permissions for each personnel department position and use these profiles as the approval baseline for incoming access.
+          Official seat and governance access templates are handled separately under Barangay Official Governance.
         </p>
       </div>
 
@@ -277,7 +276,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           <i class="fas fa-user-plus me-1"></i> Account Invite
         </a>
         <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>" class="btn btn-primary btn-sm">
-          <i class="fas fa-shield-halved me-1"></i> Access Control
+          <i class="fas fa-shield-halved me-1"></i> Personnel Access Control
         </a>
       </div>
 
@@ -446,7 +445,8 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
   <script>
     window.PERSONNEL_ROLE_ACCESS_OPTIONS = {
       apiUrl: <?= json_encode(appUrl('PhpFiles/Admin-End/personnelRoleAccess.php'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
-      permissionCatalog: <?= json_encode($personnelRolePermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+      permissionCatalog: <?= json_encode($personnelRolePermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      defaultPermissionKeys: <?= json_encode(array_values(amp_get_default_admin_permission_keys()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260327-2"></script>

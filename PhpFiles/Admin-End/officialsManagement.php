@@ -29,7 +29,7 @@ function rowDisplayRole(string $role): string {
 
 function requestedManagementMode(string $rawMode): string {
     $mode = strtolower(trim($rawMode));
-    return in_array($mode, ['official', 'personnel'], true) ? $mode : 'official';
+    return in_array($mode, ['official', 'personnel', 'admin'], true) ? $mode : 'official';
 }
 
 function managementAudienceFromPosition(string $positionAccess, string $fallbackRole = ''): string {
@@ -48,7 +48,7 @@ function managementAudienceFromPosition(string $positionAccess, string $fallback
     ];
 
     if (strcasecmp($position, 'IT Administrator') === 0) {
-        return 'personnel';
+        return 'admin';
     }
     if (in_array($position, $officialPositions, true)) {
         return 'official';
@@ -59,11 +59,38 @@ function managementAudienceFromPosition(string $positionAccess, string $fallback
     if ($role === 'Personnel') {
         return 'personnel';
     }
-    if (in_array($role, ['Official', 'SuperAdmin'], true)) {
+    if ($role === 'SuperAdmin') {
+        return 'admin';
+    }
+    if ($role === 'Official') {
         return 'official';
     }
 
     return 'unknown';
+}
+
+function managementModeLabel(string $mode): string {
+    return match ($mode) {
+        'personnel' => 'Personnel Management',
+        'admin' => 'Admin Management',
+        default => 'Officials Management',
+    };
+}
+
+function managementEntityLabel(string $mode): string {
+    return match ($mode) {
+        'personnel' => 'Personnel',
+        'admin' => 'Admin',
+        default => 'Official',
+    };
+}
+
+function managementWorkflowScope(string $mode): string {
+    return match ($mode) {
+        'personnel' => 'Personnel',
+        'admin' => 'SuperAdmin',
+        default => 'Official',
+    };
 }
 
 function managementAudienceFromRow(array $row): string {
@@ -379,7 +406,7 @@ function officialsManagementLoadProfileDetailOrFail(mysqli $conn, string $offici
         LIMIT 1
     ");
     if (!$stmt) {
-        throw new Exception('Failed to load personnel profile.');
+        throw new Exception('Failed to load profile details.');
     }
 
     $stmt->bind_param('s', $officialId);
@@ -388,7 +415,7 @@ function officialsManagementLoadProfileDetailOrFail(mysqli $conn, string $offici
     $stmt->close();
 
     if (!$row) {
-        throw new Exception('Personnel profile not found.');
+        throw new Exception('Profile not found.');
     }
 
     $row = pii_decrypt_official_row($row) ?? $row;
@@ -432,8 +459,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         $action = trim((string)($_POST['action'] ?? ''));
         $requestedMode = requestedManagementMode((string)($_POST['mode'] ?? 'official'));
-        $auditModuleName = $requestedMode === 'personnel' ? 'Personnel Management' : 'Officials Management';
-        $secureModuleKey = 'officials_management';
+        $auditModuleName = managementModeLabel($requestedMode);
+        $secureModuleKey = match ($requestedMode) {
+            'personnel' => 'officials_management',
+            'admin' => 'admin_management',
+            default => 'official_records_management',
+        };
         if ($action === 'request_secure_action_otp') {
             $secureAction = trim((string)($_POST['secure_action'] ?? ''));
             $allowedSecureActions = ['send_all_invites', 'send_invite', 'revoke_permission', 'restore_permission', 'lock_account', 'unlock_account'];
@@ -441,7 +472,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 throw new Exception('This action cannot use secure confirmation.');
             }
 
-            $targetLabel = $requestedMode === 'personnel' ? 'personnel workflow action' : 'official workflow action';
+            $targetLabel = strtolower(managementEntityLabel($requestedMode)) . ' workflow action';
             $officialIdForLabel = trim((string)($_POST['official_id'] ?? ''));
             if ($officialIdForLabel !== '') {
                 $targetDetail = officialsManagementLoadProfileDetailOrFail($conn, $officialIdForLabel);
@@ -486,7 +517,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $secureModuleKey,
                 'send_all_invites'
             );
-            $scope = $requestedMode === 'personnel' ? 'Personnel' : 'Official';
+            $scope = managementWorkflowScope($requestedMode);
             $result = ogw_send_all_ready_invites($conn, $actorUserId, $scope);
             insertUnifiedAuditLog(
                 $conn,
@@ -555,6 +586,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $targetAudience = managementAudienceFromRow($targetAccount);
         if ($requestedMode === 'personnel' && $targetAudience !== 'personnel') {
             throw new Exception('This record is not available in Personnel Tracker.');
+        }
+        if ($requestedMode === 'admin' && $targetAudience !== 'admin') {
+            throw new Exception('This record is not available in Admin Management.');
         }
         if ($requestedMode === 'official' && $targetAudience !== 'official') {
             throw new Exception('This record is not available in Official Management.');
@@ -805,7 +839,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     LIMIT 1
                 ");
                 if (!$updateOfficial) {
-                    throw new Exception('Failed to prepare personnel profile update.');
+                    throw new Exception('Failed to prepare profile update.');
                 }
                 $updateOfficial->bind_param(
                     'sssssssssssssssssssssss',
@@ -853,7 +887,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 'profile_information',
                 $oldSummary,
                 $newSummary,
-                'Updated personnel profile information.',
+                'Updated profile information.',
                 null
             );
 
@@ -862,7 +896,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             echo json_encode([
                 'success' => true,
-                'message' => ($requestedMode === 'personnel' ? 'Personnel' : 'Official') . ' profile updated successfully.',
+                'message' => managementEntityLabel($requestedMode) . ' profile updated successfully.',
                 'data' => array_merge($updatedProfile, [
                     'can_edit_profile' => $canEditProfile,
                     'edit_profile_disabled_reason' => $editProfileDisabledReason,
@@ -998,8 +1032,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_official_profile'
         }
 
         $requestedMode = requestedManagementMode((string)($_GET['mode'] ?? 'official'));
-        if ($requestedMode !== 'personnel') {
-            throw new Exception('Profile viewing is available in Personnel Tracker only.');
+        if (!in_array($requestedMode, ['personnel', 'admin'], true)) {
+            throw new Exception('Profile viewing is available in Personnel Tracker and Admin Management only.');
         }
 
         $actorUserId = (string)($_SESSION['user_id'] ?? '');
@@ -1009,8 +1043,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_official_profile'
         $profile = officialsManagementLoadProfileDetailOrFail($conn, $officialId);
         $targetAccount = loadOfficialAccountOrFail($conn, (string)($profile['user_id'] ?? ''));
         $targetAudience = managementAudienceFromRow($targetAccount);
-        if ($targetAudience !== 'personnel') {
+        if ($requestedMode === 'personnel' && $targetAudience !== 'personnel') {
             throw new Exception('This record is not available in Personnel Tracker.');
+        }
+        if ($requestedMode === 'admin' && $targetAudience !== 'admin') {
+            throw new Exception('This record is not available in Admin Management.');
         }
 
         [$canEditProfile, $editProfileDisabledReason] = officialsManagementProfileEditability($conn, $actorUserId, $actorProtectedCode, $targetAccount);
@@ -1139,6 +1176,9 @@ try {
         if ($requestedMode === 'personnel' && $actorUserId !== '' && strcasecmp((string)($row['user_id'] ?? ''), $actorUserId) === 0) {
             continue;
         }
+        if ($requestedMode === 'admin' && $audience !== 'admin') {
+            continue;
+        }
         if ($requestedMode === 'official' && $audience !== 'official') {
             continue;
         }
@@ -1168,7 +1208,7 @@ try {
             'official_id' => (string)($row['official_id'] ?? ''),
             'user_id' => (string)($row['user_id'] ?? ''),
             'full_name' => $fullName !== '' ? $fullName : '—',
-            'role_access' => $audience === 'personnel' ? 'Personnel' : 'Official',
+            'role_access' => $audience === 'personnel' ? 'Personnel' : ($audience === 'admin' ? 'Admin' : 'Official'),
             'display_role' => $displayRole,
             'position_access' => $positionAccess,
             'area_number' => (string)($row['area_number'] ?? ''),
