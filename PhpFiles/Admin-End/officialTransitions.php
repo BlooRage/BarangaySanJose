@@ -1213,7 +1213,7 @@ if ($action === 'request_secure_action_otp') {
             'secure_action' => $secureAction,
             'error' => $e->getMessage(),
         ]);
-        throw $e;
+        otError($e->getMessage());
     }
 
     otSecureDebugLog('request_secure_action_otp:success', [

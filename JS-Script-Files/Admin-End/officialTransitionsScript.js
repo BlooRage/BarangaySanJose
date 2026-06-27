@@ -79,6 +79,9 @@
     }
 
     const rawText = await res.text();
+    if (!res.ok && !rawText.trim()) {
+      throw new Error(`Server returned HTTP ${res.status} with an empty response for ${params?.action || 'official transitions'}.`);
+    }
     try {
       return rawText ? JSON.parse(rawText) : {};
     } catch (error) {
@@ -110,7 +113,7 @@
       throw new Error(describeRequestFailure(error, 'Secure confirmation could not start'));
     }
     if (!otpRequest?.success) {
-      throw new Error(otpRequest?.message || 'Unable to send OTP.');
+      throw new Error(otpRequest?.message || otpRequest?.error || 'Unable to send OTP.');
     }
 
     const deliveryLabel = String(otpRequest.delivery_label || '').trim();
