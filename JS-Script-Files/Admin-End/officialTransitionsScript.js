@@ -114,10 +114,17 @@
     }
 
     const deliveryLabel = String(otpRequest.delivery_label || '').trim();
+    const otpPreview = String(otpRequest.otp_preview || '').trim();
+    const deliveryWarning = String(otpRequest.delivery_warning || '').trim();
+    if (deliveryWarning) {
+      showToast(deliveryWarning, 'warning');
+    }
     const otpCode = window.prompt(
-      deliveryLabel
-        ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
-        : 'Enter the 6-digit OTP sent to your verified contact:'
+      otpPreview
+        ? `Enter the 6-digit OTP for ${deliveryLabel || 'this action'}:\n\nLocal preview code: ${otpPreview}`
+        : deliveryLabel
+          ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
+          : 'Enter the 6-digit OTP sent to your verified contact:'
     );
     if (otpCode === null) return null;
 

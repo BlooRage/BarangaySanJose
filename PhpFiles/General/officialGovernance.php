@@ -679,9 +679,7 @@ if (!function_exists('ogw_issue_secure_action_otp')) {
         $contacts = ogw_load_actor_delivery_contacts($conn, $actorUserId);
         $email = (string)($contacts['email'] ?? '');
         $phone10 = (string)($contacts['phone10'] ?? '');
-        if ($email === '' && $phone10 === '') {
-            throw new RuntimeException('No deliverable SuperAdmin email or mobile number is configured for OTP confirmation.');
-        }
+        $isLocalPreviewAllowed = function_exists('db_is_localhost_request') && db_is_localhost_request();
 
         $challengeKey = bin2hex(random_bytes(16));
         $purpose = 'ogw-sec-' . substr(hash('sha256', $moduleKey . '|' . $actionKey . '|' . $challengeKey), 0, 24);
@@ -696,6 +694,14 @@ if (!function_exists('ogw_issue_secure_action_otp')) {
         $emailSent = false;
         $smsSent = false;
         $deliveryNotes = [];
+        $usedPreviewFallback = false;
+
+        if ($email === '' && $phone10 === '') {
+            if (!$isLocalPreviewAllowed) {
+                throw new RuntimeException('No deliverable SuperAdmin email or mobile number is configured for OTP confirmation.');
+            }
+            $deliveryNotes[] = 'Local preview fallback used because no deliverable SuperAdmin email or mobile number is configured.';
+        }
 
         if ($email !== '') {
             try {
@@ -736,7 +742,13 @@ if (!function_exists('ogw_issue_secure_action_otp')) {
         }
 
         if (!$emailSent && !$smsSent) {
-            throw new RuntimeException('OTP could not be delivered. ' . trim(implode(' | ', array_filter($deliveryNotes))));
+            if (!$isLocalPreviewAllowed) {
+                throw new RuntimeException('OTP could not be delivered. ' . trim(implode(' | ', array_filter($deliveryNotes))));
+            }
+            $usedPreviewFallback = true;
+            if ($deliveryNotes === []) {
+                $deliveryNotes[] = 'Local preview fallback used because no delivery channel succeeded.';
+            }
         }
 
         $_SESSION['ogw_secure_action_challenges'][$challengeKey] = [
@@ -757,11 +769,16 @@ if (!function_exists('ogw_issue_secure_action_otp')) {
         if ($emailSent && $email !== '') {
             $deliveryTargets[] = 'email ' . ogw_mask_email($email);
         }
+        if ($usedPreviewFallback) {
+            $deliveryTargets[] = 'local OTP preview';
+        }
 
         return [
             'challenge_key' => $challengeKey,
             'expires_at' => $expiryTime,
             'delivery_label' => implode(' and ', $deliveryTargets),
+            'otp_preview' => $usedPreviewFallback ? $otpCode : '',
+            'delivery_warning' => $usedPreviewFallback ? trim(implode(' | ', array_filter($deliveryNotes))) : '',
         ];
     }
 }

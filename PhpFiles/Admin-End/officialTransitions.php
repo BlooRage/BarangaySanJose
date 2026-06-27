@@ -1221,6 +1221,7 @@ if ($action === 'request_secure_action_otp') {
         'secure_action' => $secureAction,
         'delivery_label' => (string)($challenge['delivery_label'] ?? ''),
         'challenge_key_prefix' => substr((string)($challenge['challenge_key'] ?? ''), 0, 8),
+        'used_preview_fallback' => (string)($challenge['otp_preview'] ?? '') !== '',
     ]);
 
     otJson([
@@ -1229,6 +1230,8 @@ if ($action === 'request_secure_action_otp') {
         'challenge_key' => $challenge['challenge_key'],
         'expires_at' => $challenge['expires_at'],
         'delivery_label' => $challenge['delivery_label'],
+        'otp_preview' => (string)($challenge['otp_preview'] ?? ''),
+        'delivery_warning' => (string)($challenge['delivery_warning'] ?? ''),
     ]);
 }
 
@@ -1466,6 +1469,13 @@ if ($action === 'complete_transition') {
     $incomingUserId = '';
     $outgoingId = (string)($transition['outgoing_official_id'] ?? '');
     $councilId = (int)($transition['council_id'] ?? 0);
+    $inviteResponse = [
+        'invite_link' => '',
+        'invite_email_sent' => null,
+        'invite_email_error' => '',
+        'invite_sms_sent' => null,
+        'invite_sms_error' => '',
+    ];
 
     $conn->begin_transaction();
     try {
@@ -1600,8 +1610,55 @@ if ($action === 'complete_transition') {
         otError($e->getMessage());
     }
 
+    $shouldSendOnboardingInvite = in_array($outcome, ['NewPerson', 'Reactivated'], true) && $incomingOfficialId !== '';
+    if ($shouldSendOnboardingInvite) {
+        try {
+            $incomingOfficial = otGetOfficialUser($conn, $incomingOfficialId);
+            if (!$incomingOfficial) {
+                throw new RuntimeException('Incoming official record could not be loaded for onboarding invite delivery.');
+            }
+
+            $invite = otCreateOfficialInvite($conn, [
+                'email' => (string)($incomingOfficial['email'] ?? ''),
+                'phone_number' => (string)($incomingOfficial['phone_number'] ?? ''),
+                'firstname' => (string)($incomingOfficial['firstname'] ?? ''),
+                'middlename' => (string)($incomingOfficial['middlename'] ?? ''),
+                'lastname' => (string)($incomingOfficial['lastname'] ?? ''),
+                'suffix' => (string)($incomingOfficial['suffix'] ?? ''),
+                'role_access' => (string)($incomingOfficial['ua_role'] ?? 'Official'),
+                'position_access' => (string)($incomingOfficial['position'] ?? ''),
+                'department' => (string)($incomingOfficial['department'] ?? ''),
+                'employment_status' => (string)($incomingOfficial['employment_status'] ?? 'Regular'),
+                'area_number' => (string)($incomingOfficial['area_number'] ?? ''),
+                'user_id' => (string)($incomingOfficial['user_id'] ?? ''),
+            ], $actorId);
+
+            $delivery = otDeliverOnboardingInvite($invite);
+            ogw_sync_profile_workflow($conn, $incomingOfficialId);
+
+            $inviteResponse['invite_link'] = (string)($invite['invite_link'] ?? '');
+            $inviteResponse['invite_email_sent'] = (bool)($delivery['email_sent'] ?? false);
+            $inviteResponse['invite_email_error'] = trim((string)($delivery['email_error'] ?? ''));
+            $inviteResponse['invite_sms_sent'] = (bool)($delivery['sms_sent'] ?? false);
+            $inviteResponse['invite_sms_error'] = trim((string)($delivery['sms_error'] ?? ''));
+        } catch (Throwable $e) {
+            $inviteResponse['invite_email_sent'] = false;
+            $inviteResponse['invite_sms_sent'] = false;
+            $inviteResponse['invite_email_error'] = $e->getMessage();
+            $inviteResponse['invite_sms_error'] = $e->getMessage();
+        }
+    }
+
     insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Transition', 'transition', $transitionId, 'complete_transition', 'status', 'PendingSuperAdminApproval', 'Completed', 'Completed transition workflow.');
-    otJson(['success' => true, 'message' => 'Transition completed successfully. Incoming access stays pending until Access Control approves it.']);
+    otJson([
+        'success' => true,
+        'message' => 'Transition completed successfully. Incoming access stays pending until Access Control approves it.',
+        'invite_link' => $inviteResponse['invite_link'],
+        'invite_email_sent' => $inviteResponse['invite_email_sent'],
+        'invite_email_error' => $inviteResponse['invite_email_error'],
+        'invite_sms_sent' => $inviteResponse['invite_sms_sent'],
+        'invite_sms_error' => $inviteResponse['invite_sms_error'],
+    ]);
 }
 
 if ($action === 'fetch_inactive_officials') {
