@@ -123,8 +123,8 @@ if (!function_exists('apos_weekly_schedule_for_user')) {
             $schedule[$weekday] = [
                 'weekday' => $weekday,
                 'enabled' => (int)($row['is_available'] ?? 0) === 1,
-                'start_time' => aps_normalize_time_value($row['start_time'] ?? '', apos_schedule_start_time()),
-                'end_time' => aps_normalize_time_value($row['end_time'] ?? '', apos_schedule_end_time()),
+                'start_time' => aps_normalize_time_value($row['start_time'] ?? '', aps_schedule_start_time()),
+                'end_time' => aps_normalize_time_value($row['end_time'] ?? '', aps_schedule_end_time()),
                 'meeting_location' => apos_normalize_location($row['meeting_location'] ?? ''),
             ];
         }

@@ -1178,7 +1178,7 @@ if (!function_exists('amp_get_protected_code')) {
             return 'IT_SUPERADMIN';
         }
 
-        if ($role === 'SuperAdmin' && strcasecmp($position, 'Barangay Chairman') === 0) {
+        if (strcasecmp($position, 'Barangay Chairman') === 0) {
             return 'BARANGAY_CAPTAIN';
         }
 

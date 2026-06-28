@@ -665,8 +665,8 @@ function otResolveIncomingAccessProfile(array $transition): array {
     $positionAccess = $position !== '' ? $position : 'Barangay Official';
 
     if (str_contains($positionLower, 'punong barangay') || str_contains($positionLower, 'barangay captain') || $positionLower === 'barangay chairman') {
-        $accountRole = 'SuperAdmin';
-        $officialRole = 'SuperAdmin';
+        $accountRole = 'Official';
+        $officialRole = 'Official';
         $positionAccess = 'Barangay Chairman';
         $department = $department !== '' ? $department : 'Office of the Barangay';
         $areaNumber = 'Barangay Wide';
