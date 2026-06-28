@@ -393,11 +393,11 @@ $officialScheduleMap = apos_fetch_schedule_map(
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Appointment Submitted</h5>
+                    <h5 class="modal-title">Appointment Confirmed</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0" id="appointmentSuccessMessage">Your appointment request has been submitted successfully.</p>
+                    <p class="mb-0" id="appointmentSuccessMessage">Your appointment has been confirmed successfully.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>

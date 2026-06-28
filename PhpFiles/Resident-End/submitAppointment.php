@@ -6,6 +6,10 @@ require_once __DIR__ . "/../General/appointmentSettings.php";
 require_once __DIR__ . "/../General/appointmentOfficialSchedules.php";
 require_once __DIR__ . "/../General/appointmentTimeSlots.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
+require_once __DIR__ . "/../General/sendSMS.php";
+require_once __DIR__ . "/../General/mailConfigurations.php";
+require_once __DIR__ . "/../General/piiCrypto.php";
+require_once __DIR__ . "/../EmailHandlers/emailSender.php";
 require_once __DIR__ . "/../GET/getResidentProfile.php";
 
 function appointmentRedirectWithMessage(string $type, string $message, array $extra = []): void
@@ -128,6 +132,246 @@ function appointmentNormalizeSubjectLabel(string $value): string
     return $map[$normalized] ?? $value;
 }
 
+function appointmentDisplayName(array $row, string $fallback = ''): string
+{
+    $parts = array_filter([
+        trim((string)($row['firstname'] ?? '')),
+        trim((string)($row['middlename'] ?? '')),
+        trim((string)($row['lastname'] ?? '')),
+        trim((string)($row['suffix'] ?? '')),
+    ], static fn($value) => $value !== '');
+
+    $fullName = preg_replace('/\s+/', ' ', trim(implode(' ', $parts)));
+    if ($fullName !== '') {
+        return $fullName;
+    }
+
+    return trim($fallback);
+}
+
+function appointmentFormatTimestampLabel(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return 'the selected schedule';
+    }
+
+    try {
+        $timestamp = new DateTimeImmutable($value);
+        return $timestamp->format('F j, Y g:i A');
+    } catch (Throwable $e) {
+        return $value;
+    }
+}
+
+function appointmentLoadOfficialDeliveryContact(mysqli $conn, string $officialUserId, array $fallback = []): array
+{
+    $officialUserId = trim($officialUserId);
+    if ($officialUserId === '') {
+        return [
+            'user_id' => '',
+            'full_name' => trim((string)($fallback['full_name'] ?? $fallback['option_label'] ?? 'Barangay Official')),
+            'phone_number' => '',
+            'email' => '',
+        ];
+    }
+
+    $stmt = $conn->prepare("
+        SELECT ua.user_id,
+               ua.email,
+               ua.phone_number,
+               oi.firstname,
+               oi.middlename,
+               oi.lastname,
+               oi.suffix,
+               oi.contact_number AS official_contact_number,
+               oi.email AS official_email
+        FROM useraccountstbl ua
+        LEFT JOIN officialinformationtbl oi
+            ON oi.user_id COLLATE utf8mb4_general_ci = ua.user_id COLLATE utf8mb4_general_ci
+        WHERE ua.user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new RuntimeException('Unable to load the assigned official contact details.');
+    }
+
+    $stmt->bind_param('s', $officialUserId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        throw new RuntimeException('Assigned official account could not be found.');
+    }
+
+    $row = pii_decrypt_official_row($row) ?? $row;
+    $row = pii_decrypt_useraccount_row($row) ?? $row;
+
+    $fullName = appointmentDisplayName($row, (string)($fallback['full_name'] ?? $fallback['option_label'] ?? 'Barangay Official'));
+    $email = strtolower(trim((string)($row['official_email'] ?? '')));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $email = strtolower(trim((string)($row['email'] ?? '')));
+    }
+
+    $phoneNumber = appointmentNormalizePhone((string)($row['official_contact_number'] ?? ''));
+    if ($phoneNumber === null) {
+        $phoneNumber = appointmentNormalizePhone((string)($row['phone_number'] ?? ''));
+    }
+
+    return [
+        'user_id' => $officialUserId,
+        'full_name' => $fullName !== '' ? $fullName : 'Barangay Official',
+        'phone_number' => $phoneNumber ?? '',
+        'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '',
+    ];
+}
+
+function appointmentSlotIsAlreadyBooked(mysqli $conn, array $appointmentColumns, string $officialUserId, string $scheduleTimestamp): bool
+{
+    $officialUserId = trim($officialUserId);
+    $scheduleTimestamp = trim($scheduleTimestamp);
+    if (
+        $officialUserId === ''
+        || $scheduleTimestamp === ''
+        || !isset($appointmentColumns['user_id_official_assigned'])
+    ) {
+        return false;
+    }
+
+    $timestampColumns = [];
+    foreach (['confirmed_schedule_timestamp', 'preferred_schedule_timestamp', 'schedule_timestamp'] as $column) {
+        if (isset($appointmentColumns[$column])) {
+            $timestampColumns[] = $column;
+        }
+    }
+
+    if ($timestampColumns === []) {
+        return false;
+    }
+
+    $timeClauses = [];
+    $bindTypes = 's';
+    $bindValues = [$officialUserId];
+    foreach ($timestampColumns as $column) {
+        $timeClauses[] = "a.{$column} = ?";
+        $bindTypes .= 's';
+        $bindValues[] = $scheduleTimestamp;
+    }
+
+    $statusJoin = '';
+    $statusFilter = '';
+    if (appointmentTableExists($conn, 'statuslookuptbl') && isset($appointmentColumns['appointment_status_id'])) {
+        $statusJoin = "
+            LEFT JOIN statuslookuptbl s
+                ON s.status_id = a.appointment_status_id
+        ";
+        $statusFilter = "AND LOWER(TRIM(COALESCE(s.status_name, ''))) <> 'denied'";
+    }
+
+    $sql = "
+        SELECT a.appointment_id
+        FROM appointmentstbl a
+        {$statusJoin}
+        WHERE a.user_id_official_assigned = ?
+          AND (" . implode(' OR ', $timeClauses) . ")
+          {$statusFilter}
+        LIMIT 1
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new RuntimeException('Unable to validate the selected appointment slot.');
+    }
+
+    $stmt->bind_param($bindTypes, ...$bindValues);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return (bool)$row;
+}
+
+function appointmentSendNotifications(array $resident, array $official, array $appointment): array
+{
+    $errors = [];
+    $appointmentId = trim((string)($appointment['appointment_id'] ?? ''));
+    $subject = trim((string)($appointment['subject'] ?? ''));
+    $purpose = trim((string)($appointment['purpose'] ?? ''));
+    $location = trim((string)($appointment['meeting_location'] ?? ''));
+    $scheduleLabel = appointmentFormatTimestampLabel((string)($appointment['confirmed_schedule_timestamp'] ?? ''));
+    $locationLabel = $location !== '' ? $location : 'the assigned meeting location';
+    $officialName = trim((string)($official['full_name'] ?? 'Barangay Official'));
+    $residentName = trim((string)($resident['full_name'] ?? 'Resident'));
+    $residentPhone = trim((string)($resident['phone_number'] ?? ''));
+    $officialPhone = trim((string)($official['phone_number'] ?? ''));
+    $officialEmail = trim((string)($official['email'] ?? ''));
+    $residentSms = "Barangay San Jose: Your appointment {$appointmentId} with {$officialName} is confirmed for {$scheduleLabel} at {$locationLabel}. Subject: {$subject}.";
+    $officialSms = "Barangay San Jose: New confirmed appointment {$appointmentId} with {$residentName} on {$scheduleLabel} at {$locationLabel}. Subject: {$subject}.";
+
+    if ($residentPhone !== '') {
+        if (!sendSMS($residentPhone, $residentSms)) {
+            $errors[] = 'Resident SMS failed' . (getLastSmsError() !== '' ? ': ' . getLastSmsError() : '.');
+        }
+    } else {
+        $errors[] = 'Resident SMS skipped because no mobile number is on file.';
+    }
+
+    if ($officialPhone !== '') {
+        if (!sendSMS($officialPhone, $officialSms)) {
+            $errors[] = 'Official SMS failed' . (getLastSmsError() !== '' ? ': ' . getLastSmsError() : '.');
+        }
+    } else {
+        $errors[] = 'Official SMS skipped because no mobile number is on file.';
+    }
+
+    if ($officialEmail !== '') {
+        $smtpConfig = require __DIR__ . '/../General/mailConfigurations.php';
+        $emailSender = new EmailSender($smtpConfig);
+        $emailSubject = 'New Appointment Confirmed: ' . ($appointmentId !== '' ? $appointmentId : 'Barangay San Jose');
+        $emailBodyHtml = '
+            <p>Hello ' . htmlspecialchars($officialName, ENT_QUOTES, 'UTF-8') . ',</p>
+            <p>A resident appointment was automatically confirmed after booking.</p>
+            <ul>
+                <li><strong>Appointment ID:</strong> ' . htmlspecialchars($appointmentId, ENT_QUOTES, 'UTF-8') . '</li>
+                <li><strong>Resident:</strong> ' . htmlspecialchars($residentName, ENT_QUOTES, 'UTF-8') . '</li>
+                <li><strong>Schedule:</strong> ' . htmlspecialchars($scheduleLabel, ENT_QUOTES, 'UTF-8') . '</li>
+                <li><strong>Meeting location:</strong> ' . htmlspecialchars($locationLabel, ENT_QUOTES, 'UTF-8') . '</li>
+                <li><strong>Subject:</strong> ' . htmlspecialchars($subject, ENT_QUOTES, 'UTF-8') . '</li>
+                <li><strong>Purpose:</strong> ' . htmlspecialchars($purpose, ENT_QUOTES, 'UTF-8') . '</li>
+                <li><strong>Resident contact:</strong> ' . htmlspecialchars($residentPhone !== '' ? $residentPhone : 'Not available', ENT_QUOTES, 'UTF-8') . '</li>
+            </ul>
+            <p>Please open the appointment tracker if any follow-up or rescheduling is needed.</p>
+        ';
+        $emailBodyText = implode("\n", [
+            "Hello {$officialName},",
+            '',
+            'A resident appointment was automatically confirmed after booking.',
+            "Appointment ID: {$appointmentId}",
+            "Resident: {$residentName}",
+            "Schedule: {$scheduleLabel}",
+            "Meeting location: {$locationLabel}",
+            "Subject: {$subject}",
+            "Purpose: {$purpose}",
+            'Resident contact: ' . ($residentPhone !== '' ? $residentPhone : 'Not available'),
+        ]);
+
+        if (!$emailSender->send([
+            'type' => 'transaction',
+            'to' => $officialEmail,
+            'subject' => $emailSubject,
+            'bodyHtml' => $emailBodyHtml,
+            'bodyText' => $emailBodyText,
+        ])) {
+            $errors[] = 'Official email failed' . ($emailSender->getLastError() !== '' ? ': ' . $emailSender->getLastError() : '.');
+        }
+    } else {
+        $errors[] = 'Official email skipped because no email address is on file.';
+    }
+
+    return $errors;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     exit('Method not allowed.');
@@ -230,7 +474,7 @@ if ($firstName === '' || $lastName === '' || $contactNumber === null) {
 
 $nameParts = array_filter([$firstName, $middleName, $lastName, $suffix], static fn($value) => trim((string)$value) !== '');
 $residentName = implode(' ', $nameParts);
-$statusId = appointmentEnsureStatusId($conn, 'Pending', 'Appointment');
+$statusId = appointmentEnsureStatusId($conn, 'Approved', 'Appointment');
 $appointmentId = GenerateAppointmentID($conn);
 
 if (!$appointmentId) {
@@ -242,8 +486,14 @@ $normalizedSubjectOther = $subject === 'other' ? $subjectOther : null;
 $residentNotes = $subject === 'other' ? 'Other subject detail: ' . $subjectOther : null;
 $residentUserId = $userId !== '' ? $userId : null;
 $preferredScheduleTimestamp = $schedule->format('Y-m-d H:i:s');
+$confirmedScheduleTimestamp = $preferredScheduleTimestamp;
 $meetingLocation = apos_normalize_location($officialAvailability['meeting_location'] ?? '');
 $appointmentColumns = appointmentGetTableColumns($conn, 'appointmentstbl');
+try {
+    $officialContact = appointmentLoadOfficialDeliveryContact($conn, $officialUserId, $councilMembersByUserId[$officialUserId] ?? []);
+} catch (Throwable $e) {
+    appointmentRedirectWithMessage('error', 'Unable to prepare the assigned official details for this appointment.');
+}
 
 if (!isset($appointmentColumns['user_id_official_assigned'])) {
     appointmentRedirectWithMessage('error', 'The appointment module is missing the council member assignment field. Please run the latest appointment migration first.');
@@ -273,6 +523,10 @@ try {
     ];
     $bindTypes = 'ssssssss';
 
+    if (appointmentSlotIsAlreadyBooked($conn, $appointmentColumns, $officialUserId, $confirmedScheduleTimestamp)) {
+        throw new Exception('The selected schedule was just taken. Please choose another available appointment slot.');
+    }
+
     if (isset($appointmentColumns['preferred_schedule_timestamp'])) {
         $insertColumns[] = 'preferred_schedule_timestamp';
         $insertValues[] = $preferredScheduleTimestamp;
@@ -283,6 +537,12 @@ try {
         $bindTypes .= 's';
     } else {
         throw new Exception('Appointment schedule column is missing from appointmentstbl.');
+    }
+
+    if (isset($appointmentColumns['confirmed_schedule_timestamp'])) {
+        $insertColumns[] = 'confirmed_schedule_timestamp';
+        $insertValues[] = $confirmedScheduleTimestamp;
+        $bindTypes .= 's';
     }
 
     if (isset($appointmentColumns['appointment_status_id'])) {
@@ -328,11 +588,25 @@ try {
     $stmt->close();
 
     $conn->commit();
-    appointmentRedirectWithMessage('success', 'Appointment request submitted successfully.', [
+    $notificationErrors = appointmentSendNotifications([
+        'full_name' => $residentName,
+        'phone_number' => $contactNumber,
+    ], $officialContact, [
+        'appointment_id' => $appointmentId,
+        'subject' => $subjectLabel,
+        'purpose' => $purpose,
+        'meeting_location' => $meetingLocation,
+        'confirmed_schedule_timestamp' => $confirmedScheduleTimestamp,
+    ]);
+    if ($notificationErrors !== []) {
+        error_log('submitAppointment notification warnings: ' . implode(' | ', $notificationErrors));
+    }
+
+    appointmentRedirectWithMessage('success', 'Appointment confirmed successfully.', [
         'appointment_id' => $appointmentId,
     ]);
 } catch (Throwable $e) {
     $conn->rollback();
     error_log('submitAppointment failed: ' . $e->getMessage());
-    appointmentRedirectWithMessage('error', 'Unable to submit your appointment request right now.');
+    appointmentRedirectWithMessage('error', $e->getMessage() !== '' ? $e->getMessage() : 'Unable to submit your appointment request right now.');
 }
