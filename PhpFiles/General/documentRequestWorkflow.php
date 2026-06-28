@@ -1742,10 +1742,7 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
         $transactionId = GenerateTransactionID($conn, 'financetransactiontbl', 'transaction_id');
     }
 
-    $payload = json_decode((string)($request['request_details'] ?? $request['payload_json'] ?? '{}'), true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dr_decode_request_payload($request);
     $lastName = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
     $firstName = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
     $middle = trim((string)($payload['middle_name'] ?? $payload['middlename'] ?? ''));
@@ -2942,11 +2939,7 @@ function dr_ensure_barangay_id_row_for_request(mysqli $conn, array $requestRow):
         return;
     }
 
-    $detailsRaw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
-    $payload = json_decode($detailsRaw, true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dr_decode_request_payload($requestRow);
 
     $docType = trim((string)($requestRow['document_type'] ?? ''));
     if ($docType === '') {
@@ -2973,11 +2966,7 @@ function dr_ensure_issuance_row_for_request(mysqli $conn, array $requestRow): vo
         return;
     }
 
-    $detailsRaw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
-    $payload = json_decode($detailsRaw, true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dr_decode_request_payload($requestRow);
 
     $docType = trim((string)($requestRow['document_type'] ?? ''));
     if ($docType === '') {
@@ -3009,11 +2998,7 @@ function dr_ensure_clearance_row_for_request(mysqli $conn, array $requestRow): v
         return;
     }
 
-    $detailsRaw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
-    $payload = json_decode($detailsRaw, true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dr_decode_request_payload($requestRow);
 
     $docType = trim((string)($requestRow['document_type'] ?? ''));
     if ($docType === '') {
@@ -3096,10 +3081,8 @@ function dr_backfill_missing_issuance_requests(mysqli $conn, int $limit = 1000):
     foreach ($rows as $row) {
         $docType = trim((string)($row['document_type'] ?? ''));
         if ($docType === '' && $hasRequestDetails) {
-            $decoded = json_decode((string)($row['request_details'] ?? '{}'), true);
-            if (is_array($decoded)) {
-                $docType = trim((string)($decoded['document_type'] ?? ''));
-            }
+            $decoded = dr_decode_request_payload($row);
+            $docType = trim((string)($decoded['document_type'] ?? ''));
         }
         if (!dr_is_issuance_document_type(dr_normalize_document_type($docType))) {
             continue;
@@ -3161,10 +3144,8 @@ function dr_backfill_missing_clearance_requests(mysqli $conn, int $limit = 1000)
     foreach ($rows as $row) {
         $docType = trim((string)($row['document_type'] ?? ''));
         if ($docType === '' && $hasRequestDetails) {
-            $decoded = json_decode((string)($row['request_details'] ?? '{}'), true);
-            if (is_array($decoded)) {
-                $docType = trim((string)($decoded['document_type'] ?? ''));
-            }
+            $decoded = dr_decode_request_payload($row);
+            $docType = trim((string)($decoded['document_type'] ?? ''));
         }
         if (!dr_is_clearance_document_type(dr_normalize_document_type($docType))) {
             continue;

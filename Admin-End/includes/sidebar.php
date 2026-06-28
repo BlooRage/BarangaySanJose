@@ -30,7 +30,7 @@ if ($officialTransitionTool === '' || in_array($officialTransitionTool, ['tracke
 }
 
 $appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
-if (!in_array($appointmentTool, ['tracker', 'settings'], true)) {
+if (!in_array($appointmentTool, ['tracker', 'settings', 'schedule'], true)) {
     $appointmentTool = 'tracker';
 }
 

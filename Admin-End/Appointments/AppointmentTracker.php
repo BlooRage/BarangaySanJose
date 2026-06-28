@@ -19,6 +19,10 @@ $appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if (!in_array($appointmentTool, ['tracker', 'settings', 'schedule'], true)) {
     $appointmentTool = 'tracker';
 }
+$appointmentDateScope = strtolower(trim((string)($_GET['date_scope'] ?? '')));
+if (!in_array($appointmentDateScope, ['today', 'tomorrow'], true)) {
+    $appointmentDateScope = '';
+}
 $isAppointmentSettingsView = $appointmentTool === 'settings';
 $isAppointmentScheduleView = $appointmentTool === 'schedule';
 $isAppointmentTrackerView = !$isAppointmentSettingsView && !$isAppointmentScheduleView;
@@ -249,6 +253,7 @@ $appointmentScheduleRows = $appointmentScheduleSelectedUserId !== ''
     ? apos_weekly_schedule_for_user($conn, $appointmentScheduleSelectedUserId, $appointmentSettings)
     : [];
 $appointmentScheduleMap = apos_fetch_schedule_map($conn, array_keys($appointmentCouncilMembersByUserId), $appointmentSettings);
+$appointmentBookedSlotMap = apos_fetch_booked_slots_map($conn, array_keys($appointmentCouncilMembersByUserId));
 $appointmentScheduleWeekdayOptions = aps_weekday_options();
 $appointmentScheduleTimeOptions = [];
 $appointmentScheduleTimeCursor = DateTimeImmutable::createFromFormat('H:i', aps_schedule_start_time());
@@ -305,26 +310,35 @@ function at_status_key(string $value): string
     if ($normalized === '') {
         return 'pending';
     }
+    if (str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
+        return 'completed';
+    }
+    if (str_contains($normalized, 'resched')) {
+        return 'rescheduled';
+    }
+    if (str_contains($normalized, 'confirm')) {
+        return 'approved';
+    }
     if (str_contains($normalized, 'approve')) {
         return 'approved';
     }
     if (str_contains($normalized, 'deny') || str_contains($normalized, 'denied') || str_contains($normalized, 'reject')) {
         return 'denied';
     }
-    if (str_contains($normalized, 'resched')) {
-        return 'approved';
-    }
-    if (str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
-        return 'approved';
-    }
     return 'pending';
 }
 
 function at_status_label(string $value): string
 {
+    if (at_is_rescheduled($value)) {
+        return 'Rescheduled';
+    }
     $key = at_status_key($value);
+    if ($key === 'completed') {
+        return 'Completed';
+    }
     if ($key === 'approved') {
-        return 'Approved';
+        return 'Confirmed';
     }
     if ($key === 'denied') {
         return 'Denied';
@@ -335,6 +349,12 @@ function at_status_label(string $value): string
 function at_status_pill(string $value): string
 {
     $key = at_status_key($value);
+    if ($key === 'completed') {
+        return 'completed';
+    }
+    if ($key === 'rescheduled') {
+        return 'rescheduled';
+    }
     if ($key === 'approved') {
         return 'approved';
     }
@@ -437,6 +457,79 @@ function at_middle_initial_name(string $value, string $fallback = '-'): string
     ])) . $suffix);
 }
 
+function at_contains_encrypted_marker(string $value): bool
+{
+    $value = strtolower(trim($value));
+    if ($value === '') {
+        return false;
+    }
+
+    return str_contains($value, 'pii:v1:') || str_contains($value, 'pii:v2:');
+}
+
+function at_fetch_official_directory(mysqli $conn): array
+{
+    if (!($conn->query("SHOW TABLES LIKE 'officialinformationtbl'") instanceof mysqli_result)) {
+        return [];
+    }
+
+    $result = $conn->query("
+        SELECT user_id, firstname, middlename, lastname, suffix
+        FROM officialinformationtbl
+    ");
+    if (!($result instanceof mysqli_result)) {
+        return [];
+    }
+
+    $directory = [];
+    while ($row = $result->fetch_assoc()) {
+        $row = pii_decrypt_official_row($row) ?? $row;
+        $userId = trim((string)($row['user_id'] ?? ''));
+        if ($userId === '') {
+            continue;
+        }
+
+        $name = trim(implode(' ', array_values(array_filter([
+            trim((string)($row['firstname'] ?? '')),
+            trim((string)($row['middlename'] ?? '')),
+            trim((string)($row['lastname'] ?? '')),
+            trim((string)($row['suffix'] ?? '')),
+        ], static fn(string $part): bool => $part !== ''))));
+
+        if ($name !== '') {
+            $directory[$userId] = $name;
+        }
+    }
+    $result->free();
+
+    return $directory;
+}
+
+function at_resolve_official_display_name(string $userId, array $councilMap, array $officialDirectory, string $fallback = '-'): string
+{
+    $userId = trim($userId);
+    if ($userId !== '' && isset($councilMap[$userId])) {
+        $label = trim((string)($councilMap[$userId]['option_label'] ?? $councilMap[$userId]['full_name'] ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+    }
+
+    if ($userId !== '' && isset($officialDirectory[$userId])) {
+        $label = trim((string)$officialDirectory[$userId]);
+        if ($label !== '') {
+            return $label;
+        }
+    }
+
+    $fallback = trim($fallback);
+    if ($fallback !== '' && !at_contains_encrypted_marker($fallback)) {
+        return $fallback;
+    }
+
+    return '-';
+}
+
 function at_flash_message(string $key): string
 {
     return trim((string)($_GET[$key] ?? ''));
@@ -446,9 +539,11 @@ $appointmentRows = [];
 $loadError = '';
 $appointmentSuccessMessage = at_flash_message('success');
 $appointmentErrorMessage = at_flash_message('error');
+$appointmentInfoMessage = at_flash_message('info');
 $highlightAppointmentId = at_flash_message('appointment_id');
 $officialOptions = [];
 $scopedOfficialUserId = trim((string)($appointmentAccess['scoped_official_user_id'] ?? ''));
+$appointmentOfficialDirectory = at_fetch_official_directory($conn);
 
 if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
     $loadError = 'Appointment table is not available. Run the appointment migration first.';
@@ -559,6 +654,20 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
                 $confirmedAppointmentTime = at_format_time($row['confirmed_schedule_timestamp'] ?? null);
                 $scheduleDisplay = trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
                 $scheduleSubtitle = '';
+                $staffUserId = at_value($row, 'staff_user_id', '');
+                $staffName = at_resolve_official_display_name(
+                    $staffUserId,
+                    [],
+                    $appointmentOfficialDirectory,
+                    at_value($row, 'staff_name', '-')
+                );
+                $officialUserId = at_value($row, 'official_user_id', '');
+                $officialName = at_resolve_official_display_name(
+                    $officialUserId,
+                    $appointmentCouncilMembersByUserId,
+                    $appointmentOfficialDirectory,
+                    at_value($row, 'official_name', '-')
+                );
 
                 if ($confirmedScheduleTimestamp !== '') {
                     $scheduleDisplay = trim($confirmedAppointmentDate . ' ' . $confirmedAppointmentTime);
@@ -586,14 +695,17 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
                     'status_name' => $statusName,
                     'status_key' => at_status_key($statusName),
                     'status_pill' => at_status_pill($statusName),
-                    'status_subtitle' => $isRescheduled ? 'Rescheduled' : '',
-                    'staff_name' => at_value($row, 'staff_name', '-'),
-                    'official_user_id' => at_value($row, 'official_user_id', ''),
-                    'official_name' => at_value($row, 'official_name', '-'),
+                    'status_subtitle' => '',
+                    'staff_name' => $staffName,
+                    'official_user_id' => $officialUserId,
+                    'official_name' => $officialName,
                     'meeting_location' => at_value($row, 'meeting_location', ''),
                     'resident_notes' => at_value($row, 'resident_notes', '-'),
                     'appointment_remarks' => at_value($row, 'appointment_remarks', '-'),
-                    'review_timestamp_display' => at_format_datetime($row['review_timestamp'] ?? null),
+                    'review_timestamp_display' => at_format_datetime(
+                        $row['review_timestamp'] ?? null,
+                        $statusName === 'Confirmed' ? 'Confirmed upon submission' : '-'
+                    ),
                 ];
             }
             $result->free();
@@ -623,18 +735,6 @@ foreach ($appointmentCouncilMembers as $member) {
     ];
 }
 
-$pendingCount = 0;
-$approvedCount = 0;
-$deniedCount = 0;
-foreach ($appointmentRows as $row) {
-    if ($row['status_key'] === 'pending') {
-        $pendingCount++;
-    } elseif ($row['status_key'] === 'approved') {
-        $approvedCount++;
-    } elseif ($row['status_key'] === 'denied') {
-        $deniedCount++;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -669,10 +769,118 @@ foreach ($appointmentRows as $row) {
             white-space: nowrap;
         }
 
+        #appointmentTrackerPageTabs .nav-link {
+            color: #d76f12;
+            font-weight: 600;
+        }
+
+        #appointmentTrackerPageTabs .nav-link:hover,
+        #appointmentTrackerPageTabs .nav-link:focus-visible {
+            color: #b45309;
+        }
+
+        #appointmentTrackerPageTabs .nav-link.active,
+        #appointmentTrackerPageTabs .nav-link.active:hover,
+        #appointmentTrackerPageTabs .nav-link.active:focus-visible {
+            color: #d76f12;
+        }
+
+        #appointmentTrackerPanel {
+            border-top-left-radius: 0 !important;
+        }
+
+        .appointment-click-loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.88;
+        }
+
+        .appointment-click-loading::after {
+            content: "";
+            display: inline-block;
+            width: 0.9rem;
+            height: 0.9rem;
+            margin-left: 0.55rem;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            vertical-align: -0.12rem;
+            animation: appointment-button-spin 0.75s linear infinite;
+        }
+
+        .appointment-click-loading i {
+            opacity: 0.78;
+        }
+
+        .appointment-tracker-shell .btn,
+        #appointmentTrackerPageTabs .nav-link {
+            transition: opacity 0.16s ease, transform 0.16s ease;
+        }
+
+        .appointment-tracker-shell .btn:disabled,
+        #appointmentTrackerPageTabs .nav-link:disabled {
+            cursor: wait;
+        }
+
+        .appointment-tracker-shell.is-busy {
+            cursor: progress;
+        }
+
+        @keyframes appointment-button-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .appointment-filter-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .appointment-filter-grid .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .appointment-filter-summary {
+            color: #6b7280;
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 767.98px) {
+            #appointmentTrackerPageTabs {
+                gap: 0.5rem;
+            }
+
+            #appointmentTrackerPageTabs .nav-item {
+                width: 100%;
+            }
+
+            #appointmentTrackerPageTabs .nav-link {
+                width: 100%;
+            }
+
+            .appointment-filter-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
         .appointment-status-stack {
             display: inline-flex;
             flex-direction: column;
             align-items: flex-start;
+        }
+
+        .status-pill.rescheduled {
+            color: #1d4ed8;
+            background: #dbeafe;
+            border-color: #bfdbfe;
+        }
+
+        .status-pill.completed {
+            color: #0f5132;
+            background: #d1e7dd;
+            border-color: #badbcc;
         }
 
         .appointment-settings-shell {
@@ -1534,23 +1742,38 @@ foreach ($appointmentRows as $row) {
             </div>
         </div>
         <?php else: ?>
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border appointment-tracker-shell resident-masterlist-shell">
+        <ul class="nav nav-tabs mb-0" id="appointmentTrackerPageTabs" style="border-bottom:0">
+            <li class="nav-item">
+                <button class="nav-link appointment-date-scope-tab <?= $appointmentDateScope === '' ? 'active' : '' ?> fw-semibold" type="button" data-date-scope="">All</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link appointment-date-scope-tab <?= $appointmentDateScope === 'today' ? 'active' : '' ?> fw-semibold" type="button" data-date-scope="today">Appointments Today</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link appointment-date-scope-tab <?= $appointmentDateScope === 'tomorrow' ? 'active' : '' ?> fw-semibold" type="button" data-date-scope="tomorrow">Appointments Tomorrow</button>
+            </li>
+        </ul>
+
+        <div id="appointmentTrackerPanel" class="bg-white p-4 rounded-4 shadow-sm border appointment-tracker-shell resident-masterlist-shell">
+
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
                     <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="approved">&nbsp;&nbsp;Confirmed&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="completed">&nbsp;&nbsp;Completed&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="rescheduled">&nbsp;&nbsp;Rescheduled&nbsp;&nbsp;</button>
                     <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="denied">&nbsp;&nbsp;Denied&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" type="button" data-filter="pending">
-                        &nbsp;&nbsp;Pending
-                        <span class="pending-count-badge <?= $pendingCount > 0 ? '' : 'd-none' ?>" id="pendingAppointmentBadge"><?= (int)$pendingCount ?></span>
-                    </button>
                 </div>
 
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Appointment ID, resident, subject, purpose">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Appointment ID, resident, official, subject, purpose">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
+                    <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalAppointmentTrackerFilter" id="btnAppointmentFilter" title="Filter" aria-label="Filter">
+                        <i class="fa-solid fa-filter"></i>
+                        <span class="visually-hidden">Filter</span>
+                    </button>
                     <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAppointmentColumns" title="Columns" aria-label="Columns">
                         <i class="fa-solid fa-sliders"></i>
                         <span class="visually-hidden">Columns</span>
@@ -1589,9 +1812,13 @@ foreach ($appointmentRows as $row) {
                                 <tr
                                     class="<?= $highlightAppointmentId !== '' && $highlightAppointmentId === $row['appointment_id'] ? 'table-warning' : '' ?>"
                                     data-status="<?= htmlspecialchars($row['status_key'], ENT_QUOTES, 'UTF-8') ?>"
+                                    data-schedule-date="<?= htmlspecialchars(substr((string)($row['confirmed_schedule_timestamp'] !== '' ? $row['confirmed_schedule_timestamp'] : $row['preferred_schedule_timestamp']), 0, 10), ENT_QUOTES, 'UTF-8') ?>"
+                                    data-official-user-id="<?= htmlspecialchars($row['official_user_id'], ENT_QUOTES, 'UTF-8') ?>"
+                                    data-official-name="<?= htmlspecialchars($row['official_name'], ENT_QUOTES, 'UTF-8') ?>"
                                     data-search="<?= htmlspecialchars(strtolower(implode(' ', [
                                         $row['appointment_id'],
                                         $row['resident_name'],
+                                        $row['official_name'],
                                         $row['subject'],
                                         $row['purpose'],
                                         $row['status_name'],
@@ -1684,6 +1911,49 @@ foreach ($appointmentRows as $row) {
     </div>
 </div>
 
+<div class="modal fade" id="modalAppointmentTrackerFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Filter Appointments</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="appointment-filter-grid">
+                    <div>
+                        <label class="form-label small fw-bold mb-1" for="appointmentFilterDateFrom">Schedule From</label>
+                        <input type="date" class="form-control" id="appointmentFilterDateFrom">
+                    </div>
+                    <div>
+                        <label class="form-label small fw-bold mb-1" for="appointmentFilterDateTo">Schedule To</label>
+                        <input type="date" class="form-control" id="appointmentFilterDateTo">
+                    </div>
+                    <?php if (!empty($appointmentAccess['can_manage_all_tracker'])): ?>
+                    <div class="full-width">
+                        <label class="form-label small fw-bold mb-1" for="appointmentFilterOfficial">Council Member</label>
+                        <select class="form-select" id="appointmentFilterOfficial">
+                            <option value="">All council members</option>
+                            <?php foreach ($officialOptions as $official): ?>
+                                <option value="<?= htmlspecialchars((string)($official['user_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars((string)($official['option_label'] !== '' ? $official['option_label'] : ($official['full_name'] !== '' ? $official['full_name'] : $official['user_id'])), ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div class="appointment-filter-summary mt-3">
+                    Date filters apply to the appointment schedule date shown in the tracker.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="btnAppointmentFilterReset">Reset</button>
+                <button type="button" class="btn btn-primary" id="btnAppointmentFilterApply">Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="appointmentFeedbackModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1759,61 +2029,6 @@ foreach ($appointmentRows as $row) {
                         </div>
                     </section>
 
-                    <section class="tracker-form-section">
-                        <h6 class="tracker-form-section-title">Review Action</h6>
-                        <div class="tracker-form-value d-none" id="reviewLockedMessage">
-                            This appointment has already been reviewed. Status changes can no longer be modified.
-                        </div>
-                        <form method="post" action="<?= htmlspecialchars(appUrl('/PhpFiles/Admin-End/appointmentManagement.php'), ENT_QUOTES, 'UTF-8') ?>" id="appointmentReviewForm" class="tracker-profile-view">
-                            <?= csrfTokenField() ?>
-                            <input type="hidden" name="appointment_id" id="reviewAppointmentId" value="">
-                            <input type="hidden" name="action" id="reviewActionInput" value="">
-
-                            <div class="tracker-form-grid cols-4">
-                                <div class="tracker-form-field">
-                                    <label class="tracker-form-label" for="reviewOfficialUserId">Council Member</label>
-                                    <select class="form-select" name="official_user_id" id="reviewOfficialUserId">
-                                        <option value="">Select council member</option>
-                                        <?php foreach ($officialOptions as $official): ?>
-                                            <option value="<?= htmlspecialchars($official['user_id'], ENT_QUOTES, 'UTF-8') ?>">
-                                                <?= htmlspecialchars((string)($official['option_label'] !== '' ? $official['option_label'] : ($official['full_name'] !== '' ? $official['full_name'] : $official['user_id'])), ENT_QUOTES, 'UTF-8') ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <?php if ($officialOptions === []): ?>
-                                        <div class="text-danger small mt-1">No active barangay council members are currently available for appointment approval.</div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="tracker-form-field">
-                                    <label class="tracker-form-label" for="reviewConfirmedDate">Confirmed Date</label>
-                                    <input class="form-control" type="date" name="confirmed_date" id="reviewConfirmedDate" min="<?= htmlspecialchars($minConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" data-disabled-weekdays="<?= htmlspecialchars(implode(',', $appointmentDisabledWeekdays), ENT_QUOTES, 'UTF-8') ?>" data-disabled-dates="<?= htmlspecialchars($appointmentUnavailableDatesCsv, ENT_QUOTES, 'UTF-8') ?>" data-available-weekdays="<?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>" data-date-modal-ignore>
-                                </div>
-                                <div class="tracker-form-field">
-                                    <label class="tracker-form-label" for="reviewConfirmedTime">Confirmed Time</label>
-                                    <select class="form-select" name="confirmed_time" id="reviewConfirmedTime">
-                                        <option value="">Select allotted time</option>
-                                        <?php foreach ($appointmentTimeSlots as $slotValue => $slotLabel): ?>
-                                            <option value="<?= htmlspecialchars($slotValue, ENT_QUOTES, 'UTF-8') ?>">
-                                                <?= htmlspecialchars($slotLabel, ENT_QUOTES, 'UTF-8') ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="tracker-form-field">
-                                    <label class="tracker-form-label" for="reviewMeetingLocation">Meeting Location</label>
-                                    <input class="form-control" type="text" id="reviewMeetingLocation" value="" readonly>
-                                </div>
-                            </div>
-
-                            <div class="tracker-form-grid cols-1">
-                                <div class="tracker-form-field">
-                                    <div class="text-danger small d-none" id="reviewScheduleError">
-                                        Rescheduled time must be within office hours, from 9:00 AM to 5:00 PM.
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </section>
                 </div>
             </div>
             <div class="modal-footer justify-content-between flex-wrap gap-2">
@@ -1821,52 +2036,55 @@ foreach ($appointmentRows as $row) {
                 <div class="d-flex flex-wrap gap-2 d-none" id="reviewActionFooter">
                     <button type="button" class="btn btn-danger" data-review-action="deny_appointment">Deny</button>
                     <button type="button" class="btn btn-warning" data-review-action="reschedule_appointment">Reschedule</button>
-                    <button type="button" class="btn btn-success" data-review-action="approve_appointment">Approve</button>
+                    <button type="button" class="btn btn-success" data-review-action="complete_appointment">Complete</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<form method="post" action="<?= htmlspecialchars(appUrl('/PhpFiles/Admin-End/appointmentManagement.php'), ENT_QUOTES, 'UTF-8') ?>" id="appointmentReviewForm" class="d-none">
+    <?= csrfTokenField() ?>
+    <input type="hidden" name="appointment_id" id="reviewAppointmentId" value="">
+    <input type="hidden" name="action" id="reviewActionInput" value="">
+    <input type="hidden" name="official_user_id" id="reviewOfficialUserId" value="">
+</form>
+
 <div class="modal fade" id="appointmentActionConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="appointmentActionConfirmTitle">Confirm Appointment Action</h5>
+                <h5 class="modal-title" id="appointmentActionConfirmTitle">Confirm Review Action</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p class="mb-2" id="appointmentActionConfirmMessage">This action cannot be undone.</p>
-                <div class="tracker-form-field d-none" id="appointmentActionSchedulePreviewField">
-                    <div class="tracker-form-value p-0 overflow-hidden">
-                        <div class="table-responsive">
-                            <table class="table table-sm appointment-action-compare mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th scope="col"></th>
-                                        <th scope="col">Preferred</th>
-                                        <th scope="col">Confirmed</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <th scope="row">Date</th>
-                                        <td id="appointmentActionPreferredDate">-</td>
-                                        <td id="appointmentActionConfirmedDate">-</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">Time</th>
-                                        <td id="appointmentActionPreferredTime">-</td>
-                                        <td id="appointmentActionConfirmedTime">-</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                <div class="tracker-form-field d-none" id="appointmentActionScheduleFields">
+                    <div class="tracker-form-grid cols-2">
+                        <div class="tracker-form-field">
+                            <label class="tracker-form-label" for="reviewConfirmedDate">Reschedule Date</label>
+                            <input class="form-control" type="date" name="confirmed_date" id="reviewConfirmedDate" form="appointmentReviewForm" min="<?= htmlspecialchars($minConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" data-disabled-weekdays="<?= htmlspecialchars(implode(',', $appointmentDisabledWeekdays), ENT_QUOTES, 'UTF-8') ?>" data-disabled-dates="<?= htmlspecialchars($appointmentUnavailableDatesCsv, ENT_QUOTES, 'UTF-8') ?>" data-available-weekdays="<?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>" data-date-modal-ignore>
                         </div>
+                        <div class="tracker-form-field">
+                            <label class="tracker-form-label" for="reviewConfirmedTime">Reschedule Time</label>
+                            <select class="form-select" name="confirmed_time" id="reviewConfirmedTime" form="appointmentReviewForm">
+                                <option value="">Select allotted time</option>
+                                <?php foreach ($appointmentTimeSlots as $slotValue => $slotLabel): ?>
+                                    <option value="<?= htmlspecialchars($slotValue, ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= htmlspecialchars($slotLabel, ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="text-danger small d-none mt-2" id="reviewScheduleError">
+                        Rescheduled time must be within office hours, from 9:00 AM to 5:00 PM.
                     </div>
                 </div>
                 <div class="tracker-form-field d-none" id="appointmentActionRemarksField">
-                    <label class="tracker-form-label" for="reviewAppointmentRemarks">Review Remarks</label>
-                    <textarea class="form-control" name="appointment_remarks" id="reviewAppointmentRemarks" rows="3" form="appointmentReviewForm" placeholder="Add denial remarks"></textarea>
+                    <label class="tracker-form-label" for="reviewAppointmentRemarks">Denial Reason</label>
+                    <textarea class="form-control" name="appointment_remarks" id="reviewAppointmentRemarks" rows="3" form="appointmentReviewForm" placeholder="Add denial reason" maxlength="140"></textarea>
+                    <div class="text-muted small mt-1">Keep the denial reason within 140 characters so the SMS stays within one message.</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1888,6 +2106,7 @@ foreach ($appointmentRows as $row) {
         defaultHiddenIdxs: []
     };
     window.APPOINTMENT_OFFICIAL_SCHEDULE_MAP = <?= json_encode($appointmentScheduleMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.APPOINTMENT_BOOKED_SLOT_MAP = <?= json_encode($appointmentBookedSlotMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.APPOINTMENT_MEETING_LOCATION_OPTIONS = <?= json_encode(array_values($appointmentMeetingLocations), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.APPOINTMENT_GLOBAL_SCHEDULE_CONFIG = <?= json_encode([
         'startTime' => aps_schedule_start_time(),
@@ -1910,13 +2129,25 @@ foreach ($appointmentRows as $row) {
     (() => {
         const feedbackSuccessMessage = <?= json_encode($appointmentSuccessMessage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         const feedbackErrorMessage = <?= json_encode($appointmentErrorMessage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        const feedbackInfoMessage = <?= json_encode($appointmentInfoMessage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        const initialDateScope = <?= json_encode($appointmentDateScope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        const todayIso = <?= json_encode($appointmentToday->format('Y-m-d'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        const tomorrowIso = <?= json_encode($appointmentToday->modify('+1 day')->format('Y-m-d'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        const trackerPanel = document.getElementById("appointmentTrackerPanel");
         const tableBody = document.getElementById("tableBody");
         const searchInput = document.getElementById("searchInput");
         const entriesPerPageInput = document.getElementById("entriesPerPageInput");
         const paginationEl = document.getElementById("appointmentPagination");
         const refreshBtn = document.getElementById("btnAppointmentTableRefresh");
-        const pendingBadge = document.getElementById("pendingAppointmentBadge");
-        const filterButtons = Array.from(document.querySelectorAll(".status-filter-btn"));
+        const statusFilterButtons = Array.from(document.querySelectorAll(".status-filter-btn"));
+        const dateScopeButtons = Array.from(document.querySelectorAll(".appointment-date-scope-tab"));
+        const appointmentFilterBtn = document.getElementById("btnAppointmentFilter");
+        const appointmentFilterModalEl = document.getElementById("modalAppointmentTrackerFilter");
+        const appointmentFilterDateFrom = document.getElementById("appointmentFilterDateFrom");
+        const appointmentFilterDateTo = document.getElementById("appointmentFilterDateTo");
+        const appointmentFilterOfficial = document.getElementById("appointmentFilterOfficial");
+        const appointmentFilterResetBtn = document.getElementById("btnAppointmentFilterReset");
+        const appointmentFilterApplyBtn = document.getElementById("btnAppointmentFilterApply");
         const reviewForm = document.getElementById("appointmentReviewForm");
         const reviewActionInput = document.getElementById("reviewActionInput");
         const reviewAppointmentId = document.getElementById("reviewAppointmentId");
@@ -1927,8 +2158,10 @@ foreach ($appointmentRows as $row) {
         const reviewScheduleError = document.getElementById("reviewScheduleError");
         const reviewRemarks = document.getElementById("reviewAppointmentRemarks");
         const reviewActionButtons = Array.from(document.querySelectorAll("[data-review-action]"));
+        const reviewActionButtonsByAction = Object.fromEntries(
+            reviewActionButtons.map((button) => [String(button.dataset.reviewAction || "").trim(), button])
+        );
         const reviewActionFooter = document.getElementById("reviewActionFooter");
-        const reviewLockedMessage = document.getElementById("reviewLockedMessage");
         const feedbackModalEl = document.getElementById("appointmentFeedbackModal");
         const feedbackModalTitle = document.getElementById("appointmentFeedbackModalTitle");
         const feedbackModalMessage = document.getElementById("appointmentFeedbackModalMessage");
@@ -1936,25 +2169,30 @@ foreach ($appointmentRows as $row) {
         const confirmModalEl = document.getElementById("appointmentActionConfirmModal");
         const confirmModalTitle = document.getElementById("appointmentActionConfirmTitle");
         const confirmModalMessage = document.getElementById("appointmentActionConfirmMessage");
-        const confirmSchedulePreviewField = document.getElementById("appointmentActionSchedulePreviewField");
-        const confirmPreferredDate = document.getElementById("appointmentActionPreferredDate");
-        const confirmPreferredTime = document.getElementById("appointmentActionPreferredTime");
-        const confirmConfirmedDate = document.getElementById("appointmentActionConfirmedDate");
-        const confirmConfirmedTime = document.getElementById("appointmentActionConfirmedTime");
+        const confirmScheduleFields = document.getElementById("appointmentActionScheduleFields");
         const confirmRemarksField = document.getElementById("appointmentActionRemarksField");
         const confirmModalReturnBtn = document.getElementById("appointmentActionReturnBtn");
         const confirmModalConfirmBtn = document.getElementById("appointmentActionConfirmBtn");
         const viewModalInstance = modal ? bootstrap.Modal.getOrCreateInstance(modal) : null;
         const confirmModalInstance = confirmModalEl ? bootstrap.Modal.getOrCreateInstance(confirmModalEl) : null;
+        const appointmentFilterModalInstance = appointmentFilterModalEl ? bootstrap.Modal.getOrCreateInstance(appointmentFilterModalEl) : null;
 
         let allRows = Array.from(tableBody?.querySelectorAll("tr") || []).filter((row) => row.dataset.status !== undefined);
         let currentPage = 1;
-        let activeFilter = "";
+        let activeStatusFilter = "";
+        let activeDateScope = ["today", "tomorrow"].includes(initialDateScope) ? initialDateScope : "";
+        let activeDateFrom = "";
+        let activeDateTo = "";
+        let activeOfficialUserId = "";
         let pendingReviewAction = "";
+        let renderQueued = false;
+        let renderPromise = null;
+        let searchInputDebounce = null;
         const AUTO_REFRESH_MS = 30000;
         let autoRefreshTimeout = null;
         let autoRefreshInFlight = false;
         const officialScheduleMap = window.APPOINTMENT_OFFICIAL_SCHEDULE_MAP || {};
+        const bookedSlotMap = window.APPOINTMENT_BOOKED_SLOT_MAP || {};
         const globalScheduleConfig = window.APPOINTMENT_GLOBAL_SCHEDULE_CONFIG || {};
         const disabledWeekdays = new Set((Array.isArray(globalScheduleConfig.disabledWeekdays) ? globalScheduleConfig.disabledWeekdays : []).map((value) => String(value)));
         const disabledDates = new Set(Array.isArray(globalScheduleConfig.disabledDates) ? globalScheduleConfig.disabledDates : []);
@@ -2002,6 +2240,80 @@ foreach ($appointmentRows as $row) {
 
         const formatReviewTime = (value) => formatTimeLabel(value);
 
+        const nextPaint = () => new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(resolve);
+            });
+        });
+
+        const setButtonLoading = (button, on, loadingLabel = "") => {
+            if (!(button instanceof HTMLElement)) {
+                return;
+            }
+
+            if (on) {
+                if (!button.dataset.originalHtml) {
+                    button.dataset.originalHtml = button.innerHTML;
+                }
+                if (!button.dataset.originalWidth) {
+                    button.dataset.originalWidth = String(button.getBoundingClientRect().width || 0);
+                }
+                if (loadingLabel !== "") {
+                    button.textContent = loadingLabel;
+                }
+                button.classList.add("appointment-click-loading");
+                button.setAttribute("aria-busy", "true");
+                button.setAttribute("disabled", "disabled");
+                const lockedWidth = Number(button.dataset.originalWidth || 0);
+                if (lockedWidth > 0) {
+                    button.style.width = `${lockedWidth}px`;
+                }
+                return;
+            }
+
+            if (button.dataset.originalHtml) {
+                button.innerHTML = button.dataset.originalHtml;
+            }
+            button.classList.remove("appointment-click-loading");
+            button.removeAttribute("aria-busy");
+            button.removeAttribute("disabled");
+            button.style.width = "";
+        };
+
+        const withButtonLoading = async (button, work, loadingLabel = "") => {
+            setButtonLoading(button, true, loadingLabel);
+            trackerPanel?.classList.add("is-busy");
+            try {
+                await nextPaint();
+                return await work();
+            } finally {
+                trackerPanel?.classList.remove("is-busy");
+                setButtonLoading(button, false);
+            }
+        };
+
+        const submitWithLoading = async (button, loadingLabel = "") => {
+            setButtonLoading(button, true, loadingLabel);
+            trackerPanel?.classList.add("is-busy");
+            await nextPaint();
+            reviewForm?.submit();
+        };
+
+        const syncAppointmentFilterButtonState = () => {
+            const hasActiveFilter = activeDateFrom !== "" || activeDateTo !== "" || activeOfficialUserId !== "";
+            appointmentFilterBtn?.classList.toggle("btn-outline-primary", hasActiveFilter);
+            appointmentFilterBtn?.classList.toggle("btn-outline-secondary", !hasActiveFilter);
+        };
+
+        const syncDateScopeButtons = () => {
+            dateScopeButtons.forEach((button) => {
+                const scope = String(button.dataset.dateScope || "").trim();
+                const isActive = scope === activeDateScope;
+                button.classList.toggle("active", isActive);
+                button.setAttribute("aria-selected", isActive ? "true" : "false");
+            });
+        };
+
         const isWithinOfficeHours = (value) => {
             const minutes = toMinutes(value);
             const minMinutes = toMinutes(globalScheduleConfig.startTime || "");
@@ -2032,7 +2344,23 @@ foreach ($appointmentRows as $row) {
             return dayEntry;
         };
 
-        const buildOfficialSlots = (officialUserId, isoDate) => {
+        const bookedAppointmentIdsFor = (officialUserId, isoDate, timeValue) => {
+            const officialKey = String(officialUserId || "").trim();
+            const dateKey = String(isoDate || "").trim();
+            const timeKey = String(timeValue || "").trim();
+            const officialBookings = bookedSlotMap[officialKey] || null;
+            if (!officialBookings || !dateKey || !timeKey) {
+                return [];
+            }
+            const dateBookings = officialBookings[dateKey] || null;
+            if (!dateBookings) {
+                return [];
+            }
+            return Array.isArray(dateBookings[timeKey]) ? dateBookings[timeKey] : [];
+        };
+
+        const buildOfficialSlots = (officialUserId, isoDate, options = {}) => {
+            const excludeAppointmentId = String(options.excludeAppointmentId || "").trim();
             const dayEntry = scheduleDayFor(officialUserId, isoDate);
             if (!dayEntry) {
                 return { dayEntry: null, slots: [] };
@@ -2070,6 +2398,10 @@ foreach ($appointmentRows as $row) {
                 const hours = Math.floor(current / 60);
                 const minutes = current % 60;
                 const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                const bookedIds = bookedAppointmentIdsFor(officialUserId, isoDate, value);
+                if (bookedIds.some((appointmentId) => String(appointmentId || "").trim() !== excludeAppointmentId)) {
+                    continue;
+                }
                 slots.push({
                     value,
                     label: formatTimeLabel(value),
@@ -2084,7 +2416,8 @@ foreach ($appointmentRows as $row) {
                 return [];
             }
 
-            const { slots } = buildOfficialSlots(officialUserId, isoDate);
+            const excludeAppointmentId = String(reviewAppointmentId?.value || "").trim();
+            const { slots } = buildOfficialSlots(officialUserId, isoDate, { excludeAppointmentId });
             reviewConfirmedTime.innerHTML = '<option value="">Select allotted time</option>';
             slots.forEach((slot) => {
                 const option = document.createElement("option");
@@ -2109,7 +2442,8 @@ foreach ($appointmentRows as $row) {
             }
             const officialUserId = String(reviewOfficialUserId?.value || "").trim();
             const isoDate = String(reviewConfirmedDate?.value || "").trim();
-            const { dayEntry } = buildOfficialSlots(officialUserId, isoDate);
+            const excludeAppointmentId = String(reviewAppointmentId?.value || "").trim();
+            const { dayEntry } = buildOfficialSlots(officialUserId, isoDate, { excludeAppointmentId });
             reviewMeetingLocation.value = dayEntry && String(dayEntry.meeting_location || "").trim()
                 ? String(dayEntry.meeting_location || "").trim()
                 : "";
@@ -2142,9 +2476,15 @@ foreach ($appointmentRows as $row) {
             }
 
             const officialUserId = String(reviewOfficialUserId?.value || "").trim();
-            const { dayEntry, slots } = buildOfficialSlots(officialUserId, value);
-            if (officialUserId !== "" && (!dayEntry || slots.length === 0)) {
+            const excludeAppointmentId = String(reviewAppointmentId?.value || "").trim();
+            const { dayEntry, slots } = buildOfficialSlots(officialUserId, value, { excludeAppointmentId });
+            if (officialUserId !== "" && !dayEntry) {
                 const message = "The selected council member is not available on that date.";
+                reviewConfirmedDate.setCustomValidity(message);
+                return { ok: false, message };
+            }
+            if (officialUserId !== "" && slots.length === 0) {
+                const message = "All appointment times for the selected council member are already taken on that date.";
                 reviewConfirmedDate.setCustomValidity(message);
                 return { ok: false, message };
             }
@@ -2162,24 +2502,41 @@ foreach ($appointmentRows as $row) {
 
             reviewActionButtons.forEach((button) => {
                 const action = String(button.dataset.reviewAction || "").trim();
-                const needsSchedule = action === "approve_appointment" || action === "reschedule_appointment";
-                button.disabled = needsSchedule
-                    ? !(hasOfficial && hasDate && hasTime && reviewDateValidation.ok)
-                    : false;
+                if (action === "reschedule_appointment") {
+                    button.disabled = !hasOfficial;
+                    return;
+                }
+                button.disabled = false;
             });
+        };
+
+        const syncReviewActionVisibility = (statusKey) => {
+            const normalizedStatusKey = String(statusKey || "").trim();
+            const isTerminal = normalizedStatusKey === "denied" || normalizedStatusKey === "completed";
+            const canModify = !isTerminal;
+
+            reviewActionFooter?.classList.toggle("d-none", !canModify);
+
+            reviewActionButtons.forEach((button) => {
+                button.classList.add("d-none");
+            });
+
+            if (!canModify) {
+                return;
+            }
+
+            reviewActionButtonsByAction["deny_appointment"]?.classList.remove("d-none");
+            reviewActionButtonsByAction["reschedule_appointment"]?.classList.remove("d-none");
+
+            if (normalizedStatusKey === "approved" || normalizedStatusKey === "rescheduled") {
+                reviewActionButtonsByAction["complete_appointment"]?.classList.remove("d-none");
+            }
         };
 
         function setRefreshLoading(on) {
             if (!refreshBtn) return;
             refreshBtn.classList.toggle("is-loading", !!on);
             refreshBtn.disabled = !!on;
-        }
-
-        function updatePendingBadge() {
-            if (!pendingBadge) return;
-            const count = allRows.filter((row) => String(row.dataset.status || "").trim().toLowerCase() === "pending").length;
-            pendingBadge.textContent = String(count);
-            pendingBadge.classList.toggle("d-none", count <= 0);
         }
 
         async function refreshTableOnly() {
@@ -2202,7 +2559,6 @@ foreach ($appointmentRows as $row) {
                 }
                 tableBody.innerHTML = nextBody.innerHTML;
                 allRows = Array.from(tableBody.querySelectorAll("tr")).filter((row) => row.dataset.status !== undefined);
-                updatePendingBadge();
                 renderTable();
             } catch (error) {
                 console.error("Unable to refresh appointment tracker:", error);
@@ -2261,8 +2617,39 @@ foreach ($appointmentRows as $row) {
         function getFilteredRows() {
             const term = String(searchInput?.value || "").trim().toLowerCase();
             return allRows.filter((row) => {
-                const matchesFilter = !activeFilter || String(row.dataset.status || "").trim().toLowerCase() === activeFilter;
+                const scheduleDate = String(row.dataset.scheduleDate || "").trim();
+                const statusKey = String(row.dataset.status || "").trim().toLowerCase();
+                const officialUserId = String(row.dataset.officialUserId || "").trim();
+                const matchesFilter = !activeStatusFilter || statusKey === activeStatusFilter;
                 if (!matchesFilter) return false;
+
+                if (activeDateScope === "today") {
+                    if (statusKey === "denied") {
+                        return false;
+                    }
+                    if (scheduleDate !== todayIso) {
+                        return false;
+                    }
+                } else if (activeDateScope === "tomorrow") {
+                    if (statusKey === "denied") {
+                        return false;
+                    }
+                    if (scheduleDate !== tomorrowIso) {
+                        return false;
+                    }
+                }
+
+                if (activeDateFrom !== "" && (scheduleDate === "" || scheduleDate < activeDateFrom)) {
+                    return false;
+                }
+
+                if (activeDateTo !== "" && (scheduleDate === "" || scheduleDate > activeDateTo)) {
+                    return false;
+                }
+
+                if (activeOfficialUserId !== "" && officialUserId !== activeOfficialUserId) {
+                    return false;
+                }
 
                 if (!term) return true;
                 return String(row.dataset.search || "").includes(term);
@@ -2270,24 +2657,37 @@ foreach ($appointmentRows as $row) {
         }
 
         function renderTable() {
+            renderQueued = false;
             const filteredRows = getFilteredRows();
             const perPage = Math.max(1, Number(entriesPerPageInput?.value || 20));
             const start = (currentPage - 1) * perPage;
             const end = start + perPage;
+            const visibleRows = new Set(filteredRows.slice(start, end));
 
             allRows.forEach((row) => {
-                row.style.display = "none";
-            });
-
-            filteredRows.slice(start, end).forEach((row) => {
-                row.style.display = "";
+                row.style.display = visibleRows.has(row) ? "" : "none";
             });
 
             renderPagination(filteredRows.length);
         }
 
+        function queueRenderTable() {
+            if (renderQueued && renderPromise) {
+                return renderPromise;
+            }
+            renderQueued = true;
+            renderPromise = new Promise((resolve) => {
+                window.requestAnimationFrame(() => {
+                    renderTable();
+                    renderPromise = null;
+                    resolve();
+                });
+            });
+            return renderPromise;
+        }
+
         function setFilterButtonState(activeValue) {
-            filterButtons.forEach((button) => {
+            statusFilterButtons.forEach((button) => {
                 const isActive = String(button.dataset.filter || "") === activeValue;
                 button.classList.toggle("active", isActive);
                 button.classList.toggle("btn-outline-primary", isActive);
@@ -2295,23 +2695,95 @@ foreach ($appointmentRows as $row) {
             });
         }
 
-        filterButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-                activeFilter = String(button.dataset.filter || "").trim().toLowerCase();
-                currentPage = 1;
-                setFilterButtonState(String(button.dataset.filter || ""));
-                renderTable();
+        statusFilterButtons.forEach((button) => {
+            button.addEventListener("click", async () => {
+                await withButtonLoading(button, async () => {
+                    activeStatusFilter = String(button.dataset.filter || "").trim().toLowerCase();
+                    currentPage = 1;
+                    setFilterButtonState(String(button.dataset.filter || ""));
+                    await queueRenderTable();
+                });
             });
+        });
+
+        dateScopeButtons.forEach((button) => {
+            button.addEventListener("click", async () => {
+                await withButtonLoading(button, async () => {
+                    activeDateScope = String(button.dataset.dateScope || "").trim();
+                    currentPage = 1;
+                    syncDateScopeButtons();
+                    await queueRenderTable();
+                });
+            });
+        });
+
+        appointmentFilterApplyBtn?.addEventListener("click", async () => {
+            const nextDateFrom = String(appointmentFilterDateFrom?.value || "").trim();
+            const nextDateTo = String(appointmentFilterDateTo?.value || "").trim();
+            const nextOfficialUserId = String(appointmentFilterOfficial?.value || "").trim();
+
+            if (nextDateFrom !== "" && nextDateTo !== "" && nextDateFrom > nextDateTo) {
+                window.alert("Schedule from date cannot be later than the to date.");
+                appointmentFilterDateFrom?.focus();
+                return;
+            }
+
+            await withButtonLoading(appointmentFilterApplyBtn, async () => {
+                activeDateFrom = nextDateFrom;
+                activeDateTo = nextDateTo;
+                activeOfficialUserId = nextOfficialUserId;
+                currentPage = 1;
+                syncAppointmentFilterButtonState();
+                await queueRenderTable();
+                appointmentFilterModalInstance?.hide();
+            }, "Applying...");
+        });
+
+        appointmentFilterResetBtn?.addEventListener("click", async () => {
+            await withButtonLoading(appointmentFilterResetBtn, async () => {
+                if (appointmentFilterDateFrom) {
+                    appointmentFilterDateFrom.value = "";
+                }
+                if (appointmentFilterDateTo) {
+                    appointmentFilterDateTo.value = "";
+                }
+                if (appointmentFilterOfficial) {
+                    appointmentFilterOfficial.value = "";
+                }
+                activeDateFrom = "";
+                activeDateTo = "";
+                activeOfficialUserId = "";
+                currentPage = 1;
+                syncAppointmentFilterButtonState();
+                await queueRenderTable();
+            }, "Resetting...");
+        });
+
+        appointmentFilterModalEl?.addEventListener("show.bs.modal", () => {
+            if (appointmentFilterDateFrom) {
+                appointmentFilterDateFrom.value = activeDateFrom;
+            }
+            if (appointmentFilterDateTo) {
+                appointmentFilterDateTo.value = activeDateTo;
+            }
+            if (appointmentFilterOfficial) {
+                appointmentFilterOfficial.value = activeOfficialUserId;
+            }
         });
 
         searchInput?.addEventListener("input", () => {
             currentPage = 1;
-            renderTable();
+            if (searchInputDebounce) {
+                window.clearTimeout(searchInputDebounce);
+            }
+            searchInputDebounce = window.setTimeout(() => {
+                queueRenderTable();
+            }, 120);
         });
 
         entriesPerPageInput?.addEventListener("change", () => {
             currentPage = 1;
-            renderTable();
+            queueRenderTable();
         });
 
         refreshBtn?.addEventListener("click", triggerRefresh);
@@ -2404,9 +2876,8 @@ foreach ($appointmentRows as $row) {
             syncReviewMeetingLocation();
             validateReviewConfirmedDate();
 
-            const isPending = String(button.dataset.statusKey || "").trim() === "pending";
-            reviewLockedMessage?.classList.toggle("d-none", isPending);
-            reviewActionFooter?.classList.toggle("d-none", !isPending);
+            const statusKey = String(button.dataset.statusKey || "").trim();
+            syncReviewActionVisibility(statusKey);
             syncReviewActionStates();
         });
 
@@ -2421,26 +2892,8 @@ foreach ($appointmentRows as $row) {
                     return;
                 }
 
-                const needsSchedule = action === "approve_appointment" || action === "reschedule_appointment";
-                if (needsSchedule) {
-                    if (!reviewOfficialUserId?.value) {
-                        window.alert("Please select the barangay council member for this appointment.");
-                        return;
-                    }
-                    if (!reviewConfirmedDate?.value || !reviewConfirmedTime?.value) {
-                        window.alert("Confirmed date and time are required for this action.");
-                        return;
-                    }
-
-                    const reviewDateValidation = validateReviewConfirmedDate();
-                    if (!reviewDateValidation.ok) {
-                        window.alert(reviewDateValidation.message);
-                        return;
-                    }
-                }
-                if (action === "reschedule_appointment" && !isWithinOfficeHours(reviewConfirmedTime?.value || "")) {
-                    reviewScheduleError?.classList.remove("d-none");
-                    window.alert("Rescheduled time must be within office hours, from 9:00 AM to 5:00 PM.");
+                if (action === "reschedule_appointment" && !reviewOfficialUserId?.value) {
+                    window.alert("This appointment does not have an assigned council member yet.");
                     return;
                 }
 
@@ -2449,38 +2902,30 @@ foreach ($appointmentRows as $row) {
                     reviewActionInput.value = action;
                 }
 
-                confirmSchedulePreviewField?.classList.toggle("d-none", action !== "reschedule_appointment");
-                if (action === "reschedule_appointment") {
-                    if (confirmPreferredDate) {
-                        confirmPreferredDate.textContent = String(modal?.dataset.preferredAppointmentDate || "").trim() || "-";
-                    }
-                    if (confirmPreferredTime) {
-                        confirmPreferredTime.textContent = String(modal?.dataset.preferredAppointmentTime || "").trim() || "-";
-                    }
-                    if (confirmConfirmedDate) {
-                        confirmConfirmedDate.textContent = formatReviewDate(reviewConfirmedDate?.value || "");
-                    }
-                    if (confirmConfirmedTime) {
-                        confirmConfirmedTime.textContent = formatReviewTime(reviewConfirmedTime?.value || "");
-                    }
-                }
+                confirmScheduleFields?.classList.toggle("d-none", action !== "reschedule_appointment");
+                reviewScheduleError?.classList.add("d-none");
 
-                confirmRemarksField?.classList.toggle("d-none", action !== "deny_appointment");
+                    confirmRemarksField?.classList.toggle("d-none", action !== "deny_appointment");
                 if (reviewRemarks && action !== "deny_appointment") {
                     reviewRemarks.value = "";
                 }
 
                 if (confirmModalTitle) {
-                    confirmModalTitle.textContent = action === "approve_appointment"
-                        ? "Confirm Approval"
-                        : (action === "reschedule_appointment" ? "Confirm Reschedule" : "Confirm Denial");
+                    confirmModalTitle.textContent = action === "reschedule_appointment"
+                        ? "Confirm Reschedule"
+                        : (action === "complete_appointment" ? "Confirm Completion" : "Confirm Denial");
                 }
                 if (confirmModalMessage) {
-                    confirmModalMessage.textContent = action === "approve_appointment"
-                        ? "You are about to approve this appointment. This action cannot be undone."
-                        : (action === "reschedule_appointment"
-                            ? "Review the selected date and time before continuing with this reschedule."
-                            : "You are about to deny this appointment. This action cannot be undone.");
+                    confirmModalMessage.textContent = action === "reschedule_appointment"
+                        ? "Review the selected date and time before continuing with this reschedule."
+                        : (action === "complete_appointment"
+                            ? "Mark this appointment as completed. This will lock further review actions."
+                            : "Add a short denial reason before continuing. This action cannot be undone.");
+                }
+                if (confirmModalConfirmBtn) {
+                    confirmModalConfirmBtn.textContent = action === "reschedule_appointment"
+                        ? "Confirm Reschedule"
+                        : (action === "complete_appointment" ? "Mark Completed" : "Confirm Denial");
                 }
 
                 viewModalInstance?.hide();
@@ -2490,34 +2935,86 @@ foreach ($appointmentRows as $row) {
 
         confirmModalReturnBtn?.addEventListener("click", () => {
             confirmModalInstance?.hide();
+            if (confirmModalConfirmBtn) {
+                confirmModalConfirmBtn.textContent = "Continue";
+            }
             window.setTimeout(() => {
                 viewModalInstance?.show();
             }, 150);
         });
 
-        confirmModalConfirmBtn?.addEventListener("click", () => {
+        confirmModalConfirmBtn?.addEventListener("click", async () => {
             if (!pendingReviewAction) {
                 return;
+            }
+            if (pendingReviewAction === "deny_appointment") {
+                const reason = String(reviewRemarks?.value || "").trim();
+                if (!reason) {
+                    window.alert("Please enter a denial reason.");
+                    reviewRemarks?.focus();
+                    return;
+                }
+                if (reason.length > 140) {
+                    window.alert("Denial reason must stay within 140 characters.");
+                    reviewRemarks?.focus();
+                    return;
+                }
+            }
+            if (pendingReviewAction === "reschedule_appointment") {
+                if (!reviewOfficialUserId?.value) {
+                    window.alert("This appointment does not have an assigned council member yet.");
+                    return;
+                }
+                if (!reviewConfirmedDate?.value || !reviewConfirmedTime?.value) {
+                    window.alert("Please choose the new reschedule date and time.");
+                    return;
+                }
+
+                const reviewDateValidation = validateReviewConfirmedDate();
+                if (!reviewDateValidation.ok) {
+                    window.alert(reviewDateValidation.message);
+                    return;
+                }
+
+                if (!isWithinOfficeHours(reviewConfirmedTime?.value || "")) {
+                    reviewScheduleError?.classList.remove("d-none");
+                    window.alert("Rescheduled time must be within office hours, from 9:00 AM to 5:00 PM.");
+                    return;
+                }
             }
             if (reviewActionInput) {
                 reviewActionInput.value = pendingReviewAction;
             }
-            reviewForm?.submit();
+            confirmModalReturnBtn?.setAttribute("disabled", "disabled");
+            await submitWithLoading(
+                confirmModalConfirmBtn,
+                pendingReviewAction === "complete_appointment" ? "Processing..." : "Submitting..."
+            );
         });
 
-        if (feedbackModalEl && (feedbackSuccessMessage || feedbackErrorMessage)) {
+        confirmModalEl?.addEventListener("hidden.bs.modal", () => {
+            if (confirmModalConfirmBtn) {
+                confirmModalConfirmBtn.textContent = "Continue";
+            }
+            confirmModalReturnBtn?.removeAttribute("disabled");
+        });
+
+        if (feedbackModalEl && (feedbackSuccessMessage || feedbackErrorMessage || feedbackInfoMessage)) {
             if (feedbackModalTitle) {
-                feedbackModalTitle.textContent = feedbackSuccessMessage ? "Success" : "Unable To Update";
+                feedbackModalTitle.textContent = feedbackSuccessMessage
+                    ? "Success"
+                    : (feedbackErrorMessage ? "Unable To Update" : "Appointment Info");
             }
             if (feedbackModalMessage) {
-                feedbackModalMessage.textContent = feedbackSuccessMessage || feedbackErrorMessage || "-";
+                feedbackModalMessage.textContent = feedbackSuccessMessage || feedbackErrorMessage || feedbackInfoMessage || "-";
             }
             const feedbackModal = new bootstrap.Modal(feedbackModalEl);
             feedbackModal.show();
         }
 
         setFilterButtonState("");
-        updatePendingBadge();
+        syncDateScopeButtons();
+        syncAppointmentFilterButtonState();
         renderTable();
         scheduleAutoRefresh();
     })();

@@ -76,16 +76,98 @@ function rat_status_bucket(string $statusName): string
     if ($normalized === '') {
         return 'pending';
     }
-    if (str_contains($normalized, 'approve') || str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
+    if (str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
+        return 'completed';
+    }
+    if (str_contains($normalized, 'confirm') || str_contains($normalized, 'approve')) {
         return 'approved';
     }
     if (str_contains($normalized, 'resched')) {
-        return 'info';
+        return 'rescheduled';
     }
-    if (str_contains($normalized, 'deny') || str_contains($normalized, 'reject')) {
+    if (str_contains($normalized, 'deny') || str_contains($normalized, 'reject') || str_contains($normalized, 'cancel')) {
         return 'archived';
     }
     return 'pending';
+}
+
+function rat_contains_encrypted_marker(string $value): bool
+{
+    $value = strtolower(trim($value));
+    if ($value === '') {
+        return false;
+    }
+
+    return str_contains($value, 'pii:v1:') || str_contains($value, 'pii:v2:');
+}
+
+function rat_format_person_name(string $firstName, string $middleName, string $lastName, string $suffix): string
+{
+    $firstName = trim($firstName);
+    $middleName = trim($middleName);
+    $lastName = trim($lastName);
+    $suffix = trim($suffix);
+
+    foreach ([$firstName, $middleName, $lastName, $suffix] as $part) {
+        if (rat_contains_encrypted_marker($part)) {
+            return '';
+        }
+    }
+
+    if ($middleName !== '') {
+        $middleName = strtoupper(substr($middleName, 0, 1)) . '.';
+    }
+
+    return trim(implode(' ', array_values(array_filter([
+        $firstName,
+        $middleName,
+        $lastName,
+        $suffix,
+    ], static fn(string $part): bool => $part !== ''))));
+}
+
+function rat_extract_official_label(array $row): string
+{
+    if (function_exists('pii_decrypt_assoc')) {
+        $row = pii_decrypt_assoc($row, [
+            'official_firstname',
+            'official_middlename',
+            'official_lastname',
+            'official_suffix',
+        ]);
+    }
+
+    $seatName = trim((string)($row['official_seat_name'] ?? ''));
+    if (rat_contains_encrypted_marker($seatName)) {
+        $seatName = '';
+    }
+
+    $formattedName = rat_format_person_name(
+        (string)($row['official_firstname'] ?? ''),
+        (string)($row['official_middlename'] ?? ''),
+        (string)($row['official_lastname'] ?? ''),
+        (string)($row['official_suffix'] ?? '')
+    );
+
+    if ($formattedName !== '' && $seatName !== '') {
+        return $formattedName . ' (' . $seatName . ')';
+    }
+
+    if ($formattedName !== '') {
+        return $formattedName;
+    }
+
+    return $seatName;
+}
+
+function rat_resolved_status_name(string $statusName, string $confirmedScheduleTimestamp): string
+{
+    $statusName = trim($statusName);
+    if ($statusName !== '') {
+        return $statusName;
+    }
+
+    return trim($confirmedScheduleTimestamp) !== '' ? 'Approved' : 'Pending';
 }
 
 if (!rat_table_exists($conn, 'appointmentstbl')) {
@@ -124,16 +206,23 @@ $statusJoin = rat_table_exists($conn, 'statuslookuptbl')
     ? "LEFT JOIN statuslookuptbl s ON a.appointment_status_id = s.status_id"
     : '';
 $statusSelect = rat_table_exists($conn, 'statuslookuptbl')
-    ? "COALESCE(s.status_name, 'Pending') AS status_name"
-    : "'Pending' AS status_name";
+    ? "NULLIF(TRIM(s.status_name), '') AS status_name"
+    : "NULL AS status_name";
 $officialJoin = '';
-$officialNameSelect = "'-' AS official_name";
+$officialFirstNameSelect = "'' AS official_firstname";
+$officialMiddleNameSelect = "'' AS official_middlename";
+$officialLastNameSelect = "'' AS official_lastname";
+$officialSuffixSelect = "'' AS official_suffix";
+$officialSeatNameSelect = "'' AS official_seat_name";
 if ($hasAssignedOfficial && rat_table_exists($conn, 'officialinformationtbl')) {
     $officialJoin = "
         LEFT JOIN officialinformationtbl oi
             ON a.user_id_official_assigned COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
     ";
-    $officialNameSelect = "TRIM(CONCAT_WS(' ', oi.firstname, oi.middlename, oi.lastname, oi.suffix)) AS official_name";
+    $officialFirstNameSelect = "oi.firstname AS official_firstname";
+    $officialMiddleNameSelect = "oi.middlename AS official_middlename";
+    $officialLastNameSelect = "oi.lastname AS official_lastname";
+    $officialSuffixSelect = "oi.suffix AS official_suffix";
 
     if (rat_table_exists($conn, 'barangaycounciltbl')) {
         $officialJoin .= "
@@ -141,7 +230,7 @@ if ($hasAssignedOfficial && rat_table_exists($conn, 'officialinformationtbl')) {
                 ON bc.current_official_id = oi.official_id
                AND bc.is_active = 1
         ";
-        $officialNameSelect = "TRIM(CONCAT_WS(' - ', CONCAT_WS(' ', oi.firstname, oi.middlename, oi.lastname, oi.suffix), NULLIF(bc.seat_name, ''))) AS official_name";
+        $officialSeatNameSelect = "NULLIF(bc.seat_name, '') AS official_seat_name";
     }
 }
 $requestTimestampSelect = isset($appointmentColumns['request_timestamp']) ? 'a.request_timestamp' : 'NULL';
@@ -168,7 +257,11 @@ $sql = "
         {$meetingLocationSelect} AS meeting_location,
         {$residentNotesSelect} AS resident_notes,
         {$statusSelect},
-        {$officialNameSelect}
+        {$officialFirstNameSelect},
+        {$officialMiddleNameSelect},
+        {$officialLastNameSelect},
+        {$officialSuffixSelect},
+        {$officialSeatNameSelect}
     FROM appointmentstbl a
     {$statusJoin}
     {$officialJoin}
@@ -195,6 +288,10 @@ while ($row = $result->fetch_assoc()) {
         $subject = 'Other: ' . $subjectOther;
     }
 
+    $confirmedScheduleTimestamp = (string)($row['confirmed_schedule_timestamp'] ?? '');
+    $statusName = rat_resolved_status_name((string)($row['status_name'] ?? ''), $confirmedScheduleTimestamp);
+    $officialName = rat_extract_official_label($row);
+
     $items[] = [
         'appointment_id' => (string)($row['appointment_id'] ?? ''),
         'resident_name' => (string)($row['name'] ?? ''),
@@ -202,15 +299,15 @@ while ($row = $result->fetch_assoc()) {
         'subject' => $subject !== '' ? $subject : 'Appointment',
         'purpose' => trim((string)($row['purpose'] ?? '')),
         'preferred_schedule_timestamp' => (string)($row['preferred_schedule_timestamp'] ?? ''),
-        'confirmed_schedule_timestamp' => (string)($row['confirmed_schedule_timestamp'] ?? ''),
+        'confirmed_schedule_timestamp' => $confirmedScheduleTimestamp,
         'meeting_location' => trim((string)($row['meeting_location'] ?? '')),
         'review_timestamp' => (string)($row['review_timestamp'] ?? ''),
         'request_timestamp' => (string)($row['request_timestamp'] ?? ''),
         'appointment_remarks' => trim((string)($row['appointment_remarks'] ?? '')),
         'resident_notes' => trim((string)($row['resident_notes'] ?? '')),
-        'status_name' => (string)($row['status_name'] ?? 'Pending'),
-        'status_bucket' => rat_status_bucket((string)($row['status_name'] ?? 'Pending')),
-        'official_name' => trim((string)($row['official_name'] ?? '')) !== '' ? (string)$row['official_name'] : '-',
+        'status_name' => $statusName,
+        'status_bucket' => rat_status_bucket($statusName),
+        'official_name' => $officialName !== '' ? $officialName : '-',
     ];
 }
 $stmt->close();

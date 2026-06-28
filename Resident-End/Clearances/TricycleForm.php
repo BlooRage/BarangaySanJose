@@ -18,6 +18,7 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentRequestWorkflow.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $data = getResidentProfileData($conn, $userId);
@@ -276,7 +277,9 @@ function tcFetchTricycleRenewalHistory(mysqli $conn, string $residentUserId): ar
 
     $recordsByVehicle = [];
     while ($row = $result ? $result->fetch_assoc() : null) {
-        $payload = json_decode((string)($row['request_details'] ?? ''), true);
+        $payload = function_exists('dr_decode_request_payload')
+            ? dr_decode_request_payload($row)
+            : json_decode((string)($row['request_details'] ?? ''), true);
         if (!is_array($payload)) {
             continue;
         }

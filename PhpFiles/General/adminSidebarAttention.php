@@ -353,26 +353,7 @@ if (!function_exists('sbatt_extract_sector_side')) {
 if (!function_exists('sbatt_count_pending_appointments')) {
     function sbatt_count_pending_appointments(mysqli $conn): int
     {
-        if (!sbatt_table_exists($conn, 'appointmentstbl')) {
-            return 0;
-        }
-
-        return sbatt_scalar_count($conn, "
-            SELECT COUNT(*) AS total
-            FROM appointmentstbl a
-            LEFT JOIN statuslookuptbl s ON s.status_id = a.appointment_status_id
-            WHERE
-                COALESCE(TRIM(LOWER(s.status_name)), '') = ''
-                OR (
-                    LOWER(COALESCE(s.status_name, '')) NOT LIKE '%approve%'
-                    AND LOWER(COALESCE(s.status_name, '')) NOT LIKE '%resched%'
-                    AND LOWER(COALESCE(s.status_name, '')) NOT LIKE '%complete%'
-                    AND LOWER(COALESCE(s.status_name, '')) NOT LIKE '%done%'
-                    AND LOWER(COALESCE(s.status_name, '')) NOT LIKE '%deny%'
-                    AND LOWER(COALESCE(s.status_name, '')) NOT LIKE '%denied%'
-                    AND LOWER(COALESCE(s.status_name, '')) NOT LIKE '%reject%'
-                )
-        ");
+        return 0;
     }
 }
 

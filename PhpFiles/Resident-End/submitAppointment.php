@@ -115,9 +115,16 @@ function appointmentNormalizePhone(string $value): ?string
         return null;
     }
     if (preg_match('/^9\d{9}$/', $digits)) {
-        $digits = '0' . $digits;
+        return '0' . $digits;
     }
-    return $digits;
+    if (preg_match('/^0\d{10}$/', $digits)) {
+        return $digits;
+    }
+    if (preg_match('/^63\d{10}$/', $digits)) {
+        return '0' . substr($digits, 2);
+    }
+
+    return null;
 }
 
 function appointmentNormalizeSubjectLabel(string $value): string
@@ -149,6 +156,43 @@ function appointmentDisplayName(array $row, string $fallback = ''): string
     return trim($fallback);
 }
 
+function appointmentOfficialTitleFromPosition(string $positionAccess, string $seatName = ''): string
+{
+    $label = strtolower(trim($positionAccess . ' ' . $seatName));
+    if ($label === '') {
+        return '';
+    }
+    if (strpos($label, 'punong barangay') !== false || strpos($label, 'barangay captain') !== false || strpos($label, 'kapitan') !== false) {
+        return 'Kapitan';
+    }
+    if (strpos($label, 'kagawad') !== false || strpos($label, 'councilor') !== false) {
+        return 'Kagawad';
+    }
+    if (strpos($label, 'barangay secretary') !== false || preg_match('/\bsecretary\b/', $label)) {
+        return 'Barangay Secretary';
+    }
+    if (strpos($label, 'barangay treasurer') !== false || preg_match('/\btreasurer\b/', $label)) {
+        return 'Barangay Treasurer';
+    }
+
+    return '';
+}
+
+function appointmentOfficialMessageLabel(array $official): string
+{
+    $fullName = trim((string)($official['full_name'] ?? ''));
+    $positionAccess = trim((string)($official['position_access'] ?? ''));
+    $seatName = trim((string)($official['seat_name'] ?? ''));
+    $title = appointmentOfficialTitleFromPosition($positionAccess, $seatName);
+    if ($title !== '' && $fullName !== '') {
+        return $title . ' ' . $fullName;
+    }
+    if ($fullName !== '') {
+        return $fullName;
+    }
+    return 'the assigned barangay official';
+}
+
 function appointmentFormatTimestampLabel(string $value): string
 {
     $value = trim($value);
@@ -164,6 +208,34 @@ function appointmentFormatTimestampLabel(string $value): string
     }
 }
 
+function appointmentFormatSmsTimestampLabel(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return 'the selected schedule';
+    }
+
+    try {
+        $timestamp = new DateTimeImmutable($value);
+        return $timestamp->format('M j, Y g:i A');
+    } catch (Throwable $e) {
+        return $value;
+    }
+}
+
+function appointmentSmsClip(string $value, int $maxLength): string
+{
+    $value = preg_replace('/\s+/', ' ', trim($value));
+    if ($value === '') {
+        return '';
+    }
+    if ($maxLength < 4 || strlen($value) <= $maxLength) {
+        return $value;
+    }
+
+    return rtrim(substr($value, 0, $maxLength - 3)) . '...';
+}
+
 function appointmentLoadOfficialDeliveryContact(mysqli $conn, string $officialUserId, array $fallback = []): array
 {
     $officialUserId = trim($officialUserId);
@@ -173,6 +245,8 @@ function appointmentLoadOfficialDeliveryContact(mysqli $conn, string $officialUs
             'full_name' => trim((string)($fallback['full_name'] ?? $fallback['option_label'] ?? 'Barangay Official')),
             'phone_number' => '',
             'email' => '',
+            'position_access' => trim((string)($fallback['position_access'] ?? '')),
+            'seat_name' => trim((string)($fallback['seat_name'] ?? '')),
         ];
     }
 
@@ -209,21 +283,30 @@ function appointmentLoadOfficialDeliveryContact(mysqli $conn, string $officialUs
     $row = pii_decrypt_useraccount_row($row) ?? $row;
 
     $fullName = appointmentDisplayName($row, (string)($fallback['full_name'] ?? $fallback['option_label'] ?? 'Barangay Official'));
-    $email = strtolower(trim((string)($row['official_email'] ?? '')));
+    $officialEmail = pii_decrypt_string((string)($row['official_email'] ?? ''));
+    $officialContactNumber = pii_decrypt_string((string)($row['official_contact_number'] ?? ''));
+    $email = strtolower(trim($officialEmail));
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $email = strtolower(trim((string)($row['email'] ?? '')));
     }
 
-    $phoneNumber = appointmentNormalizePhone((string)($row['official_contact_number'] ?? ''));
+    $phoneNumber = appointmentNormalizePhone($officialContactNumber);
     if ($phoneNumber === null) {
         $phoneNumber = appointmentNormalizePhone((string)($row['phone_number'] ?? ''));
     }
+    $positionAccess = trim((string)($fallback['position_access'] ?? ''));
+    if ($positionAccess === '') {
+        $positionAccess = trim((string)apcm_current_official_position($conn, $officialUserId));
+    }
+    $seatName = trim((string)($fallback['seat_name'] ?? ''));
 
     return [
         'user_id' => $officialUserId,
         'full_name' => $fullName !== '' ? $fullName : 'Barangay Official',
         'phone_number' => $phoneNumber ?? '',
         'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '',
+        'position_access' => $positionAccess,
+        'seat_name' => $seatName,
     ];
 }
 
@@ -300,14 +383,19 @@ function appointmentSendNotifications(array $resident, array $official, array $a
     $purpose = trim((string)($appointment['purpose'] ?? ''));
     $location = trim((string)($appointment['meeting_location'] ?? ''));
     $scheduleLabel = appointmentFormatTimestampLabel((string)($appointment['confirmed_schedule_timestamp'] ?? ''));
+    $smsScheduleLabel = appointmentFormatSmsTimestampLabel((string)($appointment['confirmed_schedule_timestamp'] ?? ''));
     $locationLabel = $location !== '' ? $location : 'the assigned meeting location';
     $officialName = trim((string)($official['full_name'] ?? 'Barangay Official'));
+    $officialLabel = appointmentOfficialMessageLabel($official);
     $residentName = trim((string)($resident['full_name'] ?? 'Resident'));
     $residentPhone = trim((string)($resident['phone_number'] ?? ''));
     $officialPhone = trim((string)($official['phone_number'] ?? ''));
     $officialEmail = trim((string)($official['email'] ?? ''));
-    $residentSms = "Barangay San Jose: Your appointment {$appointmentId} with {$officialName} is confirmed for {$scheduleLabel} at {$locationLabel}. Subject: {$subject}.";
-    $officialSms = "Barangay San Jose: New confirmed appointment {$appointmentId} with {$residentName} on {$scheduleLabel} at {$locationLabel}. Subject: {$subject}.";
+    $smsLocationLabel = appointmentSmsClip($locationLabel, 30);
+    $smsOfficialLabel = appointmentSmsClip($officialLabel, 36);
+    $smsResidentName = appointmentSmsClip($residentName, 28);
+    $residentSms = "Your appointment with {$smsOfficialLabel} is confirmed for {$smsScheduleLabel} at {$smsLocationLabel}.";
+    $officialSms = "{$smsResidentName} booked an appointment with you for {$smsScheduleLabel} at {$smsLocationLabel}.";
 
     if ($residentPhone !== '') {
         if (!sendSMS($residentPhone, $residentSms)) {
@@ -331,7 +419,7 @@ function appointmentSendNotifications(array $resident, array $official, array $a
         $emailSubject = 'New Appointment Confirmed: ' . ($appointmentId !== '' ? $appointmentId : 'Barangay San Jose');
         $emailBodyHtml = '
             <p>Hello ' . htmlspecialchars($officialName, ENT_QUOTES, 'UTF-8') . ',</p>
-            <p>A resident appointment was automatically confirmed after booking.</p>
+            <p>A resident appointment has been confirmed and added to your schedule.</p>
             <ul>
                 <li><strong>Appointment ID:</strong> ' . htmlspecialchars($appointmentId, ENT_QUOTES, 'UTF-8') . '</li>
                 <li><strong>Resident:</strong> ' . htmlspecialchars($residentName, ENT_QUOTES, 'UTF-8') . '</li>
@@ -346,7 +434,7 @@ function appointmentSendNotifications(array $resident, array $official, array $a
         $emailBodyText = implode("\n", [
             "Hello {$officialName},",
             '',
-            'A resident appointment was automatically confirmed after booking.',
+            'A resident appointment has been confirmed and added to your schedule.',
             "Appointment ID: {$appointmentId}",
             "Resident: {$residentName}",
             "Schedule: {$scheduleLabel}",
@@ -549,6 +637,12 @@ try {
         $insertColumns[] = 'appointment_status_id';
         $insertValues[] = $statusId;
         $bindTypes .= 'i';
+    }
+
+    if (isset($appointmentColumns['review_timestamp'])) {
+        $insertColumns[] = 'review_timestamp';
+        $insertValues[] = $now->format('Y-m-d H:i:s');
+        $bindTypes .= 's';
     }
 
     if (isset($appointmentColumns['resident_notes'])) {

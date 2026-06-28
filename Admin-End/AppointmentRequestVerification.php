@@ -17,6 +17,9 @@ if (empty($appointmentAccess['can_view_all_tracker'])) {
     exit;
 }
 
+header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php?tool=tracker&info=' . rawurlencode('Appointment requests are auto-confirmed now. Use the appointment tracker for viewing, rescheduling, or denial.')));
+exit;
+
 function ar_first_existing_col(array $cols, array $candidates): ?string {
     foreach ($candidates as $candidate) {
         if (isset($cols[strtolower($candidate)])) {

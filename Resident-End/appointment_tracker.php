@@ -166,11 +166,19 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
     .tracker-shell .status-pill.info,
     .tracker-shell .status-pill.rescheduled,
+    .tracker-shell .status-pill.completed,
     #appointmentViewModal .status-pill.info,
+    #appointmentViewModal .status-pill.completed,
     #appointmentViewModal .status-pill.rescheduled {
       color: #1d4ed8;
       background: #dbeafe;
       border: 2px solid #bfdbfe;
+    }
+    .tracker-shell .status-pill.completed,
+    #appointmentViewModal .status-pill.completed {
+      color: #0f5132;
+      background: #d1e7dd;
+      border-color: #badbcc;
     }
     .tracker-shell .status-pill.denied,
     .tracker-shell .status-pill.archived,
@@ -291,8 +299,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn tracker-tab active" data-tab="all" data-filter="ALL">All</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="pending" data-filter="Pending">Pending</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="approved" data-filter="Approved">Approved</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="approved" data-filter="Approved">Confirmed</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="completed" data-filter="Completed">Completed</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="rescheduled" data-filter="Rescheduled">Rescheduled</button>
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="archived" data-filter="Denied">Denied</button>
           </div>
           <div class="admin-list-actions">
@@ -359,8 +368,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
               <label class="form-label small text-muted mb-1">Status</label>
               <select class="form-select" id="appointmentStatusFilter">
                 <option value="">All Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Approved">Approved</option>
+                <option value="Approved">Confirmed</option>
+                <option value="Completed">Completed</option>
                 <option value="Rescheduled">Rescheduled</option>
                 <option value="Denied">Denied</option>
               </select>
@@ -418,7 +427,6 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             <div class="col-md-6"><strong>Requested At:</strong><div id="appointmentViewRequested" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Reviewed At:</strong><div id="appointmentViewReviewed" class="text-muted"></div></div>
             <div class="col-12"><strong>Purpose:</strong><div id="appointmentViewPurpose" class="text-muted"></div></div>
-            <div class="col-12"><strong>Resident Notes:</strong><div id="appointmentViewResidentNotes" class="text-muted"></div></div>
             <div class="col-12"><strong>Office Remarks:</strong><div id="appointmentViewRemarks" class="text-muted"></div></div>
           </div>
         </div>
@@ -461,10 +469,47 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
     function statusBadgeClass(value) {
       const normalized = String(value || "").toLowerCase();
-      if (normalized.includes("approve") || normalized.includes("complete")) return "approved";
+      if (normalized.includes("complete") || normalized.includes("done")) return "completed";
+      if (normalized.includes("confirm") || normalized.includes("approve")) return "approved";
       if (normalized.includes("resched")) return "rescheduled";
       if (normalized.includes("deny") || normalized.includes("denied") || normalized.includes("reject")) return "denied";
       return "pending";
+    }
+
+    function appointmentStatusLabel(value) {
+      const normalized = String(value || "").toLowerCase();
+      if (normalized.includes("complete") || normalized.includes("done")) return "Completed";
+      if (normalized.includes("resched")) return "Rescheduled";
+      if (normalized.includes("confirm") || normalized.includes("approve")) return "Confirmed";
+      if (normalized.includes("deny") || normalized.includes("denied") || normalized.includes("reject")) return "Denied";
+      return "Pending";
+    }
+
+    function confirmedScheduleDisplay(item) {
+      const confirmedValue = String(item?.confirmed_schedule_timestamp || "").trim();
+      if (confirmedValue) {
+        return formatDateTime(confirmedValue);
+      }
+
+      const preferredValue = String(item?.preferred_schedule_timestamp || "").trim();
+      if (preferredValue) {
+        return formatDateTime(preferredValue, "Same as requested schedule");
+      }
+
+      return appointmentStatusLabel(item?.status_name) === "Confirmed"
+        ? "Confirmed upon submission"
+        : "To be scheduled";
+    }
+
+    function reviewedTimestampDisplay(item) {
+      const reviewValue = String(item?.review_timestamp || "").trim();
+      if (reviewValue) {
+        return formatDateTime(reviewValue);
+      }
+
+      return appointmentStatusLabel(item?.status_name) === "Confirmed"
+        ? "Confirmed upon submission"
+        : "Not reviewed yet";
     }
 
     function paginateRows(rows, currentPage, perPage) {
@@ -523,7 +568,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
       return allAppointments.filter((item) => {
         if (activeTab !== "all" && String(item.status_bucket || "") !== activeTab) return false;
-        if (status && String(item.status_name || "").toLowerCase() !== status) return false;
+        if (status && appointmentStatusLabel(item.status_name).toLowerCase() !== status.toLowerCase()) return false;
 
         const haystack = [
           item.appointment_id,
@@ -545,16 +590,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     function openAppointmentView(item) {
       document.getElementById("appointmentViewTitle").textContent = `Appointment ${item.appointment_id || ""}`;
       document.getElementById("appointmentViewId").textContent = item.appointment_id || "-";
-      document.getElementById("appointmentViewStatus").innerHTML = `<span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span>`;
+      document.getElementById("appointmentViewStatus").innerHTML = `<span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(appointmentStatusLabel(item.status_name))}</span>`;
       document.getElementById("appointmentViewSubject").textContent = item.subject || "-";
       document.getElementById("appointmentViewOfficial").textContent = item.official_name || "-";
       document.getElementById("appointmentViewPreferred").textContent = formatDateTime(item.preferred_schedule_timestamp, "To be scheduled");
-      document.getElementById("appointmentViewConfirmed").textContent = formatDateTime(item.confirmed_schedule_timestamp, "Awaiting confirmation");
+      document.getElementById("appointmentViewConfirmed").textContent = confirmedScheduleDisplay(item);
       document.getElementById("appointmentViewMeetingLocation").textContent = item.meeting_location || "To be shared by the office";
       document.getElementById("appointmentViewRequested").textContent = formatDateTime(item.request_timestamp);
-      document.getElementById("appointmentViewReviewed").textContent = formatDateTime(item.review_timestamp, "Not reviewed yet");
+      document.getElementById("appointmentViewReviewed").textContent = reviewedTimestampDisplay(item);
       document.getElementById("appointmentViewPurpose").textContent = item.purpose || "-";
-      document.getElementById("appointmentViewResidentNotes").textContent = item.resident_notes || "-";
       document.getElementById("appointmentViewRemarks").textContent = item.appointment_remarks || "-";
 
       if (!appointmentViewModal && window.bootstrap?.Modal) {
@@ -592,8 +636,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <td><strong>${escapeHtml(item.appointment_id || "-")}</strong></td>
           <td>${escapeHtml(item.subject || "-")}</td>
           <td>${escapeHtml(formatDateTime(item.preferred_schedule_timestamp, "To be scheduled"))}</td>
-          <td>${escapeHtml(formatDateTime(item.confirmed_schedule_timestamp, "Awaiting confirmation"))}</td>
-          <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span></td>
+          <td>${escapeHtml(confirmedScheduleDisplay(item))}</td>
+          <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(appointmentStatusLabel(item.status_name))}</span></td>
           <td><button type="button" class="btn btn-sm btn-outline-secondary appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}">View</button></td>
         </tr>
       `).join("");
@@ -609,7 +653,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-label mt-2">Preferred Schedule</div>
           <div class="tracker-value">${escapeHtml(formatDateTime(item.preferred_schedule_timestamp, "To be scheduled"))}</div>
           <div class="tracker-label mt-2">Status</div>
-          <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span></div>
+          <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(appointmentStatusLabel(item.status_name))}</span></div>
           <button type="button" class="btn btn-sm btn-outline-secondary mt-3 appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}">View</button>
         </article>
       `).join("");

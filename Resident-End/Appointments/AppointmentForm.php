@@ -101,6 +101,14 @@ $officialScheduleMap = apos_fetch_schedule_map(
     })),
     $appointmentSettings
 );
+$bookedSlotMap = apos_fetch_booked_slots_map(
+    $conn,
+    array_values(array_filter(array_map(static function (array $member): string {
+        return trim((string)($member['user_id'] ?? ''));
+    }, $councilMemberOptions), static function (string $userId): bool {
+        return $userId !== '';
+    }))
+);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -198,6 +206,42 @@ $officialScheduleMap = apos_fetch_schedule_map(
         input[type="date"].form-control::-webkit-calendar-picker-indicator,
         input[type="time"].form-control::-webkit-calendar-picker-indicator {
             opacity: 1;
+        }
+        .submit-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            min-width: 190px;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .submit-btn:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(254, 153, 60, 0.22);
+        }
+        .submit-btn.is-loading {
+            pointer-events: none;
+        }
+        .submit-btn-spinner {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #ffffff;
+            border-radius: 999px;
+            display: none;
+            flex: 0 0 auto;
+            animation: appointmentSubmitSpin 0.8s linear infinite;
+        }
+        .submit-btn.is-loading .submit-btn-spinner {
+            display: inline-block;
+        }
+        @keyframes appointmentSubmitSpin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -376,7 +420,16 @@ $officialScheduleMap = apos_fetch_schedule_map(
                                 <input type="checkbox" required>I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
 
-                            <button type="submit" class="submit-btn" <?php echo $hasAppointmentAvailability ? '' : 'disabled'; ?>>SUBMIT</button>
+                            <button
+                                type="submit"
+                                class="submit-btn"
+                                data-default-label="SUBMIT"
+                                data-loading-label="Submitting..."
+                                <?php echo $hasAppointmentAvailability ? '' : 'disabled'; ?>
+                            >
+                                <span class="submit-btn-label">SUBMIT</span>
+                                <span class="submit-btn-spinner" aria-hidden="true"></span>
+                            </button>
                         </div>
             </form>
         </main>
@@ -412,6 +465,7 @@ $officialScheduleMap = apos_fetch_schedule_map(
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
+            const submitBtnLabel = submitBtn?.querySelector(".submit-btn-label");
             const appointmentDateInput = document.getElementById("appointmentDate");
             const appointmentDateError = document.getElementById("appointmentDateError");
             const appointmentTimeInput = document.getElementById("appointmentTime");
@@ -426,6 +480,7 @@ $officialScheduleMap = apos_fetch_schedule_map(
             const appointmentSuccessModalEl = document.getElementById("appointmentSuccessModal");
             const appointmentSuccessMessage = document.getElementById("appointmentSuccessMessage");
             const officialScheduleMap = <?= json_encode($officialScheduleMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const bookedSlotMap = <?= json_encode($bookedSlotMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const appointmentGlobalScheduleConfig = <?= json_encode([
                 'startTime' => aps_schedule_start_time(),
                 'endTime' => aps_schedule_end_time(),
@@ -437,6 +492,19 @@ $officialScheduleMap = apos_fetch_schedule_map(
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const hasConfiguredAppointmentAvailability = <?= $hasAppointmentAvailability ? 'true' : 'false' ?>;
             if (!form || !submitBtn) return;
+            let isSubmitting = false;
+            const defaultSubmitLabel = String(submitBtn.dataset.defaultLabel || "SUBMIT").trim() || "SUBMIT";
+            const loadingSubmitLabel = String(submitBtn.dataset.loadingLabel || "Submitting...").trim() || "Submitting...";
+
+            const setSubmittingState = (submitting) => {
+                isSubmitting = submitting === true;
+                form.setAttribute("aria-busy", isSubmitting ? "true" : "false");
+                submitBtn.classList.toggle("is-loading", isSubmitting);
+                submitBtn.disabled = isSubmitting || submitBtn.disabled;
+                if (submitBtnLabel) {
+                    submitBtnLabel.textContent = isSubmitting ? loadingSubmitLabel : defaultSubmitLabel;
+                }
+            };
 
             const today = new Date();
             const todayDisplay = today.toLocaleDateString(undefined, {
@@ -495,7 +563,23 @@ $officialScheduleMap = apos_fetch_schedule_map(
                 return schedule[weekday] || schedule[Number(weekday)] || null;
             };
 
+            const bookedAppointmentIdsFor = (officialUserId, isoDate, timeValue) => {
+                const officialKey = String(officialUserId || "").trim();
+                const dateKey = String(isoDate || "").trim();
+                const timeKey = String(timeValue || "").trim();
+                const officialBookings = bookedSlotMap[officialKey] || null;
+                if (!officialBookings || !dateKey || !timeKey) {
+                    return [];
+                }
+                const dateBookings = officialBookings[dateKey] || null;
+                if (!dateBookings) {
+                    return [];
+                }
+                return Array.isArray(dateBookings[timeKey]) ? dateBookings[timeKey] : [];
+            };
+
             const buildOfficialSlots = () => {
+                const officialUserId = String(appointmentCouncilMemberInput?.value || "").trim();
                 const isoDate = String(appointmentDateInput?.value || "").trim();
                 const dayEntry = scheduleDayForSelection();
                 if (!dayEntry || dayEntry.enabled !== true || disabledDates.has(isoDate)) {
@@ -540,6 +624,9 @@ $officialScheduleMap = apos_fetch_schedule_map(
                     const hours = Math.floor(current / 60);
                     const minutes = current % 60;
                     const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                    if (bookedAppointmentIdsFor(officialUserId, isoDate, value).length > 0) {
+                        continue;
+                    }
                     slots.push({ value, label: formatTimeLabel(value) });
                 }
 
@@ -578,8 +665,10 @@ $officialScheduleMap = apos_fetch_schedule_map(
                         appointmentLocationHelp.textContent = "Choose a council member and date to load the official meeting location for that schedule.";
                     } else if (isoDate === "") {
                         appointmentLocationHelp.textContent = "Choose an appointment date to load the weekly meeting location for the selected council member.";
-                    } else if (!dayEntry || slots.length === 0) {
+                    } else if (!dayEntry) {
                         appointmentLocationHelp.textContent = "That council member is not available on the selected date.";
+                    } else if (slots.length === 0) {
+                        appointmentLocationHelp.textContent = "All appointment times for that council member are already taken on the selected date.";
                     } else {
                         appointmentLocationHelp.textContent = "Meeting location is pulled from the weekly schedule of the selected council member.";
                     }
@@ -642,8 +731,17 @@ $officialScheduleMap = apos_fetch_schedule_map(
                 const officialUserId = String(appointmentCouncilMemberInput?.value || "").trim();
                 if (officialUserId !== "") {
                     const { dayEntry, slots } = buildOfficialSlots();
-                    if (!dayEntry || slots.length === 0) {
+                    if (!dayEntry) {
                         const msg = "The selected council member is not available on that date";
+                        appointmentDateInput.setCustomValidity(msg);
+                        if (appointmentDateError) {
+                            appointmentDateError.textContent = msg;
+                            appointmentDateError.classList.remove("d-none");
+                        }
+                        return false;
+                    }
+                    if (slots.length === 0) {
+                        const msg = "All appointment times for the selected council member are already taken on that date";
                         appointmentDateInput.setCustomValidity(msg);
                         if (appointmentDateError) {
                             appointmentDateError.textContent = msg;
@@ -732,6 +830,10 @@ $officialScheduleMap = apos_fetch_schedule_map(
             };
 
             const updateState = () => {
+                if (isSubmitting) {
+                    submitBtn.disabled = true;
+                    return;
+                }
                 syncAppointmentAvailability();
                 validateSubjectOther();
                 validateAppointmentDate();
@@ -773,7 +875,15 @@ $officialScheduleMap = apos_fetch_schedule_map(
                     if (!okSubjectOther) appointmentSubjectOtherInput?.focus();
                     else if (!okDate) appointmentDateInput?.focus();
                     else appointmentTimeInput?.focus();
+                    setSubmittingState(false);
+                    return;
                 }
+
+                e.preventDefault();
+                setSubmittingState(true);
+                window.setTimeout(() => {
+                    HTMLFormElement.prototype.submit.call(form);
+                }, 120);
             });
 
             const feedbackType = String(appointmentFeedbackData?.dataset.feedbackType || "").trim();
@@ -790,6 +900,7 @@ $officialScheduleMap = apos_fetch_schedule_map(
             }
 
             syncAppointmentAvailability();
+            setSubmittingState(false);
             updateState();
         });
     </script>

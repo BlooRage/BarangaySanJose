@@ -2766,8 +2766,10 @@ if ($action === 'list') {
                 $docTypesForFee[$docTypeForFee] = true;
             }
         }
-        $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
-        $row['payload'] = is_array($payload) ? $payload : [];
+        $row['payload'] = dr_decode_request_payload($row);
+        if ($row['payload']) {
+            $row['request_details'] = dr_safe_json($row['payload']);
+        }
         unset(
             $row['_tx_amount'],
             $row['_tx_payment_method'],

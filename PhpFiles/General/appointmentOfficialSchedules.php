@@ -9,6 +9,58 @@ if (!function_exists('apos_schedule_table_name')) {
     }
 }
 
+if (!function_exists('apos_table_exists')) {
+    function apos_table_exists(mysqli $conn, string $tableName): bool
+    {
+        $stmt = $conn->prepare("
+            SELECT 1
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param('s', $tableName);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_row();
+        $stmt->close();
+
+        return !empty($row);
+    }
+}
+
+if (!function_exists('apos_table_columns')) {
+    function apos_table_columns(mysqli $conn, string $tableName): array
+    {
+        $columns = [];
+        $stmt = $conn->prepare("
+            SELECT COLUMN_NAME
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+        ");
+        if (!$stmt) {
+            return $columns;
+        }
+
+        $stmt->bind_param('s', $tableName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $column = strtolower(trim((string)($row['COLUMN_NAME'] ?? '')));
+            if ($column !== '') {
+                $columns[$column] = true;
+            }
+        }
+        $stmt->close();
+
+        return $columns;
+    }
+}
+
 if (!function_exists('apos_appointment_table_name')) {
     function apos_appointment_table_name(): string
     {
@@ -364,5 +416,133 @@ if (!function_exists('apos_time_is_available_for_user_date')) {
         }
 
         return array_key_exists($time, (array)($effective['slots'] ?? []));
+    }
+}
+
+if (!function_exists('apos_booking_status_blocks_slot')) {
+    function apos_booking_status_blocks_slot(string $statusName): bool
+    {
+        $normalized = strtolower(trim($statusName));
+        if ($normalized === '') {
+            return true;
+        }
+
+        return !preg_match('/deny|reject|cancel/', $normalized);
+    }
+}
+
+if (!function_exists('apos_fetch_booked_slots_map')) {
+    function apos_fetch_booked_slots_map(mysqli $conn, array $userIds = [], string $excludeAppointmentId = ''): array
+    {
+        $map = [];
+        $appointmentTable = apos_appointment_table_name();
+        if (!apos_table_exists($conn, $appointmentTable)) {
+            return $map;
+        }
+
+        $columns = apos_table_columns($conn, $appointmentTable);
+        if (!isset($columns['user_id_official_assigned'])) {
+            return $map;
+        }
+
+        $timestampExpressions = [];
+        foreach (['confirmed_schedule_timestamp', 'preferred_schedule_timestamp', 'schedule_timestamp'] as $column) {
+            if (isset($columns[$column])) {
+                $timestampExpressions[] = 'a.' . $column;
+            }
+        }
+        if ($timestampExpressions === []) {
+            return $map;
+        }
+
+        $normalizedUserIds = array_values(array_unique(array_filter(array_map(static function ($value): string {
+            return trim((string)$value);
+        }, $userIds), static function (string $value): bool {
+            return $value !== '';
+        })));
+
+        $timestampSql = count($timestampExpressions) === 1
+            ? $timestampExpressions[0]
+            : 'COALESCE(' . implode(', ', $timestampExpressions) . ')';
+        $statusJoin = apos_table_exists($conn, 'statuslookuptbl') && isset($columns['appointment_status_id'])
+            ? "LEFT JOIN statuslookuptbl s ON s.status_id = a.appointment_status_id"
+            : '';
+        $statusSelect = $statusJoin !== ''
+            ? "COALESCE(s.status_name, '')"
+            : "''";
+
+        $sql = "
+            SELECT a.appointment_id,
+                   a.user_id_official_assigned AS official_user_id,
+                   {$timestampSql} AS slot_timestamp,
+                   {$statusSelect} AS status_name
+            FROM {$appointmentTable} a
+            {$statusJoin}
+            WHERE a.user_id_official_assigned IS NOT NULL
+              AND TRIM(a.user_id_official_assigned) <> ''
+        ";
+
+        $bindTypes = '';
+        $bindValues = [];
+
+        if ($normalizedUserIds !== []) {
+            $placeholders = implode(', ', array_fill(0, count($normalizedUserIds), '?'));
+            $sql .= " AND a.user_id_official_assigned IN ({$placeholders})";
+            $bindTypes .= str_repeat('s', count($normalizedUserIds));
+            array_push($bindValues, ...$normalizedUserIds);
+        }
+
+        if (trim($excludeAppointmentId) !== '') {
+            $sql .= " AND a.appointment_id <> ?";
+            $bindTypes .= 's';
+            $bindValues[] = trim($excludeAppointmentId);
+        }
+
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return $map;
+        }
+
+        if ($bindTypes !== '') {
+            $stmt->bind_param($bindTypes, ...$bindValues);
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $officialUserId = trim((string)($row['official_user_id'] ?? ''));
+            $appointmentId = trim((string)($row['appointment_id'] ?? ''));
+            $slotTimestamp = trim((string)($row['slot_timestamp'] ?? ''));
+            $statusName = trim((string)($row['status_name'] ?? ''));
+            if (
+                $officialUserId === ''
+                || $appointmentId === ''
+                || $slotTimestamp === ''
+                || !apos_booking_status_blocks_slot($statusName)
+            ) {
+                continue;
+            }
+
+            try {
+                $timestamp = new DateTimeImmutable($slotTimestamp);
+            } catch (Throwable $e) {
+                continue;
+            }
+
+            $slotDate = $timestamp->format('Y-m-d');
+            $slotTime = $timestamp->format('H:i');
+            if (!isset($map[$officialUserId])) {
+                $map[$officialUserId] = [];
+            }
+            if (!isset($map[$officialUserId][$slotDate])) {
+                $map[$officialUserId][$slotDate] = [];
+            }
+            if (!isset($map[$officialUserId][$slotDate][$slotTime])) {
+                $map[$officialUserId][$slotDate][$slotTime] = [];
+            }
+            $map[$officialUserId][$slotDate][$slotTime][] = $appointmentId;
+        }
+        $stmt->close();
+
+        return $map;
     }
 }

@@ -95,7 +95,9 @@ if (isset($conn) && $conn instanceof mysqli) {
             $stmt->execute();
             $result = $stmt->get_result();
             while ($row = $result->fetch_assoc()) {
-                $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
+                $payload = function_exists('dr_decode_request_payload')
+                    ? dr_decode_request_payload($row)
+                    : json_decode((string)($row['request_details'] ?? '{}'), true);
                 if (!is_array($payload)) {
                     $payload = [];
                 }

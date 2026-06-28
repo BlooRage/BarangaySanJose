@@ -16,6 +16,7 @@ if (!isset($baseUrl)) {
 
 $allowUnregistered = false;
 require_once __DIR__ . '/includes/resident_access_guard.php';
+require_once __DIR__ . '/../PhpFiles/General/documentRequestWorkflow.php';
 
 $residentUserId   = (string)($_SESSION['user_id'] ?? '');
 $workflowEndpoint = $baseUrl . '/PhpFiles/Resident-End/documentRequestWorkflow.php';
@@ -116,6 +117,16 @@ function receipts_resolve_details(string $documentType, ?string $requestDetailsJ
     return $details;
 }
 
+function receipts_decode_request_details(array $row): array
+{
+    if (function_exists('dr_decode_request_payload')) {
+        return dr_decode_request_payload($row);
+    }
+
+    $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
+    return is_array($payload) ? $payload : [];
+}
+
 function receipts_build_view_url(string $workflowEndpoint, string $requestId): string
 {
     return $workflowEndpoint
@@ -189,6 +200,7 @@ if (isset($conn) && $conn instanceof mysqli) {
             $stmt->execute();
             $result = $stmt->get_result();
             while ($row = $result->fetch_assoc()) {
+                $decodedDetails = receipts_decode_request_details($row);
                 $requestId = trim((string)($row['request_id'] ?? ''));
                 $paymentId = trim((string)($row['payment_id'] ?? ''));
                 $invoicePath = trim((string)($row['invoice_file_path'] ?? ''));
@@ -204,7 +216,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                     'request_id' => $requestId,
                     'details' => receipts_resolve_details(
                         (string)($row['document_type'] ?? ''),
-                        (string)($row['request_details'] ?? '')
+                        $decodedDetails ? json_encode($decodedDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : (string)($row['request_details'] ?? '')
                     ),
                     'price' => receipts_format_amount($row['amount'] ?? null),
                     'timestamp' => receipts_format_datetime((string)($row['transaction_timestamp'] ?? '')),

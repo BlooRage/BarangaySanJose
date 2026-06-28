@@ -61,7 +61,7 @@ if (!function_exists('resident_schedule_status_bucket')) {
         if ($normalized === '') {
             return 'pending';
         }
-        if (str_contains($normalized, 'approve') || str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
+        if (str_contains($normalized, 'confirm') || str_contains($normalized, 'approve') || str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
             return 'approved';
         }
         if (str_contains($normalized, 'resched')) {
@@ -71,6 +71,24 @@ if (!function_exists('resident_schedule_status_bucket')) {
             return 'archived';
         }
         return 'pending';
+    }
+}
+
+if (!function_exists('resident_schedule_status_label')) {
+    function resident_schedule_status_label(string $statusName): string
+    {
+        $normalized = strtolower(trim($statusName));
+        if (str_contains($normalized, 'resched')) {
+            return 'Rescheduled';
+        }
+        if (str_contains($normalized, 'confirm') || str_contains($normalized, 'approve') || str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
+            return 'Confirmed';
+        }
+        if (str_contains($normalized, 'deny') || str_contains($normalized, 'reject') || str_contains($normalized, 'cancel')) {
+            return 'Denied';
+        }
+
+        return 'Pending';
     }
 }
 
@@ -176,6 +194,18 @@ if (!function_exists('resident_schedule_extract_official_label')) {
     }
 }
 
+if (!function_exists('resident_schedule_resolved_status_name')) {
+    function resident_schedule_resolved_status_name(string $statusName, string $confirmedScheduleTimestamp): string
+    {
+        $statusName = trim($statusName);
+        if ($statusName !== '') {
+            return $statusName;
+        }
+
+        return trim($confirmedScheduleTimestamp) !== '' ? 'Approved' : 'Pending';
+    }
+}
+
 if (!function_exists('resident_schedule_collect_announcements')) {
     function resident_schedule_collect_announcements(array $viewerContext): array
     {
@@ -255,8 +285,8 @@ if (!function_exists('resident_schedule_collect_appointments')) {
             ? "LEFT JOIN statuslookuptbl s ON a.appointment_status_id = s.status_id"
             : '';
         $statusSelect = resident_schedule_table_exists($conn, 'statuslookuptbl')
-            ? "COALESCE(s.status_name, 'Pending') AS status_name"
-            : "'Pending' AS status_name";
+            ? "NULLIF(TRIM(s.status_name), '') AS status_name"
+            : "NULL AS status_name";
 
         $officialJoin = '';
         $officialFirstNameSelect = "'' AS official_firstname";
@@ -337,7 +367,11 @@ if (!function_exists('resident_schedule_collect_appointments')) {
 
             $purpose = trim((string)($row['purpose'] ?? ''));
             $officialName = resident_schedule_extract_official_label($row);
-            $statusName = trim((string)($row['status_name'] ?? 'Pending'));
+            $statusName = resident_schedule_resolved_status_name(
+                (string)($row['status_name'] ?? ''),
+                (string)($row['confirmed_schedule_timestamp'] ?? '')
+            );
+            $statusLabel = resident_schedule_status_label($statusName);
             $scheduleContext = trim((string)($row['confirmed_schedule_timestamp'] ?? '')) !== '' ? 'Confirmed' : 'Requested';
 
             $title = $subject;
@@ -364,7 +398,7 @@ if (!function_exists('resident_schedule_collect_appointments')) {
                 'title' => $title,
                 'summary' => $summary,
                 'meta' => $scheduleContext . ' schedule · ' . date('M d, Y h:i A', $ts),
-                'status_label' => $statusName !== '' ? $statusName : 'Pending',
+                'status_label' => $statusLabel,
                 'status_bucket' => resident_schedule_status_bucket($statusName),
                 'href' => 'appointment_tracker',
             ];

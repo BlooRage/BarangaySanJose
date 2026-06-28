@@ -169,8 +169,12 @@ if ($requestId === '') {
     } elseif (strtolower(trim((string)($requestRow['stage'] ?? ''))) !== strtolower((string)DR_STAGE_COMPLETED)) {
         $errorMessage = 'Your digital Barangay ID will be available once the request is marked completed.';
     } else {
-        $decodedPayload = json_decode((string)($requestRow['request_details'] ?? '{}'), true);
-        $payload = is_array($decodedPayload) ? $decodedPayload : [];
+        $payload = function_exists('dr_decode_request_payload')
+            ? dr_decode_request_payload($requestRow)
+            : json_decode((string)($requestRow['request_details'] ?? '{}'), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
 
         if (isset($conn) && $conn instanceof mysqli && $userId !== '') {
             $stmtResident = $conn->prepare("
