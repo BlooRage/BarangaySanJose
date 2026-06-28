@@ -414,6 +414,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             <div class="col-md-6"><strong>Council Member:</strong><div id="appointmentViewOfficial" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Preferred Schedule:</strong><div id="appointmentViewPreferred" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Confirmed Schedule:</strong><div id="appointmentViewConfirmed" class="text-muted"></div></div>
+            <div class="col-md-6"><strong>Meeting Location:</strong><div id="appointmentViewMeetingLocation" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Requested At:</strong><div id="appointmentViewRequested" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Reviewed At:</strong><div id="appointmentViewReviewed" class="text-muted"></div></div>
             <div class="col-12"><strong>Purpose:</strong><div id="appointmentViewPurpose" class="text-muted"></div></div>
@@ -528,6 +529,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           item.appointment_id,
           item.subject,
           item.purpose,
+          item.meeting_location,
           item.status_name,
           item.official_name
         ].join(" ").toLowerCase();
@@ -548,6 +550,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       document.getElementById("appointmentViewOfficial").textContent = item.official_name || "-";
       document.getElementById("appointmentViewPreferred").textContent = formatDateTime(item.preferred_schedule_timestamp, "To be scheduled");
       document.getElementById("appointmentViewConfirmed").textContent = formatDateTime(item.confirmed_schedule_timestamp, "Awaiting confirmation");
+      document.getElementById("appointmentViewMeetingLocation").textContent = item.meeting_location || "To be shared by the office";
       document.getElementById("appointmentViewRequested").textContent = formatDateTime(item.request_timestamp);
       document.getElementById("appointmentViewReviewed").textContent = formatDateTime(item.review_timestamp, "Not reviewed yet");
       document.getElementById("appointmentViewPurpose").textContent = item.purpose || "-";

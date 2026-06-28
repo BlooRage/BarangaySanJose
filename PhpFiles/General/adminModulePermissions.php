@@ -92,11 +92,11 @@ if (!function_exists('amp_get_permission_catalog')) {
                     ],
                     [
                         'key' => 'area_statistics',
-                        'label' => 'Area Statistics',
+                        'label' => 'Statistics',
                         'children' => [
                             [
                                 'key' => 'area_statistics_summary',
-                                'label' => 'Summary',
+                                'label' => 'Area Statistics',
                                 'path' => 'Admin-End/AreaManagement/AreaStatistics.php?tab=summary',
                             ],
                             [
@@ -1575,6 +1575,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
 
         return match ($current) {
             'AdminDashboard.php' => 'dashboard',
+            'BarangayStatistics.php' => 'dashboard',
             'AppointmentTracker.php' => 'appointments',
             'ResidentTracker.php' => 'resident_masterlist',
             'ResidentMasterlist.php' => 'resident_masterlist',

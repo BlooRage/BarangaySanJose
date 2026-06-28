@@ -3,6 +3,7 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/appointmentCouncilMembers.php";
 require_once __DIR__ . "/../General/appointmentSettings.php";
+require_once __DIR__ . "/../General/appointmentOfficialSchedules.php";
 require_once __DIR__ . "/../General/appointmentTimeSlots.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 require_once __DIR__ . "/../GET/getResidentProfile.php";
@@ -208,8 +209,13 @@ if (!aps_is_date_available($appointmentSettings, $appointmentDate)) {
     appointmentRedirectWithMessage('error', 'The selected appointment date is unavailable for official appointments.');
 }
 
-if (!ats_is_valid_time($appointmentTime, $appointmentSettings)) {
-    appointmentRedirectWithMessage('error', 'Please select one of the allotted appointment times.');
+$officialAvailability = apos_effective_schedule_for_user_date($conn, $officialUserId, $appointmentDate, $appointmentSettings);
+if ($officialAvailability === null) {
+    appointmentRedirectWithMessage('error', 'The selected council member is not available on that appointment date.');
+}
+
+if (!array_key_exists($appointmentTime, (array)($officialAvailability['slots'] ?? []))) {
+    appointmentRedirectWithMessage('error', 'Please select one of the allotted appointment times for that council member.');
 }
 
 $firstName = trim((string)($residentinformationtbl['firstname'] ?? ''));
@@ -236,6 +242,7 @@ $normalizedSubjectOther = $subject === 'other' ? $subjectOther : null;
 $residentNotes = $subject === 'other' ? 'Other subject detail: ' . $subjectOther : null;
 $residentUserId = $userId !== '' ? $userId : null;
 $preferredScheduleTimestamp = $schedule->format('Y-m-d H:i:s');
+$meetingLocation = apos_normalize_location($officialAvailability['meeting_location'] ?? '');
 $appointmentColumns = appointmentGetTableColumns($conn, 'appointmentstbl');
 
 if (!isset($appointmentColumns['user_id_official_assigned'])) {
@@ -287,6 +294,12 @@ try {
     if (isset($appointmentColumns['resident_notes'])) {
         $insertColumns[] = 'resident_notes';
         $insertValues[] = $residentNotes;
+        $bindTypes .= 's';
+    }
+
+    if (isset($appointmentColumns['meeting_location'])) {
+        $insertColumns[] = 'meeting_location';
+        $insertValues[] = $meetingLocation !== '' ? $meetingLocation : null;
         $bindTypes .= 's';
     }
 

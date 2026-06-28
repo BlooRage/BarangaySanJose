@@ -19,6 +19,7 @@
   let hasInitializedLayout = false;
   let appliedFilterSnapshot = '';
   let isLoading = false;
+  let overlayVisible = false;
 
   const chartPalette = {
     orange: '#de710c',
@@ -67,21 +68,25 @@
     updateApplyButtonState();
   }
 
-  function setLoadingState(nextLoading) {
+  function setLoadingState(nextLoading, options = {}) {
+    const { showOverlay = true, disableInputs = true, updateButtonLabel = true } = options;
     isLoading = nextLoading;
-    mainDisplay.classList.toggle('is-loading', nextLoading);
+    overlayVisible = nextLoading && showOverlay;
+    mainDisplay.classList.toggle('is-loading', overlayVisible);
     if (loadingOverlay) {
-      loadingOverlay.setAttribute('aria-hidden', nextLoading ? 'false' : 'true');
+      loadingOverlay.setAttribute('aria-hidden', overlayVisible ? 'false' : 'true');
     }
 
-    if (applyBtn) {
+    if (applyBtn && updateButtonLabel) {
       applyBtn.textContent = nextLoading ? 'Applying...' : 'Apply Filters';
     }
 
-    [moduleSelect, dateFromInput, dateToInput, statusSelect, resetBtn].forEach((input) => {
-      if (!input) return;
-      input.disabled = nextLoading;
-    });
+    if (disableInputs) {
+      [moduleSelect, dateFromInput, dateToInput, statusSelect, resetBtn].forEach((input) => {
+        if (!input) return;
+        input.disabled = nextLoading;
+      });
+    }
 
     updateApplyButtonState();
   }
@@ -516,10 +521,19 @@
     document.querySelectorAll('[data-stat="cases"]').forEach((el) => el.textContent = Number(payload.cards?.cases || 0).toLocaleString());
   }
 
-  async function loadData() {
-    setLoadingState(true);
+  async function loadData(options = {}) {
+    const { showOverlay = true, updateButtonLabel = true } = options;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller
+      ? window.setTimeout(() => controller.abort(), 10000)
+      : 0;
+
+    setLoadingState(true, { showOverlay, updateButtonLabel });
     try {
-      const response = await fetch(`${endpoint}?${params().toString()}`, { credentials: 'same-origin' });
+      const response = await fetch(`${endpoint}?${params().toString()}`, {
+        credentials: 'same-origin',
+        signal: controller?.signal
+      });
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
       const payload = await response.json();
 
@@ -543,11 +557,21 @@
     } catch (error) {
       renderHighlights([
         { label: 'Load error', value: 'Failed to fetch area statistics.' },
-        { label: 'Details', value: error instanceof Error ? error.message : 'Unknown error' }
+        {
+          label: 'Details',
+          value: error instanceof Error && error.name === 'AbortError'
+            ? 'The statistics request timed out.'
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error'
+        }
       ]);
       renderTable([]);
     } finally {
-      setLoadingState(false);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      setLoadingState(false, { showOverlay: false, updateButtonLabel: true });
     }
   }
 
@@ -558,7 +582,7 @@
   buildWidgetCustomizer();
   applyWidgetState();
   startPageAnimation();
-  loadData();
+  loadData({ showOverlay: false, updateButtonLabel: false });
 
   [moduleSelect, dateFromInput, dateToInput, statusSelect].forEach((input) => {
     if (!input) return;
@@ -584,7 +608,7 @@
   }
 
   if (applyBtn) {
-    applyBtn.addEventListener('click', loadData);
+    applyBtn.addEventListener('click', () => loadData());
   }
 
   if (resetWidgetBtn) {

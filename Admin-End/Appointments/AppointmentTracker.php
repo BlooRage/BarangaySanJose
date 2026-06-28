@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../../PhpFiles/General/appointmentCouncilMembers.php";
 require_once __DIR__ . "/../../PhpFiles/General/appointmentSettings.php";
+require_once __DIR__ . "/../../PhpFiles/General/appointmentOfficialSchedules.php";
 require_once __DIR__ . "/../../PhpFiles/General/appointmentTimeSlots.php";
 require_once __DIR__ . "/../../PhpFiles/General/audit.php";
 require_once __DIR__ . "/../includes/admin_guard.php";
@@ -15,13 +16,18 @@ if (empty($appointmentAccess['can_access_tracker'])) {
 }
 
 $appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
-if (!in_array($appointmentTool, ['tracker', 'settings'], true)) {
+if (!in_array($appointmentTool, ['tracker', 'settings', 'schedule'], true)) {
     $appointmentTool = 'tracker';
 }
 $isAppointmentSettingsView = $appointmentTool === 'settings';
-$isAppointmentTrackerView = !$isAppointmentSettingsView;
+$isAppointmentScheduleView = $appointmentTool === 'schedule';
+$isAppointmentTrackerView = !$isAppointmentSettingsView && !$isAppointmentScheduleView;
 if ($isAppointmentSettingsView && empty($appointmentAccess['can_access_settings'])) {
     header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php?tool=tracker&error=' . rawurlencode('Only SuperAdmin or the Barangay Secretary can manage appointment settings.')));
+    exit;
+}
+if ($isAppointmentScheduleView && empty($appointmentAccess['can_access_schedule'])) {
+    header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php?tool=tracker&error=' . rawurlencode('Appointment schedule access is not available for your account.')));
     exit;
 }
 
@@ -45,6 +51,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
         $lunchStartTime = trim((string)($_POST['lunch_start_time'] ?? ''));
         $lunchEndTime = trim((string)($_POST['lunch_end_time'] ?? ''));
         $unavailableDatesRaw = trim((string)($_POST['unavailable_dates'] ?? ''));
+        $meetingLocationsRaw = (string)($_POST['meeting_locations'] ?? '');
 
         if ($slotInterval === '' || filter_var($slotInterval, FILTER_VALIDATE_INT) === false) {
             throw new RuntimeException('Slot interval must be a whole number.');
@@ -96,6 +103,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
             }
         }
 
+        $meetingLocationTokens = aps_normalize_location_options($meetingLocationsRaw);
+
         $normalizedLunchStartTime = aps_normalize_time_value($lunchStartTime);
         $normalizedLunchEndTime = aps_normalize_time_value($lunchEndTime);
         if ($lunchBreakEnabled === '1') {
@@ -118,6 +127,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
             'lunch_start_time' => $normalizedLunchStartTime !== '' ? $normalizedLunchStartTime : ($existingSettings['lunch_start_time'] ?? '12:00'),
             'lunch_end_time' => $normalizedLunchEndTime !== '' ? $normalizedLunchEndTime : ($existingSettings['lunch_end_time'] ?? '13:00'),
             'unavailable_dates' => $unavailableDateTokens,
+            'meeting_locations' => $meetingLocationTokens,
         ];
         $normalizedSettings = aps_normalize_settings($settingsToSave);
         if (ats_allotted_times($normalizedSettings) === []) {
@@ -148,6 +158,59 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
 }
 
 $appointmentSettings = aps_settings_load($conn);
+$appointmentCouncilMembers = apcm_fetch_council_members($conn);
+$appointmentCouncilMembersByUserId = [];
+foreach ($appointmentCouncilMembers as $member) {
+    $memberUserId = trim((string)($member['user_id'] ?? ''));
+    if ($memberUserId !== '') {
+        $appointmentCouncilMembersByUserId[$memberUserId] = $member;
+    }
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_appointment_official_schedule') {
+    verifyCsrfToken(false);
+
+    $actorUserId = (string)($_SESSION['user_id'] ?? '');
+    $selectedOfficialUserId = trim((string)($_POST['official_user_id'] ?? ''));
+    if (empty($appointmentAccess['can_manage_all_schedule'])) {
+        $selectedOfficialUserId = trim((string)($appointmentAccess['scoped_official_user_id'] ?? $actorUserId));
+    }
+
+    try {
+        if ($selectedOfficialUserId === '' || !isset($appointmentCouncilMembersByUserId[$selectedOfficialUserId])) {
+            throw new RuntimeException('Please select a valid barangay council member for the appointment schedule.');
+        }
+
+        $rawWeeklySchedule = $_POST['weekly_schedule'] ?? [];
+        if (!is_array($rawWeeklySchedule)) {
+            throw new RuntimeException('Weekly appointment schedule data is invalid.');
+        }
+
+        apos_save_weekly_schedule($conn, $selectedOfficialUserId, $rawWeeklySchedule, $actorUserId, $appointmentSettings);
+
+        $redirectParams = [
+            'tool' => 'schedule',
+            'success' => 'Appointment schedule saved successfully.',
+        ];
+        if (!empty($appointmentAccess['can_manage_all_schedule'])) {
+            $redirectParams['official_user_id'] = $selectedOfficialUserId;
+        }
+
+        header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php') . '?' . http_build_query($redirectParams));
+        exit;
+    } catch (Throwable $e) {
+        $redirectParams = [
+            'tool' => 'schedule',
+            'error' => $e->getMessage() !== '' ? $e->getMessage() : 'Unable to save the appointment schedule right now.',
+        ];
+        if (!empty($appointmentAccess['can_manage_all_schedule']) && $selectedOfficialUserId !== '') {
+            $redirectParams['official_user_id'] = $selectedOfficialUserId;
+        }
+        header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php') . '?' . http_build_query($redirectParams));
+        exit;
+    }
+}
+
 $bookingLimits = aps_booking_date_limits($appointmentSettings);
 $minConfirmedDate = (string)($bookingLimits['min_date'] ?? '');
 $maxConfirmedDate = (string)($bookingLimits['max_date'] ?? '');
@@ -165,6 +228,8 @@ $appointmentDisabledWeekdays = aps_disabled_weekdays($appointmentSettings);
 $appointmentUnavailableDates = aps_normalize_unavailable_dates($appointmentSettings['unavailable_dates'] ?? []);
 $appointmentUnavailableDatesCsv = implode(',', $appointmentUnavailableDates);
 $appointmentUnavailableDatesSummary = aps_unavailable_dates_label($appointmentUnavailableDates);
+$appointmentMeetingLocations = aps_normalize_location_options($appointmentSettings['meeting_locations'] ?? []);
+$appointmentMeetingLocationsSummary = $appointmentMeetingLocations !== [] ? implode(', ', $appointmentMeetingLocations) : 'No meeting locations configured yet';
 $appointmentLunchBreakEnabled = aps_has_lunch_break($appointmentSettings);
 $appointmentLunchBreakLabel = aps_lunch_break_label($appointmentSettings);
 $appointmentLunchStartTime = (string)($appointmentSettings['lunch_start_time'] ?? '12:00');
@@ -172,6 +237,31 @@ $appointmentLunchEndTime = (string)($appointmentSettings['lunch_end_time'] ?? '1
 $appointmentScheduleCoverageLabel = date('h:i A', strtotime(aps_schedule_start_time())) . ' to ' . date('h:i A', strtotime(aps_schedule_end_time()));
 $appointmentFirstAvailableDate = aps_first_available_booking_date($appointmentSettings);
 $appointmentFirstAvailableDateLabel = $appointmentFirstAvailableDate !== null ? date('M d, Y', strtotime($appointmentFirstAvailableDate)) : 'No available dates';
+$appointmentScheduleScopedOfficialUserId = trim((string)($appointmentAccess['scoped_official_user_id'] ?? ''));
+$appointmentScheduleSelectedUserId = trim((string)($_GET['official_user_id'] ?? ''));
+if (empty($appointmentAccess['can_manage_all_schedule'])) {
+    $appointmentScheduleSelectedUserId = $appointmentScheduleScopedOfficialUserId !== '' ? $appointmentScheduleScopedOfficialUserId : $appointmentCurrentUserId;
+}
+if ($appointmentScheduleSelectedUserId === '' || !isset($appointmentCouncilMembersByUserId[$appointmentScheduleSelectedUserId])) {
+    $appointmentScheduleSelectedUserId = array_key_first($appointmentCouncilMembersByUserId) ?? '';
+}
+$appointmentScheduleRows = $appointmentScheduleSelectedUserId !== ''
+    ? apos_weekly_schedule_for_user($conn, $appointmentScheduleSelectedUserId, $appointmentSettings)
+    : [];
+$appointmentScheduleMap = apos_fetch_schedule_map($conn, array_keys($appointmentCouncilMembersByUserId), $appointmentSettings);
+$appointmentScheduleWeekdayOptions = aps_weekday_options();
+$appointmentScheduleTimeOptions = [];
+$appointmentScheduleTimeCursor = DateTimeImmutable::createFromFormat('H:i', aps_schedule_start_time());
+$appointmentScheduleTimeLast = DateTimeImmutable::createFromFormat('H:i', aps_schedule_end_time());
+while ($appointmentScheduleTimeCursor && $appointmentScheduleTimeLast && $appointmentScheduleTimeCursor <= $appointmentScheduleTimeLast) {
+    $appointmentScheduleTimeValue = $appointmentScheduleTimeCursor->format('H:i');
+    $appointmentScheduleTimeOptions[$appointmentScheduleTimeValue] = $appointmentScheduleTimeCursor->format('h:i A');
+    $appointmentScheduleTimeCursor = $appointmentScheduleTimeCursor->modify('+5 minutes');
+}
+$appointmentSelectedScheduleMember = $appointmentScheduleSelectedUserId !== '' && isset($appointmentCouncilMembersByUserId[$appointmentScheduleSelectedUserId])
+    ? $appointmentCouncilMembersByUserId[$appointmentScheduleSelectedUserId]
+    : null;
+$appointmentScheduleLocationPlaceholder = 'Select meeting location';
 
 function at_table_columns(mysqli $conn, string $tableName): array
 {
@@ -368,6 +458,7 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
     $hasConfirmedSchedule = isset($appointmentColumns['confirmed_schedule_timestamp']);
     $hasReviewTimestamp = isset($appointmentColumns['review_timestamp']);
     $hasAssignedOfficial = isset($appointmentColumns['user_id_official_assigned']);
+    $hasMeetingLocation = isset($appointmentColumns['meeting_location']);
     $hasCouncilTable = $conn->query("SHOW TABLES LIKE 'barangaycounciltbl'")->num_rows > 0;
 
     $preferredScheduleSelect = $hasPreferredSchedule
@@ -376,6 +467,7 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
     $confirmedScheduleSelect = $hasConfirmedSchedule ? 'a.confirmed_schedule_timestamp' : 'NULL';
     $reviewTimestampSelect = $hasReviewTimestamp ? 'a.review_timestamp' : 'NULL';
     $assignedOfficialSelect = $hasAssignedOfficial ? 'a.user_id_official_assigned' : 'NULL';
+    $meetingLocationSelect = $hasMeetingLocation ? 'a.meeting_location' : 'NULL';
     $assignedOfficialJoin = $hasAssignedOfficial
         ? "LEFT JOIN officialinformationtbl official
             ON a.user_id_official_assigned COLLATE utf8mb4_general_ci = official.user_id COLLATE utf8mb4_general_ci"
@@ -427,6 +519,7 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
                 a.resident_notes,
                 a.appointment_remarks,
                 {$reviewTimestampSelect} AS review_timestamp,
+                {$meetingLocationSelect} AS meeting_location,
                 COALESCE(s.status_name, 'Pending') AS status_name,
                 staff.user_id AS staff_user_id,
                 CONCAT_WS(' ', staff.firstname, staff.lastname) AS staff_name,
@@ -497,6 +590,7 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
                     'staff_name' => at_value($row, 'staff_name', '-'),
                     'official_user_id' => at_value($row, 'official_user_id', ''),
                     'official_name' => at_value($row, 'official_name', '-'),
+                    'meeting_location' => at_value($row, 'meeting_location', ''),
                     'resident_notes' => at_value($row, 'resident_notes', '-'),
                     'appointment_remarks' => at_value($row, 'appointment_remarks', '-'),
                     'review_timestamp_display' => at_format_datetime($row['review_timestamp'] ?? null),
@@ -510,7 +604,7 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
     }
 }
 
-foreach (apcm_fetch_council_members($conn) as $member) {
+foreach ($appointmentCouncilMembers as $member) {
     $memberUserId = trim((string)($member['user_id'] ?? ''));
     if (
         empty($appointmentAccess['can_manage_all_tracker'])
@@ -813,6 +907,94 @@ foreach ($appointmentRows as $row) {
             gap: 0.75rem;
         }
 
+        .appointment-schedule-editor-shell {
+            display: grid;
+            grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.55fr);
+            gap: 18px;
+        }
+
+        .appointment-schedule-overview {
+            display: grid;
+            gap: 0.9rem;
+            align-content: start;
+        }
+
+        .appointment-schedule-member-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .appointment-schedule-hint {
+            color: #6b7280;
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .appointment-week-schedule-grid {
+            display: grid;
+            gap: 0.85rem;
+        }
+
+        .appointment-week-schedule-row {
+            display: grid;
+            grid-template-columns: minmax(170px, 0.78fr) repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+            align-items: stretch;
+            padding: 0.9rem 0.95rem;
+            border: 1px solid #e7ecf2;
+            border-radius: 16px;
+            background: #fbfcfe;
+        }
+
+        .appointment-week-schedule-row.is-disabled {
+            background: #f8fafc;
+            opacity: 0.78;
+        }
+
+        .appointment-week-schedule-day {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .appointment-week-schedule-day input {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: #ea580c;
+        }
+
+        .appointment-week-schedule-field {
+            display: grid;
+            gap: 0.35rem;
+            align-content: start;
+        }
+
+        .appointment-week-schedule-field-label {
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .appointment-week-schedule-row .form-control,
+        .appointment-week-schedule-row .form-select {
+            min-width: 0;
+            min-height: 46px;
+        }
+
+        .appointment-schedule-summary-list {
+            margin: 0;
+            padding-left: 1.1rem;
+            display: grid;
+            gap: 0.35rem;
+            color: #374151;
+        }
+
         #viewModal .modal-content {
             border: 1px solid #e9ecef;
             border-radius: 16px;
@@ -922,6 +1104,18 @@ foreach ($appointmentRows as $row) {
                 grid-template-columns: minmax(0, 1fr);
             }
 
+            .appointment-schedule-editor-shell {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .appointment-week-schedule-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .appointment-week-schedule-day {
+                grid-column: 1 / -1;
+            }
+
             .appointment-weekday-grid {
                 grid-template-columns: repeat(4, minmax(0, 1fr));
             }
@@ -935,6 +1129,10 @@ foreach ($appointmentRows as $row) {
         @media (max-width: 575.98px) {
             .appointment-weekday-grid {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .appointment-week-schedule-row {
+                grid-template-columns: minmax(0, 1fr);
             }
 
             .appointment-lunch-grid {
@@ -1105,6 +1303,36 @@ foreach ($appointmentRows as $row) {
                             <small>Use this for holidays, office closures, or one-off days when appointments should stay blocked.</small>
                         </div>
 
+                        <hr>
+
+                        <div class="appointment-settings-field">
+                            <label for="appointmentMeetingLocationInput">Meeting location options</label>
+                            <input type="hidden" name="meeting_locations" id="appointmentMeetingLocations" value="<?= htmlspecialchars(implode("\n", $appointmentMeetingLocations), ENT_QUOTES, 'UTF-8') ?>">
+                            <div class="appointment-settings-inline appointment-unavailable-toolbar">
+                                <input
+                                    class="form-control"
+                                    type="text"
+                                    id="appointmentMeetingLocationInput"
+                                    maxlength="255"
+                                    placeholder="Add a meeting location"
+                                >
+                                <button type="button" class="btn btn-outline-secondary" id="appointmentMeetingLocationAdd">Add location</button>
+                            </div>
+                            <div class="appointment-unavailable-list" id="appointmentMeetingLocationList">
+                                <?php if ($appointmentMeetingLocations === []): ?>
+                                    <div class="appointment-unavailable-empty">No meeting locations added yet.</div>
+                                <?php else: ?>
+                                    <?php foreach ($appointmentMeetingLocations as $locationLabel): ?>
+                                        <button type="button" class="appointment-unavailable-pill" data-meeting-location="<?= htmlspecialchars($locationLabel, ENT_QUOTES, 'UTF-8') ?>">
+                                            <span><?= htmlspecialchars($locationLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                            <small>These saved locations will appear in the official weekly schedule dropdown.</small>
+                        </div>
+
                         <div class="appointment-settings-actions">
                             <button type="submit" class="btn btn-primary" disabled>Save Settings</button>
                         </div>
@@ -1120,6 +1348,7 @@ foreach ($appointmentRows as $row) {
                             <li>Closed weekdays: <?= htmlspecialchars($appointmentClosedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
                             <li>Lunch break: <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
                             <li>Unavailable dates: <?= htmlspecialchars($appointmentUnavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?>.</li>
+                            <li>Meeting locations: <?= htmlspecialchars($appointmentMeetingLocationsSummary, ENT_QUOTES, 'UTF-8') ?>.</li>
                             <li>Residents can book from tomorrow up to <?= htmlspecialchars((string)($appointmentSettings['booking_window_days'] ?? 365), ENT_QUOTES, 'UTF-8') ?> days ahead.</li>
                             <li>Earliest bookable date right now: <?= htmlspecialchars($appointmentFirstAvailableDateLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
                         </ul>
@@ -1150,6 +1379,156 @@ foreach ($appointmentRows as $row) {
                                 <?php endforeach; ?>
                             </div>
                         </div>
+                    <?php endif; ?>
+                </section>
+            </div>
+        </div>
+        <?php elseif ($isAppointmentScheduleView): ?>
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border appointment-tracker-shell appointment-settings-shell">
+            <p class="appointment-settings-lead">Set the recurring weekly appointment schedule and meeting location for each barangay council member. SuperAdmin and the Barangay Secretary can manage everyone, while barangay officials can update their own weekly coverage and venue.</p>
+
+            <div class="appointment-schedule-editor-shell">
+                <section class="appointment-settings-card appointment-schedule-overview">
+                    <h5><?= !empty($appointmentAccess['can_manage_all_schedule']) ? 'Select Council Member' : 'My Appointment Schedule' ?></h5>
+
+                    <?php if ($appointmentCouncilMembers === []): ?>
+                        <p class="text-danger mb-0">No active barangay council members are currently available for appointment scheduling.</p>
+                    <?php elseif ($appointmentSelectedScheduleMember === null): ?>
+                        <p class="text-danger mb-0">The selected council member is not currently available for appointment scheduling.</p>
+                    <?php else: ?>
+                        <?php if (!empty($appointmentAccess['can_manage_all_schedule'])): ?>
+                            <div class="appointment-settings-field">
+                                <label for="appointmentScheduleOfficialSelector">Council member</label>
+                                <select class="form-select" id="appointmentScheduleOfficialSelector">
+                                    <?php foreach ($appointmentCouncilMembers as $member): ?>
+                                        <?php $scheduleMemberUserId = trim((string)($member['user_id'] ?? '')); ?>
+                                        <option value="<?= htmlspecialchars($scheduleMemberUserId, ENT_QUOTES, 'UTF-8') ?>" <?= $scheduleMemberUserId === $appointmentScheduleSelectedUserId ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars((string)($member['option_label'] ?? $member['full_name'] ?? $scheduleMemberUserId), ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php else: ?>
+                            <div class="appointment-schedule-member-name"><?= htmlspecialchars((string)($appointmentSelectedScheduleMember['option_label'] ?? $appointmentSelectedScheduleMember['full_name'] ?? $appointmentScheduleSelectedUserId), ENT_QUOTES, 'UTF-8') ?></div>
+                        <?php endif; ?>
+
+                        <p class="appointment-schedule-hint mb-0">Residents can only book dates that match this weekly schedule, stay inside the global booking window, and land on one of the currently generated appointment slots.</p>
+
+                        <ul class="appointment-schedule-summary-list">
+                            <li>Global office coverage: <?= htmlspecialchars($appointmentScheduleCoverageLabel, ENT_QUOTES, 'UTF-8') ?></li>
+                            <li>Slot interval: <?= htmlspecialchars((string)($appointmentSettings['slot_interval_minutes'] ?? 30), ENT_QUOTES, 'UTF-8') ?> minutes</li>
+                            <li>Open weekdays: <?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></li>
+                            <li>Global lunch break: <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></li>
+                            <li>Blocked dates: <?= htmlspecialchars($appointmentUnavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?></li>
+                            <li>Saved meeting locations: <?= htmlspecialchars($appointmentMeetingLocationsSummary, ENT_QUOTES, 'UTF-8') ?></li>
+                        </ul>
+                    <?php endif; ?>
+                </section>
+
+                <section class="appointment-settings-card">
+                    <h5>Weekly Meeting Schedule</h5>
+                    <?php if ($appointmentSelectedScheduleMember === null): ?>
+                        <p class="mb-0 text-muted">Choose a council member to edit their weekly appointment coverage and meeting location.</p>
+                    <?php else: ?>
+                        <?php if ($appointmentMeetingLocations === []): ?>
+                            <p class="text-danger mb-3">No meeting locations are configured yet. Add them first in Appointment Settings before saving weekly schedules.</p>
+                        <?php endif; ?>
+                        <form method="post" action="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=schedule'), ENT_QUOTES, 'UTF-8') ?>" class="appointment-settings-form" id="appointmentOfficialScheduleForm">
+                            <?= csrfTokenField() ?>
+                            <input type="hidden" name="action" value="save_appointment_official_schedule">
+                            <input type="hidden" name="official_user_id" id="appointmentScheduleOfficialUserId" value="<?= htmlspecialchars($appointmentScheduleSelectedUserId, ENT_QUOTES, 'UTF-8') ?>">
+
+                            <div class="appointment-week-schedule-grid">
+                                <?php foreach ($appointmentScheduleWeekdayOptions as $weekdayValue => $weekdayLabel): ?>
+                                    <?php $weekdayValue = (int)$weekdayValue; ?>
+                                    <?php $daySchedule = $appointmentScheduleRows[$weekdayValue] ?? apos_default_daily_schedule($appointmentSettings, $weekdayValue); ?>
+                                    <?php
+                                        $dayStartValue = trim((string)($daySchedule['start_time'] ?? ''));
+                                        $dayEndValue = trim((string)($daySchedule['end_time'] ?? ''));
+                                        $dayLocationValue = trim((string)($daySchedule['meeting_location'] ?? ''));
+                                        $dayStartOptions = $appointmentScheduleTimeOptions;
+                                        $dayEndOptions = $appointmentScheduleTimeOptions;
+                                        if ($dayStartValue !== '' && !isset($dayStartOptions[$dayStartValue])) {
+                                            $dayStartOptions[$dayStartValue] = date('h:i A', strtotime($dayStartValue));
+                                            ksort($dayStartOptions, SORT_STRING);
+                                        }
+                                        if ($dayEndValue !== '' && !isset($dayEndOptions[$dayEndValue])) {
+                                            $dayEndOptions[$dayEndValue] = date('h:i A', strtotime($dayEndValue));
+                                            ksort($dayEndOptions, SORT_STRING);
+                                        }
+                                        $dayLocationOptions = $appointmentMeetingLocations;
+                                        if ($dayLocationValue !== '' && !in_array($dayLocationValue, $dayLocationOptions, true)) {
+                                            array_unshift($dayLocationOptions, $dayLocationValue);
+                                        }
+                                    ?>
+                                    <div class="appointment-week-schedule-row<?= !empty($daySchedule['enabled']) ? '' : ' is-disabled' ?>" data-schedule-row="<?= $weekdayValue ?>">
+                                        <label class="appointment-week-schedule-day" for="appointmentWeekdayEnabled<?= $weekdayValue ?>">
+                                            <input
+                                                type="checkbox"
+                                                id="appointmentWeekdayEnabled<?= $weekdayValue ?>"
+                                                name="weekly_schedule[<?= $weekdayValue ?>][enabled]"
+                                                value="1"
+                                                data-schedule-toggle="<?= $weekdayValue ?>"
+                                                <?= !empty($daySchedule['enabled']) ? 'checked' : '' ?>
+                                            >
+                                            <span><?= htmlspecialchars($weekdayLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                                        </label>
+                                        <div class="appointment-week-schedule-field">
+                                            <span class="appointment-week-schedule-field-label">Start Time</span>
+                                            <select
+                                                class="form-select"
+                                                name="weekly_schedule[<?= $weekdayValue ?>][start_time]"
+                                                data-schedule-start="<?= $weekdayValue ?>"
+                                                <?= !empty($daySchedule['enabled']) ? '' : 'disabled' ?>
+                                            >
+                                                <option value="">Select start time</option>
+                                                <?php foreach ($dayStartOptions as $timeValue => $timeLabel): ?>
+                                                    <option value="<?= htmlspecialchars($timeValue, ENT_QUOTES, 'UTF-8') ?>" <?= $dayStartValue === $timeValue ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($timeLabel, ENT_QUOTES, 'UTF-8') ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="appointment-week-schedule-field">
+                                            <span class="appointment-week-schedule-field-label">End Time</span>
+                                            <select
+                                                class="form-select"
+                                                name="weekly_schedule[<?= $weekdayValue ?>][end_time]"
+                                                data-schedule-end="<?= $weekdayValue ?>"
+                                                <?= !empty($daySchedule['enabled']) ? '' : 'disabled' ?>
+                                            >
+                                                <option value="">Select end time</option>
+                                                <?php foreach ($dayEndOptions as $timeValue => $timeLabel): ?>
+                                                    <option value="<?= htmlspecialchars($timeValue, ENT_QUOTES, 'UTF-8') ?>" <?= $dayEndValue === $timeValue ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($timeLabel, ENT_QUOTES, 'UTF-8') ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="appointment-week-schedule-field">
+                                            <span class="appointment-week-schedule-field-label">Meeting Location</span>
+                                            <select
+                                                class="form-select"
+                                                name="weekly_schedule[<?= $weekdayValue ?>][meeting_location]"
+                                                data-schedule-location="<?= $weekdayValue ?>"
+                                                <?= !empty($daySchedule['enabled']) ? '' : 'disabled' ?>
+                                            >
+                                                <option value=""><?= htmlspecialchars($appointmentScheduleLocationPlaceholder, ENT_QUOTES, 'UTF-8') ?></option>
+                                                <?php foreach ($dayLocationOptions as $locationOption): ?>
+                                                    <option value="<?= htmlspecialchars($locationOption, ENT_QUOTES, 'UTF-8') ?>" <?= $dayLocationValue === $locationOption ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($locationOption, ENT_QUOTES, 'UTF-8') ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <div class="appointment-settings-actions">
+                                <button type="submit" class="btn btn-primary" disabled>Save Schedule</button>
+                            </div>
+                        </form>
                     <?php endif; ?>
                 </section>
             </div>
@@ -1258,6 +1637,7 @@ foreach ($appointmentRows as $row) {
                                             data-staff-name="<?= htmlspecialchars($row['staff_name'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-official-user-id="<?= htmlspecialchars($row['official_user_id'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-official-name="<?= htmlspecialchars($row['official_name'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-meeting-location="<?= htmlspecialchars($row['meeting_location'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-resident-notes="<?= htmlspecialchars($row['resident_notes'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-appointment-remarks="<?= htmlspecialchars($row['appointment_remarks'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-review-timestamp="<?= htmlspecialchars($row['review_timestamp_display'], ENT_QUOTES, 'UTF-8') ?>"
@@ -1364,6 +1744,9 @@ foreach ($appointmentRows as $row) {
                             <div class="tracker-form-field"><p class="tracker-form-label">Confirmed Time</p><div class="tracker-form-value" id="viewConfirmedAppointmentTime">-</div></div>
                         </div>
                         <div class="tracker-form-grid cols-1">
+                            <div class="tracker-form-field"><p class="tracker-form-label">Meeting Location</p><div class="tracker-form-value" id="viewMeetingLocation">-</div></div>
+                        </div>
+                        <div class="tracker-form-grid cols-1">
                             <div class="tracker-form-field"><p class="tracker-form-label">Purpose</p><div class="tracker-form-value" id="viewPurpose">-</div></div>
                         </div>
                     </section>
@@ -1386,7 +1769,7 @@ foreach ($appointmentRows as $row) {
                             <input type="hidden" name="appointment_id" id="reviewAppointmentId" value="">
                             <input type="hidden" name="action" id="reviewActionInput" value="">
 
-                            <div class="tracker-form-grid cols-3">
+                            <div class="tracker-form-grid cols-4">
                                 <div class="tracker-form-field">
                                     <label class="tracker-form-label" for="reviewOfficialUserId">Council Member</label>
                                     <select class="form-select" name="official_user_id" id="reviewOfficialUserId">
@@ -1415,6 +1798,10 @@ foreach ($appointmentRows as $row) {
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                </div>
+                                <div class="tracker-form-field">
+                                    <label class="tracker-form-label" for="reviewMeetingLocation">Meeting Location</label>
+                                    <input class="form-control" type="text" id="reviewMeetingLocation" value="" readonly>
                                 </div>
                             </div>
 
@@ -1500,6 +1887,22 @@ foreach ($appointmentRows as $row) {
         storageKey: "admin_cols_appointment_tracker_v1",
         defaultHiddenIdxs: []
     };
+    window.APPOINTMENT_OFFICIAL_SCHEDULE_MAP = <?= json_encode($appointmentScheduleMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.APPOINTMENT_MEETING_LOCATION_OPTIONS = <?= json_encode(array_values($appointmentMeetingLocations), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.APPOINTMENT_GLOBAL_SCHEDULE_CONFIG = <?= json_encode([
+        'startTime' => aps_schedule_start_time(),
+        'endTime' => aps_schedule_end_time(),
+        'slotIntervalMinutes' => (int)($appointmentSettings['slot_interval_minutes'] ?? 30),
+        'disabledWeekdays' => array_values(array_map('intval', $appointmentDisabledWeekdays)),
+        'disabledDates' => array_values($appointmentUnavailableDates),
+        'minDate' => $minConfirmedDate,
+        'maxDate' => $maxConfirmedDate,
+        'availableWeekdaysLabel' => $appointmentAvailableWeekdayLabels,
+        'lunchBreak' => $appointmentLunchBreakEnabled ? [
+            'start' => $appointmentLunchStartTime,
+            'end' => $appointmentLunchEndTime,
+        ] : null,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260326-1"></script>
@@ -1520,6 +1923,7 @@ foreach ($appointmentRows as $row) {
         const reviewOfficialUserId = document.getElementById("reviewOfficialUserId");
         const reviewConfirmedDate = document.getElementById("reviewConfirmedDate");
         const reviewConfirmedTime = document.getElementById("reviewConfirmedTime");
+        const reviewMeetingLocation = document.getElementById("reviewMeetingLocation");
         const reviewScheduleError = document.getElementById("reviewScheduleError");
         const reviewRemarks = document.getElementById("reviewAppointmentRemarks");
         const reviewActionButtons = Array.from(document.querySelectorAll("[data-review-action]"));
@@ -1550,6 +1954,10 @@ foreach ($appointmentRows as $row) {
         const AUTO_REFRESH_MS = 30000;
         let autoRefreshTimeout = null;
         let autoRefreshInFlight = false;
+        const officialScheduleMap = window.APPOINTMENT_OFFICIAL_SCHEDULE_MAP || {};
+        const globalScheduleConfig = window.APPOINTMENT_GLOBAL_SCHEDULE_CONFIG || {};
+        const disabledWeekdays = new Set((Array.isArray(globalScheduleConfig.disabledWeekdays) ? globalScheduleConfig.disabledWeekdays : []).map((value) => String(value)));
+        const disabledDates = new Set(Array.isArray(globalScheduleConfig.disabledDates) ? globalScheduleConfig.disabledDates : []);
 
         const parseIsoDate = (value) => {
             const text = String(value || "").trim();
@@ -1558,6 +1966,207 @@ foreach ($appointmentRows as $row) {
                 return null;
             }
             return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        };
+
+        const toMinutes = (value) => {
+            const match = String(value || "").trim().match(/^(\d{2}):(\d{2})$/);
+            if (!match) {
+                return null;
+            }
+            return (Number(match[1]) * 60) + Number(match[2]);
+        };
+
+        const formatTimeLabel = (value) => {
+            const totalMinutes = toMinutes(value);
+            if (totalMinutes === null) {
+                return String(value || "").trim() || "-";
+            }
+            const hour24 = Math.floor(totalMinutes / 60);
+            const minute = totalMinutes % 60;
+            const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+            const suffix = hour24 >= 12 ? "PM" : "AM";
+            return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${suffix}`;
+        };
+
+        const formatReviewDate = (value) => {
+            const parsed = parseIsoDate(value);
+            if (!parsed) {
+                return String(value || "").trim() || "-";
+            }
+            return parsed.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            });
+        };
+
+        const formatReviewTime = (value) => formatTimeLabel(value);
+
+        const isWithinOfficeHours = (value) => {
+            const minutes = toMinutes(value);
+            const minMinutes = toMinutes(globalScheduleConfig.startTime || "");
+            const maxMinutes = toMinutes(globalScheduleConfig.endTime || "");
+            if (minutes === null || minMinutes === null || maxMinutes === null) {
+                return false;
+            }
+            return minutes >= minMinutes && minutes <= maxMinutes;
+        };
+
+        const scheduleDayFor = (officialUserId, isoDate) => {
+            const schedule = officialScheduleMap[String(officialUserId || "").trim()] || null;
+            const parsedDate = parseIsoDate(isoDate);
+            if (!schedule || !parsedDate) {
+                return null;
+            }
+
+            const weekday = String(parsedDate.getDay());
+            if (disabledDates.has(String(isoDate || "").trim()) || disabledWeekdays.has(weekday)) {
+                return null;
+            }
+
+            const dayEntry = schedule[weekday] || schedule[Number(weekday)] || null;
+            if (!dayEntry || dayEntry.enabled !== true) {
+                return null;
+            }
+
+            return dayEntry;
+        };
+
+        const buildOfficialSlots = (officialUserId, isoDate) => {
+            const dayEntry = scheduleDayFor(officialUserId, isoDate);
+            if (!dayEntry) {
+                return { dayEntry: null, slots: [] };
+            }
+
+            const startMinutes = Math.max(
+                toMinutes(dayEntry.start_time || "") ?? 0,
+                toMinutes(globalScheduleConfig.startTime || "") ?? 0
+            );
+            const endMinutes = Math.min(
+                toMinutes(dayEntry.end_time || "") ?? 0,
+                toMinutes(globalScheduleConfig.endTime || "") ?? 0
+            );
+            const interval = Math.max(5, Number(globalScheduleConfig.slotIntervalMinutes || 30));
+            if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || startMinutes >= endMinutes) {
+                return { dayEntry: null, slots: [] };
+            }
+
+            const lunchBreak = globalScheduleConfig.lunchBreak || null;
+            const lunchStart = lunchBreak ? toMinutes(lunchBreak.start || "") : null;
+            const lunchEnd = lunchBreak ? toMinutes(lunchBreak.end || "") : null;
+            const slots = [];
+
+            for (let current = startMinutes; current <= endMinutes; current += interval) {
+                const slotEnd = current + interval;
+                if (
+                    lunchStart !== null
+                    && lunchEnd !== null
+                    && current < lunchEnd
+                    && slotEnd > lunchStart
+                ) {
+                    continue;
+                }
+
+                const hours = Math.floor(current / 60);
+                const minutes = current % 60;
+                const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                slots.push({
+                    value,
+                    label: formatTimeLabel(value),
+                });
+            }
+
+            return { dayEntry, slots };
+        };
+
+        const populateReviewTimeOptions = (officialUserId, isoDate, selectedValue = "") => {
+            if (!reviewConfirmedTime) {
+                return [];
+            }
+
+            const { slots } = buildOfficialSlots(officialUserId, isoDate);
+            reviewConfirmedTime.innerHTML = '<option value="">Select allotted time</option>';
+            slots.forEach((slot) => {
+                const option = document.createElement("option");
+                option.value = slot.value;
+                option.textContent = slot.label;
+                if (selectedValue && selectedValue === slot.value) {
+                    option.selected = true;
+                }
+                reviewConfirmedTime.appendChild(option);
+            });
+
+            if (selectedValue && !slots.some((slot) => slot.value === selectedValue)) {
+                reviewConfirmedTime.value = "";
+            }
+
+            return slots;
+        };
+
+        const syncReviewMeetingLocation = () => {
+            if (!reviewMeetingLocation) {
+                return;
+            }
+            const officialUserId = String(reviewOfficialUserId?.value || "").trim();
+            const isoDate = String(reviewConfirmedDate?.value || "").trim();
+            const { dayEntry } = buildOfficialSlots(officialUserId, isoDate);
+            reviewMeetingLocation.value = dayEntry && String(dayEntry.meeting_location || "").trim()
+                ? String(dayEntry.meeting_location || "").trim()
+                : "";
+        };
+
+        const validateReviewConfirmedDate = () => {
+            if (!reviewConfirmedDate) {
+                return { ok: true, message: "" };
+            }
+
+            const value = String(reviewConfirmedDate.value || "").trim();
+            if (value === "") {
+                reviewConfirmedDate.setCustomValidity("");
+                reviewScheduleError?.classList.add("d-none");
+                return { ok: true, message: "" };
+            }
+
+            if ((globalScheduleConfig.minDate && value < globalScheduleConfig.minDate) || (globalScheduleConfig.maxDate && value > globalScheduleConfig.maxDate)) {
+                const message = "Confirmed appointment date is outside the current booking window.";
+                reviewConfirmedDate.setCustomValidity(message);
+                return { ok: false, message };
+            }
+
+            const parsedDate = parseIsoDate(value);
+            const weekday = parsedDate ? String(parsedDate.getDay()) : "";
+            if (!parsedDate || disabledDates.has(value) || (weekday !== "" && disabledWeekdays.has(weekday))) {
+                const message = "The selected date is unavailable based on the current global appointment settings.";
+                reviewConfirmedDate.setCustomValidity(message);
+                return { ok: false, message };
+            }
+
+            const officialUserId = String(reviewOfficialUserId?.value || "").trim();
+            const { dayEntry, slots } = buildOfficialSlots(officialUserId, value);
+            if (officialUserId !== "" && (!dayEntry || slots.length === 0)) {
+                const message = "The selected council member is not available on that date.";
+                reviewConfirmedDate.setCustomValidity(message);
+                return { ok: false, message };
+            }
+
+            reviewConfirmedDate.setCustomValidity("");
+            reviewScheduleError?.classList.add("d-none");
+            return { ok: true, message: "" };
+        };
+
+        const syncReviewActionStates = () => {
+            const reviewDateValidation = validateReviewConfirmedDate();
+            const hasOfficial = String(reviewOfficialUserId?.value || "").trim() !== "";
+            const hasDate = String(reviewConfirmedDate?.value || "").trim() !== "";
+            const hasTime = String(reviewConfirmedTime?.value || "").trim() !== "";
+
+            reviewActionButtons.forEach((button) => {
+                const action = String(button.dataset.reviewAction || "").trim();
+                const needsSchedule = action === "approve_appointment" || action === "reschedule_appointment";
+                button.disabled = needsSchedule
+                    ? !(hasOfficial && hasDate && hasTime && reviewDateValidation.ok)
+                    : false;
+            });
         };
 
         function setRefreshLoading(on) {
@@ -1706,6 +2315,25 @@ foreach ($appointmentRows as $row) {
         });
 
         refreshBtn?.addEventListener("click", triggerRefresh);
+        reviewOfficialUserId?.addEventListener("change", () => {
+            populateReviewTimeOptions(reviewOfficialUserId.value || "", reviewConfirmedDate?.value || "", "");
+            syncReviewMeetingLocation();
+            syncReviewActionStates();
+        });
+        reviewConfirmedDate?.addEventListener("input", () => {
+            populateReviewTimeOptions(reviewOfficialUserId?.value || "", reviewConfirmedDate.value || "", "");
+            syncReviewMeetingLocation();
+            syncReviewActionStates();
+        });
+        reviewConfirmedDate?.addEventListener("change", () => {
+            populateReviewTimeOptions(reviewOfficialUserId?.value || "", reviewConfirmedDate.value || "", "");
+            syncReviewMeetingLocation();
+            syncReviewActionStates();
+        });
+        reviewConfirmedTime?.addEventListener("change", () => {
+            reviewScheduleError?.classList.add("d-none");
+            syncReviewActionStates();
+        });
 
         modal?.addEventListener("show.bs.modal", (event) => {
             const button = event.relatedTarget;
@@ -1731,6 +2359,7 @@ foreach ($appointmentRows as $row) {
             setText("viewPreferredAppointmentTime", button.dataset.preferredAppointmentTime);
             setText("viewConfirmedAppointmentDate", button.dataset.confirmedAppointmentDate);
             setText("viewConfirmedAppointmentTime", button.dataset.confirmedAppointmentTime);
+            setText("viewMeetingLocation", button.dataset.meetingLocation);
             setText("viewPurpose", button.dataset.purpose);
             setText("viewResidentNotes", button.dataset.residentNotes);
             setText("viewAppointmentRemarks", button.dataset.appointmentRemarks);
@@ -1757,24 +2386,23 @@ foreach ($appointmentRows as $row) {
                         modal.dataset.originalReviewDate = stampToUse.slice(0, 10);
                     }
                 }
-                validateReviewConfirmedDate();
             }
             if (reviewConfirmedTime) {
-                reviewConfirmedTime.value = "";
                 const confirmedStamp = String(button.dataset.confirmedScheduleTimestamp || "").trim();
                 const preferredStamp = String(button.dataset.preferredScheduleTimestamp || "").trim();
                 const stampToUse = confirmedStamp || preferredStamp;
-                if (stampToUse.length >= 16) {
-                    reviewConfirmedTime.value = stampToUse.slice(11, 16);
-                    if (modal) {
-                        modal.dataset.originalReviewTime = stampToUse.slice(11, 16);
-                    }
+                const selectedTime = stampToUse.length >= 16 ? stampToUse.slice(11, 16) : "";
+                populateReviewTimeOptions(String(button.dataset.officialUserId || "").trim(), reviewConfirmedDate?.value || "", selectedTime);
+                if (selectedTime && modal) {
+                    modal.dataset.originalReviewTime = selectedTime;
                 }
             }
             if (reviewRemarks) {
                 const remarks = String(button.dataset.appointmentRemarks || "").trim();
                 reviewRemarks.value = remarks && remarks !== '-' ? remarks : '';
             }
+            syncReviewMeetingLocation();
+            validateReviewConfirmedDate();
 
             const isPending = String(button.dataset.statusKey || "").trim() === "pending";
             reviewLockedMessage?.classList.toggle("d-none", isPending);
@@ -1905,8 +2533,12 @@ foreach ($appointmentRows as $row) {
         const unavailableDatePicker = document.getElementById("appointmentUnavailableDatePicker");
         const unavailableDateAddBtn = document.getElementById("appointmentUnavailableDateAdd");
         const unavailableDateList = document.getElementById("appointmentUnavailableDateList");
+        const meetingLocationsHidden = document.getElementById("appointmentMeetingLocations");
+        const meetingLocationInput = document.getElementById("appointmentMeetingLocationInput");
+        const meetingLocationAddBtn = document.getElementById("appointmentMeetingLocationAdd");
+        const meetingLocationList = document.getElementById("appointmentMeetingLocationList");
 
-        if (!settingsForm || !unavailableDatesHidden || !unavailableDatePicker || !unavailableDateAddBtn || !unavailableDateList) {
+        if (!settingsForm || !unavailableDatesHidden || !unavailableDatePicker || !unavailableDateAddBtn || !unavailableDateList || !meetingLocationsHidden || !meetingLocationInput || !meetingLocationAddBtn || !meetingLocationList) {
             return;
         }
 
@@ -1930,7 +2562,16 @@ foreach ($appointmentRows as $row) {
                 .filter((value) => value !== "")
         )).sort();
 
+        const normalizeMeetingLocationValue = (value) => String(value || "").replace(/\s+/g, " ").trim().slice(0, 255);
+
+        const normalizeMeetingLocations = (values) => Array.from(new Set(
+            (Array.isArray(values) ? values : String(values || "").split(/\r\n|\r|\n/))
+                .map((value) => normalizeMeetingLocationValue(value))
+                .filter((value) => value !== "")
+        ));
+
         const getUnavailableDates = () => normalizeUnavailableDates(unavailableDatesHidden.value);
+        const getMeetingLocations = () => normalizeMeetingLocations(meetingLocationsHidden.value);
 
         const setUnavailableDates = (dates, notify = false) => {
             const normalizedValue = normalizeUnavailableDates(dates).join(",");
@@ -1944,7 +2585,34 @@ foreach ($appointmentRows as $row) {
             }
         };
 
+        const setMeetingLocations = (locations, notify = false) => {
+            const normalizedValue = normalizeMeetingLocations(locations).join("\n");
+            if (meetingLocationsHidden.value === normalizedValue) {
+                return;
+            }
+            meetingLocationsHidden.value = normalizedValue;
+            if (notify) {
+                meetingLocationsHidden.dispatchEvent(new Event("input", { bubbles: true }));
+                meetingLocationsHidden.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        };
+
         const useMultiDatePicker = String(unavailableDatePicker.dataset.dateModalSelection || "").trim().toLowerCase() === "multiple";
+
+        const renderMeetingLocations = () => {
+            const locations = getMeetingLocations();
+            if (locations.length === 0) {
+                meetingLocationList.innerHTML = '<div class="appointment-unavailable-empty">No meeting locations added yet.</div>';
+                return;
+            }
+
+            meetingLocationList.innerHTML = locations.map((location) => `
+                <button type="button" class="appointment-unavailable-pill" data-meeting-location="${location.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")}">
+                    <span>${location.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")}</span>
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            `).join("");
+        };
 
         const getSettingsFormState = () => {
             const lunchBreakEnabled = lunchBreakToggle?.checked === true;
@@ -1959,6 +2627,7 @@ foreach ($appointmentRows as $row) {
                 lunch_start_time: lunchBreakEnabled ? String(lunchStartInput?.value || "").trim() : "",
                 lunch_end_time: lunchBreakEnabled ? String(lunchEndInput?.value || "").trim() : "",
                 unavailable_dates: getUnavailableDates(),
+                meeting_locations: getMeetingLocations(),
             };
         };
 
@@ -2048,6 +2717,40 @@ foreach ($appointmentRows as $row) {
             renderUnavailableDates();
         });
 
+        meetingLocationAddBtn.addEventListener("click", () => {
+            const locationValue = normalizeMeetingLocationValue(meetingLocationInput.value);
+            meetingLocationInput.setCustomValidity("");
+
+            if (locationValue === "") {
+                meetingLocationInput.setCustomValidity("Please enter a meeting location to add.");
+                meetingLocationInput.reportValidity();
+                return;
+            }
+
+            const locations = getMeetingLocations();
+            if (!locations.includes(locationValue)) {
+                locations.push(locationValue);
+                setMeetingLocations(locations, true);
+            }
+
+            meetingLocationInput.value = "";
+            meetingLocationInput.setCustomValidity("");
+        });
+
+        meetingLocationInput.addEventListener("input", () => {
+            meetingLocationInput.setCustomValidity("");
+        });
+
+        meetingLocationsHidden.addEventListener("input", () => {
+            setMeetingLocations(getMeetingLocations());
+            renderMeetingLocations();
+        });
+
+        meetingLocationsHidden.addEventListener("change", () => {
+            setMeetingLocations(getMeetingLocations());
+            renderMeetingLocations();
+        });
+
         unavailableDateList.addEventListener("click", (event) => {
             const removeButton = event.target.closest("[data-unavailable-date]");
             if (!(removeButton instanceof HTMLButtonElement)) {
@@ -2060,6 +2763,20 @@ foreach ($appointmentRows as $row) {
             }
 
             setUnavailableDates(getUnavailableDates().filter((value) => value !== isoDate), true);
+        });
+
+        meetingLocationList.addEventListener("click", (event) => {
+            const removeButton = event.target.closest("[data-meeting-location]");
+            if (!(removeButton instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const locationValue = normalizeMeetingLocationValue(removeButton.dataset.meetingLocation || "");
+            if (!locationValue) {
+                return;
+            }
+
+            setMeetingLocations(getMeetingLocations().filter((value) => value !== locationValue), true);
         });
 
         lunchBreakToggle?.addEventListener("change", syncLunchBreakInputs);
@@ -2109,7 +2826,243 @@ foreach ($appointmentRows as $row) {
         syncLunchBreakInputs();
         setUnavailableDates(getUnavailableDates());
         renderUnavailableDates();
+        setMeetingLocations(getMeetingLocations());
+        renderMeetingLocations();
         const originalSettingsState = JSON.stringify(getSettingsFormState());
+        updateSaveButtonState();
+    })();
+
+    (() => {
+        const scheduleForm = document.getElementById("appointmentOfficialScheduleForm");
+        if (!scheduleForm) {
+            return;
+        }
+
+        const officialSelector = document.getElementById("appointmentScheduleOfficialSelector");
+        const hiddenOfficialInput = document.getElementById("appointmentScheduleOfficialUserId");
+        const saveBtn = scheduleForm.querySelector('button[type="submit"]');
+        const scheduleMap = window.APPOINTMENT_OFFICIAL_SCHEDULE_MAP || {};
+        const baseLocationOptions = Array.isArray(window.APPOINTMENT_MEETING_LOCATION_OPTIONS)
+            ? window.APPOINTMENT_MEETING_LOCATION_OPTIONS.map((value) => String(value || "").trim()).filter((value) => value !== "")
+            : [];
+
+        const getRow = (weekday) => document.querySelector(`[data-schedule-row="${weekday}"]`);
+        const getToggle = (weekday) => document.querySelector(`[data-schedule-toggle="${weekday}"]`);
+        const getStartInput = (weekday) => document.querySelector(`[data-schedule-start="${weekday}"]`);
+        const getEndInput = (weekday) => document.querySelector(`[data-schedule-end="${weekday}"]`);
+        const getLocationInput = (weekday) => document.querySelector(`[data-schedule-location="${weekday}"]`);
+
+        const formatTimeLabel = (value) => {
+            const match = String(value || "").trim().match(/^(\d{2}):(\d{2})$/);
+            if (!match) {
+                return String(value || "").trim();
+            }
+            const hour24 = Number(match[1]);
+            const minute = Number(match[2]);
+            const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+            const suffix = hour24 >= 12 ? "PM" : "AM";
+            return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${suffix}`;
+        };
+
+        const ensureTimeOption = (select, value) => {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const normalizedValue = String(value || "").trim();
+            if (normalizedValue === "" || Array.from(select.options).some((option) => option.value === normalizedValue)) {
+                return;
+            }
+
+            const option = document.createElement("option");
+            option.value = normalizedValue;
+            option.textContent = formatTimeLabel(normalizedValue);
+            select.appendChild(option);
+        };
+
+        const ensureLocationOption = (select, value) => {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const normalizedValue = String(value || "").trim();
+            const currentValues = Array.from(select.options).map((option) => String(option.value || "").trim());
+            const mergedValues = normalizedValue !== "" && !baseLocationOptions.includes(normalizedValue)
+                ? [normalizedValue, ...baseLocationOptions]
+                : [...baseLocationOptions];
+
+            const nextValues = ["", ...mergedValues];
+            if (currentValues.length === nextValues.length && currentValues.every((item, index) => item === nextValues[index])) {
+                return;
+            }
+
+            select.innerHTML = "";
+            const placeholderOption = document.createElement("option");
+            placeholderOption.value = "";
+            placeholderOption.textContent = <?= json_encode($appointmentScheduleLocationPlaceholder, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            select.appendChild(placeholderOption);
+
+            mergedValues.forEach((locationLabel) => {
+                const option = document.createElement("option");
+                option.value = locationLabel;
+                option.textContent = locationLabel;
+                select.appendChild(option);
+            });
+        };
+
+        const setRowEnabled = (weekday, enabled) => {
+            const row = getRow(weekday);
+            const startInput = getStartInput(weekday);
+            const endInput = getEndInput(weekday);
+            const locationInput = getLocationInput(weekday);
+            row?.classList.toggle("is-disabled", !enabled);
+            [startInput, endInput, locationInput].forEach((input) => {
+                if (!input) {
+                    return;
+                }
+                input.disabled = !enabled;
+                input.required = enabled;
+                input.setCustomValidity("");
+            });
+        };
+
+        const applyOfficialSchedule = (officialUserId) => {
+            const schedule = scheduleMap[String(officialUserId || "").trim()] || {};
+            if (hiddenOfficialInput) {
+                hiddenOfficialInput.value = String(officialUserId || "").trim();
+            }
+
+            Object.keys(<?= json_encode($appointmentScheduleWeekdayOptions, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>).forEach((weekdayKey) => {
+                const dayEntry = schedule[weekdayKey] || schedule[Number(weekdayKey)] || {};
+                const toggle = getToggle(weekdayKey);
+                const startInput = getStartInput(weekdayKey);
+                const endInput = getEndInput(weekdayKey);
+                const locationInput = getLocationInput(weekdayKey);
+                const enabled = dayEntry.enabled === true;
+
+                if (toggle) {
+                    toggle.checked = enabled;
+                }
+                if (startInput) {
+                    ensureTimeOption(startInput, dayEntry.start_time || "");
+                    startInput.value = String(dayEntry.start_time || "09:00").trim();
+                }
+                if (endInput) {
+                    ensureTimeOption(endInput, dayEntry.end_time || "");
+                    endInput.value = String(dayEntry.end_time || "16:30").trim();
+                }
+                if (locationInput) {
+                    ensureLocationOption(locationInput, dayEntry.meeting_location || "");
+                    locationInput.value = String(dayEntry.meeting_location || "").trim();
+                }
+
+                setRowEnabled(weekdayKey, enabled);
+            });
+        };
+
+        const getScheduleFormState = () => {
+            const state = {
+                official_user_id: String(hiddenOfficialInput?.value || "").trim(),
+                days: {},
+            };
+
+            Object.keys(<?= json_encode($appointmentScheduleWeekdayOptions, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>).forEach((weekdayKey) => {
+                state.days[weekdayKey] = {
+                    enabled: getToggle(weekdayKey)?.checked === true,
+                    start_time: String(getStartInput(weekdayKey)?.value || "").trim(),
+                    end_time: String(getEndInput(weekdayKey)?.value || "").trim(),
+                    meeting_location: String(getLocationInput(weekdayKey)?.value || "").trim(),
+                };
+            });
+
+            return state;
+        };
+
+        let originalScheduleState = JSON.stringify(getScheduleFormState());
+
+        const updateSaveButtonState = () => {
+            if (!saveBtn) {
+                return;
+            }
+            saveBtn.disabled = JSON.stringify(getScheduleFormState()) === originalScheduleState;
+        };
+
+        officialSelector?.addEventListener("change", () => {
+            applyOfficialSchedule(officialSelector.value || "");
+            originalScheduleState = JSON.stringify(getScheduleFormState());
+            updateSaveButtonState();
+        });
+
+        scheduleForm.addEventListener("change", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+
+            if (target.matches("[data-schedule-toggle]")) {
+                const weekday = String(target.getAttribute("data-schedule-toggle") || "").trim();
+                setRowEnabled(weekday, target instanceof HTMLInputElement && target.checked);
+            }
+
+            updateSaveButtonState();
+        });
+
+        scheduleForm.addEventListener("input", () => {
+            updateSaveButtonState();
+        });
+
+        scheduleForm.addEventListener("submit", (event) => {
+            const officialUserId = String(hiddenOfficialInput?.value || "").trim();
+            if (officialUserId === "") {
+                event.preventDefault();
+                window.alert("Please select a council member before saving the weekly appointment schedule.");
+                return;
+            }
+
+            let firstInvalidInput = null;
+            Object.keys(<?= json_encode($appointmentScheduleWeekdayOptions, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>).forEach((weekdayKey) => {
+                const enabled = getToggle(weekdayKey)?.checked === true;
+                const startInput = getStartInput(weekdayKey);
+                const endInput = getEndInput(weekdayKey);
+                const locationInput = getLocationInput(weekdayKey);
+
+                [startInput, endInput, locationInput].forEach((input) => input?.setCustomValidity(""));
+                if (!enabled) {
+                    return;
+                }
+
+                const startValue = String(startInput?.value || "").trim();
+                const endValue = String(endInput?.value || "").trim();
+                const locationValue = String(locationInput?.value || "").trim();
+
+                if (startValue === "" || endValue === "") {
+                    const target = startValue === "" ? startInput : endInput;
+                    target?.setCustomValidity("Start and end times are required for available appointment days.");
+                    firstInvalidInput = firstInvalidInput || target;
+                    return;
+                }
+
+                if (startValue >= endValue) {
+                    endInput?.setCustomValidity("End time must be later than the start time.");
+                    firstInvalidInput = firstInvalidInput || endInput;
+                    return;
+                }
+
+                if (locationValue === "") {
+                    locationInput?.setCustomValidity("Meeting location is required for available appointment days.");
+                    firstInvalidInput = firstInvalidInput || locationInput;
+                }
+            });
+
+            if (firstInvalidInput) {
+                event.preventDefault();
+                firstInvalidInput.reportValidity();
+                return;
+            }
+        });
+
+        applyOfficialSchedule(hiddenOfficialInput?.value || officialSelector?.value || "");
+        originalScheduleState = JSON.stringify(getScheduleFormState());
         updateSaveButtonState();
     })();
 </script>

@@ -30,8 +30,10 @@
   const secureConfirmOtpStepEl = document.getElementById('secureConfirmStepOtp');
   const secureConfirmPasswordPanelEl = document.getElementById('secureConfirmPasswordPanel');
   const secureConfirmOtpPanelEl = document.getElementById('secureConfirmOtpPanel');
+  const secureConfirmOtpShellEl = document.getElementById('secureConfirmOtpShell');
   const secureConfirmPasswordEl = document.getElementById('secureConfirmPassword');
   const secureConfirmOtpEl = document.getElementById('secureConfirmOtp');
+  const secureConfirmOtpBoxes = Array.from(document.querySelectorAll('[data-otp-box]'));
   const secureConfirmDeliveryTextEl = document.getElementById('secureConfirmDeliveryText');
   const secureConfirmOtpHintEl = document.getElementById('secureConfirmOtpHint');
   const secureConfirmPreviewWrapEl = document.getElementById('secureConfirmPreviewWrap');
@@ -113,6 +115,20 @@
     }
     setSecureConfirmAlert('');
     setSecureConfirmStep('password');
+    renderSecureConfirmOtpBoxes();
+  }
+
+  function renderSecureConfirmOtpBoxes() {
+    const digits = String(secureConfirmOtpEl?.value || '').replace(/\D+/g, '').slice(0, 6);
+    const isFocused = document.activeElement === secureConfirmOtpEl;
+    const activeIndex = digits.length >= 6 ? 5 : digits.length;
+
+    secureConfirmOtpBoxes.forEach((box, index) => {
+      const digit = digits[index] || '';
+      box.textContent = digit;
+      box.classList.toggle('is-filled', digit !== '');
+      box.classList.toggle('is-active', isFocused && index === activeIndex);
+    });
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────────
@@ -210,6 +226,9 @@
         secureConfirmPasswordEl?.removeEventListener('keydown', onPasswordKeydown);
         secureConfirmOtpEl?.removeEventListener('keydown', onOtpKeydown);
         secureConfirmOtpEl?.removeEventListener('input', onOtpInput);
+        secureConfirmOtpEl?.removeEventListener('focus', onOtpFocus);
+        secureConfirmOtpEl?.removeEventListener('blur', onOtpBlur);
+        secureConfirmOtpShellEl?.removeEventListener('mousedown', onOtpShellMouseDown);
         resetSecureConfirmationModal(actionLabel);
       };
 
@@ -253,12 +272,20 @@
       const onOtpInput = () => {
         if (!secureConfirmOtpEl) return;
         secureConfirmOtpEl.value = String(secureConfirmOtpEl.value || '').replace(/\D+/g, '').slice(0, 6);
+        renderSecureConfirmOtpBoxes();
       };
 
       const onOtpKeydown = (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
         onVerify();
+      };
+
+      const onOtpFocus = () => renderSecureConfirmOtpBoxes();
+      const onOtpBlur = () => renderSecureConfirmOtpBoxes();
+      const onOtpShellMouseDown = (event) => {
+        event.preventDefault();
+        secureConfirmOtpEl?.focus();
       };
 
       const onSendOtp = async () => {
@@ -328,6 +355,7 @@
         currentStep = 'otp';
         setSecureConfirmStep('otp');
         setBusy(false, 'otp');
+        renderSecureConfirmOtpBoxes();
         secureConfirmOtpEl?.focus();
       };
 
@@ -359,6 +387,9 @@
       secureConfirmPasswordEl?.addEventListener('keydown', onPasswordKeydown);
       secureConfirmOtpEl?.addEventListener('keydown', onOtpKeydown);
       secureConfirmOtpEl?.addEventListener('input', onOtpInput);
+      secureConfirmOtpEl?.addEventListener('focus', onOtpFocus);
+      secureConfirmOtpEl?.addEventListener('blur', onOtpBlur);
+      secureConfirmOtpShellEl?.addEventListener('mousedown', onOtpShellMouseDown);
 
       modal.show();
       secureConfirmPasswordEl?.focus();

@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <meta charset="UTF-8">
   <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Area Statistics Summary</title>
+  <title>Area Statistics</title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -31,7 +31,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       </div>
     </div>
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
-      Area Statistics Summary
+      Area Statistics
     </h2>
     <hr><br>
 

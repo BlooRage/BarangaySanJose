@@ -45,6 +45,11 @@ if (!function_exists('aps_settings_definitions')) {
                 'description' => 'Specific dates that cannot be booked.',
                 'default' => '',
             ],
+            'meeting_locations' => [
+                'label' => 'Meeting locations',
+                'description' => 'Saved location options that appear in official appointment schedules.',
+                'default' => '',
+            ],
         ];
     }
 }
@@ -208,6 +213,54 @@ if (!function_exists('aps_normalize_time_value')) {
     }
 }
 
+if (!function_exists('aps_normalize_location_value')) {
+    function aps_normalize_location_value($value): string
+    {
+        $location = trim((string)$value);
+        if ($location === '') {
+            return '';
+        }
+
+        $location = preg_replace('/\s+/', ' ', $location) ?: $location;
+        if (function_exists('mb_substr')) {
+            return trim((string)mb_substr($location, 0, 255));
+        }
+
+        return trim((string)substr($location, 0, 255));
+    }
+}
+
+if (!function_exists('aps_normalize_location_options')) {
+    function aps_normalize_location_options($value): array
+    {
+        $source = $value;
+        if (is_string($source)) {
+            $trimmed = trim($source);
+            if ($trimmed !== '' && substr($trimmed, 0, 1) === '[') {
+                $decoded = json_decode($trimmed, true);
+                if (is_array($decoded)) {
+                    $source = $decoded;
+                }
+            }
+        }
+
+        if (!is_array($source)) {
+            $source = preg_split('/\r\n|\r|\n|,/', (string)$source) ?: [];
+        }
+
+        $normalized = [];
+        foreach ($source as $item) {
+            $location = aps_normalize_location_value($item);
+            if ($location === '') {
+                continue;
+            }
+            $normalized[$location] = true;
+        }
+
+        return array_values(array_keys($normalized));
+    }
+}
+
 if (!function_exists('aps_normalize_unavailable_dates')) {
     function aps_normalize_unavailable_dates($value): array
     {
@@ -248,6 +301,7 @@ if (!function_exists('aps_settings_defaults')) {
             'lunch_start_time' => aps_normalize_time_value((string)($definitions['lunch_start_time']['default'] ?? '12:00'), '12:00'),
             'lunch_end_time' => aps_normalize_time_value((string)($definitions['lunch_end_time']['default'] ?? '13:00'), '13:00'),
             'unavailable_dates' => aps_normalize_unavailable_dates((string)($definitions['unavailable_dates']['default'] ?? '')),
+            'meeting_locations' => aps_normalize_location_options((string)($definitions['meeting_locations']['default'] ?? '')),
         ];
     }
 }
@@ -288,6 +342,7 @@ if (!function_exists('aps_normalize_settings')) {
             'lunch_start_time' => $lunchStartTime,
             'lunch_end_time' => $lunchEndTime,
             'unavailable_dates' => aps_normalize_unavailable_dates($settings['unavailable_dates'] ?? $defaults['unavailable_dates']),
+            'meeting_locations' => aps_normalize_location_options($settings['meeting_locations'] ?? $defaults['meeting_locations']),
         ];
     }
 }
@@ -329,6 +384,7 @@ if (!function_exists('aps_settings_upsert')) {
             'lunch_start_time' => (string)($normalized['lunch_start_time'] ?? ''),
             'lunch_end_time' => (string)($normalized['lunch_end_time'] ?? ''),
             'unavailable_dates' => implode(',', $normalized['unavailable_dates'] ?? []),
+            'meeting_locations' => implode("\n", $normalized['meeting_locations'] ?? []),
         ];
 
         $stmt = $conn->prepare("

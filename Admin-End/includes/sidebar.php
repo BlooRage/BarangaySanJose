@@ -10,7 +10,7 @@ $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
 $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
 $contentMgmtPages = ['Contents.php', 'CreateContent.php', 'CreateNews.php'];
-$areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
+$areaManagementPages = ['BarangayStatistics.php', 'AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php', 'UserArchive.php'];
 $personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php'];
@@ -79,6 +79,7 @@ $isHouseholdProfilingActive = in_array($current, $householdProfilingPages);
 $isAppointmentActive = in_array($current, $appointmentPages);
 $isAppointmentTrackerActive = $current === 'AppointmentTracker.php' && $appointmentTool === 'tracker';
 $isAppointmentSettingsActive = $current === 'AppointmentTracker.php' && $appointmentTool === 'settings';
+$isAppointmentScheduleActive = $current === 'AppointmentTracker.php' && $appointmentTool === 'schedule';
 $isFinanceActive = in_array($current, $financePages);
 $isBlotterActive = in_array($current, $blotterPages);
 $isComplaintActive = in_array($current, $complaintPages);
@@ -305,6 +306,7 @@ if (isset($conn) && $conn instanceof mysqli && $sbSidebarUserId !== '') {
 }
 $sbCanAccessAppointmentTracker = $sbCan('appointments') && !empty($sbAppointmentAccess['can_access_tracker']);
 $sbCanAccessAppointmentSettings = $sbCanAccessAppointmentTracker && !empty($sbAppointmentAccess['can_access_settings']);
+$sbCanAccessAppointmentSchedule = $sbCanAccessAppointmentTracker && !empty($sbAppointmentAccess['can_access_schedule']);
 $sbCanReviewContent = strtolower($sbSidebarRole) === 'superadmin';
 if (!$sbCanReviewContent && $sbCurrentOfficialAccount) {
     $sbCanReviewContent = strtolower(trim((string)($sbCurrentOfficialAccount['position_access'] ?? ''))) === 'barangay secretary';
@@ -374,6 +376,7 @@ $sbHouseholdProfilingKeys = [
     'household_member_verification',
 ];
 $sbAreaStatisticsKeys = [
+    'dashboard',
     'area_statistics_summary',
     'area_profile_area_01',
     'area_profile_area_1a',
@@ -631,7 +634,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 <style>
   :root {
-    --admin-sidebar-expanded: 252px;
+    --admin-sidebar-expanded: 284px;
     --admin-sidebar-collapsed: 92px;
   }
 
@@ -639,6 +642,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     width: var(--admin-sidebar-expanded);
     min-width: var(--admin-sidebar-expanded);
     transition: width 0.24s ease, min-width 0.24s ease, padding 0.24s ease;
+    z-index: 30;
   }
 
   #dashboard-sidebar .sidebar-header {
@@ -654,7 +658,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     position: absolute;
     top: 50%;
     right: 0;
-    z-index: 16;
+    z-index: 40;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -712,6 +716,10 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
   #dashboard-sidebar .sidebar-button-label,
   #dashboard-sidebar .sidebar-subnav-text {
     min-width: 0;
+  }
+
+  #dashboard-sidebar .sidebar-button-label {
+    white-space: nowrap;
   }
 
   #dashboard-sidebar .sidebar-button-label--certificate {
@@ -938,6 +946,11 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     #dashboard-sidebar {
       overflow: visible;
     }
+
+    #main-display {
+      position: relative;
+      z-index: 1;
+    }
   }
 </style>
 
@@ -1013,6 +1026,14 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=settings')) ?>"
                  class="link-dark rounded sidebar-subnav-link <?= $isAppointmentSettingsActive ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">Settings</span>
+              </a>
+            </li>
+            <?php endif; ?>
+            <?php if ($sbCanAccessAppointmentSchedule): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=schedule')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isAppointmentScheduleActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text"><?= $sbCanAccessAppointmentSettings ? 'Official Schedules' : 'My Schedule' ?></span>
               </a>
             </li>
             <?php endif; ?>
@@ -1144,15 +1165,23 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-map-location-dot"></i>
           </span>
-          <span class="sidebar-button-label">Area Statistics</span>
+          <span class="sidebar-button-label">Statistics</span>
         </button>
         <div class="collapse <?= $isAreaManagementActive ? 'show' : '' ?>" id="area-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('dashboard')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/BarangayStatistics.php')) ?>"
+                 class="link-dark rounded <?= $current == 'BarangayStatistics.php' ? 'active' : '' ?>">
+                Barangay Statistics
+              </a>
+            </li>
+            <?php endif; ?>
             <?php if ($sbCan('area_statistics_summary')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaStatistics.php?tab=summary')) ?>"
                  class="link-dark rounded <?= ($current == 'AreaStatistics.php' && $areaManagementTab === 'summary') ? 'active' : '' ?>">
-                Summary
+                Area Statistics
               </a>
             </li>
             <?php endif; ?>
@@ -1854,7 +1883,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     const burgerBtn = document.getElementById("btn-admin-burger");
     const sidebar = document.getElementById("dashboard-sidebar");
     const desktopToggleBtn = document.getElementById("btn-admin-sidebar-collapse");
-    if (!burgerBtn || !sidebar) return;
+    if (!sidebar) return;
     const collapseButtons = Array.from(sidebar.querySelectorAll('[data-sidebar-toggle="collapse"]'));
     const topLevelItems = Array.from(sidebar.querySelectorAll(".btn-toggle, .sidebar-direct-link, .sidebar-profile-trigger"));
     const portraitMq = window.matchMedia("(orientation: portrait) and (max-width: 1024px)");
@@ -2001,10 +2030,12 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       updateCollapsedTitles();
     };
 
-    burgerBtn.addEventListener("click", () => {
-      if (!portraitMq.matches) return;
-      sidebar.classList.toggle("show");
-    });
+    if (burgerBtn) {
+      burgerBtn.addEventListener("click", () => {
+        if (!portraitMq.matches) return;
+        sidebar.classList.toggle("show");
+      });
+    }
 
     if (desktopToggleBtn) {
       desktopToggleBtn.addEventListener("click", () => {

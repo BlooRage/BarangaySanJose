@@ -312,6 +312,9 @@ if (!function_exists('apcm_get_appointment_admin_scope')) {
             'can_view_all_tracker' => $canViewAllTracker,
             'can_manage_all_tracker' => $canViewAllTracker,
             'can_access_settings' => $canViewAllTracker,
+            'can_access_schedule' => $canAccessTracker,
+            'can_manage_all_schedule' => $canViewAllTracker,
+            'can_manage_self_schedule' => $canAccessTracker,
             'scoped_official_user_id' => $canViewAllTracker ? '' : $userId,
         ];
     }

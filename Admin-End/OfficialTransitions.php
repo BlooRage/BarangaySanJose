@@ -1017,20 +1017,66 @@ if ($hasCouncilTbl) {
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
-    .ot-sec-otp-input {
-      text-align: center;
-      letter-spacing: .38em;
-      font-size: 1.1rem;
+    .ot-sec-otp-shell {
+      position: relative;
+      cursor: text;
+      margin-top: .15rem;
+    }
+    .ot-sec-otp-native {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      border: 0;
+      background: transparent;
+      color: transparent;
+      caret-color: transparent;
+      z-index: 2;
+    }
+    .ot-sec-otp-boxes {
+      display: flex;
+      justify-content: center;
+      gap: .7rem;
+    }
+    .ot-sec-otp-box {
+      flex: 1 1 0;
+      max-width: 3.75rem;
+      min-width: 0;
+      height: 3.95rem;
+      border: 1px solid #cbd5e1;
+      border-radius: .35rem;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.45rem;
       font-weight: 800;
       font-variant-numeric: tabular-nums;
+      color: #0f172a;
+      box-shadow: inset 0 -1px 0 rgba(148, 163, 184, .16);
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+      user-select: none;
+    }
+    .ot-sec-otp-box.is-active {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, .18);
+      transform: translateY(-1px);
+    }
+    .ot-sec-otp-box.is-filled {
+      border-color: #94a3b8;
+      background: #f8fafc;
     }
     @media (max-width: 575.98px) {
       .ot-sec-steps {
         grid-template-columns: 1fr;
       }
       .ot-sec-preview-code,
-      .ot-sec-otp-input {
-        letter-spacing: .24em;
+      .ot-sec-otp-box {
+        font-size: 1.2rem;
+      }
+      .ot-sec-otp-boxes {
+        gap: .45rem;
       }
     }
   </style>
@@ -2154,11 +2200,21 @@ if ($hasCouncilTbl) {
               <div class="ot-sec-panel-title">Enter the one-time password</div>
               <p class="ot-sec-panel-copy">Use the 6-digit code sent for this secure action. The code expires quickly, so enter it before continuing.</p>
             </div>
-          </div>
-          <div class="ot-sec-delivery" id="secureConfirmDeliveryText">A 6-digit OTP will appear here after your password is verified.</div>
-          <label for="secureConfirmOtp" class="form-label small fw-semibold mb-1">One-Time Password</label>
-          <input type="text" class="form-control ot-sec-otp-input" id="secureConfirmOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
-          <div class="form-text" id="secureConfirmOtpHint">Enter the 6-digit code from your email or SMS.</div>
+	          </div>
+	          <div class="ot-sec-delivery" id="secureConfirmDeliveryText">A 6-digit OTP will appear here after your password is verified.</div>
+	          <label for="secureConfirmOtp" class="form-label small fw-semibold mb-1">One-Time Password</label>
+	          <div class="ot-sec-otp-shell" id="secureConfirmOtpShell">
+	            <input type="text" class="ot-sec-otp-native" id="secureConfirmOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+	            <div class="ot-sec-otp-boxes" aria-hidden="true">
+	              <span class="ot-sec-otp-box" data-otp-box="0"></span>
+	              <span class="ot-sec-otp-box" data-otp-box="1"></span>
+	              <span class="ot-sec-otp-box" data-otp-box="2"></span>
+	              <span class="ot-sec-otp-box" data-otp-box="3"></span>
+	              <span class="ot-sec-otp-box" data-otp-box="4"></span>
+	              <span class="ot-sec-otp-box" data-otp-box="5"></span>
+	            </div>
+	          </div>
+	          <div class="form-text" id="secureConfirmOtpHint">Enter the 6-digit code from your email or SMS.</div>
           <div class="ot-sec-preview d-none" id="secureConfirmPreviewWrap">
             <div class="ot-sec-preview-label">Local Preview Code</div>
             <div class="ot-sec-preview-code" id="secureConfirmPreviewCode"></div>
@@ -2333,7 +2389,7 @@ if ($hasCouncilTbl) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260628-02"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260628-03"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};

@@ -19,6 +19,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 require_once __DIR__ . "/../../PhpFiles/General/appointmentCouncilMembers.php";
 require_once __DIR__ . "/../../PhpFiles/General/appointmentSettings.php";
+require_once __DIR__ . "/../../PhpFiles/General/appointmentOfficialSchedules.php";
 require_once __DIR__ . "/../../PhpFiles/General/appointmentTimeSlots.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
@@ -91,6 +92,15 @@ $firstAvailableAppointmentDateLabel = $firstAvailableAppointmentDate !== null
     ? date('F j, Y', strtotime($firstAvailableAppointmentDate))
     : 'No available date configured';
 $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime($maxAppointmentDate)) : 'No maximum date available';
+$officialScheduleMap = apos_fetch_schedule_map(
+    $conn,
+    array_values(array_filter(array_map(static function (array $member): string {
+        return trim((string)($member['user_id'] ?? ''));
+    }, $councilMemberOptions), static function (string $userId): bool {
+        return $userId !== '';
+    })),
+    $appointmentSettings
+);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -207,7 +217,7 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
 
             <div class="appointment-guide">
                 <div class="appointment-guide-title">Before You Submit</div>
-                <p class="appointment-guide-text">Choose the barangay council member you want to meet, then pick one of the available dates on <strong><?= htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>. Appointments use <strong><?= htmlspecialchars((string)$slotIntervalMinutes, ENT_QUOTES, 'UTF-8') ?>-minute</strong> time allotments<?php if ($lunchBreakEnabled): ?> with lunch time blocked from <strong><?= htmlspecialchars($lunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></strong><?php endif; ?> and can be scheduled up to <strong><?= htmlspecialchars((string)$bookingWindowDays, ENT_QUOTES, 'UTF-8') ?> days ahead</strong>, capped through <strong><?= htmlspecialchars($maxAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
+                <p class="appointment-guide-text">Choose the barangay council member you want to meet, then pick one of the available dates on <strong><?= htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>. Appointments use <strong><?= htmlspecialchars((string)$slotIntervalMinutes, ENT_QUOTES, 'UTF-8') ?>-minute</strong> time allotments<?php if ($lunchBreakEnabled): ?> with lunch time blocked from <strong><?= htmlspecialchars($lunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></strong><?php endif; ?> and can be scheduled up to <strong><?= htmlspecialchars((string)$bookingWindowDays, ENT_QUOTES, 'UTF-8') ?> days ahead</strong>, capped through <strong><?= htmlspecialchars($maxAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>. Available times and the meeting location update based on the weekly schedule of the selected council member. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
                 <?php if ($closedWeekdays !== []): ?>
                     <p class="appointment-guide-text mt-2">Weekly appointment closures are set for <strong><?= htmlspecialchars($closedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
                 <?php endif; ?>
@@ -340,14 +350,17 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
                             <div>
                                 <label class="top-label">Time of Appointment <span class="required-asterisk">*</span></label>
                                 <select class="form-select" id="appointmentTime" name="appointment_time" required>
-                                    <option value="">Select allotted time</option>
-                                    <?php foreach ($appointmentTimeSlots as $slotValue => $slotLabel): ?>
-                                        <option value="<?php echo htmlspecialchars($slotValue, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $formValues['appointment_time'] === $slotValue ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($slotLabel, ENT_QUOTES, 'UTF-8'); ?>
-                                        </option>
-                                    <?php endforeach; ?>
+                                    <option value="">Select council member and date first</option>
                                 </select>
                                 <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label">Meeting Location</label>
+                                <input type="text" class="form-control" id="appointmentMeetingLocation" value="" readonly>
+                                <div id="appointmentLocationHelp" class="text-muted small mt-1">Choose a council member and date to load the official meeting location for that schedule.</div>
                             </div>
                         </div>
 
@@ -403,6 +416,8 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
             const appointmentDateError = document.getElementById("appointmentDateError");
             const appointmentTimeInput = document.getElementById("appointmentTime");
             const appointmentTimeError = document.getElementById("appointmentTimeError");
+            const appointmentMeetingLocationInput = document.getElementById("appointmentMeetingLocation");
+            const appointmentLocationHelp = document.getElementById("appointmentLocationHelp");
             const appointmentCouncilMemberInput = document.getElementById("appointmentCouncilMember");
             const appointmentSubjectInput = document.getElementById("appointmentSubject");
             const appointmentSubjectOtherInput = document.getElementById("appointmentSubjectOther");
@@ -410,7 +425,16 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
             const appointmentFeedbackData = document.getElementById("appointmentFeedbackData");
             const appointmentSuccessModalEl = document.getElementById("appointmentSuccessModal");
             const appointmentSuccessMessage = document.getElementById("appointmentSuccessMessage");
-            const allottedAppointmentTimes = new Set(<?= json_encode(array_keys($appointmentTimeSlots), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>);
+            const officialScheduleMap = <?= json_encode($officialScheduleMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const appointmentGlobalScheduleConfig = <?= json_encode([
+                'startTime' => aps_schedule_start_time(),
+                'endTime' => aps_schedule_end_time(),
+                'slotIntervalMinutes' => (int)$slotIntervalMinutes,
+                'lunchBreak' => $lunchBreakEnabled ? [
+                    'start' => (string)($appointmentSettings['lunch_start_time'] ?? '12:00'),
+                    'end' => (string)($appointmentSettings['lunch_end_time'] ?? '13:00'),
+                ] : null,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const hasConfiguredAppointmentAvailability = <?= $hasAppointmentAvailability ? 'true' : 'false' ?>;
             if (!form || !submitBtn) return;
 
@@ -441,6 +465,125 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
                 const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
                 if (!match) return null;
                 return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+            };
+
+            const toMinutes = (value) => {
+                const match = String(value || "").trim().match(/^(\d{2}):(\d{2})$/);
+                if (!match) return null;
+                return (Number(match[1]) * 60) + Number(match[2]);
+            };
+
+            const formatTimeLabel = (value) => {
+                const minutes = toMinutes(value);
+                if (minutes === null) return String(value || "").trim() || "-";
+                const hour24 = Math.floor(minutes / 60);
+                const minute = minutes % 60;
+                const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+                const suffix = hour24 >= 12 ? "PM" : "AM";
+                return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${suffix}`;
+            };
+
+            const scheduleDayForSelection = () => {
+                const officialUserId = String(appointmentCouncilMemberInput?.value || "").trim();
+                const isoDate = String(appointmentDateInput?.value || "").trim();
+                const schedule = officialScheduleMap[officialUserId] || null;
+                const parsedDate = parseIsoDate(isoDate);
+                if (!schedule || !parsedDate) {
+                    return null;
+                }
+                const weekday = String(parsedDate.getDay());
+                return schedule[weekday] || schedule[Number(weekday)] || null;
+            };
+
+            const buildOfficialSlots = () => {
+                const isoDate = String(appointmentDateInput?.value || "").trim();
+                const dayEntry = scheduleDayForSelection();
+                if (!dayEntry || dayEntry.enabled !== true || disabledDates.has(isoDate)) {
+                    return { dayEntry: null, slots: [] };
+                }
+
+                const parsedDate = parseIsoDate(isoDate);
+                const weekday = parsedDate ? String(parsedDate.getDay()) : "";
+                if (weekday !== "" && disabledWeekdays.has(weekday)) {
+                    return { dayEntry: null, slots: [] };
+                }
+
+                const startMinutes = Math.max(
+                    toMinutes(dayEntry.start_time || "") ?? 0,
+                    toMinutes(appointmentGlobalScheduleConfig.startTime || "") ?? 0
+                );
+                const endMinutes = Math.min(
+                    toMinutes(dayEntry.end_time || "") ?? 0,
+                    toMinutes(appointmentGlobalScheduleConfig.endTime || "") ?? 0
+                );
+                const interval = Math.max(5, Number(appointmentGlobalScheduleConfig.slotIntervalMinutes || 30));
+                if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || startMinutes >= endMinutes) {
+                    return { dayEntry: null, slots: [] };
+                }
+
+                const lunchBreak = appointmentGlobalScheduleConfig.lunchBreak || null;
+                const lunchStart = lunchBreak ? toMinutes(lunchBreak.start || "") : null;
+                const lunchEnd = lunchBreak ? toMinutes(lunchBreak.end || "") : null;
+                const slots = [];
+
+                for (let current = startMinutes; current <= endMinutes; current += interval) {
+                    const slotEnd = current + interval;
+                    if (
+                        lunchStart !== null
+                        && lunchEnd !== null
+                        && current < lunchEnd
+                        && slotEnd > lunchStart
+                    ) {
+                        continue;
+                    }
+
+                    const hours = Math.floor(current / 60);
+                    const minutes = current % 60;
+                    const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                    slots.push({ value, label: formatTimeLabel(value) });
+                }
+
+                return { dayEntry, slots };
+            };
+
+            const syncAppointmentAvailability = () => {
+                if (!appointmentTimeInput) return;
+
+                const officialUserId = String(appointmentCouncilMemberInput?.value || "").trim();
+                const isoDate = String(appointmentDateInput?.value || "").trim();
+                const selectedTime = String(appointmentTimeInput.value || "").trim();
+                const { dayEntry, slots } = buildOfficialSlots();
+
+                appointmentTimeInput.innerHTML = '<option value="">Select allotted time</option>';
+                slots.forEach((slot) => {
+                    const option = document.createElement("option");
+                    option.value = slot.value;
+                    option.textContent = slot.label;
+                    if (selectedTime !== "" && selectedTime === slot.value) {
+                        option.selected = true;
+                    }
+                    appointmentTimeInput.appendChild(option);
+                });
+                if (selectedTime !== "" && !slots.some((slot) => slot.value === selectedTime)) {
+                    appointmentTimeInput.value = "";
+                }
+
+                if (appointmentMeetingLocationInput) {
+                    appointmentMeetingLocationInput.value = dayEntry && String(dayEntry.meeting_location || "").trim()
+                        ? String(dayEntry.meeting_location || "").trim()
+                        : "";
+                }
+                if (appointmentLocationHelp) {
+                    if (officialUserId === "") {
+                        appointmentLocationHelp.textContent = "Choose a council member and date to load the official meeting location for that schedule.";
+                    } else if (isoDate === "") {
+                        appointmentLocationHelp.textContent = "Choose an appointment date to load the weekly meeting location for the selected council member.";
+                    } else if (!dayEntry || slots.length === 0) {
+                        appointmentLocationHelp.textContent = "That council member is not available on the selected date.";
+                    } else {
+                        appointmentLocationHelp.textContent = "Meeting location is pulled from the weekly schedule of the selected council member.";
+                    }
+                }
             };
 
             const validateAppointmentDate = () => {
@@ -496,6 +639,20 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
                     return false;
                 }
 
+                const officialUserId = String(appointmentCouncilMemberInput?.value || "").trim();
+                if (officialUserId !== "") {
+                    const { dayEntry, slots } = buildOfficialSlots();
+                    if (!dayEntry || slots.length === 0) {
+                        const msg = "The selected council member is not available on that date";
+                        appointmentDateInput.setCustomValidity(msg);
+                        if (appointmentDateError) {
+                            appointmentDateError.textContent = msg;
+                            appointmentDateError.classList.remove("d-none");
+                        }
+                        return false;
+                    }
+                }
+
                 appointmentDateInput.setCustomValidity("");
                 if (appointmentDateError) {
                     appointmentDateError.textContent = "";
@@ -527,7 +684,7 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
 
                 const value = String(appointmentTimeInput.value || "").trim();
                 const hasValue = value !== "";
-                const isInvalidSlot = hasValue && !allottedAppointmentTimes.has(value);
+                const isInvalidSlot = hasValue && !buildOfficialSlots().slots.some((slot) => slot.value === value);
 
                 if (isInvalidSlot) {
                     const msg = "Incorrect Input. Please choose one of the allotted appointment times";
@@ -575,6 +732,7 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
             };
 
             const updateState = () => {
+                syncAppointmentAvailability();
                 validateSubjectOther();
                 validateAppointmentDate();
                 validateAppointmentTime();
@@ -631,6 +789,7 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
                 successModal.show();
             }
 
+            syncAppointmentAvailability();
             updateState();
         });
     </script>

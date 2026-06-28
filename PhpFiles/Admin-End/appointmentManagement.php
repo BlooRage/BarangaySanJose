@@ -3,6 +3,7 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/appointmentCouncilMembers.php";
 require_once __DIR__ . "/../General/appointmentSettings.php";
+require_once __DIR__ . "/../General/appointmentOfficialSchedules.php";
 require_once __DIR__ . "/../General/appointmentTimeSlots.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
@@ -171,7 +172,7 @@ function am_ensure_status_id(mysqli $conn, string $name, string $type): int
     return $statusId;
 }
 
-function am_validate_schedule(string $date, string $time, array $appointmentSettings): string
+function am_validate_schedule(mysqli $conn, string $officialUserId, string $date, string $time, array $appointmentSettings): array
 {
     if ($date === '' || $time === '') {
         throw new Exception('Confirmed date and time are required for this action.');
@@ -200,11 +201,19 @@ function am_validate_schedule(string $date, string $time, array $appointmentSett
         throw new Exception('The selected appointment date is unavailable for official appointments.');
     }
 
-    if (!ats_is_valid_time($time, $appointmentSettings)) {
-        throw new Exception('Please select one of the allotted appointment times.');
+    $officialAvailability = apos_effective_schedule_for_user_date($conn, $officialUserId, $date, $appointmentSettings);
+    if ($officialAvailability === null) {
+        throw new Exception('The selected council member is not available on that appointment date.');
     }
 
-    return $schedule->format('Y-m-d H:i:s');
+    if (!array_key_exists($time, (array)($officialAvailability['slots'] ?? []))) {
+        throw new Exception('Please select one of the allotted appointment times for that council member.');
+    }
+
+    return [
+        'timestamp' => $schedule->format('Y-m-d H:i:s'),
+        'meeting_location' => apos_normalize_location($officialAvailability['meeting_location'] ?? ''),
+    ];
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -273,9 +282,12 @@ if ($officialUserId !== '' && !isset($councilMembersByUserId[$officialUserId])) 
 }
 
 $confirmedScheduleTimestamp = null;
+$meetingLocation = '';
 if ($needsSchedule) {
     try {
-        $confirmedScheduleTimestamp = am_validate_schedule($confirmedDate, $confirmedTime, $appointmentSettings);
+        $validatedSchedule = am_validate_schedule($conn, $officialUserId, $confirmedDate, $confirmedTime, $appointmentSettings);
+        $confirmedScheduleTimestamp = (string)($validatedSchedule['timestamp'] ?? '');
+        $meetingLocation = (string)($validatedSchedule['meeting_location'] ?? '');
     } catch (Throwable $e) {
         am_redirect_with_message('error', $e->getMessage(), ['appointment_id' => $appointmentId]);
     }
@@ -356,6 +368,12 @@ try {
         $setClauses[] = 'appointment_remarks = ?';
         $bindTypes .= 's';
         $bindValues[] = $remarks;
+    }
+
+    if (isset($appointmentColumns['meeting_location'])) {
+        $setClauses[] = 'meeting_location = ?';
+        $bindTypes .= 's';
+        $bindValues[] = $needsSchedule ? ($meetingLocation !== '' ? $meetingLocation : null) : null;
     }
 
     if (isset($appointmentColumns['review_timestamp'])) {

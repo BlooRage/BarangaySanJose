@@ -186,3 +186,47 @@ function ann_audience_fetch_resident_context(mysqli $conn, string $userId): arra
         'area' => trim((string)($row['area_number'] ?? '')),
     ];
 }
+
+function ann_audience_fetch_staff_context(mysqli $conn, string $userId, string $fallbackRole = 'Official'): array
+{
+    $fallbackGroup = ann_audience_normalize_group($fallbackRole);
+    if (!in_array($fallbackGroup, ['official', 'personnel'], true)) {
+        $fallbackGroup = 'official';
+    }
+
+    if ($userId === '') {
+        return ['group' => $fallbackGroup, 'area' => ''];
+    }
+
+    $stmt = $conn->prepare("
+        SELECT
+            u.role_access AS account_role_access,
+            oi.role_access AS info_role_access,
+            oi.area_number
+        FROM useraccountstbl u
+        LEFT JOIN officialinformationtbl oi ON oi.user_id = u.user_id
+        WHERE u.user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return ['group' => $fallbackGroup, 'area' => ''];
+    }
+
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+
+    $group = ann_audience_normalize_group((string)($row['info_role_access'] ?? ''));
+    if (!in_array($group, ['official', 'personnel'], true)) {
+        $group = ann_audience_normalize_group((string)($row['account_role_access'] ?? ''));
+    }
+    if (!in_array($group, ['official', 'personnel'], true)) {
+        $group = $fallbackGroup;
+    }
+
+    return [
+        'group' => $group,
+        'area' => trim((string)($row['area_number'] ?? '')),
+    ];
+}

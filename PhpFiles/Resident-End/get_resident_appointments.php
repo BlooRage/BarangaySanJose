@@ -12,12 +12,15 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/appointmentOfficialSchedules.php';
 
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable']);
     exit;
 }
+
+apos_schedule_ensure_storage($conn);
 
 function rat_table_exists(mysqli $conn, string $tableName): bool
 {
@@ -110,6 +113,9 @@ $reviewTimestampSelect = isset($appointmentColumns['review_timestamp'])
 $remarksSelect = isset($appointmentColumns['appointment_remarks'])
     ? 'a.appointment_remarks'
     : 'NULL';
+$meetingLocationSelect = isset($appointmentColumns['meeting_location'])
+    ? 'a.meeting_location'
+    : 'NULL';
 $hasAssignedOfficial = isset($appointmentColumns['user_id_official_assigned']);
 $residentNotesSelect = isset($appointmentColumns['resident_notes'])
     ? 'a.resident_notes'
@@ -159,6 +165,7 @@ $sql = "
         {$reviewTimestampSelect} AS review_timestamp,
         {$requestTimestampSelect} AS request_timestamp,
         {$remarksSelect} AS appointment_remarks,
+        {$meetingLocationSelect} AS meeting_location,
         {$residentNotesSelect} AS resident_notes,
         {$statusSelect},
         {$officialNameSelect}
@@ -196,6 +203,7 @@ while ($row = $result->fetch_assoc()) {
         'purpose' => trim((string)($row['purpose'] ?? '')),
         'preferred_schedule_timestamp' => (string)($row['preferred_schedule_timestamp'] ?? ''),
         'confirmed_schedule_timestamp' => (string)($row['confirmed_schedule_timestamp'] ?? ''),
+        'meeting_location' => trim((string)($row['meeting_location'] ?? '')),
         'review_timestamp' => (string)($row['review_timestamp'] ?? ''),
         'request_timestamp' => (string)($row['request_timestamp'] ?? ''),
         'appointment_remarks' => trim((string)($row['appointment_remarks'] ?? '')),
