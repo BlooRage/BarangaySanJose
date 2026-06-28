@@ -288,7 +288,7 @@ $isNewsManagementView = $typeFilter === 'news';
 $canCreateNews = false;
 if ($currentUserId !== '' && isset($conn) && $conn instanceof mysqli && function_exists('amp_get_allowed_permission_keys') && function_exists('amp_permission_key_allowed')) {
   $allowedPermissions = amp_get_allowed_permission_keys($conn, $currentUserId, (string)($_SESSION['role'] ?? ''));
-  $canCreateNews = amp_permission_key_allowed($allowedPermissions, 'announcements_page');
+  $canCreateNews = amp_permission_key_allowed($allowedPermissions, 'news_management');
 }
 $audienceAreaOptions = [
   'Barangay Wide',

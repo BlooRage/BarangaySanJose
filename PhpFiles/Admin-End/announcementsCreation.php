@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../../Admin-End/includes/admin_guard.php";
+require_once __DIR__ . "/../General/adminModulePermissions.php";
 require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 require_once __DIR__ . "/announcementAudience.php";
@@ -170,6 +171,18 @@ function ann_should_send_delivery_for_record(array $record): bool
 $contentType = strtolower(trim((string)($_POST['content_type'] ?? 'page')));
 if (!in_array($contentType, ['page', 'news', 'delivery', 'faq'], true)) {
   $contentType = 'page';
+}
+
+$requiredPermissionKey = match ($contentType) {
+  'news' => 'news_management',
+  'delivery' => 'announcements_delivery',
+  'faq' => 'announcements_faq',
+  default => 'announcements_page',
+};
+$allowedPermissions = amp_get_allowed_permission_keys($conn, (string)($_SESSION['user_id'] ?? ''), (string)($_SESSION['role'] ?? ''));
+if (!amp_permission_key_allowed($allowedPermissions, $requiredPermissionKey)) {
+  header('Location: ' . appUrl('/Admin-End/Contents/Contents.php'));
+  exit;
 }
 
 $title = trim((string)($_POST["title"] ?? ""));

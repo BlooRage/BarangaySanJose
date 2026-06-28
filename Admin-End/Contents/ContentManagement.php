@@ -19,6 +19,7 @@ $canManageAnnouncements = amp_permission_keys_have_any($allowedPermissions, [
     'announcements_faq',
     'announcements_tracker',
 ]);
+$canManageNews = amp_permission_key_allowed($allowedPermissions, 'news_management');
 $canViewReports = amp_permission_keys_have_any($allowedPermissions, [
     'reports_certificate_issuance',
     'reports_clearance_issuance',
@@ -34,6 +35,7 @@ $currentUserLabel = cms_content_current_user_display($conn, $currentUserId, $cur
 $canReviewContent = cms_content_can_review($conn, $currentUserId, $currentRole);
 
 $contentToolsUrl = appUrl('Admin-End/Contents/Contents.php') . '?tool=tracker#tracker-card';
+$newsToolsUrl = appUrl('Admin-End/Contents/Contents.php') . '?tool=tracker&type_filter=news#tracker-card';
 $createNewsUrl = appUrl('Admin-End/Contents/CreateNews.php');
 $createAnnouncementUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=page';
 $reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_issuance';
@@ -108,8 +110,8 @@ $editorMeta = [
             'Use the Announcements tools for public announcements, SMS, email, and FAQ items.',
         ],
         'quick_links' => [
-            ['label' => 'Open Content Tools', 'href' => $canManageAnnouncements ? $contentToolsUrl : ''],
-            ['label' => 'Create News', 'href' => $canManageAnnouncements ? $createNewsUrl : ''],
+            ['label' => 'Open Content Tools', 'href' => $canManageAnnouncements ? $contentToolsUrl : ($canManageNews ? $newsToolsUrl : '')],
+            ['label' => 'Create News', 'href' => $canManageNews ? $createNewsUrl : ''],
             ['label' => 'Create Announcement', 'href' => $canManageAnnouncements ? $createAnnouncementUrl : ''],
         ],
     ],

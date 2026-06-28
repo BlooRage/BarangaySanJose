@@ -251,6 +251,11 @@ if (!function_exists('amp_get_permission_catalog')) {
                 'section' => 'General Modules',
                 'items' => [
                     [
+                        'key' => 'news_management',
+                        'label' => 'News',
+                        'path' => 'Admin-End/Contents/Contents.php?tool=tracker&type_filter=news',
+                    ],
+                    [
                         'key' => 'announcements',
                         'label' => 'Announcements',
                         'children' => [
@@ -1594,7 +1599,10 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'ComplaintTracker.php' => 'complaint_tracker',
             'ComplaintForm.php' => 'complaint_log_new_incident',
             'ContentManagement.php' => 'announcements_tracker',
-            'Contents.php' => 'announcements_tracker',
+            'Contents.php' => strtolower(trim((string)($_GET['type_filter'] ?? 'all'))) === 'news'
+                ? 'news_management'
+                : 'announcements_tracker',
+            'CreateNews.php' => 'news_management',
             'CreateContent.php' => match (strtolower(trim((string)($_GET['type'] ?? 'page')))) {
                 'delivery' => 'announcements_delivery',
                 'faq' => 'announcements_faq',

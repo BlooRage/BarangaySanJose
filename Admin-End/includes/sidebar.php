@@ -410,6 +410,9 @@ $sbAnnouncementKeys = [
     'announcements_faq',
     'announcements_tracker',
 ];
+$sbNewsKeys = [
+    'news_management',
+];
 $sbReportKeys = [
     'reports_certificate_issuance',
     'reports_clearance_issuance',
@@ -1570,9 +1573,9 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
       </li>
       <?php endif; ?>
-      <?php if ($sbHasAny(array_merge($sbAnnouncementKeys, $sbReportKeys))): ?>
+      <?php if ($sbHasAny(array_merge($sbNewsKeys, $sbAnnouncementKeys, $sbReportKeys))): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
-      <?php if ($sbCan('announcements_tracker')): ?>
+      <?php if ($sbCan('news_management')): ?>
       <li class="mb-2">
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker&amp;type_filter=news#tracker-card"
            class="btn btn-toggle sidebar-direct-link rounded <?= $isNewsManagementActive ? 'active' : '' ?>">

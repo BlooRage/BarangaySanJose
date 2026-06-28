@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/security.php";
+require_once __DIR__ . "/../General/adminModulePermissions.php";
 require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 require_once __DIR__ . "/announcementAudience.php";
@@ -169,6 +170,7 @@ $sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
 $isSuperAdmin = $sessionRole === 'superadmin';
 $currentUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $currentUserDisplayLabel = ann_action_current_user_display($conn, $currentUserId, $currentUserId);
+$allowedPermissions = amp_get_allowed_permission_keys($conn, $currentUserId, (string)($_SESSION['role'] ?? ''));
 $rows = announcements_load_all();
 $found = false;
 
@@ -178,6 +180,16 @@ foreach ($rows as $idx => $item) {
   }
 
   $found = true;
+  $itemContentType = strtolower(trim((string)($item['content_type'] ?? 'page')));
+  $requiredPermissionKey = match ($itemContentType) {
+    'news' => 'news_management',
+    'delivery' => 'announcements_delivery',
+    'faq' => 'announcements_faq',
+    default => 'announcements_page',
+  };
+  if (!amp_permission_key_allowed($allowedPermissions, $requiredPermissionKey)) {
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'You do not have access to manage this content type.');
+  }
   $currentStatus = strtolower((string)($item['status'] ?? 'draft'));
   $ownerUserId = trim((string)($item['created_by_user_id'] ?? ''));
   if ($ownerUserId === '') {
