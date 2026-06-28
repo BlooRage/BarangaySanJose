@@ -15,7 +15,7 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
   <link rel="preconnect" href="https://kit.fontawesome.com" crossorigin>
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css?v=20260628-1">
 </head>
 
 <body>
