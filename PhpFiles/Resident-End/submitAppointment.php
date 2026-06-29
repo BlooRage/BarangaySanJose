@@ -474,6 +474,8 @@ if ($action !== 'submit_appointment') {
     exit('Unknown appointment action.');
 }
 
+apos_schedule_ensure_storage($conn);
+
 if (!appointmentTableExists($conn, 'appointmentstbl')) {
     http_response_code(500);
     exit('Appointment table is not available. Run the appointment migration first.');
@@ -562,6 +564,10 @@ if ($firstName === '' || $lastName === '' || $contactNumber === null) {
 
 $nameParts = array_filter([$firstName, $middleName, $lastName, $suffix], static fn($value) => trim((string)$value) !== '');
 $residentName = implode(' ', $nameParts);
+$emailAddress = strtolower(trim((string)($useraccountstbl['email'] ?? '')));
+if ($emailAddress !== '' && !filter_var($emailAddress, FILTER_VALIDATE_EMAIL)) {
+    $emailAddress = '';
+}
 $statusId = appointmentEnsureStatusId($conn, 'Approved', 'Appointment');
 $appointmentId = GenerateAppointmentID($conn);
 
@@ -610,6 +616,18 @@ try {
         $purpose,
     ];
     $bindTypes = 'ssssssss';
+
+    if (isset($appointmentColumns['email_address'])) {
+        $insertColumns[] = 'email_address';
+        $insertValues[] = $emailAddress !== '' ? $emailAddress : null;
+        $bindTypes .= 's';
+    }
+
+    if (isset($appointmentColumns['booking_channel'])) {
+        $insertColumns[] = 'booking_channel';
+        $insertValues[] = 'resident_portal';
+        $bindTypes .= 's';
+    }
 
     if (appointmentSlotIsAlreadyBooked($conn, $appointmentColumns, $officialUserId, $confirmedScheduleTimestamp)) {
         throw new Exception('The selected schedule was just taken. Please choose another available appointment slot.');

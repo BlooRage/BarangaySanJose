@@ -68,6 +68,39 @@ if (!function_exists('apos_appointment_table_name')) {
     }
 }
 
+if (!function_exists('apos_ensure_appointment_storage')) {
+    function apos_ensure_appointment_storage(mysqli $conn): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+
+        $table = apos_appointment_table_name();
+        $result = $conn->query("SHOW TABLES LIKE '" . $conn->real_escape_string($table) . "'");
+        if ($result instanceof mysqli_result) {
+            $exists = $result->num_rows > 0;
+            $result->free();
+            if ($exists) {
+                @$conn->query("
+                    ALTER TABLE {$table}
+                    ADD COLUMN IF NOT EXISTS meeting_location VARCHAR(255) NULL AFTER appointment_remarks
+                ");
+                @$conn->query("
+                    ALTER TABLE {$table}
+                    ADD COLUMN IF NOT EXISTS email_address VARCHAR(255) NULL AFTER contact_number
+                ");
+                @$conn->query("
+                    ALTER TABLE {$table}
+                    ADD COLUMN IF NOT EXISTS booking_channel VARCHAR(40) NULL AFTER email_address
+                ");
+            }
+        }
+
+        $done = true;
+    }
+}
+
 if (!function_exists('apos_schedule_ensure_storage')) {
     function apos_schedule_ensure_storage(mysqli $conn): void
     {
@@ -95,12 +128,7 @@ if (!function_exists('apos_schedule_ensure_storage')) {
             throw new RuntimeException('Failed to prepare official appointment schedules.');
         }
 
-        if ($conn->query("SHOW TABLES LIKE '" . $conn->real_escape_string(apos_appointment_table_name()) . "'") instanceof mysqli_result) {
-            @$conn->query("
-                ALTER TABLE " . apos_appointment_table_name() . "
-                ADD COLUMN IF NOT EXISTS meeting_location VARCHAR(255) NULL AFTER appointment_remarks
-            ");
-        }
+        apos_ensure_appointment_storage($conn);
 
         $done = true;
     }

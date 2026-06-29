@@ -122,5 +122,13 @@ if ($purpose === 'forgot') {
     }
 }
 
+if ($purpose === 'guest_appointment') {
+    $_SESSION['guest_appointment_otp_verified'] = [
+        'phone' => (string)$recipient,
+        'otp_id' => (int)$otp_id,
+        'verified_at' => time(),
+    ];
+}
+
 echo json_encode(['success' => true]);
 ?>

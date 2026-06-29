@@ -15,6 +15,8 @@ if (empty($appointmentAccess['can_access_tracker'])) {
     exit('Access denied.');
 }
 
+apos_ensure_appointment_storage($conn);
+
 $appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if (!in_array($appointmentTool, ['tracker', 'settings', 'schedule'], true)) {
     $appointmentTool = 'tracker';
@@ -364,6 +366,25 @@ function at_status_pill(string $value): string
     return 'pending';
 }
 
+function at_booking_channel_label(string $value, bool $hasResidentLink = false): string
+{
+    $normalized = strtolower(trim($value));
+    if ($normalized === 'resident_portal') {
+        return 'Resident Portal';
+    }
+    if ($normalized === 'guest_otp') {
+        return 'Guest OTP';
+    }
+    if ($normalized === 'walkin_desk') {
+        return 'Walk-in Desk';
+    }
+    if ($hasResidentLink) {
+        return 'Resident Portal';
+    }
+
+    return 'Manual / Guest';
+}
+
 function at_is_rescheduled(string $value): bool
 {
     return str_contains(strtolower(trim($value)), 'resched');
@@ -603,8 +624,11 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
         $sql = "
             SELECT
                 a.appointment_id,
+                " . (isset($appointmentColumns['user_id_resident']) ? 'a.user_id_resident' : "NULL") . " AS resident_user_id,
                 a.name,
                 a.contact_number,
+                " . (isset($appointmentColumns['email_address']) ? 'a.email_address' : "NULL") . " AS email_address,
+                " . (isset($appointmentColumns['booking_channel']) ? 'a.booking_channel' : "NULL") . " AS booking_channel,
                 a.subject,
                 a.subject_other,
                 a.purpose,
@@ -668,6 +692,11 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
                     $appointmentOfficialDirectory,
                     at_value($row, 'official_name', '-')
                 );
+                $residentUserId = at_value($row, 'resident_user_id', '');
+                $bookingChannelLabel = at_booking_channel_label(
+                    at_value($row, 'booking_channel', ''),
+                    $residentUserId !== ''
+                );
 
                 if ($confirmedScheduleTimestamp !== '') {
                     $scheduleDisplay = trim($confirmedAppointmentDate . ' ' . $confirmedAppointmentTime);
@@ -682,6 +711,8 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
                     'request_timestamp_display' => at_format_datetime($row['request_timestamp'] ?? null),
                     'resident_name' => at_middle_initial_name(at_value($row, 'name', '')),
                     'contact_number' => at_value($row, 'contact_number', '-'),
+                    'email_address' => at_value($row, 'email_address', '-'),
+                    'booking_channel' => $bookingChannelLabel,
                     'subject' => $subject,
                     'purpose' => at_value($row, 'purpose', '-'),
                     'preferred_schedule_timestamp' => $preferredScheduleTimestamp,
@@ -1767,9 +1798,12 @@ foreach ($appointmentCouncilMembers as $member) {
 
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Appointment ID, resident, official, subject, purpose">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Appointment ID, applicant, source, official, subject, purpose">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
+                    <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars(appUrl('/Admin-End/Appointments/WalkInAppointmentForm.php'), ENT_QUOTES, 'UTF-8') ?>">
+                        <i class="fa-solid fa-plus me-1"></i> Encode Walk-in
+                    </a>
                     <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalAppointmentTrackerFilter" id="btnAppointmentFilter" title="Filter" aria-label="Filter">
                         <i class="fa-solid fa-filter"></i>
                         <span class="visually-hidden">Filter</span>
@@ -1790,11 +1824,11 @@ foreach ($appointmentCouncilMembers as $member) {
                     <thead>
                         <tr class="table-light">
                             <th>Appointment ID</th>
-                            <th>Date Submitted</th>
-                            <th>Resident</th>
-                            <th>Subject</th>
-                            <th>Schedule</th>
-                            <th>Status</th>
+                                    <th>Date Submitted</th>
+                                    <th>Applicant</th>
+                                    <th>Subject</th>
+                                    <th>Schedule</th>
+                                    <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -1818,6 +1852,7 @@ foreach ($appointmentCouncilMembers as $member) {
                                     data-search="<?= htmlspecialchars(strtolower(implode(' ', [
                                         $row['appointment_id'],
                                         $row['resident_name'],
+                                        $row['booking_channel'],
                                         $row['official_name'],
                                         $row['subject'],
                                         $row['purpose'],
@@ -1826,7 +1861,10 @@ foreach ($appointmentCouncilMembers as $member) {
                                 >
                                     <td><?= htmlspecialchars($row['appointment_id'], ENT_QUOTES, 'UTF-8') ?></td>
                                     <td><?= htmlspecialchars($row['request_timestamp_display'], ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td><?= htmlspecialchars($row['resident_name'], ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td>
+                                        <div class="appointment-cell-main"><?= htmlspecialchars($row['resident_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <div class="appointment-cell-subtitle"><?= htmlspecialchars($row['booking_channel'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    </td>
                                     <td><?= htmlspecialchars($row['subject'], ENT_QUOTES, 'UTF-8') ?></td>
                                     <td>
                                         <div class="appointment-cell-main"><?= htmlspecialchars($row['schedule_display'], ENT_QUOTES, 'UTF-8') ?></div>
@@ -1852,6 +1890,8 @@ foreach ($appointmentCouncilMembers as $member) {
                                             data-request-timestamp="<?= htmlspecialchars($row['request_timestamp_display'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-resident-name="<?= htmlspecialchars($row['resident_name'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-contact-number="<?= htmlspecialchars($row['contact_number'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-email-address="<?= htmlspecialchars($row['email_address'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-booking-channel="<?= htmlspecialchars($row['booking_channel'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-subject="<?= htmlspecialchars($row['subject'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-purpose="<?= htmlspecialchars($row['purpose'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-preferred-appointment-date="<?= htmlspecialchars($row['preferred_appointment_date'], ENT_QUOTES, 'UTF-8') ?>"
@@ -1991,10 +2031,12 @@ foreach ($appointmentCouncilMembers as $member) {
                     </section>
 
                     <section class="tracker-form-section">
-                        <h6 class="tracker-form-section-title">Resident and Assignment</h6>
-                        <div class="tracker-form-grid cols-4">
-                            <div class="tracker-form-field"><p class="tracker-form-label">Resident Name</p><div class="tracker-form-value" id="viewResidentName">-</div></div>
+                        <h6 class="tracker-form-section-title">Applicant and Assignment</h6>
+                        <div class="tracker-form-grid cols-3">
+                            <div class="tracker-form-field"><p class="tracker-form-label">Applicant Name</p><div class="tracker-form-value" id="viewResidentName">-</div></div>
                             <div class="tracker-form-field"><p class="tracker-form-label">Contact Number</p><div class="tracker-form-value" id="viewContactNumber">-</div></div>
+                            <div class="tracker-form-field"><p class="tracker-form-label">Email Address</p><div class="tracker-form-value" id="viewEmailAddress">-</div></div>
+                            <div class="tracker-form-field"><p class="tracker-form-label">Booking Source</p><div class="tracker-form-value" id="viewBookingChannel">-</div></div>
                             <div class="tracker-form-field"><p class="tracker-form-label">Reviewed By Staff</p><div class="tracker-form-value" id="viewStaffName">-</div></div>
                             <div class="tracker-form-field"><p class="tracker-form-label">Council Member</p><div class="tracker-form-value" id="viewOfficialName">-</div></div>
                         </div>
@@ -2024,7 +2066,7 @@ foreach ($appointmentCouncilMembers as $member) {
                     <section class="tracker-form-section">
                         <h6 class="tracker-form-section-title">Notes</h6>
                         <div class="tracker-form-grid cols-1">
-                            <div class="tracker-form-field"><p class="tracker-form-label">Resident Notes</p><div class="tracker-form-value" id="viewResidentNotes">-</div></div>
+                            <div class="tracker-form-field"><p class="tracker-form-label">Applicant Notes</p><div class="tracker-form-value" id="viewResidentNotes">-</div></div>
                             <div class="tracker-form-field"><p class="tracker-form-label">Appointment Remarks</p><div class="tracker-form-value" id="viewAppointmentRemarks">-</div></div>
                         </div>
                     </section>
@@ -2824,6 +2866,8 @@ foreach ($appointmentCouncilMembers as $member) {
             setText("viewReviewTimestamp", button.dataset.reviewTimestamp);
             setText("viewResidentName", button.dataset.residentName);
             setText("viewContactNumber", button.dataset.contactNumber);
+            setText("viewEmailAddress", button.dataset.emailAddress);
+            setText("viewBookingChannel", button.dataset.bookingChannel);
             setText("viewStaffName", button.dataset.staffName);
             setText("viewOfficialName", button.dataset.officialName);
             setText("viewSubject", button.dataset.subject);
