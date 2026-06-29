@@ -362,7 +362,8 @@ h1, h2, h3, h4, h5, h6 {
     color: #111111;
 }
 .serviceAuthActions {
-    display: block;
+    display: grid;
+    gap: 10px;
     margin-bottom: 12px;
 }
 .serviceAuthPrimary,
@@ -514,7 +515,7 @@ h1, h2, h3, h4, h5, h6 {
         font-size: 28px;
     }
     .serviceAuthActions {
-        display: block;
+        gap: 10px;
     }
     .vicinityGrid {
         text-align: center;

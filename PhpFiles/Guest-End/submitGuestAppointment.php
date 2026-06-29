@@ -29,7 +29,15 @@ $lastName = trim((string)($_POST['last_name'] ?? ''));
 $suffix = trim((string)($_POST['suffix_name'] ?? ''));
 $contactNumber = apsh_normalize_phone((string)($_POST['contact_number'] ?? ''));
 $emailAddress = apsh_normalize_email((string)($_POST['email_address'] ?? ''));
-$address = preg_replace('/\s+/', ' ', trim((string)($_POST['current_address'] ?? '')));
+$addressSystem = apsh_normalize_address_mode((string)($_POST['address_system'] ?? ''));
+$unitNumber = apsh_normalize_address_short_part((string)($_POST['unit_number'] ?? ''));
+$houseNumber = apsh_normalize_address_short_part((string)($_POST['house_number'] ?? ''));
+$streetName = apsh_normalize_address_text_part((string)($_POST['street_name'] ?? ''));
+$lotNumber = apsh_normalize_address_short_part((string)($_POST['lot_number'] ?? ''));
+$blockNumber = apsh_normalize_address_short_part((string)($_POST['block_number'] ?? ''));
+$phaseNumber = apsh_normalize_address_short_part((string)($_POST['phase_number'] ?? ''));
+$subdivision = apsh_normalize_address_text_part((string)($_POST['subdivision'] ?? ''));
+$areaNumber = preg_replace('/\s+/', ' ', trim((string)($_POST['area_number'] ?? '')));
 $officialUserId = trim((string)($_POST['official_user_id'] ?? ''));
 $subject = strtolower(trim((string)($_POST['subject'] ?? '')));
 $subjectOther = preg_replace('/\s+/', ' ', trim((string)($_POST['subject_other'] ?? '')));
@@ -37,8 +45,37 @@ $appointmentDate = trim((string)($_POST['appointment_date'] ?? ''));
 $appointmentTime = trim((string)($_POST['appointment_time'] ?? ''));
 $purpose = preg_replace('/\s+/', ' ', trim((string)($_POST['purpose'] ?? '')));
 
+$allowedAreaOptions = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+$hasStructuredAddressInput = $addressSystem !== ''
+    || $unitNumber !== ''
+    || $houseNumber !== ''
+    || $streetName !== ''
+    || $lotNumber !== ''
+    || $blockNumber !== ''
+    || $phaseNumber !== ''
+    || $subdivision !== ''
+    || $areaNumber !== '';
+
 if ($firstName === '' || $lastName === '' || $contactNumber === null || $officialUserId === '' || $subject === '' || $appointmentDate === '' || $appointmentTime === '' || $purpose === '') {
     apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please complete all required appointment fields.');
+}
+
+if ($hasStructuredAddressInput) {
+    if ($addressSystem === '') {
+        apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please select an address system for the current address.');
+    }
+
+    if ($addressSystem === 'house' && ($houseNumber === '' || $streetName === '')) {
+        apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please complete the required house address fields.');
+    }
+
+    if ($addressSystem === 'lot_block' && ($lotNumber === '' || $blockNumber === '' || $phaseNumber === '')) {
+        apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please complete the required lot/block address fields.');
+    }
+
+    if ($areaNumber !== '' && !in_array($areaNumber, $allowedAreaOptions, true)) {
+        apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please select a valid area for the current address.');
+    }
 }
 
 if (!in_array($subject, ['follow_up', 'consultation', 'event_coordination', 'other'], true)) {
@@ -114,9 +151,25 @@ if (!isset($appointmentColumns['user_id_official_assigned'])) {
 
 $subjectLabel = apsh_normalize_subject_label($subject);
 $normalizedSubjectOther = $subject === 'other' ? $subjectOther : null;
+$structuredAddress = $hasStructuredAddressInput
+    ? apsh_compose_structured_guest_address([
+        'address_system' => $addressSystem,
+        'unit_number' => $unitNumber,
+        'house_number' => $houseNumber,
+        'street_name' => $streetName,
+        'lot_number' => $lotNumber,
+        'block_number' => $blockNumber,
+        'phase_number' => $phaseNumber,
+        'subdivision' => $subdivision,
+        'area_number' => $areaNumber,
+        'barangay' => 'Barangay San Jose',
+        'municipality_city' => 'Rodriguez',
+        'province' => 'Rizal',
+    ])
+    : '';
 $notes = [];
-if ($address !== '') {
-    $notes[] = 'Guest address: ' . $address;
+if ($structuredAddress !== '') {
+    $notes[] = 'Guest address: ' . $structuredAddress;
 }
 if ($subject === 'other' && $subjectOther !== '') {
     $notes[] = 'Other subject detail: ' . $subjectOther;

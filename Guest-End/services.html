@@ -9,7 +9,7 @@
     <title>Services</title>
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css?v=20260629-appointment-modal">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
 </head>
 <body data-cms-page="services" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">
@@ -92,7 +92,7 @@
                     <div class="p-4 servBox">
                         <h3>Appointments</h3>
                         <p>Schedule a visit with the barangay office for specific services or concerns.  Organized and time efficient.</p>
-                        <a href="../Guest-End/appointments.php" class="btn serviceApplyBtn" data-service-slug="appointments" data-service-name="Appointments">Apply</a>
+                        <a href="../login?service=appointments" class="btn serviceApplyBtn" data-service-login data-service-slug="appointments" data-service-name="Appointments" data-service-eyebrow="Choose Appointment Access" data-service-title="Login / Register or Schedule Appointment as Guest" data-service-copy="Residents can sign in for the resident appointment flow, or continue as a guest using OTP verification." data-service-guest-href="../Guest-End/appointments.php" data-service-guest-label="Schedule Appointment as Guest" data-service-hint="Guests will continue to the OTP-based appointment form. Residents will return to the appointment module after authentication.">Apply</a>
                     </div>
                 </div>
                 <div class="col">
@@ -118,8 +118,9 @@
                     </p>
                     <div class="serviceAuthActions">
                         <a id="serviceAuthLoginLink" class="btn btn-orange text-white serviceAuthPrimary" href="../login">Login / Register</a>
+                        <a id="serviceAuthGuestLink" class="btn serviceAuthSecondary" href="../Guest-End/appointments.php" hidden>Schedule Appointment as Guest</a>
                     </div>
-                    <p class="serviceAuthHint mb-0">You will return to the selected service after authentication.</p>
+                    <p class="serviceAuthHint mb-0" id="serviceAuthHint">You will return to the selected service after authentication.</p>
                 </div>
             </div>
         </div>
@@ -159,7 +160,7 @@
     
     
     <script src="../JS-Script-Files/publicPagePrefetch.js?v=20260622-1"></script>
-    <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
+    <script src="../JS-Script-Files/siteContentRuntime.js?v=20260629-appointment-modal" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
         
@@ -184,8 +185,12 @@
         (function() {
             const modalEl = document.getElementById("serviceAuthModal");
             const modal = modalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
-            const serviceNameEl = document.getElementById("serviceAuthServiceName");
+            const eyebrowEl = modalEl ? modalEl.querySelector(".serviceAuthEyebrow") : null;
+            const titleEl = document.getElementById("serviceAuthModalTitle");
+            const copyEl = modalEl ? modalEl.querySelector(".serviceAuthCopy") : null;
             const loginLinkEl = document.getElementById("serviceAuthLoginLink");
+            const guestLinkEl = document.getElementById("serviceAuthGuestLink");
+            const hintEl = document.getElementById("serviceAuthHint");
             const redirectBase = "../account-redirect";
 
             function isLoginUrl(value) {
@@ -200,12 +205,46 @@
             function hydrateModal(trigger) {
                 const serviceName = (trigger.dataset.serviceName || "this service").trim();
                 const loginHref = trigger.getAttribute("href") || "../login";
+                const eyebrowText = (trigger.dataset.serviceEyebrow || "Resident Access Required").trim();
+                const titleText = (trigger.dataset.serviceTitle || "Login or Register").trim();
+                const copyText = (trigger.dataset.serviceCopy || "").trim();
+                const guestHref = (trigger.dataset.serviceGuestHref || "").trim();
+                const guestLabel = (trigger.dataset.serviceGuestLabel || "Continue as Guest").trim();
+                const hintText = (trigger.dataset.serviceHint || "You will return to the selected service after authentication.").trim();
 
-                if (serviceNameEl) {
-                    serviceNameEl.textContent = serviceName;
+                if (eyebrowEl) {
+                    eyebrowEl.textContent = eyebrowText;
+                }
+                if (titleEl) {
+                    titleEl.textContent = titleText;
+                }
+                if (copyEl) {
+                    if (copyText !== "") {
+                        copyEl.textContent = copyText;
+                    } else {
+                        copyEl.textContent = "";
+                        copyEl.append("To continue with ");
+                        const strong = document.createElement("strong");
+                        strong.textContent = serviceName;
+                        copyEl.append(strong, ", sign in to your resident account or register first.");
+                    }
                 }
                 if (loginLinkEl) {
                     loginLinkEl.href = loginHref;
+                }
+                if (guestLinkEl) {
+                    if (guestHref !== "") {
+                        guestLinkEl.hidden = false;
+                        guestLinkEl.href = guestHref;
+                        guestLinkEl.textContent = guestLabel;
+                    } else {
+                        guestLinkEl.hidden = true;
+                        guestLinkEl.href = "../Guest-End/appointments.php";
+                        guestLinkEl.textContent = "Schedule Appointment as Guest";
+                    }
+                }
+                if (hintEl) {
+                    hintEl.textContent = hintText;
                 }
             }
 

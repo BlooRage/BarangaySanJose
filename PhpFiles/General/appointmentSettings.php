@@ -575,7 +575,7 @@ if (!function_exists('aps_booking_date_limits')) {
         $baseNow = $now ?? new DateTimeImmutable('now', $timezone);
         $normalized = aps_normalize_settings($settings);
 
-        $minDate = $baseNow->modify('+1 day');
+        $minDate = $baseNow;
         $windowMax = $baseNow->modify('+' . (int)$normalized['booking_window_days'] . ' days');
         $yearEnd = new DateTimeImmutable($baseNow->format('Y-12-31'), $timezone);
         $maxDate = $windowMax < $yearEnd ? $windowMax : $yearEnd;

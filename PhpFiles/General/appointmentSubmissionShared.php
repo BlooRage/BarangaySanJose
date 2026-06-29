@@ -161,6 +161,100 @@ if (!function_exists('apsh_normalize_email')) {
     }
 }
 
+if (!function_exists('apsh_normalize_address_mode')) {
+    function apsh_normalize_address_mode(string $value): string
+    {
+        $mode = strtolower(trim($value));
+        if (in_array($mode, ['house', 'street'], true)) {
+            return 'house';
+        }
+        if (in_array($mode, ['lot_block', 'block_lot'], true)) {
+            return 'lot_block';
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('apsh_normalize_address_short_part')) {
+    function apsh_normalize_address_short_part(string $value, int $maxLength = 50): string
+    {
+        $normalized = preg_replace('/\s+/', ' ', trim($value));
+        if (!is_string($normalized) || $normalized === '') {
+            return '';
+        }
+        if (mb_strlen($normalized) > $maxLength) {
+            return '';
+        }
+        if (!preg_match('/^[A-Za-z0-9#\/-][A-Za-z0-9#\/\- ]*$/', $normalized)) {
+            return '';
+        }
+
+        return $normalized;
+    }
+}
+
+if (!function_exists('apsh_normalize_address_text_part')) {
+    function apsh_normalize_address_text_part(string $value, int $maxLength = 150): string
+    {
+        $normalized = preg_replace('/\s+/', ' ', trim($value));
+        if (!is_string($normalized) || $normalized === '') {
+            return '';
+        }
+        if (mb_strlen($normalized) > $maxLength) {
+            return '';
+        }
+        if (!preg_match("/^[A-Za-z0-9#.,'\/()-][A-Za-z0-9#.,'\/()\- ]*$/", $normalized)) {
+            return '';
+        }
+
+        return $normalized;
+    }
+}
+
+if (!function_exists('apsh_compose_structured_guest_address')) {
+    function apsh_compose_structured_guest_address(array $address): string
+    {
+        $mode = apsh_normalize_address_mode((string)($address['address_system'] ?? ''));
+        $subdivision = trim((string)($address['subdivision'] ?? ''));
+        $area = trim((string)($address['area_number'] ?? ''));
+        $barangay = trim((string)($address['barangay'] ?? 'Barangay San Jose'));
+        $municipalityCity = trim((string)($address['municipality_city'] ?? 'Rodriguez'));
+        $province = trim((string)($address['province'] ?? 'Rizal'));
+
+        $parts = [];
+        if ($mode === 'house') {
+            $lineParts = array_values(array_filter([
+                trim((string)($address['unit_number'] ?? '')),
+                trim(implode(' ', array_filter([
+                    trim((string)($address['house_number'] ?? '')),
+                    trim((string)($address['street_name'] ?? '')),
+                ], static fn(string $part): bool => $part !== ''))),
+            ], static fn(string $part): bool => $part !== ''));
+            if ($lineParts !== []) {
+                $parts[] = implode(', ', $lineParts);
+            }
+        } elseif ($mode === 'lot_block') {
+            $lotBlockLine = trim(implode(' ', array_filter([
+                trim((string)($address['lot_number'] ?? '')) !== '' ? 'Lot ' . trim((string)($address['lot_number'] ?? '')) : '',
+                trim((string)($address['block_number'] ?? '')) !== '' ? 'Block ' . trim((string)($address['block_number'] ?? '')) : '',
+                trim((string)($address['phase_number'] ?? '')) !== '' ? 'Phase ' . trim((string)($address['phase_number'] ?? '')) : '',
+            ], static fn(string $part): bool => $part !== '')));
+            if ($lotBlockLine !== '') {
+                $parts[] = $lotBlockLine;
+            }
+        }
+
+        foreach ([$subdivision, $area, $barangay, $municipalityCity, $province] as $part) {
+            if ($part !== '') {
+                $parts[] = $part;
+            }
+        }
+
+        return implode(', ', $parts);
+    }
+}
+
 if (!function_exists('apsh_normalize_subject_label')) {
     function apsh_normalize_subject_label(string $value): string
     {
@@ -381,6 +475,10 @@ if (!function_exists('apsh_validate_schedule_selection')) {
         $schedule = DateTimeImmutable::createFromFormat('Y-m-d H:i', $appointmentDate . ' ' . $appointmentTime, $timezone);
         if (!$schedule || $schedule->format('Y-m-d') !== $appointmentDate || $schedule->format('H:i') !== $appointmentTime) {
             throw new RuntimeException('Appointment date or time is invalid.');
+        }
+
+        if ($schedule <= $now) {
+            throw new RuntimeException('Please select a remaining appointment time later than the current time.');
         }
 
         if ($appointmentDate < $minAppointmentDate || $appointmentDate > $maxAppointmentDate) {

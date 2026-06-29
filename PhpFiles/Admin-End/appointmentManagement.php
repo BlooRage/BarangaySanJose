@@ -614,6 +614,10 @@ function am_validate_schedule(mysqli $conn, string $officialUserId, string $date
         throw new Exception('Confirmed appointment date or time is invalid.');
     }
 
+    if ($schedule <= $now) {
+        throw new Exception('Please select a remaining appointment time later than the current time.');
+    }
+
     if (empty($bookingLimits['has_window']) || aps_first_available_booking_date($appointmentSettings, $now) === null) {
         throw new Exception('No appointment dates are currently available based on the saved appointment settings.');
     }

@@ -2238,6 +2238,13 @@ foreach ($appointmentCouncilMembers as $member) {
         const globalScheduleConfig = window.APPOINTMENT_GLOBAL_SCHEDULE_CONFIG || {};
         const disabledWeekdays = new Set((Array.isArray(globalScheduleConfig.disabledWeekdays) ? globalScheduleConfig.disabledWeekdays : []).map((value) => String(value)));
         const disabledDates = new Set(Array.isArray(globalScheduleConfig.disabledDates) ? globalScheduleConfig.disabledDates : []);
+        const currentBookingMoment = () => {
+            const now = new Date();
+            return {
+                isoDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+                minutes: (now.getHours() * 60) + now.getMinutes(),
+            };
+        };
 
         const parseIsoDate = (value) => {
             const text = String(value || "").trim();
@@ -2424,6 +2431,7 @@ foreach ($appointmentCouncilMembers as $member) {
             const lunchBreak = globalScheduleConfig.lunchBreak || null;
             const lunchStart = lunchBreak ? toMinutes(lunchBreak.start || "") : null;
             const lunchEnd = lunchBreak ? toMinutes(lunchBreak.end || "") : null;
+            const currentBookingState = currentBookingMoment();
             const slots = [];
 
             for (let current = startMinutes; current <= endMinutes; current += interval) {
@@ -2440,6 +2448,9 @@ foreach ($appointmentCouncilMembers as $member) {
                 const hours = Math.floor(current / 60);
                 const minutes = current % 60;
                 const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                if (String(isoDate || "").trim() === currentBookingState.isoDate && current <= currentBookingState.minutes) {
+                    continue;
+                }
                 const bookedIds = bookedAppointmentIdsFor(officialUserId, isoDate, value);
                 if (bookedIds.some((appointmentId) => String(appointmentId || "").trim() !== excludeAppointmentId)) {
                     continue;
@@ -2526,7 +2537,7 @@ foreach ($appointmentCouncilMembers as $member) {
                 return { ok: false, message };
             }
             if (officialUserId !== "" && slots.length === 0) {
-                const message = "All appointment times for the selected council member are already taken on that date.";
+                const message = "No remaining appointment times are available for the selected council member on that date.";
                 reviewConfirmedDate.setCustomValidity(message);
                 return { ok: false, message };
             }

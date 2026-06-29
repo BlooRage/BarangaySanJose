@@ -452,6 +452,28 @@
     };
   }
 
+  function getServiceApplyConfig(applyIntent) {
+    var slug = applyIntent && applyIntent.slug ? applyIntent.slug : "";
+
+    if (slug === "appointments") {
+      return {
+        href: "../login?service=appointments",
+        requiresLogin: true,
+        eyebrow: "Choose Appointment Access",
+        title: "Login / Register or Schedule Appointment as Guest",
+        copy: "Residents can sign in for the resident appointment flow, or continue as a guest using OTP verification.",
+        guestHref: "../Guest-End/appointments.php",
+        guestLabel: "Schedule Appointment as Guest",
+        hint: "Guests will continue to the OTP-based appointment form. Residents will return to the appointment module after authentication."
+      };
+    }
+
+    return {
+      href: "../login" + (slug ? "?service=" + encodeURIComponent(slug) : ""),
+      requiresLogin: true
+    };
+  }
+
   function renderServices(root, payload) {
     setImage(root, '[data-cms-services="banner-image"]', payload.banner_image, "Services Banner");
     setInlineHtml(root, '[data-cms-services="banner-title"]', payload.banner_title_html || "");
@@ -464,13 +486,42 @@
     var services = Array.isArray(payload.services) ? payload.services : [];
     servicesContainer.innerHTML = services.map(function (service) {
       var applyIntent = getServiceApplyIntent(service.title_html || "");
-      var loginHref = "../login" + (applyIntent.slug ? "?service=" + encodeURIComponent(applyIntent.slug) : "");
+      var applyConfig = getServiceApplyConfig(applyIntent);
+      var applyAttributes = [
+        'href="' + escapeHtml(applyConfig.href) + '"',
+        'class="btn serviceApplyBtn"',
+        'data-service-slug="' + escapeHtml(applyIntent.slug) + '"',
+        'data-service-name="' + escapeHtml(applyIntent.label) + '"'
+      ];
+
+      if (applyConfig.requiresLogin) {
+        applyAttributes.push("data-service-login");
+      }
+      if (applyConfig.eyebrow) {
+        applyAttributes.push('data-service-eyebrow="' + escapeHtml(applyConfig.eyebrow) + '"');
+      }
+      if (applyConfig.title) {
+        applyAttributes.push('data-service-title="' + escapeHtml(applyConfig.title) + '"');
+      }
+      if (applyConfig.copy) {
+        applyAttributes.push('data-service-copy="' + escapeHtml(applyConfig.copy) + '"');
+      }
+      if (applyConfig.guestHref) {
+        applyAttributes.push('data-service-guest-href="' + escapeHtml(applyConfig.guestHref) + '"');
+      }
+      if (applyConfig.guestLabel) {
+        applyAttributes.push('data-service-guest-label="' + escapeHtml(applyConfig.guestLabel) + '"');
+      }
+      if (applyConfig.hint) {
+        applyAttributes.push('data-service-hint="' + escapeHtml(applyConfig.hint) + '"');
+      }
+
       return [
         '<div class="col">',
         '  <div class="p-4 servBox">',
         '    <h3>' + (service.title_html || "") + "</h3>",
         '    <div class="cms-runtime-richtext">' + (service.description_html || "") + "</div>",
-        '    <a href="' + escapeHtml(loginHref) + '" class="btn serviceApplyBtn" data-service-login data-service-slug="' + escapeHtml(applyIntent.slug) + '" data-service-name="' + escapeHtml(applyIntent.label) + '">Apply</a>',
+        '    <a ' + applyAttributes.join(" ") + '>Apply</a>',
         "  </div>",
         "</div>"
       ].join("");

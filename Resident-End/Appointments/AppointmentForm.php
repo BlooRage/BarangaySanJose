@@ -512,6 +512,13 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 month: "long",
                 day: "numeric",
             });
+            const currentBookingMoment = () => {
+                const now = new Date();
+                return {
+                    isoDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+                    minutes: (now.getHours() * 60) + now.getMinutes(),
+                };
+            };
             const minAllowedIso = String(appointmentDateInput?.min || "").trim();
             const maxAllowedIso = String(appointmentDateInput?.max || "").trim();
             const availableWeekdaysLabel = String(appointmentDateInput?.dataset.availableWeekdays || "").trim();
@@ -608,6 +615,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 const lunchBreak = appointmentGlobalScheduleConfig.lunchBreak || null;
                 const lunchStart = lunchBreak ? toMinutes(lunchBreak.start || "") : null;
                 const lunchEnd = lunchBreak ? toMinutes(lunchBreak.end || "") : null;
+                const currentBookingState = currentBookingMoment();
                 const slots = [];
 
                 for (let current = startMinutes; current <= endMinutes; current += interval) {
@@ -624,6 +632,9 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     const hours = Math.floor(current / 60);
                     const minutes = current % 60;
                     const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                    if (isoDate === currentBookingState.isoDate && current <= currentBookingState.minutes) {
+                        continue;
+                    }
                     if (bookedAppointmentIdsFor(officialUserId, isoDate, value).length > 0) {
                         continue;
                     }
@@ -668,7 +679,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     } else if (!dayEntry) {
                         appointmentLocationHelp.textContent = "That council member is not available on the selected date.";
                     } else if (slots.length === 0) {
-                        appointmentLocationHelp.textContent = "All appointment times for that council member are already taken on the selected date.";
+                        appointmentLocationHelp.textContent = "No remaining appointment times are available for that council member on the selected date.";
                     } else {
                         appointmentLocationHelp.textContent = "Meeting location is pulled from the weekly schedule of the selected council member.";
                     }
@@ -687,7 +698,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 const isUnavailableWeekday = value !== "" && weekday !== "" && disabledWeekdays.has(weekday);
 
                 if (isBeforeMin) {
-                    const msg = `Incorrect Input. Date must be after ${todayDisplay}`;
+                    const msg = `Incorrect Input. Date must be on or after ${todayDisplay}`;
                     appointmentDateInput.setCustomValidity(msg);
                     if (appointmentDateError) {
                         appointmentDateError.textContent = msg;
@@ -741,7 +752,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                         return false;
                     }
                     if (slots.length === 0) {
-                        const msg = "All appointment times for the selected council member are already taken on that date";
+                        const msg = "No remaining appointment times are available for the selected council member on that date";
                         appointmentDateInput.setCustomValidity(msg);
                         if (appointmentDateError) {
                             appointmentDateError.textContent = msg;

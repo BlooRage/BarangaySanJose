@@ -535,6 +535,10 @@ if (!$schedule || $schedule->format('Y-m-d') !== $appointmentDate || $schedule->
     appointmentRedirectWithMessage('error', 'Appointment date or time is invalid.');
 }
 
+if ($schedule <= $now) {
+    appointmentRedirectWithMessage('error', 'Please select a remaining appointment time later than the current time.');
+}
+
 if ($appointmentDate < $minAppointmentDate || $appointmentDate > $maxAppointmentDate) {
     appointmentRedirectWithMessage('error', 'Date of appointment is outside the current booking window.');
 }
