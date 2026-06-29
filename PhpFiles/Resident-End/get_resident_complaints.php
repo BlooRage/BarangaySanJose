@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/complaintTypeDetails.php';
 
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);
@@ -149,6 +150,7 @@ $result = $stmt->get_result();
 $items = [];
 while ($row = $result->fetch_assoc()) {
     $status = rct_status_payload((string)($row['status_name'] ?? 'Pending'), $row);
+    $parsedCaseDetails = complaintTypeParseCaseDetails($row['case_details'] ?? '');
     $items[] = [
         'complaint_id' => (string)($row['complaint_id'] ?? ''),
         'case_id' => (string)($row['case_id'] ?? ''),
@@ -158,6 +160,8 @@ while ($row = $result->fetch_assoc()) {
         'incident_place' => (string)($row['incident_place'] ?? ''),
         'complaint_type' => (string)($row['complaint_type'] ?? ''),
         'case_details' => trim((string)($row['case_details'] ?? '')),
+        'complaint_narration' => $parsedCaseDetails['narration'] ?? '',
+        'complaint_detail_fields' => $parsedCaseDetails['fields'] ?? [],
         'case_remarks' => trim((string)($row['case_remarks'] ?? '')),
         'subject_kind' => (string)($row['subject_kind'] ?? ''),
         'subject_display_name' => (string)($row['subject_display_name'] ?? ''),

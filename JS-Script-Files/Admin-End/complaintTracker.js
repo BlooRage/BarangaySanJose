@@ -381,6 +381,15 @@
         return `<div class="tracker-form-grid cols-1">${clean.map((f) => formField(f.label, f.value, !!f.raw, true)).join("")}</div>`;
     }
 
+    function renderComplaintSpecificFieldGrid(fields) {
+        const clean = (Array.isArray(fields) ? fields : []).filter((field) => field && String(field.value ?? "").trim() !== "");
+        if (!clean.length) return "";
+        return renderFieldGrid(clean.map((field) => ({
+            label: field.label || field.name || "Detail",
+            value: field.value || "-",
+        })), 2);
+    }
+
     function formSection(title, content) {
         return `
             <section class="tracker-form-section">
@@ -644,6 +653,7 @@
                     { label: "Witness Address", value: d.witness?.address || "-" },
                 ], 1),
             ].join("");
+            const complaintSpecificGrid = renderComplaintSpecificFieldGrid(d.complaint_detail_fields || []);
 
             const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
             const blotterRequestNotice = buildBlotterRequestNotice(d);
@@ -661,7 +671,7 @@
                     { label: "Request Reviewed", value: d.blotter_request_reviewed_at || "-" },
                 ], 2) : "",
                 renderFieldGrid([
-                    { label: "Resident Narration", value: d.case_details || "-" },
+                    { label: "Resident Narration", value: d.complaint_narration || d.case_details || "-" },
                 ], 1),
                 renderFieldGrid([
                     { label: "Screening Notes", value: d.screening_notes || "-" },
@@ -678,6 +688,7 @@
                 ].join("")),
                 formSection("Complainant Information", complainantGrid),
                 formSection("Subject Information", subjectGrid),
+                complaintSpecificGrid ? formSection("Complaint-Specific Information", complaintSpecificGrid) : "",
                 formSection("Witness Information", witnessGrid),
                 intakeNotesSection,
                 formSection("Narration and Notes", notesGrid),

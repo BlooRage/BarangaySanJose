@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
+require_once __DIR__ . "/../General/complaintTypeDetails.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
@@ -376,8 +377,13 @@ $witnessName = str_field($_POST['witness_name'] ?? '');
 $witnessContact = validateComplaintPhoneOrRedirect($_POST['witness_contact_number'] ?? '', false, 'Witness contact number');
 $witnessAddress = str_field($_POST['witness_address'] ?? '');
 
-$complaintType = $natureOfComplaint === 'Other' ? $natureOther : $natureOfComplaint;
-$complaintType = str_field($complaintType);
+try {
+    $complaintTypeMeta = complaintTypeValidateAndCollect($natureOfComplaint, $natureOther, $_POST);
+} catch (InvalidArgumentException $e) {
+    redirectWithMessage('error', $e->getMessage());
+}
+$complaintType = str_field($complaintTypeMeta['complaint_type'] ?? '');
+$caseDetails = complaintTypeBuildCaseDetails($incidentNarration, $complaintTypeMeta);
 
 if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentNarration) {
     redirectWithMessage('error', 'Missing required complaint fields.');
@@ -421,7 +427,7 @@ try {
     if (!$stmtCase) {
         throw new Exception("Prepare failed (case insert): " . $conn->error);
     }
-    $stmtCase->bind_param("ssssssssiis", $caseId, $residentUserId, $incidentDate, $incidentTime, $incidentLocation, $complaintType, $incidentNarration, $caseRemarks, $statusId, $levelId, $actorUserId);
+    $stmtCase->bind_param("ssssssssiis", $caseId, $residentUserId, $incidentDate, $incidentTime, $incidentLocation, $complaintType, $caseDetails, $caseRemarks, $statusId, $levelId, $actorUserId);
     $stmtCase->execute();
     $stmtCase->close();
 

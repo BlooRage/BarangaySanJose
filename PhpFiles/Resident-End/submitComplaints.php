@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
+require_once __DIR__ . "/../General/complaintTypeDetails.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 cuafk_ensure_case_useraccount_foreign_keys($conn);
@@ -393,8 +394,13 @@ $witnessName = str_field($_POST['witness_name'] ?? '');
 $witnessContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['witness_contact_number'] ?? '', false, 'Witness contact number');
 $witnessAddress = str_field($_POST['witness_address'] ?? '');
 
-$complaintType = $natureOfComplaint === 'Other' ? $natureOther : $natureOfComplaint;
-$complaintType = str_field($complaintType);
+try {
+    $complaintTypeMeta = complaintTypeValidateAndCollect($natureOfComplaint, $natureOther, $_POST);
+} catch (InvalidArgumentException $e) {
+    redirectWithMessage($complainantPath, 'error', $e->getMessage());
+}
+$complaintType = str_field($complaintTypeMeta['complaint_type'] ?? '');
+$caseDetails = complaintTypeBuildCaseDetails($incidentNarration, $complaintTypeMeta);
 
 if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentNarration) {
     redirectWithMessage($complainantPath, 'error', 'Missing required complaint fields.');
@@ -448,7 +454,7 @@ try {
         $incidentTime,
         $incidentLocation,
         $complaintType,
-        $incidentNarration,
+        $caseDetails,
         $caseRemarks,
         $statusId,
         $levelId,

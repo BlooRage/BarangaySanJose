@@ -3,6 +3,7 @@ session_start();
 
 require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
+require_once "../General/complaintTypeDetails.php";
 require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 
@@ -364,6 +365,7 @@ if ($action === 'detail') {
     if (!$detail) {
         respond(false, [], 'Blotter request not found.');
     }
+    $parsedCaseDetails = complaintTypeParseCaseDetails($detail['case_details'] ?? '');
 
     $stmt = $conn->prepare("
         SELECT participant_role, firstname, middlename, lastname, suffix, contact_number, address, age, sex
@@ -409,6 +411,8 @@ if ($action === 'detail') {
         'incident_place' => $detail['incident_place'] ?? '',
         'complaint_type' => $detail['complaint_type'] ?? '',
         'case_details' => $detail['case_details'] ?? '',
+        'complaint_narration' => $parsedCaseDetails['narration'] ?? '',
+        'complaint_detail_fields' => $parsedCaseDetails['fields'] ?? [],
         'case_remarks' => $detail['case_remarks'] ?? '',
         'subject_display_name' => $detail['subject_display_name'] ?? '',
         'subject_kind' => $detail['subject_kind'] ?? '',

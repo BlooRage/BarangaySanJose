@@ -3,6 +3,7 @@ session_start();
 
 require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
+require_once "../General/complaintTypeDetails.php";
 require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 
@@ -563,6 +564,7 @@ if ($action === 'detail') {
     }
 
     $detail['submitted_at'] = formatDisplayTimestamp($detail['submitted_at_raw'] ?? '');
+    $parsedCaseDetails = complaintTypeParseCaseDetails($detail['case_details'] ?? '');
 
     $stmt = $conn->prepare("
         SELECT participant_role, firstname, middlename, lastname, suffix, contact_number, address, age, sex, remarks
@@ -607,6 +609,8 @@ if ($action === 'detail') {
             'incident_place' => $detail['incident_place'] ?? '',
             'complaint_type' => $detail['complaint_type'] ?? '',
             'case_details' => $detail['case_details'] ?? '',
+            'complaint_narration' => $parsedCaseDetails['narration'] ?? '',
+            'complaint_detail_fields' => $parsedCaseDetails['fields'] ?? [],
             'case_remarks' => $detail['case_remarks'] ?? '',
             'status_name' => $detail['status_name'] ?? 'Pending',
             'level_name' => $detail['level_name'] ?? 'Complaint Only',

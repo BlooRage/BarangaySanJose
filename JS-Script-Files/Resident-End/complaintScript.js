@@ -5,6 +5,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const incidentDateError = document.getElementById("incidentDateError");
     const incidentTimeInput = form?.querySelector('input[name="incident_time"]') || null;
     const feedbackData = document.getElementById("complaintFeedbackData");
+    const complaintTypeConfig = (() => {
+        try {
+            return JSON.parse(feedbackData?.dataset.complaintTypeConfig || "{}");
+        } catch (error) {
+            return {};
+        }
+    })();
     const complainantAddressSystem = document.getElementById("complainantAddressSystem");
     const complainantHouseWrapper = document.getElementById("complainantHouseSystemWrapper");
     const complainantLotWrapper = document.getElementById("complainantLotBlockSystemWrapper");
@@ -16,8 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const natureOfComplaint = document.getElementById("natureOfComplaint") || form?.querySelector('select[name="nature_of_complaint"]') || null;
     const natureOther = document.getElementById("natureOther") || form?.querySelector('input[name="nature_other"]') || null;
     const natureOtherAsterisk = document.getElementById("natureOtherAsterisk");
+    const complaintTypeDynamicFields = document.getElementById("complaintTypeDynamicFields");
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="subject_contact_number"], input[name="witness_contact_number"]') || [];
     let isSubmitting = false;
+    let renderedComplaintType = "";
     const touchedFields = new WeakSet();
 
     if (!form || !submitBtn) {
@@ -57,6 +66,12 @@ document.addEventListener("DOMContentLoaded", () => {
             element.removeAttribute("required");
         }
     };
+
+    const escAttr = (value) => String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
     const ensureFeedbackEl = (input) => {
         if (!input) return null;
@@ -162,6 +177,132 @@ document.addEventListener("DOMContentLoaded", () => {
             const feedback = ensureFeedbackEl(natureOther);
             if (feedback) feedback.textContent = "";
         }
+    };
+
+    const renderComplaintTypeFields = () => {
+        if (!complaintTypeDynamicFields || !natureOfComplaint) return;
+        const selectedType = String(natureOfComplaint.value || "").trim();
+        const definition = complaintTypeConfig?.[selectedType];
+        const fields = Array.isArray(definition?.fields) ? definition.fields : [];
+
+        if (!selectedType || !fields.length) {
+            complaintTypeDynamicFields.innerHTML = "";
+            complaintTypeDynamicFields.classList.add("d-none");
+            renderedComplaintType = "";
+            return;
+        }
+
+        if (renderedComplaintType === selectedType) {
+            return;
+        }
+
+        complaintTypeDynamicFields.classList.remove("d-none");
+        const renderField = (field, forceFullWidth = false) => {
+            const name = String(field.name || "");
+            const label = String(field.label || name);
+            const required = !!field.required;
+            const asterisk = required ? ' <span class="required-asterisk">*</span>' : "";
+            const wrapperClass = forceFullWidth ? ' class="full-width"' : "";
+            if (String(field.type || "text") === "select") {
+                const options = Array.isArray(field.options) ? field.options : [];
+                return `
+                    <div${wrapperClass}>
+                        <label class="top-label" for="${escAttr(name)}">${label}${asterisk}</label>
+                        <select id="${escAttr(name)}" name="${escAttr(name)}" data-dynamic-complaint-field="true">
+                            <option value="">Select</option>
+                            ${options.map((option) => `<option value="${escAttr(option)}">${option}</option>`).join("")}
+                        </select>
+                    </div>
+                `;
+            }
+            if (String(field.type || "text") === "textarea") {
+                return `
+                    <div class="full-width">
+                        <label class="top-label" for="${escAttr(name)}">${label}${asterisk}</label>
+                        <textarea id="${escAttr(name)}" name="${escAttr(name)}" rows="4" placeholder="${escAttr(field.placeholder || "")}" data-dynamic-complaint-field="true"></textarea>
+                    </div>
+                `;
+            }
+            return `
+                <div${wrapperClass}>
+                    <label class="top-label" for="${escAttr(name)}">${label}${asterisk}</label>
+                    <input type="text" id="${escAttr(name)}" name="${escAttr(name)}" placeholder="${escAttr(field.placeholder || "")}" data-dynamic-complaint-field="true">
+                </div>
+            `;
+        };
+
+        const htmlParts = [];
+        for (let index = 0; index < fields.length; index += 2) {
+            const field = fields[index];
+            const nextField = fields[index + 1] || null;
+            const fieldType = String(field?.type || "text");
+
+            if (fieldType === "textarea") {
+                htmlParts.push(`
+                    <div class="form-row">
+                        ${renderField(field, true)}
+                    </div>
+                `);
+                continue;
+            }
+
+            if (!nextField) {
+                htmlParts.push(`
+                    <div class="form-row">
+                        ${renderField(field, true)}
+                    </div>
+                `);
+                continue;
+            }
+
+            const nextIsTextarea = String(nextField?.type || "text") === "textarea";
+            if (nextIsTextarea) {
+                htmlParts.push(`
+                    <div class="form-row">
+                        ${renderField(field, true)}
+                    </div>
+                `);
+                htmlParts.push(`
+                    <div class="form-row">
+                        ${renderField(nextField, true)}
+                    </div>
+                `);
+                continue;
+            }
+
+            htmlParts.push(`
+                <div class="form-row two-col-row">
+                    ${renderField(field, false)}
+                    ${renderField(nextField, false)}
+                </div>
+            `);
+        }
+
+        complaintTypeDynamicFields.innerHTML = htmlParts.join("");
+
+        complaintTypeDynamicFields.querySelectorAll("[data-dynamic-complaint-field='true']").forEach((field, index) => {
+            const fieldName = String(field.getAttribute("name") || "");
+            const fieldDef = fields.find((item) => String(item.name || "") === fieldName);
+            setRequired(field, !!fieldDef?.required);
+            field.addEventListener("input", () => {
+                touchedFields.add(field);
+                renderValidity(field);
+                updateState();
+            });
+            field.addEventListener("change", () => {
+                touchedFields.add(field);
+                renderValidity(field);
+                updateState();
+            });
+            field.addEventListener("blur", () => {
+                touchedFields.add(field);
+                renderValidity(field);
+            });
+            if (index === 0) {
+                field.autocomplete = "off";
+            }
+        });
+        renderedComplaintType = selectedType;
     };
 
     const isVisibleField = (field) => {
@@ -290,6 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         applyAddressSystem();
         syncNatureOfComplaint();
+        renderComplaintTypeFields();
         syncIncidentBounds();
         validateIncidentDate();
         validateIncidentTime();
@@ -397,6 +539,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     syncIncidentBounds();
     syncNatureOfComplaint();
+    renderComplaintTypeFields();
     updateState();
 
     window.addEventListener("pageshow", () => {

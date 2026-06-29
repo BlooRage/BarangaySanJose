@@ -27,6 +27,7 @@ if (!function_exists('db_request_expects_json')) {
         }
 
         return false;
+        return false;
     }
 }
 

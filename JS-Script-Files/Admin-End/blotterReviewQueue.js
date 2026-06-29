@@ -85,6 +85,15 @@
     `;
   }
 
+  function renderComplaintSpecificFieldGrid(fields) {
+    const clean = (Array.isArray(fields) ? fields : []).filter((field) => field && String(field.value ?? '').trim() !== '');
+    if (!clean.length) return '';
+    return renderFieldGrid(clean.map((field) => ({
+      label: field.label || field.name || 'Detail',
+      value: field.value || '-',
+    })), 2);
+  }
+
   function renderFieldGrid(fields, cols = 2) {
     const clean = fields.filter((f) => f && String(f.value ?? '').trim() !== '');
     if (!clean.length) return '';
@@ -255,6 +264,7 @@
       const d = data.detail || {};
       currentDetail = d;
       setActionButtonsState(d);
+      const complaintSpecificGrid = renderComplaintSpecificFieldGrid(d.complaint_detail_fields || []);
 
       viewDetailsBody.innerHTML = [
         formSection('Request Summary', [
@@ -288,8 +298,9 @@
             { label: 'Screening Notes', value: d.screening_notes || '-' },
             { label: 'Case Remarks', value: d.case_remarks || '-' },
           ], 1),
+          complaintSpecificGrid ? complaintSpecificGrid : '',
           renderFieldGrid([
-            { label: 'Complaint Narration', value: d.case_details || '-' },
+            { label: 'Complaint Narration', value: d.complaint_narration || d.case_details || '-' },
           ], 1),
         ].join('')),
         formSection('Participants', [

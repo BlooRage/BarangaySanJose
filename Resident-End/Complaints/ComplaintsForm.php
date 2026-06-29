@@ -17,6 +17,7 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/complaintTypeDetails.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $data = getResidentProfileData($conn, $userId);
@@ -103,6 +104,7 @@ $ageReadonly = $complainantAge !== '' ? 'readonly' : '';
 $sexReadonly = $complainantSex !== '' ? 'readonly' : '';
 $contactReadonly = $complainantContactNumber !== '' ? 'readonly' : '';
 $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
+$complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfig(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -258,6 +260,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                     id="complaintFeedbackData"
                     data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
                     data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
+                    data-complaint-type-config="<?= $complaintTypeConfigJson ?>"
                     hidden
                 ></div>
 
@@ -370,6 +373,8 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         </div>
                     </div>
 
+                    <div id="complaintTypeDynamicFields" class="d-none"></div>
+
                     <div class="form-row two-col-row">
                         <div class="">
                             <label class="top-label">Date of the Incident <span class="required-asterisk">*</span></label>
@@ -397,7 +402,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         </div>
                     </div>
 
-                    <h2 class="section-title text-center text-dark">Witness Information</h2>
+                    <h2 class="section-title text-center text-dark">Witness Information <span class="text-muted fs-6">(Optional)</span></h2>
 
                     <div class="form-row two-col-row">
                         <div>

@@ -625,6 +625,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       `;
     }
 
+    function renderComplaintSpecificFields(fields) {
+      const clean = (Array.isArray(fields) ? fields : []).filter((field) => field && String(field.value || "").trim() !== "");
+      if (!clean.length) return "";
+      return renderFieldGrid(clean.map((field) => ({
+        label: field.label || field.name || "Detail",
+        value: field.value || "-",
+      })), 2);
+    }
+
     function getFilteredComplaints() {
       const search = String(document.getElementById("complaintSearch").value || "").toLowerCase().trim();
       const status = String(document.getElementById("complaintStatusFilter").value || "").trim().toLowerCase();
@@ -697,6 +706,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             { label: "Known Address / Location", value: item.subject_address || "-" },
           ], 1),
         ].join("")),
+        item.complaint_detail_fields && item.complaint_detail_fields.length
+          ? formSection("Complaint-Specific Information", renderComplaintSpecificFields(item.complaint_detail_fields))
+          : "",
         formSection("Witness Information", renderFieldGrid([
           { label: "Witness Summary", value: item.witness_summary || "-" },
         ], 1)),
@@ -709,7 +721,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             { label: "Escalated to Blotter", value: blotterText },
           ], 2),
           renderFieldGrid([
-            { label: "Resident Narration", value: item.case_details || "-" },
+            { label: "Resident Narration", value: item.complaint_narration || item.case_details || "-" },
           ], 1),
           renderFieldGrid([
             { label: "Screening Notes", value: item.screening_notes || "-" },
