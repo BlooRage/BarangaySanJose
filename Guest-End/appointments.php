@@ -20,16 +20,8 @@ $formValues = [
     'last_name' => '',
     'suffix_name' => '',
     'contact_number' => '',
+    'current_address' => '',
     'email_address' => '',
-    'address_system' => '',
-    'unit_number' => '',
-    'house_number' => '',
-    'street_name' => '',
-    'lot_number' => '',
-    'block_number' => '',
-    'phase_number' => '',
-    'subdivision' => '',
-    'area_number' => '',
     'official_user_id' => trim((string)($_GET['official_user_id'] ?? '')),
     'subject' => '',
     'subject_other' => '',
@@ -37,8 +29,6 @@ $formValues = [
     'appointment_time' => '',
     'purpose' => '',
 ];
-
-$guestAreaOptions = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
 
 $appointmentSettings = aps_settings_load($conn);
 $bookingLimits = aps_booking_date_limits($appointmentSettings);
@@ -72,6 +62,15 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
         return $userId !== '';
     }))
 );
+
+$contactNumberFieldValue = preg_replace('/\D+/', '', (string)($formValues['contact_number'] ?? ''));
+if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
+    $contactNumberFieldValue = $phoneMatch[1];
+} elseif (preg_match('/^0(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
+    $contactNumberFieldValue = $phoneMatch[1];
+} elseif (!preg_match('/^9\d{9}$/', $contactNumberFieldValue)) {
+    $contactNumberFieldValue = '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -437,19 +436,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             display: none !important;
         }
 
-        .process-step-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.32rem 0.7rem;
-            border-radius: 999px;
-            background: #fff4e6;
-            color: var(--guest-accent-dark);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
-
         .process-stage-actions,
         .verification-stage {
             margin-top: 1.5rem;
@@ -475,7 +461,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             display: none !important;
         }
 
-        .process-stage-heading--submit {
+        .process-stage-heading {
             margin-top: 1.35rem;
         }
 
@@ -601,56 +587,40 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
         .page-return-btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.55rem;
-            margin-bottom: 0.9rem;
-            padding: 0;
-            background: transparent;
+            gap: 0.75rem;
+            min-height: 56px;
+            margin-bottom: 1.1rem;
+            padding: 0.95rem 1.9rem;
+            border-radius: 999px;
+            background: #f7efe3;
             color: var(--guest-accent-dark);
             text-decoration: none;
+            font-family: 'Geist', sans-serif;
+            font-size: 0.95rem;
             font-weight: 700;
             box-shadow: none;
-            transition: color 0.18s ease, transform 0.18s ease;
+            transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
         }
 
         .page-return-btn i {
-            font-size: 0.95rem;
+            font-size: 1.1rem;
             transition: transform 0.18s ease;
         }
 
         .page-return-btn:hover,
-        .page-return-btn:focus {
-            background: transparent;
-            color: var(--guest-accent-dark);
-            transform: translateX(-2px);
+        .page-return-btn:focus-visible {
+            background: #f2e4d2;
+            color: #b96416;
+            transform: translateY(-1px);
         }
 
         .page-return-btn:hover i,
-        .page-return-btn:focus i {
+        .page-return-btn:focus-visible i {
             transform: translateX(-1px);
         }
 
-        .form-kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            margin-bottom: 0.85rem;
-            padding: 0.38rem 0.78rem;
-            border-radius: 999px;
-            background: #fff3e1;
-            color: var(--guest-accent-dark);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .form-kicker::before {
-            content: "";
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 999px;
-            background: linear-gradient(135deg, var(--guest-accent-dark), var(--guest-accent));
-            box-shadow: 0 0 0 4px rgba(254, 153, 60, 0.12);
+        .page-return-btn:focus-visible {
+            outline: 0;
         }
 
         .hero-layout {
@@ -746,53 +716,74 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
         }
 
         .guest-card-header {
-            margin-bottom: 1.8rem;
-            padding-bottom: 1.35rem;
+            margin-bottom: 1.1rem;
+            padding-bottom: 0.95rem;
             border-bottom: 1px solid rgba(254, 153, 60, 0.16);
         }
 
         .guest-card-header > div {
-            max-width: 780px;
+            max-width: none;
         }
 
         .guest-card-header h2 {
-            margin-bottom: 0.15rem;
-            font-size: clamp(2.35rem, 4vw, 3.5rem);
-            line-height: 0.98;
-            letter-spacing: -0.05em;
+            margin-bottom: 0.3rem;
+            font-size: clamp(2rem, 2.8vw, 2.7rem);
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            max-width: none;
         }
 
         .guest-card-header p {
-            margin: 0.5rem 0 0;
-            max-width: 58ch;
-            font-size: 1.02rem;
-            line-height: 1.65;
+            margin: 0.35rem 0 0;
+            max-width: 82ch;
+            font-size: 0.97rem;
+            line-height: 1.55;
+        }
+
+        .page-form {
+            display: grid;
+            gap: 1.2rem;
+        }
+
+        .form-section-card {
+            padding: 1.45rem 1.5rem 1.55rem;
+            border: 1px solid rgba(254, 153, 60, 0.14);
+            border-radius: 1.35rem;
+            background:
+                linear-gradient(180deg, rgba(255, 249, 242, 0.95) 0%, #ffffff 100%);
+            box-shadow: 0 16px 32px rgba(58, 39, 23, 0.06);
+        }
+
+        .form-section-card--otp {
+            background:
+                radial-gradient(circle at top right, rgba(255, 224, 193, 0.46), rgba(255, 224, 193, 0) 32%),
+                linear-gradient(180deg, rgba(255, 249, 242, 0.98) 0%, #ffffff 100%);
+        }
+
+        .form-section-card .form-row {
+            margin-bottom: 1rem;
+        }
+
+        .form-section-card .form-row:last-of-type {
+            margin-bottom: 0;
         }
 
         .section-heading {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin: 2rem 0 0.45rem;
-            font-size: clamp(1.35rem, 2vw, 1.8rem);
-            color: var(--guest-accent-dark);
+            display: block;
+            margin: 0 0 0.35rem;
+            font-family: 'Charis SIL Bold', serif;
+            font-size: 1.65rem;
+            font-weight: 600;
+            color: #212529;
+            text-align: left;
         }
 
-        .section-heading::before,
-        .address-ui-title::before {
-            content: "";
-            flex: 0 0 2.25rem;
-            height: 0.24rem;
-            border-radius: 999px;
-            background: linear-gradient(90deg, var(--guest-accent-dark), var(--guest-accent));
-        }
-
-        .section-caption,
-        .address-ui-caption {
-            margin: 0 0 1rem;
-            max-width: 60ch;
-            font-size: 0.97rem;
-            line-height: 1.65;
+        .section-caption {
+            margin: 0 0 1.15rem;
+            max-width: 56ch;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            text-align: left;
         }
 
         .otp-panel {
@@ -852,6 +843,90 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             min-height: 118px;
         }
 
+        .phone-input-group {
+            display: flex;
+            align-items: stretch;
+            width: 100%;
+        }
+
+        .phone-input-prefix {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 72px;
+            padding: 0.8rem 0.95rem;
+            border: 1px solid rgba(120, 96, 72, 0.26);
+            border-right: 0;
+            border-radius: 0.9rem 0 0 0.9rem;
+            background: #fffaf3;
+            color: var(--guest-accent-dark);
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .phone-input-group .form-control {
+            border-radius: 0 0.9rem 0.9rem 0 !important;
+        }
+
+        .phone-input-group:focus-within .phone-input-prefix {
+            border-color: rgba(254, 153, 60, 0.78);
+            box-shadow: 0 0 0 0.18rem rgba(254, 153, 60, 0.16);
+        }
+
+        #appointmentDate.form-control {
+            background-color: #ffffff !important;
+            color: var(--guest-ink);
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy {
+            background: #ffffff !important;
+            border-color: rgba(120, 96, 72, 0.26) !important;
+            color: var(--guest-ink) !important;
+            box-shadow: none !important;
+            -webkit-text-fill-color: var(--guest-ink);
+        }
+
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy[readonly],
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy:hover,
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy:focus {
+            background: #ffffff !important;
+            color: var(--guest-ink) !important;
+            -webkit-text-fill-color: var(--guest-ink);
+        }
+
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy-icon {
+            color: #6b7c93 !important;
+        }
+
+        .resident-date-modal .resident-date-calendar-day.is-selected,
+        .resident-date-modal .resident-date-calendar-day.is-selected:hover,
+        .resident-date-modal .resident-date-calendar-day.is-selected:focus,
+        .resident-date-modal .resident-date-calendar-day.is-selected.is-today {
+            background: linear-gradient(180deg, #f97316 0%, #ea580c 100%) !important;
+            background-color: #ea580c !important;
+            border-color: #ea580c !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff;
+            box-shadow: 0 10px 20px rgba(234, 88, 12, 0.18) !important;
+        }
+
+        #appointmentDate::-webkit-date-and-time-value,
+        #appointmentDate::-webkit-datetime-edit,
+        #appointmentDate::-webkit-datetime-edit-text,
+        #appointmentDate::-webkit-datetime-edit-month-field,
+        #appointmentDate::-webkit-datetime-edit-day-field,
+        #appointmentDate::-webkit-datetime-edit-year-field {
+            color: var(--guest-ink);
+        }
+
+        #appointmentDate:invalid::-webkit-datetime-edit {
+            color: var(--guest-ink);
+            opacity: 1;
+        }
+
         .page-form .form-control:focus,
         .page-form .form-select:focus,
         .page-form textarea:focus {
@@ -859,56 +934,28 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             box-shadow: 0 0 0 0.18rem rgba(254, 153, 60, 0.16);
         }
 
-        .page-form .form-divider {
-            margin: 1.5rem 0 1.2rem;
-            color: rgba(254, 153, 60, 0.24);
-        }
-
-        .address-ui-card {
-            border: none !important;
-            border-radius: 0;
-            background: transparent !important;
-            padding: 0;
-            box-shadow: none !important;
-        }
-
-        .address-ui-title {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-family: 'Charis SIL Bold', serif;
-            font-size: clamp(1.35rem, 2vw, 1.8rem);
-            color: var(--guest-accent-dark);
-            margin: 0 0 0.45rem;
-        }
-
-        .address-ui-caption {
+        .field-helper {
+            margin-top: 0.45rem;
             color: var(--guest-muted);
             font-size: 0.92rem;
-            margin-bottom: 0.85rem;
+            line-height: 1.55;
         }
 
-        .address-system-panel {
-            border: none !important;
-            border-radius: 0;
-            background: transparent !important;
-            padding: 0;
-            box-shadow: none !important;
+        .otp-recipient-card {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            padding: 0.85rem 1rem;
+            border: 1px solid rgba(120, 96, 72, 0.26);
+            border-radius: 0.9rem;
+            background: #ffffff;
+            color: var(--guest-ink);
+            font-weight: 700;
         }
 
-        .address-system-panel-title {
-            font-size: 0.84rem;
-            font-weight: 800;
+        .otp-recipient-card.is-empty {
             color: var(--guest-muted);
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            margin-bottom: 0.75rem;
-        }
-
-        .readonly-highlight {
-            background-color: #f3f4f6 !important;
-            color: #6b7280 !important;
-            border-color: #d1d5db !important;
+            font-weight: 500;
         }
 
         .process-next-btn,
@@ -997,13 +1044,225 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             border-top: 1px solid rgba(254, 153, 60, 0.16);
         }
 
+        .appointment-modal--otp .modal-dialog {
+            max-width: 760px;
+            margin: 1.5rem auto;
+        }
+
+        .appointment-modal--otp .modal-content {
+            border-radius: 1.9rem;
+            border: 1px solid rgba(254, 153, 60, 0.42);
+            box-shadow: 0 28px 72px rgba(58, 39, 23, 0.22);
+            max-height: calc(100vh - 3rem);
+        }
+
+        .appointment-modal--otp .modal-header {
+            padding: 1.35rem 1.55rem 1.05rem;
+        }
+
+        .appointment-modal--otp .modal-title {
+            font-size: clamp(1.7rem, 2.2vw, 2.25rem);
+            line-height: 1.02;
+        }
+
+        .appointment-modal--otp .btn-close {
+            width: 2.4rem;
+            height: 2.4rem;
+            border-radius: 999px;
+            background-color: rgba(254, 153, 60, 0.1);
+            opacity: 1;
+        }
+
+        .appointment-modal--otp .modal-body {
+            padding: 1.45rem 1.55rem 1.6rem;
+            background:
+                radial-gradient(circle at top right, rgba(255, 224, 193, 0.28), rgba(255, 224, 193, 0) 32%),
+                linear-gradient(180deg, rgba(255, 249, 242, 0.98) 0%, #ffffff 100%);
+            overflow-y: auto;
+        }
+
+        .appointment-modal--otp .agreement-row {
+            margin-bottom: 0;
+        }
+
+        .otp-modal-shell {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .otp-modal-intro {
+            margin: 0;
+            max-width: 34rem;
+            color: var(--guest-muted);
+            font-size: 0.95rem;
+            line-height: 1.65;
+        }
+
+        .otp-modal-card {
+            padding: 1.15rem 1.2rem;
+            border-radius: 1.35rem;
+            border: 1px solid rgba(254, 153, 60, 0.18);
+            background: rgba(255, 255, 255, 0.84);
+            box-shadow: 0 10px 24px rgba(58, 39, 23, 0.05);
+        }
+
+        .otp-panel-header--modal {
+            margin-bottom: 0.95rem;
+        }
+
+        .otp-panel-header--modal p {
+            margin-top: 0;
+            max-width: 32rem;
+        }
+
+        .otp-recipient-card {
+            min-height: 60px;
+            gap: 0.85rem;
+            padding: 0.95rem 1rem;
+            border-color: rgba(254, 153, 60, 0.2);
+            border-radius: 1rem;
+            background: linear-gradient(180deg, #ffffff 0%, #fff8f1 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+
+        .otp-recipient-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 999px;
+            background: rgba(254, 153, 60, 0.14);
+            color: var(--guest-accent-dark);
+            flex: 0 0 auto;
+        }
+
+        .otp-recipient-value {
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+        }
+
+        .otp-helper {
+            margin-top: 0.65rem;
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .appointment-modal--otp .otp-actions,
+        .appointment-modal--otp .otp-verify-row {
+            gap: 1rem;
+        }
+
+        .appointment-modal--otp .otp-actions {
+            align-items: stretch;
+        }
+
+        .appointment-modal--otp .otp-actions .btn,
+        .appointment-modal--otp .otp-verify-row .btn {
+            min-height: 56px;
+            padding-inline: 1.35rem;
+            border-radius: 1rem;
+        }
+
+        .appointment-modal--otp .otp-verify-row {
+            padding: 1rem;
+            border-radius: 1.2rem;
+            background: rgba(255, 247, 237, 0.9);
+            border: 1px solid rgba(254, 153, 60, 0.16);
+        }
+
+        .appointment-modal--otp .otp-feedback,
+        .appointment-modal--otp .otp-error {
+            margin-top: 0.9rem;
+            padding: 0.8rem 0.95rem;
+            border-radius: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .appointment-modal--otp .otp-feedback {
+            background: rgba(31, 122, 79, 0.1);
+            border: 1px solid rgba(31, 122, 79, 0.14);
+        }
+
+        .appointment-modal--otp .otp-error {
+            background: rgba(180, 35, 24, 0.08);
+            border: 1px solid rgba(180, 35, 24, 0.12);
+        }
+
+        .otp-cert-card {
+            padding: 1.05rem 1.1rem 1.15rem;
+            border-radius: 1.35rem;
+            border: 1px solid rgba(254, 153, 60, 0.16);
+            background: rgba(255, 255, 255, 0.86);
+        }
+
+        .otp-cert-copy {
+            margin: 0 0 0.7rem;
+            color: var(--guest-muted);
+            line-height: 1.62;
+        }
+
+        .appointment-modal--otp .agreement-row {
+            margin-top: 0;
+            padding-top: 1rem;
+        }
+
+        .appointment-modal--otp .agreement-row .check-item {
+            gap: 0.85rem;
+            align-items: flex-start;
+        }
+
+        .appointment-modal--otp .agreement-row .check-item input {
+            width: 1.18rem;
+            height: 1.18rem;
+            margin-top: 0.15rem;
+            flex: 0 0 auto;
+            position: static !important;
+            border-radius: 0.28rem !important;
+            border: 1px solid rgba(120, 96, 72, 0.34) !important;
+            background: #ffffff !important;
+            box-shadow: none !important;
+            transform: none !important;
+            appearance: auto !important;
+            -webkit-appearance: checkbox !important;
+            accent-color: var(--guest-accent);
+        }
+
+        .appointment-modal--otp .agreement-row .check-item input::before,
+        .appointment-modal--otp .agreement-row .check-item input::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .appointment-modal--otp .submit-btn {
+            min-width: 280px;
+        }
+
+        @media (max-width: 767.98px) {
+            .appointment-modal--otp .modal-header,
+            .appointment-modal--otp .modal-body {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .appointment-modal--otp .otp-actions,
+            .appointment-modal--otp .otp-verify-row {
+                grid-template-columns: 1fr;
+            }
+
+            .appointment-modal--otp .submit-btn {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+
+        .verification-stage {
+            margin-top: 0;
+        }
+
         @media (max-width: 767.98px) {
             .guest-main {
                 padding: 1.35rem 1rem 2.5rem;
-            }
-
-            .form-kicker {
-                margin-bottom: 0.7rem;
             }
 
             .guest-card-header {
@@ -1012,22 +1271,20 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             }
 
             .guest-card-header h2 {
-                font-size: 2.2rem;
+                font-size: 2rem;
             }
 
             .hero-copy {
                 padding: 1.2rem 1rem;
             }
 
-            .section-heading,
-            .address-ui-title {
-                gap: 0.6rem;
-                font-size: 1.28rem;
+            .form-section-card {
+                padding: 1.15rem 1rem 1.2rem;
+                border-radius: 1.1rem;
             }
 
-            .section-heading::before,
-            .address-ui-title::before {
-                flex-basis: 1.6rem;
+            .section-heading {
+                font-size: 1.35rem;
             }
 
             .agreement-row {
@@ -1093,7 +1350,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                                 <i class="bi bi-arrow-left"></i>
                                 Return to Services
                             </a>
-                            <div class="form-kicker">Guest Booking</div>
                             <h2>Guest Appointment Form</h2>
                             <p>All fields marked with <span class="required-asterisk">*</span> are required. Complete OTP verification before submitting the request.</p>
                         </div>
@@ -1109,6 +1365,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                         <?= csrfTokenField() ?>
                         <input type="hidden" name="action" value="submit_guest_appointment">
 
+                        <section class="form-section-card">
                         <h3 class="section-heading">Guest Information</h3>
                         <p class="section-caption">Enter the person who will attend or represent the booking.</p>
 
@@ -1139,112 +1396,38 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
                         <div class="form-row">
                             <div class="full-width">
-                                <div class="address-ui-card">
-                                    <div class="address-ui-title">Current Address</div>
-                                    <div class="address-ui-caption">Optional. If you want to include your address, use the current address system below.</div>
-                                    <div class="row g-3">
-                                        <div class="col-12">
-                                            <div class="input-stack">
-                                                <label class="top-label" for="guestAddressSystem">Address System</label>
-                                                <select class="form-select" name="address_system" id="guestAddressSystem">
-                                                    <option value="" <?= $formValues['address_system'] === '' ? 'selected' : '' ?>>Select</option>
-                                                    <option value="house" <?= $formValues['address_system'] === 'house' ? 'selected' : '' ?>>House Numbering System</option>
-                                                    <option value="lot_block" <?= $formValues['address_system'] === 'lot_block' ? 'selected' : '' ?>>Lot/Block System</option>
-                                                </select>
-                                            </div>
-                                        </div>
+                                <label class="top-label" for="guestCurrentAddress">Current Address <span class="required-asterisk">*</span></label>
+                                <textarea
+                                    class="form-control"
+                                    id="guestCurrentAddress"
+                                    name="current_address"
+                                    rows="3"
+                                    placeholder="House number, street, barangay, municipality/city, province"
+                                    required
+                                ><?= htmlspecialchars($formValues['current_address'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                <div class="field-helper">Enter the full current address of the person who will attend the appointment.</div>
+                            </div>
+                        </div>
 
-                                        <div class="col-12<?= $formValues['address_system'] === 'house' ? '' : ' d-none' ?>" id="guestHouseSystemWrap">
-                                            <div class="address-system-panel">
-                                                <div class="address-system-panel-title">House Numbering System</div>
-                                                <div class="row g-3">
-                                                    <div class="col-md-4">
-                                                        <div class="input-stack">
-                                                            <label class="top-label" for="guestUnitNumber">Unit / Apartment Number</label>
-                                                            <input class="form-control" id="guestUnitNumber" name="unit_number" maxlength="50" value="<?= htmlspecialchars($formValues['unit_number'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="input-stack">
-                                                            <label class="top-label" for="guestHouseNumber">House Number <span class="required-asterisk">*</span></label>
-                                                            <input class="form-control" id="guestHouseNumber" name="house_number" maxlength="50" value="<?= htmlspecialchars($formValues['house_number'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="input-stack">
-                                                            <label class="top-label" for="guestStreetName">Street Name <span class="required-asterisk">*</span></label>
-                                                            <input class="form-control" id="guestStreetName" name="street_name" maxlength="150" value="<?= htmlspecialchars($formValues['street_name'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-12<?= $formValues['address_system'] === 'lot_block' ? '' : ' d-none' ?>" id="guestLotBlockSystemWrap">
-                                            <div class="address-system-panel">
-                                                <div class="address-system-panel-title">Lot/Block System</div>
-                                                <div class="row g-3">
-                                                    <div class="col-md-4">
-                                                        <div class="input-stack">
-                                                            <label class="top-label" for="guestLotNumber">Lot <span class="required-asterisk">*</span></label>
-                                                            <input class="form-control" id="guestLotNumber" name="lot_number" maxlength="50" value="<?= htmlspecialchars($formValues['lot_number'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="input-stack">
-                                                            <label class="top-label" for="guestBlockNumber">Block <span class="required-asterisk">*</span></label>
-                                                            <input class="form-control" id="guestBlockNumber" name="block_number" maxlength="50" value="<?= htmlspecialchars($formValues['block_number'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="input-stack">
-                                                            <label class="top-label" for="guestPhaseNumber">Phase <span class="required-asterisk">*</span></label>
-                                                            <input class="form-control" id="guestPhaseNumber" name="phase_number" maxlength="50" value="<?= htmlspecialchars($formValues['phase_number'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <div class="input-stack">
-                                                <label class="top-label" for="guestSubdivision">Subdivision</label>
-                                                <input class="form-control" id="guestSubdivision" name="subdivision" maxlength="150" value="<?= htmlspecialchars($formValues['subdivision'], ENT_QUOTES, 'UTF-8') ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="input-stack">
-                                                <label class="top-label" for="guestAreaNumber">Area</label>
-                                                <select class="form-select" id="guestAreaNumber" name="area_number">
-                                                    <option value="" <?= $formValues['area_number'] === '' ? 'selected' : '' ?>>Select</option>
-                                                    <?php foreach ($guestAreaOptions as $areaOption): ?>
-                                                        <option value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>" <?= $formValues['area_number'] === $areaOption ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="input-stack">
-                                                <label class="top-label" for="guestBarangay">Barangay</label>
-                                                <input class="form-control readonly-highlight" id="guestBarangay" name="barangay" value="Barangay San Jose" readonly>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="input-stack">
-                                                <label class="top-label" for="guestMunicipalityCity">Municipality / City</label>
-                                                <input class="form-control readonly-highlight" id="guestMunicipalityCity" name="municipality_city" value="Rodriguez" readonly>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="input-stack">
-                                                <label class="top-label" for="guestProvince">Province</label>
-                                                <input class="form-control readonly-highlight" id="guestProvince" name="province" value="Rizal" readonly>
-                                            </div>
-                                        </div>
-                                    </div>
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label" for="guestContactNumber">Mobile Number <span class="required-asterisk">*</span></label>
+                                <div class="phone-input-group">
+                                    <span class="phone-input-prefix">+63</span>
+                                    <input
+                                        type="text"
+                                    class="form-control"
+                                    id="guestContactNumber"
+                                    name="contact_number"
+                                    inputmode="numeric"
+                                    autocomplete="tel-national"
+                                    maxlength="10"
+                                    placeholder="9XXXXXXXXX"
+                                    value="<?= htmlspecialchars($contactNumberFieldValue, ENT_QUOTES, 'UTF-8') ?>"
+                                    required
+                                    >
                                 </div>
+                                <div class="field-helper">Use your mobile number after +63. This will be used for OTP verification and appointment updates.</div>
                             </div>
                         </div>
 
@@ -1254,9 +1437,9 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                                 <input type="email" class="form-control" id="guestEmailAddress" name="email_address" value="<?= htmlspecialchars($formValues['email_address'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Optional">
                             </div>
                         </div>
+                        </section>
 
-                        <hr class="form-divider">
-
+                        <section class="form-section-card">
                         <h3 class="section-heading">Appointment Details</h3>
                         <p class="section-caption">Pick the council member, available schedule, and the reason for your visit.</p>
 
@@ -1290,31 +1473,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
                         <div class="form-row two-col-row">
                             <div>
-                                <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
-                                <select class="form-select" name="subject" id="appointmentSubject" required>
-                                    <option value="">Select</option>
-                                    <option value="follow_up" <?= $formValues['subject'] === 'follow_up' ? 'selected' : '' ?>>Follow-up Concern</option>
-                                    <option value="consultation" <?= $formValues['subject'] === 'consultation' ? 'selected' : '' ?>>Consultation</option>
-                                    <option value="event_coordination" <?= $formValues['subject'] === 'event_coordination' ? 'selected' : '' ?>>Event Coordination</option>
-                                    <option value="other" <?= $formValues['subject'] === 'other' ? 'selected' : '' ?>>Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="top-label">If Other, please specify</label>
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="subject_other"
-                                    id="appointmentSubjectOther"
-                                    value="<?= htmlspecialchars($formValues['subject_other'], ENT_QUOTES, 'UTF-8') ?>"
-                                    maxlength="150"
-                                >
-                                <div id="appointmentSubjectOtherError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
-                            </div>
-                        </div>
-
-                        <div class="form-row two-col-row">
-                            <div>
                                 <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
                                 <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?= htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8') ?>" data-year-end="<?= htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8') ?>" data-date-disabled-weekdays="<?= htmlspecialchars(implode(',', $disabledWeekdays), ENT_QUOTES, 'UTF-8') ?>" data-date-disabled-dates="<?= htmlspecialchars(implode(',', $unavailableDates), ENT_QUOTES, 'UTF-8') ?>" data-available-weekdays="<?= htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>" data-date-modal-style="calendar" placeholder="Select date" value="<?= htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8') ?>" required>
                                 <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
@@ -1325,6 +1483,34 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                                     <option value="">Select council member and date first</option>
                                 </select>
                                 <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
+                                <select class="form-select" name="subject" id="appointmentSubject" required>
+                                    <option value="">Select</option>
+                                    <option value="follow_up" <?= $formValues['subject'] === 'follow_up' ? 'selected' : '' ?>>Follow-up Concern</option>
+                                    <option value="consultation" <?= $formValues['subject'] === 'consultation' ? 'selected' : '' ?>>Consultation</option>
+                                    <option value="event_coordination" <?= $formValues['subject'] === 'event_coordination' ? 'selected' : '' ?>>Event Coordination</option>
+                                    <option value="other" <?= $formValues['subject'] === 'other' ? 'selected' : '' ?>>Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row<?= $formValues['subject'] === 'other' ? '' : ' d-none' ?>" id="appointmentSubjectOtherWrap">
+                            <div class="full-width">
+                                <label class="top-label">If Other, please specify</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    name="subject_other"
+                                    id="appointmentSubjectOther"
+                                    value="<?= htmlspecialchars($formValues['subject_other'], ENT_QUOTES, 'UTF-8') ?>"
+                                    maxlength="150"
+                                >
+                                <div id="appointmentSubjectOtherError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                         </div>
 
@@ -1343,86 +1529,87 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                             </div>
                         </div>
 
+                        <div class="agreement-row">
+                            <label class="agreement-text check-item">
+                                <input type="checkbox" id="appointmentCertification" required>I hereby certify that the information provided is true and correct, and I understand that my mobile number will be used for appointment updates.
+                            </label>
+                        </div>
+
                         <div class="process-stage-actions" id="appointmentDetailsActions">
                             <div>
-                                <div class="process-step-badge">Step 1 of 3</div>
-                                <p class="process-stage-note">Complete the appointment details first, then continue to OTP verification.</p>
+                                <p class="process-stage-note">Confirm the statement above, then continue to OTP verification.</p>
                             </div>
                             <button type="button" class="btn process-next-btn" id="appointmentNextBtn" <?= $hasAppointmentAvailability ? '' : 'disabled' ?>>NEXT</button>
                         </div>
+                        </section>
 
-                        <div class="verification-stage" id="appointmentVerificationStage" hidden>
-                            <div class="process-step-badge">Step 2 of 3</div>
-
-                            <div class="otp-panel">
-                                <div class="otp-panel-header">
-                                    <div>
-                                        <h3>Mobile OTP Verification</h3>
-                                        <p>Use a reachable mobile number. The appointment cannot be submitted until this number is verified.</p>
+                        <div class="modal fade" id="appointmentVerificationStage" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                            <div class="modal-dialog modal-dialog-centered appointment-modal appointment-modal--otp">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Mobile OTP Verification</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
-                                    <div class="otp-verified-pill d-none" id="otpVerifiedPill">
-                                        <i class="bi bi-check-circle-fill"></i> Verified
+                                    <div class="modal-body">
+                                        <div class="otp-modal-shell">
+                                            <p class="otp-modal-intro">We will send a 6-digit code to the mobile number you entered above. The appointment cannot be submitted until that number is verified.</p>
+
+                                            <div class="otp-panel otp-modal-card">
+                                                <div class="otp-panel-header otp-panel-header--modal">
+                                                    <div>
+                                                        <h3>Send Code</h3>
+                                                        <p>Check the mobile number below before sending the OTP.</p>
+                                                    </div>
+                                                    <div class="otp-verified-pill d-none" id="otpVerifiedPill">
+                                                        <i class="bi bi-check-circle-fill"></i> Verified
+                                                    </div>
+                                                </div>
+
+                                                <div class="otp-actions">
+                                                    <div>
+                                                        <div class="top-label">Mobile Number for OTP</div>
+                                                        <div class="otp-recipient-card">
+                                                            <span class="otp-recipient-icon"><i class="bi bi-phone-fill"></i></span>
+                                                            <span class="otp-recipient-value" id="otpRecipientPreview">Enter your mobile number above first.</span>
+                                                        </div>
+                                                        <div class="otp-helper">If you need to change it, use the mobile number field in Guest Information.</div>
+                                                    </div>
+                                                    <div class="d-flex gap-2 flex-wrap">
+                                                        <button type="button" class="btn appointment-outline-btn" id="sendOtpBtn">Send OTP</button>
+                                                        <button type="button" class="btn appointment-soft-btn d-none" id="changeOtpNumberBtn">Change Number</button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="otp-verify-row" id="otpVerifyRow" hidden>
+                                                    <div>
+                                                        <label class="top-label">Enter OTP <span class="required-asterisk">*</span></label>
+                                                        <input type="text" class="form-control" id="guestOtpInput" inputmode="numeric" maxlength="6" placeholder="6-digit OTP">
+                                                    </div>
+                                                    <div>
+                                                        <button type="button" class="btn w-100" id="verifyOtpBtn">Verify OTP</button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="otp-feedback d-none" id="otpFeedback" aria-live="polite"></div>
+                                                <div class="otp-error d-none" id="otpError" aria-live="polite"></div>
+                                            </div>
+
+                                            <div class="otp-cert-card">
+                                                <p class="otp-cert-copy">Once your mobile number is verified, you can confirm your appointment below.</p>
+                                                <button
+                                                    type="submit"
+                                                    class="submit-btn"
+                                                    data-default-label="CONFIRM APPOINTMENT"
+                                                    data-loading-label="Confirming..."
+                                                    <?= $hasAppointmentAvailability ? '' : 'disabled' ?>
+                                                >
+                                                    <span class="submit-btn-label">CONFIRM APPOINTMENT</span>
+                                                    <span class="submit-btn-spinner" aria-hidden="true"></span>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div class="otp-actions">
-                                    <div>
-                                        <label class="top-label">Mobile Number <span class="required-asterisk">*</span></label>
-                                        <input
-                                            type="text"
-                                            class="form-control"
-                                            id="guestContactNumber"
-                                            name="contact_number"
-                                            inputmode="numeric"
-                                            maxlength="11"
-                                            pattern="^09\\d{9}$"
-                                            title="Format: 09XXXXXXXXX"
-                                            placeholder="09XXXXXXXXX"
-                                            value="<?= htmlspecialchars($formValues['contact_number'], ENT_QUOTES, 'UTF-8') ?>"
-                                            required
-                                        >
-                                        <div class="otp-helper">OTP is sent through SMS using the entered mobile number.</div>
-                                    </div>
-                                    <div class="d-flex gap-2 flex-wrap">
-                                        <button type="button" class="btn appointment-outline-btn" id="sendOtpBtn">Send OTP</button>
-                                        <button type="button" class="btn appointment-soft-btn d-none" id="changeOtpNumberBtn">Change Number</button>
-                                    </div>
-                                </div>
-
-                                <div class="otp-verify-row" id="otpVerifyRow" hidden>
-                                    <div>
-                                        <label class="top-label">Enter OTP <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="guestOtpInput" inputmode="numeric" maxlength="6" placeholder="6-digit OTP">
-                                    </div>
-                                    <div>
-                                        <button type="button" class="btn w-100" id="verifyOtpBtn">Verify OTP</button>
-                                    </div>
-                                </div>
-
-                                <div class="otp-feedback d-none" id="otpFeedback" aria-live="polite"></div>
-                                <div class="otp-error d-none" id="otpError" aria-live="polite"></div>
-                            </div>
-
-                            <div class="process-stage-heading process-stage-heading--submit">
-                                <div class="process-step-badge">Step 3 of 3</div>
-                                <p class="process-stage-note">After your mobile number is verified, confirm the certification below and submit your appointment request.</p>
-                            </div>
-
-                            <div class="agreement-row">
-                                <label class="agreement-text check-item">
-                                    <input type="checkbox" required>I hereby certify that the information provided is true and that I understand the contact number above will be used for appointment updates.
-                                </label>
-
-                                <button
-                                    type="submit"
-                                    class="submit-btn"
-                                    data-default-label="SUBMIT APPOINTMENT"
-                                    data-loading-label="Submitting..."
-                                    <?= $hasAppointmentAvailability ? '' : 'disabled' ?>
-                                >
-                                    <span class="submit-btn-label">SUBMIT APPOINTMENT</span>
-                                    <span class="submit-btn-spinner" aria-hidden="true"></span>
-                                </button>
                             </div>
                         </div>
                     </form>
@@ -1474,11 +1661,16 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
         <div class="modal-dialog modal-dialog-centered appointment-modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Appointment Confirmed</h5>
+                    <h5 class="modal-title">Appointment Received</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0" id="appointmentSuccessMessage">Your appointment has been confirmed successfully.</p>
+                    <p class="mb-2" id="appointmentSuccessMessage">Your appointment request has been received.</p>
+                    <p class="mb-0 text-muted" id="appointmentSuccessHint">Keep your reference number in case you need to follow up later.</p>
+                    <div class="mt-3 d-none" id="appointmentSuccessReferenceWrap">
+                        <div class="small text-uppercase fw-semibold text-muted">Reference Number</div>
+                        <div class="fs-4 fw-bold" id="appointmentSuccessReference"></div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(appUrl('/Guest-End/services.html'), ENT_QUOTES, 'UTF-8') ?>">Back to Services</a>
@@ -1544,27 +1736,28 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             const appointmentLocationHelp = document.getElementById("appointmentLocationHelp");
             const appointmentCouncilMemberInput = document.getElementById("appointmentCouncilMember");
             const appointmentSubjectInput = document.getElementById("appointmentSubject");
+            const appointmentSubjectOtherWrap = document.getElementById("appointmentSubjectOtherWrap");
             const appointmentSubjectOtherInput = document.getElementById("appointmentSubjectOther");
             const appointmentSubjectOtherError = document.getElementById("appointmentSubjectOtherError");
+            const appointmentCertificationInput = document.getElementById("appointmentCertification");
             const appointmentFeedbackData = document.getElementById("appointmentFeedbackData");
             const appointmentSuccessModalEl = document.getElementById("appointmentSuccessModal");
             const appointmentSuccessMessage = document.getElementById("appointmentSuccessMessage");
+            const appointmentSuccessHint = document.getElementById("appointmentSuccessHint");
+            const appointmentSuccessReferenceWrap = document.getElementById("appointmentSuccessReferenceWrap");
+            const appointmentSuccessReference = document.getElementById("appointmentSuccessReference");
             const contactNumberInput = document.getElementById("guestContactNumber");
+            const otpRecipientPreview = document.getElementById("otpRecipientPreview");
             const emailInput = document.getElementById("guestEmailAddress");
-            const guestAddressSystemInput = document.getElementById("guestAddressSystem");
-            const guestHouseSystemWrap = document.getElementById("guestHouseSystemWrap");
-            const guestLotBlockSystemWrap = document.getElementById("guestLotBlockSystemWrap");
-            const guestUnitNumberInput = document.getElementById("guestUnitNumber");
-            const guestHouseNumberInput = document.getElementById("guestHouseNumber");
-            const guestStreetNameInput = document.getElementById("guestStreetName");
-            const guestLotNumberInput = document.getElementById("guestLotNumber");
-            const guestBlockNumberInput = document.getElementById("guestBlockNumber");
-            const guestPhaseNumberInput = document.getElementById("guestPhaseNumber");
-            const guestSubdivisionInput = document.getElementById("guestSubdivision");
-            const guestAreaNumberInput = document.getElementById("guestAreaNumber");
             const appointmentDetailsActions = document.getElementById("appointmentDetailsActions");
             const appointmentNextBtn = document.getElementById("appointmentNextBtn");
             const appointmentVerificationStage = document.getElementById("appointmentVerificationStage");
+            const appointmentVerificationModal = appointmentVerificationStage && window.bootstrap
+                ? bootstrap.Modal.getOrCreateInstance(appointmentVerificationStage, {
+                    backdrop: "static",
+                    keyboard: true,
+                })
+                : null;
             const sendOtpBtn = document.getElementById("sendOtpBtn");
             const changeOtpNumberBtn = document.getElementById("changeOtpNumberBtn");
             const otpVerifyRow = document.getElementById("otpVerifyRow");
@@ -1592,6 +1785,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             let otpStageVisible = false;
             let otpCountdown = 0;
             let otpCountdownTimer = null;
+            let focusOtpOnModalOpen = false;
             const defaultSubmitLabel = String(submitBtn.dataset.defaultLabel || "SUBMIT APPOINTMENT").trim() || "SUBMIT APPOINTMENT";
             const loadingSubmitLabel = String(submitBtn.dataset.loadingLabel || "Submitting...").trim() || "Submitting...";
 
@@ -1918,6 +2112,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 const isOther = appointmentSubjectInput.value === "other";
                 const value = String(appointmentSubjectOtherInput.value || "").trim();
 
+                appointmentSubjectOtherWrap?.classList.toggle("d-none", !isOther);
                 appointmentSubjectOtherInput.disabled = !isOther;
                 appointmentSubjectOtherInput.required = isOther;
 
@@ -1936,6 +2131,9 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     appointmentSubjectOtherError.textContent = "";
                     appointmentSubjectOtherError.classList.add("d-none");
                 }
+                if (!isOther) {
+                    appointmentSubjectOtherInput.value = "";
+                }
                 return true;
             };
 
@@ -1953,17 +2151,33 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 if (target) target.textContent = message;
             };
 
+            const normalizePhoneDraft = (value) => {
+                let digits = String(value || "").replace(/\D+/g, "");
+                if (digits.startsWith("63")) {
+                    digits = digits.slice(2);
+                } else if (digits.startsWith("0")) {
+                    digits = digits.slice(1);
+                }
+                if (digits.length > 10) {
+                    digits = digits.slice(0, 10);
+                }
+                return digits;
+            };
+
             const normalizePhone = (value) => {
-                const digits = String(value || "").replace(/\D+/g, "");
-                return /^09\d{9}$/.test(digits) ? digits : "";
+                const digits = normalizePhoneDraft(value);
+                return /^9\d{9}$/.test(digits) ? digits : "";
             };
 
             const validateContactNumber = () => {
                 if (!contactNumberInput) return true;
                 const normalized = normalizePhone(contactNumberInput.value);
                 if (normalized === "") {
-                    contactNumberInput.setCustomValidity("Please enter a valid mobile number in the format 09XXXXXXXXX.");
+                    contactNumberInput.setCustomValidity("Please enter a valid mobile number in the format +63 9XXXXXXXXX.");
                     return false;
+                }
+                if (contactNumberInput.value !== normalized) {
+                    contactNumberInput.value = normalized;
                 }
                 contactNumberInput.setCustomValidity("");
                 return true;
@@ -1984,13 +2198,28 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 return true;
             };
 
+            const syncOtpRecipientPreview = () => {
+                if (!otpRecipientPreview) {
+                    return;
+                }
+                const normalized = normalizePhone(contactNumberInput?.value || "");
+                const displayValue = normalized !== "" ? `+63 ${normalized}` : "Enter your mobile number above first.";
+                otpRecipientPreview.textContent = displayValue;
+                otpRecipientPreview.classList.toggle("is-empty", normalized === "");
+            };
+
             const validateDetailsStep = () => {
-                syncGuestAddressSystem();
                 const okSubjectOther = validateSubjectOther();
                 const okDate = validateAppointmentDate();
                 const okTime = validateAppointmentTime();
+                const okPhone = validateContactNumber();
                 const okEmail = validateEmail();
+                const okCertification = appointmentCertificationInput ? appointmentCertificationInput.checkValidity() : true;
 
+                if (!okPhone) {
+                    contactNumberInput?.reportValidity();
+                    return false;
+                }
                 if (!okEmail) {
                     emailInput?.reportValidity();
                     return false;
@@ -2005,6 +2234,11 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 }
                 if (!okTime) {
                     appointmentTimeInput?.reportValidity();
+                    return false;
+                }
+                if (!okCertification) {
+                    appointmentCertificationInput?.reportValidity();
+                    appointmentCertificationInput?.focus();
                     return false;
                 }
 
@@ -2034,52 +2268,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 }
 
                 return true;
-            };
-
-            const syncGuestAddressSystem = () => {
-                if (!guestAddressSystemInput) {
-                    return;
-                }
-
-                const mode = String(guestAddressSystemInput.value || "").trim().toLowerCase();
-                const isHouse = mode === "house";
-                const isLotBlock = mode === "lot_block";
-                const hasAddressActivity = [
-                    guestAddressSystemInput,
-                    guestUnitNumberInput,
-                    guestHouseNumberInput,
-                    guestStreetNameInput,
-                    guestLotNumberInput,
-                    guestBlockNumberInput,
-                    guestPhaseNumberInput,
-                    guestSubdivisionInput,
-                    guestAreaNumberInput,
-                ].some((input) => String(input?.value || "").trim() !== "");
-
-                const setFieldState = (input, active, required = false) => {
-                    if (!input) {
-                        return;
-                    }
-                    input.disabled = !active;
-                    input.required = active && required;
-                    if (!active) {
-                        input.setCustomValidity("");
-                    }
-                };
-
-                guestHouseSystemWrap?.classList.toggle("d-none", !isHouse);
-                guestLotBlockSystemWrap?.classList.toggle("d-none", !isLotBlock);
-
-                guestAddressSystemInput.required = hasAddressActivity || isHouse || isLotBlock;
-
-                setFieldState(guestUnitNumberInput, isHouse, false);
-                setFieldState(guestHouseNumberInput, isHouse, true);
-                setFieldState(guestStreetNameInput, isHouse, true);
-                setFieldState(guestLotNumberInput, isLotBlock, true);
-                setFieldState(guestBlockNumberInput, isLotBlock, true);
-                setFieldState(guestPhaseNumberInput, isLotBlock, true);
-                setFieldState(guestSubdivisionInput, isHouse || isLotBlock, false);
-                setFieldState(guestAreaNumberInput, isHouse || isLotBlock, false);
             };
 
             const updateOtpButtons = () => {
@@ -2153,21 +2341,17 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
             const showVerificationStage = (focusOtp = false) => {
                 otpStageVisible = true;
-                if (appointmentDetailsActions) {
-                    appointmentDetailsActions.hidden = true;
-                }
-                if (appointmentVerificationStage) {
-                    appointmentVerificationStage.hidden = false;
-                }
+                focusOtpOnModalOpen = focusOtp;
                 updateState();
-                window.requestAnimationFrame(() => {
-                    appointmentVerificationStage?.scrollIntoView({ behavior: "smooth", block: "start" });
+                if (appointmentVerificationModal) {
+                    appointmentVerificationModal.show();
+                    return;
+                }
+                window.setTimeout(() => {
                     if (focusOtp) {
-                        window.setTimeout(() => {
-                            contactNumberInput?.focus();
-                        }, 180);
+                        sendOtpBtn?.focus();
                     }
-                });
+                }, 180);
             };
 
             const advanceToVerificationStage = () => {
@@ -2183,7 +2367,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     submitBtn.disabled = true;
                     return;
                 }
-                syncGuestAddressSystem();
+                syncOtpRecipientPreview();
                 syncAppointmentAvailability();
                 validateSubjectOther();
                 validateAppointmentDate();
@@ -2280,7 +2464,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     }
 
                     setOtpVerifiedState(true);
-                    showOtpFeedback("Mobile number verified. You may now submit the appointment.");
+                    showOtpFeedback("Mobile number verified. You can now confirm your appointment.");
                     updateState();
                 } catch (error) {
                     showOtpFeedback(error instanceof Error ? error.message : "Failed to verify OTP.", true);
@@ -2292,15 +2476,25 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
             changeOtpNumberBtn?.addEventListener("click", () => {
                 resetOtpVerification();
-                contactNumberInput?.focus();
+                appointmentVerificationModal?.hide();
+                window.setTimeout(() => {
+                    contactNumberInput?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    contactNumberInput?.focus();
+                }, 180);
             });
 
             contactNumberInput?.addEventListener("input", () => {
+                const draftValue = normalizePhoneDraft(contactNumberInput.value);
+                if (contactNumberInput.value !== draftValue) {
+                    contactNumberInput.value = draftValue;
+                }
                 if (!otpVerified) {
                     clearOtpMessages();
                 }
                 updateState();
             });
+            contactNumberInput?.addEventListener("blur", validateContactNumber);
+            contactNumberInput?.addEventListener("change", validateContactNumber);
             emailInput?.addEventListener("input", updateState);
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
@@ -2325,7 +2519,20 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             appointmentSubjectOtherInput?.addEventListener("change", updateState);
             appointmentSubjectOtherInput?.addEventListener("blur", validateSubjectOther);
             appointmentSubjectOtherInput?.addEventListener("invalid", validateSubjectOther);
-            guestAddressSystemInput?.addEventListener("change", updateState);
+            appointmentVerificationStage?.addEventListener("shown.bs.modal", () => {
+                otpStageVisible = true;
+                updateState();
+                if (focusOtpOnModalOpen) {
+                    window.setTimeout(() => {
+                        sendOtpBtn?.focus();
+                    }, 120);
+                }
+                focusOtpOnModalOpen = false;
+            });
+            appointmentVerificationStage?.addEventListener("hidden.bs.modal", () => {
+                otpStageVisible = false;
+                focusOtpOnModalOpen = false;
+            });
 
             form.addEventListener("submit", (e) => {
                 const okDetails = validateDetailsStep();
@@ -2378,9 +2585,16 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             const feedbackAppointmentId = String(appointmentFeedbackData?.dataset.feedbackAppointmentId || "").trim();
             if (feedbackType === "success" && feedbackMessage !== "" && appointmentSuccessModalEl && window.bootstrap) {
                 if (appointmentSuccessMessage) {
-                    appointmentSuccessMessage.textContent = feedbackAppointmentId !== ""
-                        ? `${feedbackMessage} Please keep this reference number for follow-up: ${feedbackAppointmentId}.`
-                        : feedbackMessage;
+                    appointmentSuccessMessage.textContent = feedbackMessage || "Your appointment is all set.";
+                }
+                if (appointmentSuccessHint) {
+                    appointmentSuccessHint.textContent = feedbackAppointmentId !== ""
+                        ? "Keep your reference number in case you need to follow up later."
+                        : "You may close this window or head back to services.";
+                }
+                if (appointmentSuccessReferenceWrap && appointmentSuccessReference) {
+                    appointmentSuccessReferenceWrap.classList.toggle("d-none", feedbackAppointmentId === "");
+                    appointmentSuccessReference.textContent = feedbackAppointmentId;
                 }
                 const successModal = bootstrap.Modal.getOrCreateInstance(appointmentSuccessModalEl, {
                     backdrop: "static",
@@ -2389,7 +2603,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 successModal.show();
             }
 
-            syncGuestAddressSystem();
+            syncOtpRecipientPreview();
             syncAppointmentAvailability();
             resetOtpVerification();
             setSubmittingState(false);
