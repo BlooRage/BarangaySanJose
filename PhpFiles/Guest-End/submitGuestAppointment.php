@@ -128,6 +128,20 @@ $preferredScheduleTimestamp = (string)($validatedSchedule['preferred_schedule_ti
 $confirmedScheduleTimestamp = (string)($validatedSchedule['confirmed_schedule_timestamp'] ?? '');
 $meetingLocation = (string)($validatedSchedule['meeting_location'] ?? '');
 $now = new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila'));
+$assignedOfficial = $councilMembersByUserId[$officialUserId] ?? [];
+$officialDisplayName = trim((string)($assignedOfficial['full_name'] ?? ''));
+if ($officialDisplayName === '') {
+    $officialDisplayName = trim((string)($assignedOfficial['option_label'] ?? ''));
+}
+$scheduleLabel = '';
+if ($confirmedScheduleTimestamp !== '') {
+    try {
+        $scheduleDate = new DateTimeImmutable($confirmedScheduleTimestamp, new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila'));
+        $scheduleLabel = $scheduleDate->format('F j, Y \a\t g:i A');
+    } catch (Throwable $e) {
+        $scheduleLabel = '';
+    }
+}
 
 $conn->begin_transaction();
 try {
@@ -253,8 +267,13 @@ try {
     apsh_redirect_with_message(
         '/Guest-End/appointments.php',
         'success',
-        'Your appointment request has been received.',
-        ['appointment_id' => $appointmentId]
+        'Appointment confirmed!',
+        [
+            'appointment_id' => $appointmentId,
+            'official_name' => $officialDisplayName,
+            'meeting_location' => $meetingLocation,
+            'schedule_label' => $scheduleLabel,
+        ]
     );
 } catch (Throwable $e) {
     $conn->rollback();

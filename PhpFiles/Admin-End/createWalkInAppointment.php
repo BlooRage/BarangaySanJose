@@ -36,7 +36,8 @@ $firstName = trim((string)($_POST['first_name'] ?? ''));
 $middleName = trim((string)($_POST['middle_name'] ?? ''));
 $lastName = trim((string)($_POST['last_name'] ?? ''));
 $suffix = trim((string)($_POST['suffix_name'] ?? ''));
-$contactNumber = apsh_normalize_phone((string)($_POST['contact_number'] ?? ''));
+$contactNumberRaw = trim((string)($_POST['contact_number'] ?? ''));
+$contactNumber = apsh_normalize_phone($contactNumberRaw);
 $emailAddress = apsh_normalize_email((string)($_POST['email_address'] ?? ''));
 $address = preg_replace('/\s+/', ' ', trim((string)($_POST['current_address'] ?? '')));
 $deskNote = preg_replace('/\s+/', ' ', trim((string)($_POST['desk_note'] ?? '')));
@@ -51,8 +52,13 @@ if (empty($appointmentAccess['can_manage_all_tracker'])) {
     $officialUserId = trim((string)($appointmentAccess['scoped_official_user_id'] ?? $currentUserId));
 }
 
-if ($firstName === '' || $lastName === '' || $contactNumber === null || $officialUserId === '' || $subject === '' || $appointmentDate === '' || $appointmentTime === '' || $purpose === '') {
+if ($firstName === '' || $lastName === '' || $officialUserId === '' || $subject === '' || $appointmentDate === '' || $appointmentTime === '') {
     header('Location: ' . appUrl('/Admin-End/Appointments/WalkInAppointmentForm.php?error=' . rawurlencode('Please complete all required walk-in appointment fields.')));
+    exit;
+}
+
+if ($contactNumberRaw !== '' && $contactNumber === null) {
+    header('Location: ' . appUrl('/Admin-End/Appointments/WalkInAppointmentForm.php?error=' . rawurlencode('Please enter a valid mobile number in the format 09XXXXXXXXX.')));
     exit;
 }
 

@@ -100,6 +100,9 @@
         .resident-date-proxy:focus + .resident-date-proxy-icon {
           color: #2563eb;
         }
+        .resident-date-modal {
+          z-index: 2060;
+        }
         .resident-date-modal .modal-content {
           border-radius: 18px;
         }

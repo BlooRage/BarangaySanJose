@@ -8525,7 +8525,7 @@
       const isBarangayId = config?.kind === 'barangay_id';
       if (manualBirthdate) manualBirthdate.required = isBarangayId;
       if (manualSex) manualSex.required = isBarangayId;
-      if (manualContactNumber) manualContactNumber.required = isBarangayId;
+      if (manualContactNumber) manualContactNumber.required = false;
       if (manualBirthplace) manualBirthplace.required = isBarangayId;
     }
 

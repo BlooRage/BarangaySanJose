@@ -13,6 +13,9 @@ $feedbackMessage = !empty($_GET['success'])
     ? (string)$_GET['success']
     : (!empty($_GET['error']) ? (string)$_GET['error'] : '');
 $feedbackAppointmentId = trim((string)($_GET['appointment_id'] ?? ''));
+$feedbackOfficialName = trim((string)($_GET['official_name'] ?? ''));
+$feedbackMeetingLocation = trim((string)($_GET['meeting_location'] ?? ''));
+$feedbackScheduleLabel = trim((string)($_GET['schedule_label'] ?? ''));
 
 $formValues = [
     'first_name' => '',
@@ -388,19 +391,6 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             line-height: 1.6;
         }
 
-        .otp-verified-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            padding: 0.42rem 0.8rem;
-            border-radius: 999px;
-            background: rgba(31, 122, 79, 0.12);
-            color: var(--guest-success);
-            border: 1px solid rgba(31, 122, 79, 0.16);
-            font-weight: 700;
-            font-size: 0.88rem;
-        }
-
         .otp-actions,
         .otp-verify-row {
             display: grid;
@@ -413,15 +403,10 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             margin-top: 0.85rem;
         }
 
-        .otp-helper,
         .otp-feedback,
         .otp-error {
             margin-top: 0.75rem;
             font-size: 0.92rem;
-        }
-
-        .otp-helper {
-            color: var(--guest-muted);
         }
 
         .otp-feedback {
@@ -981,8 +966,7 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
         }
 
         .appointment-outline-btn,
-        .appointment-soft-btn,
-        #verifyOtpBtn {
+        .appointment-soft-btn {
             border-radius: 0.9rem;
             font-weight: 700;
         }
@@ -1012,19 +996,6 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             color: var(--guest-ink);
         }
 
-        #verifyOtpBtn {
-            background: var(--guest-accent);
-            border-color: var(--guest-accent);
-            color: #ffffff;
-        }
-
-        #verifyOtpBtn:hover,
-        #verifyOtpBtn:focus {
-            background: var(--guest-accent-dark);
-            border-color: var(--guest-accent-dark);
-            color: #ffffff;
-        }
-
         .appointment-modal .modal-content {
             border-radius: 1.35rem;
             border: 1px solid rgba(254, 153, 60, 0.28);
@@ -1044,8 +1015,18 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             border-top: 1px solid rgba(254, 153, 60, 0.16);
         }
 
+        #appointmentVerificationStage,
+        #appointmentSuccessModal,
+        #residentDateModal {
+            z-index: 2000;
+        }
+
+        .modal-backdrop.show {
+            z-index: 1990;
+        }
+
         .appointment-modal--otp .modal-dialog {
-            max-width: 760px;
+            max-width: 820px;
             margin: 1.5rem auto;
         }
 
@@ -1053,31 +1034,37 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             border-radius: 1.9rem;
             border: 1px solid rgba(254, 153, 60, 0.42);
             box-shadow: 0 28px 72px rgba(58, 39, 23, 0.22);
-            max-height: calc(100vh - 3rem);
+            max-height: calc(100vh - 5rem);
         }
 
         .appointment-modal--otp .modal-header {
-            padding: 1.35rem 1.55rem 1.05rem;
+            padding: 1.1rem 1.45rem 0.9rem;
         }
 
         .appointment-modal--otp .modal-title {
-            font-size: clamp(1.7rem, 2.2vw, 2.25rem);
-            line-height: 1.02;
+            font-size: clamp(1.45rem, 2vw, 1.95rem);
+            line-height: 1.08;
         }
 
         .appointment-modal--otp .btn-close {
-            width: 2.4rem;
-            height: 2.4rem;
-            border-radius: 999px;
-            background-color: rgba(254, 153, 60, 0.1);
+            width: 1.9rem;
+            height: 1.9rem;
+            padding: 0;
+            border-radius: 0;
+            background-color: transparent;
+            background-size: 1rem;
+            box-shadow: none;
+            opacity: 0.82;
+        }
+
+        .appointment-modal--otp .btn-close:hover,
+        .appointment-modal--otp .btn-close:focus {
             opacity: 1;
         }
 
         .appointment-modal--otp .modal-body {
-            padding: 1.45rem 1.55rem 1.6rem;
-            background:
-                radial-gradient(circle at top right, rgba(255, 224, 193, 0.28), rgba(255, 224, 193, 0) 32%),
-                linear-gradient(180deg, rgba(255, 249, 242, 0.98) 0%, #ffffff 100%);
+            padding: 1.1rem 1.45rem 1.3rem;
+            background: #ffffff;
             overflow-y: auto;
         }
 
@@ -1087,119 +1074,214 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
 
         .otp-modal-shell {
             display: grid;
-            gap: 1rem;
+            gap: 0.8rem;
+        }
+
+        .otp-simple-hero {
+            display: grid;
+            justify-items: center;
+            gap: 0.7rem;
+            text-align: center;
+        }
+
+        .otp-simple-icon {
+            width: clamp(68px, 7vw, 84px);
+            height: auto;
         }
 
         .otp-modal-intro {
             margin: 0;
-            max-width: 34rem;
+            max-width: 39rem;
             color: var(--guest-muted);
-            font-size: 0.95rem;
-            line-height: 1.65;
+            font-size: 0.92rem;
+            line-height: 1.55;
+            text-align: center;
         }
 
         .otp-modal-card {
-            padding: 1.15rem 1.2rem;
-            border-radius: 1.35rem;
-            border: 1px solid rgba(254, 153, 60, 0.18);
-            background: rgba(255, 255, 255, 0.84);
-            box-shadow: 0 10px 24px rgba(58, 39, 23, 0.05);
+            padding: 0.15rem 0 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
         }
 
         .otp-panel-header--modal {
-            margin-bottom: 0.95rem;
+            display: none;
         }
 
-        .otp-panel-header--modal p {
-            margin-top: 0;
-            max-width: 32rem;
+        .otp-simple-number {
+            margin: 0;
+            text-align: center;
+            color: var(--guest-muted);
+            font-size: 0.95rem;
+            line-height: 1.45;
         }
 
         .otp-recipient-card {
-            min-height: 60px;
-            gap: 0.85rem;
-            padding: 0.95rem 1rem;
-            border-color: rgba(254, 153, 60, 0.2);
-            border-radius: 1rem;
-            background: linear-gradient(180deg, #ffffff 0%, #fff8f1 100%);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-        }
-
-        .otp-recipient-icon {
-            display: inline-flex;
-            align-items: center;
             justify-content: center;
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 999px;
-            background: rgba(254, 153, 60, 0.14);
-            color: var(--guest-accent-dark);
-            flex: 0 0 auto;
+            min-height: 0;
+            gap: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
         }
 
         .otp-recipient-value {
-            font-size: 1.15rem;
-            letter-spacing: -0.02em;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--guest-ink);
         }
 
-        .otp-helper {
-            margin-top: 0.65rem;
-            font-size: 0.88rem;
-            line-height: 1.55;
+        .otp-link-btn {
+            appearance: none;
+            -webkit-appearance: none;
+            display: inline;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--guest-accent-dark);
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 0.2rem;
+            box-shadow: none !important;
+        }
+
+        .otp-link-btn:hover,
+        .otp-link-btn:focus {
+            color: var(--guest-accent);
+            background: transparent;
+        }
+
+        .otp-link-btn:disabled {
+            background: transparent;
+            border: 0;
+            color: var(--guest-muted);
+            text-decoration: underline;
+            text-underline-offset: 0.2rem;
+            cursor: default;
+            opacity: 1;
+        }
+
+        .otp-send-actions,
+        .otp-resend-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        .otp-send-btn {
+            min-width: 160px;
         }
 
         .appointment-modal--otp .otp-actions,
         .appointment-modal--otp .otp-verify-row {
-            gap: 1rem;
+            gap: 0.7rem;
         }
 
         .appointment-modal--otp .otp-actions {
-            align-items: stretch;
+            grid-template-columns: 1fr;
+            justify-items: center;
+            align-items: start;
         }
 
         .appointment-modal--otp .otp-actions .btn,
         .appointment-modal--otp .otp-verify-row .btn {
-            min-height: 56px;
+            min-height: 52px;
             padding-inline: 1.35rem;
             border-radius: 1rem;
         }
 
+        .appointment-modal--otp .otp-actions .d-flex {
+            justify-content: center;
+        }
+
         .appointment-modal--otp .otp-verify-row {
-            padding: 1rem;
-            border-radius: 1.2rem;
-            background: rgba(255, 247, 237, 0.9);
-            border: 1px solid rgba(254, 153, 60, 0.16);
+            grid-template-columns: 1fr;
+            justify-items: center;
+            padding: 0;
+            border-radius: 0;
+            background: transparent;
+            border: 0;
+            margin-top: 0.1rem;
+        }
+
+        .appointment-modal--otp .otp-verify-row > div:first-child {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .otp-code-field {
+            position: relative;
+            width: 100%;
+            max-width: 22.5rem;
+        }
+
+        .otp-code-boxes {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.55rem;
+            width: 100%;
+        }
+
+        .otp-code-box {
+            width: 100%;
+            min-width: 42px;
+            min-height: 56px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.9rem;
+            border: 1px solid rgba(120, 96, 72, 0.24);
+            background: #ffffff;
+            color: var(--guest-ink);
+            font-size: 1.25rem;
+            font-weight: 800;
+            line-height: 1;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+        }
+
+        .otp-code-box.is-filled {
+            border-color: rgba(254, 153, 60, 0.42);
+            background: linear-gradient(180deg, #ffffff 0%, #fff9f2 100%);
+        }
+
+        .otp-code-box.is-active {
+            border-color: rgba(254, 153, 60, 0.82);
+            box-shadow: 0 0 0 0.18rem rgba(254, 153, 60, 0.14);
+            transform: translateY(-1px);
+        }
+
+        .otp-code-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: text;
+            z-index: 2;
         }
 
         .appointment-modal--otp .otp-feedback,
         .appointment-modal--otp .otp-error {
-            margin-top: 0.9rem;
-            padding: 0.8rem 0.95rem;
-            border-radius: 0.95rem;
-            line-height: 1.5;
-        }
-
-        .appointment-modal--otp .otp-feedback {
-            background: rgba(31, 122, 79, 0.1);
-            border: 1px solid rgba(31, 122, 79, 0.14);
-        }
-
-        .appointment-modal--otp .otp-error {
-            background: rgba(180, 35, 24, 0.08);
-            border: 1px solid rgba(180, 35, 24, 0.12);
+            margin-top: 0.25rem;
+            padding: 0;
+            border-radius: 0;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            text-align: center;
+            background: transparent;
+            border: 0;
         }
 
         .otp-cert-card {
-            padding: 1.05rem 1.1rem 1.15rem;
-            border-radius: 1.35rem;
-            border: 1px solid rgba(254, 153, 60, 0.16);
-            background: rgba(255, 255, 255, 0.86);
-        }
-
-        .otp-cert-copy {
-            margin: 0 0 0.7rem;
-            color: var(--guest-muted);
-            line-height: 1.62;
+            padding: 0.55rem 0 0;
+            border-radius: 0;
+            border: none;
+            background: transparent;
+            text-align: center;
         }
 
         .appointment-modal--otp .agreement-row {
@@ -1552,50 +1634,45 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                                     </div>
                                     <div class="modal-body">
                                         <div class="otp-modal-shell">
-                                            <p class="otp-modal-intro">We will send a 6-digit code to the mobile number you entered above. The appointment cannot be submitted until that number is verified.</p>
+                                            <div class="otp-simple-hero">
+                                                <img src="<?= htmlspecialchars(appUrl('/Images/SMS-OTP.png'), ENT_QUOTES, 'UTF-8') ?>" alt="OTP Icon" class="otp-simple-icon">
+                                                <p class="otp-modal-intro">Check your phone. We’ll send a 6-digit code to the mobile number below before you can confirm the appointment.</p>
+                                            </div>
 
                                             <div class="otp-panel otp-modal-card">
-                                                <div class="otp-panel-header otp-panel-header--modal">
-                                                    <div>
-                                                        <h3>Send Code</h3>
-                                                        <p>Check the mobile number below before sending the OTP.</p>
-                                                    </div>
-                                                    <div class="otp-verified-pill d-none" id="otpVerifiedPill">
-                                                        <i class="bi bi-check-circle-fill"></i> Verified
-                                                    </div>
-                                                </div>
-
                                                 <div class="otp-actions">
                                                     <div>
-                                                        <div class="top-label">Mobile Number for OTP</div>
-                                                        <div class="otp-recipient-card">
-                                                            <span class="otp-recipient-icon"><i class="bi bi-phone-fill"></i></span>
-                                                            <span class="otp-recipient-value" id="otpRecipientPreview">Enter your mobile number above first.</span>
-                                                        </div>
-                                                        <div class="otp-helper">If you need to change it, use the mobile number field in Guest Information.</div>
+                                                        <p class="otp-simple-number">OTP will be sent to <span class="otp-recipient-value" id="otpRecipientPreview">+63 •••••• XXXX</span></p>
                                                     </div>
-                                                    <div class="d-flex gap-2 flex-wrap">
-                                                        <button type="button" class="btn appointment-outline-btn" id="sendOtpBtn">Send OTP</button>
-                                                        <button type="button" class="btn appointment-soft-btn d-none" id="changeOtpNumberBtn">Change Number</button>
+                                                    <div class="otp-send-actions">
+                                                        <button type="button" class="btn appointment-outline-btn otp-send-btn" id="sendOtpBtn">Send OTP</button>
                                                     </div>
                                                 </div>
 
                                                 <div class="otp-verify-row" id="otpVerifyRow" hidden>
                                                     <div>
-                                                        <label class="top-label">Enter OTP <span class="required-asterisk">*</span></label>
-                                                        <input type="text" class="form-control" id="guestOtpInput" inputmode="numeric" maxlength="6" placeholder="6-digit OTP">
-                                                    </div>
-                                                    <div>
-                                                        <button type="button" class="btn w-100" id="verifyOtpBtn">Verify OTP</button>
+                                                        <div class="otp-code-field">
+                                                            <input type="text" class="otp-code-input" id="guestOtpInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" aria-label="6-digit OTP">
+                                                            <div class="otp-code-boxes" id="guestOtpBoxes" aria-hidden="true">
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 <div class="otp-feedback d-none" id="otpFeedback" aria-live="polite"></div>
                                                 <div class="otp-error d-none" id="otpError" aria-live="polite"></div>
+                                                <div class="otp-resend-row">
+                                                    <button type="button" class="otp-link-btn d-none" id="resendOtpBtn">Resend OTP</button>
+                                                </div>
                                             </div>
 
                                             <div class="otp-cert-card">
-                                                <p class="otp-cert-copy">Once your mobile number is verified, you can confirm your appointment below.</p>
                                                 <button
                                                     type="submit"
                                                     class="submit-btn"
@@ -1654,6 +1731,9 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
         data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
         data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
         data-feedback-appointment-id="<?= htmlspecialchars($feedbackAppointmentId, ENT_QUOTES, 'UTF-8') ?>"
+        data-feedback-official-name="<?= htmlspecialchars($feedbackOfficialName, ENT_QUOTES, 'UTF-8') ?>"
+        data-feedback-meeting-location="<?= htmlspecialchars($feedbackMeetingLocation, ENT_QUOTES, 'UTF-8') ?>"
+        data-feedback-schedule-label="<?= htmlspecialchars($feedbackScheduleLabel, ENT_QUOTES, 'UTF-8') ?>"
         hidden
     ></div>
 
@@ -1661,11 +1741,11 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
         <div class="modal-dialog modal-dialog-centered appointment-modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Appointment Received</h5>
+                    <h5 class="modal-title">Appointment Confirmed!</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-2" id="appointmentSuccessMessage">Your appointment request has been received.</p>
+                    <p class="mb-2" id="appointmentSuccessMessage">Your appointment is now confirmed.</p>
                     <p class="mb-0 text-muted" id="appointmentSuccessHint">Keep your reference number in case you need to follow up later.</p>
                     <div class="mt-3 d-none" id="appointmentSuccessReferenceWrap">
                         <div class="small text-uppercase fw-semibold text-muted">Reference Number</div>
@@ -1759,13 +1839,12 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 })
                 : null;
             const sendOtpBtn = document.getElementById("sendOtpBtn");
-            const changeOtpNumberBtn = document.getElementById("changeOtpNumberBtn");
+            const resendOtpBtn = document.getElementById("resendOtpBtn");
             const otpVerifyRow = document.getElementById("otpVerifyRow");
             const otpInput = document.getElementById("guestOtpInput");
-            const verifyOtpBtn = document.getElementById("verifyOtpBtn");
+            const otpBoxes = Array.from(document.querySelectorAll("#guestOtpBoxes .otp-code-box"));
             const otpFeedback = document.getElementById("otpFeedback");
             const otpError = document.getElementById("otpError");
-            const otpVerifiedPill = document.getElementById("otpVerifiedPill");
             const officialScheduleMap = <?= json_encode($officialScheduleMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const bookedSlotMap = <?= json_encode($bookedSlotMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const appointmentGlobalScheduleConfig = <?= json_encode([
@@ -1786,6 +1865,9 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             let otpCountdown = 0;
             let otpCountdownTimer = null;
             let focusOtpOnModalOpen = false;
+            let otpVerificationInFlight = false;
+            let otpSent = false;
+            let otpSentRecipient = "";
             const defaultSubmitLabel = String(submitBtn.dataset.defaultLabel || "SUBMIT APPOINTMENT").trim() || "SUBMIT APPOINTMENT";
             const loadingSubmitLabel = String(submitBtn.dataset.loadingLabel || "Submitting...").trim() || "Submitting...";
 
@@ -2144,6 +2226,22 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 if (otpError) otpError.textContent = "";
             };
 
+            const syncOtpBoxes = () => {
+                const digits = String(otpInput?.value || "").replace(/\D+/g, "").slice(0, 6);
+                if (otpInput && otpInput.value !== digits) {
+                    otpInput.value = digits;
+                }
+                otpBoxes.forEach((box, index) => {
+                    const digit = digits[index] || "";
+                    box.textContent = digit;
+                    box.classList.toggle("is-filled", digit !== "");
+                    box.classList.toggle("is-active", index === Math.min(digits.length, 5) && digits.length < 6);
+                });
+                if (digits.length === 6) {
+                    otpBoxes.forEach((box) => box.classList.remove("is-active"));
+                }
+            };
+
             const showOtpFeedback = (message, isError = false) => {
                 clearOtpMessages();
                 const target = isError ? otpError : otpFeedback;
@@ -2271,13 +2369,15 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             };
 
             const updateOtpButtons = () => {
+                const canUseCurrentNumber = validateContactNumber();
                 if (sendOtpBtn) {
-                    const label = otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Send OTP";
-                    sendOtpBtn.textContent = label;
-                    sendOtpBtn.disabled = otpVerified || otpCountdown > 0 || !validateContactNumber();
+                    sendOtpBtn.classList.toggle("d-none", otpSent || otpVerified);
+                    sendOtpBtn.disabled = otpVerified || otpSent || !canUseCurrentNumber;
                 }
-                if (verifyOtpBtn) {
-                    verifyOtpBtn.disabled = otpVerified;
+                if (resendOtpBtn) {
+                    resendOtpBtn.classList.toggle("d-none", !otpSent || otpVerified);
+                    resendOtpBtn.textContent = otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend OTP";
+                    resendOtpBtn.disabled = otpVerified || otpCountdown > 0 || !canUseCurrentNumber;
                 }
             };
 
@@ -2305,8 +2405,6 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 if (contactNumberInput) {
                     contactNumberInput.readOnly = otpVerified;
                 }
-                otpVerifiedPill?.classList.toggle("d-none", !otpVerified);
-                changeOtpNumberBtn?.classList.toggle("d-none", !otpVerified);
                 if (otpVerifyRow) {
                     otpVerifyRow.hidden = otpVerified;
                 }
@@ -2318,6 +2416,8 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
 
             const resetOtpVerification = () => {
                 otpVerified = false;
+                otpSent = false;
+                otpSentRecipient = "";
                 otpCountdown = 0;
                 if (otpCountdownTimer) {
                     window.clearInterval(otpCountdownTimer);
@@ -2333,9 +2433,14 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 if (otpVerifyRow) {
                     otpVerifyRow.hidden = true;
                 }
-                changeOtpNumberBtn?.classList.add("d-none");
-                otpVerifiedPill?.classList.add("d-none");
                 clearOtpMessages();
+                syncOtpBoxes();
+                if (sendOtpBtn) {
+                    sendOtpBtn.textContent = "Send OTP";
+                }
+                if (resendOtpBtn) {
+                    resendOtpBtn.textContent = "Resend OTP";
+                }
                 updateOtpButtons();
             };
 
@@ -2401,6 +2506,9 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 clearOtpMessages();
                 sendOtpBtn.disabled = true;
                 sendOtpBtn.textContent = "Sending...";
+                if (resendOtpBtn) {
+                    resendOtpBtn.disabled = true;
+                }
 
                 try {
                     const formData = new FormData();
@@ -2417,6 +2525,8 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                         throw new Error(String(data.error || "Failed to send OTP. Please try again."));
                     }
 
+                    otpSent = true;
+                    otpSentRecipient = recipient;
                     if (otpVerifyRow) {
                         otpVerifyRow.hidden = false;
                     }
@@ -2429,7 +2539,17 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 }
             });
 
-            verifyOtpBtn?.addEventListener("click", async () => {
+            resendOtpBtn?.addEventListener("click", () => {
+                if (resendOtpBtn.disabled) {
+                    return;
+                }
+                sendOtpBtn?.click();
+            });
+
+            const verifyOtpCode = async () => {
+                if (otpVerificationInFlight) {
+                    return;
+                }
                 if (!validateContactNumber()) {
                     contactNumberInput?.reportValidity();
                     return;
@@ -2444,8 +2564,7 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 }
 
                 clearOtpMessages();
-                verifyOtpBtn.disabled = true;
-                verifyOtpBtn.textContent = "Verifying...";
+                otpVerificationInFlight = true;
 
                 try {
                     const formData = new FormData();
@@ -2469,24 +2588,17 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 } catch (error) {
                     showOtpFeedback(error instanceof Error ? error.message : "Failed to verify OTP.", true);
                 } finally {
-                    verifyOtpBtn.disabled = otpVerified;
-                    verifyOtpBtn.textContent = "Verify OTP";
+                    otpVerificationInFlight = false;
                 }
-            });
-
-            changeOtpNumberBtn?.addEventListener("click", () => {
-                resetOtpVerification();
-                appointmentVerificationModal?.hide();
-                window.setTimeout(() => {
-                    contactNumberInput?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    contactNumberInput?.focus();
-                }, 180);
-            });
+            };
 
             contactNumberInput?.addEventListener("input", () => {
                 const draftValue = normalizePhoneDraft(contactNumberInput.value);
                 if (contactNumberInput.value !== draftValue) {
                     contactNumberInput.value = draftValue;
+                }
+                if (!otpVerified && otpSent && normalizePhone(contactNumberInput.value) !== otpSentRecipient) {
+                    resetOtpVerification();
                 }
                 if (!otpVerified) {
                     clearOtpMessages();
@@ -2495,6 +2607,14 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             });
             contactNumberInput?.addEventListener("blur", validateContactNumber);
             contactNumberInput?.addEventListener("change", validateContactNumber);
+            otpInput?.addEventListener("input", () => {
+                syncOtpBoxes();
+                const otpValue = String(otpInput?.value || "").trim();
+                if (/^\d{6}$/.test(otpValue) && !otpVerified && !otpVerificationInFlight) {
+                    void verifyOtpCode();
+                }
+            });
+            otpInput?.addEventListener("focus", syncOtpBoxes);
             emailInput?.addEventListener("input", updateState);
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
@@ -2583,9 +2703,24 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             const feedbackType = String(appointmentFeedbackData?.dataset.feedbackType || "").trim();
             const feedbackMessage = String(appointmentFeedbackData?.dataset.feedbackMessage || "").trim();
             const feedbackAppointmentId = String(appointmentFeedbackData?.dataset.feedbackAppointmentId || "").trim();
+            const feedbackOfficialName = String(appointmentFeedbackData?.dataset.feedbackOfficialName || "").trim();
+            const feedbackMeetingLocation = String(appointmentFeedbackData?.dataset.feedbackMeetingLocation || "").trim();
+            const feedbackScheduleLabel = String(appointmentFeedbackData?.dataset.feedbackScheduleLabel || "").trim();
             if (feedbackType === "success" && feedbackMessage !== "" && appointmentSuccessModalEl && window.bootstrap) {
                 if (appointmentSuccessMessage) {
-                    appointmentSuccessMessage.textContent = feedbackMessage || "Your appointment is all set.";
+                    const detailParts = [];
+                    if (feedbackOfficialName !== "") {
+                        detailParts.push(`with ${feedbackOfficialName}`);
+                    }
+                    if (feedbackMeetingLocation !== "") {
+                        detailParts.push(`at ${feedbackMeetingLocation}`);
+                    }
+                    if (feedbackScheduleLabel !== "") {
+                        detailParts.push(`on ${feedbackScheduleLabel}`);
+                    }
+                    appointmentSuccessMessage.textContent = detailParts.length > 0
+                        ? `Your appointment ${detailParts.join(" ")} is now confirmed.`
+                        : (feedbackMessage || "Your appointment is now confirmed.");
                 }
                 if (appointmentSuccessHint) {
                     appointmentSuccessHint.textContent = feedbackAppointmentId !== ""
@@ -2606,6 +2741,7 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             syncOtpRecipientPreview();
             syncAppointmentAvailability();
             resetOtpVerification();
+            syncOtpBoxes();
             setSubmittingState(false);
             updateState();
         });

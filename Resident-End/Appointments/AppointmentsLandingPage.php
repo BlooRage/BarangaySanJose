@@ -282,7 +282,11 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                     <div class="appointments-card__footer">
                         <p class="appointments-card__cta-copy">Set an appointment with the barangay office for your selected service, concern, or consultation schedule.</p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='AppointmentForm'">Open Form</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            onclick="window.location.href='<?= htmlspecialchars((string)$baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentForm.php'"
+                        >Open Form</button>
                     </div>
                 </section>
             </div>

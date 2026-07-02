@@ -6790,7 +6790,6 @@ if ($action === 'create_manual_request') {
             'birthdate' => 'Birthdate is required for Barangay ID.',
             'birthplace' => 'Birthplace is required for Barangay ID.',
             'sex' => 'Sex is required for Barangay ID.',
-            'contact_number' => 'Contact number is required for Barangay ID.',
             'emergency_last' => 'Emergency contact last name is required for Barangay ID.',
             'emergency_first' => 'Emergency contact first name is required for Barangay ID.',
             'emergency_contact' => 'Emergency contact number is required for Barangay ID.',

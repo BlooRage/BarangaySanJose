@@ -121,27 +121,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             padding-bottom: 48px;
         }
 
-        .form-banner {
-            max-width: 1280px;
-            margin: 1rem auto 1.5rem;
-            padding: 1rem 1.1rem;
-            border-radius: 18px;
-            border: 1px solid #f2d9c2;
-            background: linear-gradient(180deg, #fffaf6 0%, #fff7ef 100%);
-        }
-
-        .form-banner-title {
-            font-weight: 700;
-            color: #7c3f00;
-            margin-bottom: 0.35rem;
-        }
-
-        .form-banner-text {
-            color: #5f6b7a;
-            margin-bottom: 0;
-            font-size: 0.96rem;
-        }
-
         h1 {
             font-size: 2.8rem !important;
             font-weight: 700;
@@ -158,6 +137,49 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             max-width: 1280px;
             margin: 1.75rem auto 1.25rem;
             border-color: #ebe5df;
+        }
+
+        input[type="date"].form-control,
+        input[type="time"].form-control {
+            background-color: #ffffff !important;
+            color: #212529;
+        }
+
+        #appointmentDate.form-control {
+            background-color: #ffffff !important;
+            color: #212529;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy {
+            background: #ffffff !important;
+            border-color: #ced4da !important;
+            color: #212529 !important;
+            box-shadow: none !important;
+            -webkit-text-fill-color: #212529;
+        }
+
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy[readonly],
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy:hover,
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy:focus {
+            background: #ffffff !important;
+            color: #212529 !important;
+            -webkit-text-fill-color: #212529;
+        }
+
+        #appointmentDate + .resident-date-proxy-wrap .resident-date-proxy-icon {
+            color: #6b7c93 !important;
+        }
+
+        input[type="date"].form-control::-webkit-date-and-time-value,
+        input[type="time"].form-control::-webkit-date-and-time-value {
+            text-align: left;
+        }
+
+        input[type="date"].form-control::-webkit-calendar-picker-indicator,
+        input[type="time"].form-control::-webkit-calendar-picker-indicator {
+            opacity: 1;
         }
 
         .submit-btn {
@@ -223,18 +245,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             </div>
         <?php endif; ?>
 
-        <div class="form-banner">
-            <div class="form-banner-title">Before You Save</div>
-            <p class="form-banner-text">This creates a confirmed walk-in appointment directly in the tracker. Schedules follow the same weekly council-member availability used by the resident booking flow, including <strong><?= htmlspecialchars((string)$slotIntervalMinutes, ENT_QUOTES, 'UTF-8') ?>-minute</strong> time allotments<?php if ($lunchBreakEnabled): ?> and lunch blocking from <strong><?= htmlspecialchars($lunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></strong><?php endif; ?>.</p>
-            <?php if ($closedWeekdays !== []): ?>
-                <p class="form-banner-text mt-2">Weekly closures: <strong><?= htmlspecialchars($closedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
-            <?php endif; ?>
-            <?php if ($unavailableDatesCount > 0): ?>
-                <p class="form-banner-text mt-2">Blocked dates include <strong><?= htmlspecialchars($unavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
-            <?php endif; ?>
-            <p class="form-banner-text mt-2">Earliest available date: <strong><?= htmlspecialchars($firstAvailableAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>. Current booking window ends on <strong><?= htmlspecialchars($maxAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
-        </div>
-
         <form id="walkInAppointmentForm" method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Admin-End/createWalkInAppointment.php'), ENT_QUOTES, 'UTF-8') ?>" class="page-form">
             <?= csrfTokenField() ?>
             <input type="hidden" name="action" value="create_walkin_appointment">
@@ -268,8 +278,8 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
             <div class="form-row">
                 <div>
-                    <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                    <input type="text" class="form-control" id="walkInContactNumber" name="contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX" required>
+                    <label class="top-label">Contact Number</label>
+                    <input type="text" class="form-control" id="walkInContactNumber" name="contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                 </div>
                 <div>
                     <label class="top-label">Email Address</label>
@@ -317,30 +327,6 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
             <div class="form-row two-col-row">
                 <div>
-                    <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
-                    <select class="form-select" name="subject" id="appointmentSubject" required>
-                        <option value="">Select</option>
-                        <option value="follow_up">Follow-up Concern</option>
-                        <option value="consultation">Consultation</option>
-                        <option value="event_coordination">Event Coordination</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="top-label">If Other, please specify</label>
-                    <input
-                        type="text"
-                        class="form-control"
-                        name="subject_other"
-                        id="appointmentSubjectOther"
-                        maxlength="150"
-                    >
-                    <div id="appointmentSubjectOtherError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
-                </div>
-            </div>
-
-            <div class="form-row two-col-row">
-                <div>
                     <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
                     <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?= htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8') ?>" data-year-end="<?= htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8') ?>" data-date-disabled-weekdays="<?= htmlspecialchars(implode(',', $disabledWeekdays), ENT_QUOTES, 'UTF-8') ?>" data-date-disabled-dates="<?= htmlspecialchars(implode(',', $unavailableDates), ENT_QUOTES, 'UTF-8') ?>" data-available-weekdays="<?= htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>" data-date-modal-style="calendar" placeholder="Select date" required>
                     <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
@@ -348,7 +334,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 <div>
                     <label class="top-label">Time of Appointment <span class="required-asterisk">*</span></label>
                     <select class="form-select" id="appointmentTime" name="appointment_time" required>
-                        <option value="">Select council member and date first</option>
+                        <option value="">Select allotted time</option>
                     </select>
                     <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                 </div>
@@ -364,8 +350,35 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
             <div class="form-row">
                 <div class="full-width">
-                    <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                    <textarea class="form-control" name="purpose" rows="4" required></textarea>
+                    <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
+                    <select class="form-select" name="subject" id="appointmentSubject" required>
+                        <option value="">Select</option>
+                        <option value="follow_up">Follow-up Concern</option>
+                        <option value="consultation">Consultation</option>
+                        <option value="event_coordination">Event Coordination</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row d-none" id="appointmentSubjectOtherWrap">
+                <div class="full-width">
+                    <label class="top-label">If Other, please specify</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        name="subject_other"
+                        id="appointmentSubjectOther"
+                        maxlength="150"
+                    >
+                    <div id="appointmentSubjectOtherError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="full-width">
+                    <label class="top-label">Purpose</label>
+                    <textarea class="form-control" name="purpose" rows="4"></textarea>
                 </div>
             </div>
 
@@ -411,6 +424,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
         const appointmentLocationHelp = document.getElementById("appointmentLocationHelp");
         const appointmentCouncilMemberInput = document.getElementById("appointmentCouncilMember");
         const appointmentSubjectInput = document.getElementById("appointmentSubject");
+        const appointmentSubjectOtherWrap = document.getElementById("appointmentSubjectOtherWrap");
         const appointmentSubjectOtherInput = document.getElementById("appointmentSubjectOther");
         const appointmentSubjectOtherError = document.getElementById("appointmentSubjectOtherError");
         const contactNumberInput = document.getElementById("walkInContactNumber");
@@ -772,6 +786,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
             const isOther = appointmentSubjectInput.value === "other";
             const value = String(appointmentSubjectOtherInput.value || "").trim();
 
+            appointmentSubjectOtherWrap?.classList.toggle("d-none", !isOther);
             appointmentSubjectOtherInput.disabled = !isOther;
             appointmentSubjectOtherInput.required = isOther;
 
@@ -790,12 +805,20 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                 appointmentSubjectOtherError.textContent = "";
                 appointmentSubjectOtherError.classList.add("d-none");
             }
+            if (!isOther) {
+                appointmentSubjectOtherInput.value = "";
+            }
             return true;
         };
 
         const validateContactNumber = () => {
             if (!contactNumberInput) return true;
-            const normalized = String(contactNumberInput.value || "").replace(/\D+/g, "");
+            const rawValue = String(contactNumberInput.value || "").trim();
+            if (rawValue === "") {
+                contactNumberInput.setCustomValidity("");
+                return true;
+            }
+            const normalized = rawValue.replace(/\D+/g, "");
             if (!/^09\d{9}$/.test(normalized)) {
                 contactNumberInput.setCustomValidity("Please enter a valid mobile number in the format 09XXXXXXXXX.");
                 return false;
