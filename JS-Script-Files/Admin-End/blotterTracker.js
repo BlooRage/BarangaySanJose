@@ -49,9 +49,10 @@
   const btnCaseActionConfirmReturn = document.getElementById('btnCaseActionConfirmReturn');
   const btnCaseActionConfirm = document.getElementById('btnCaseActionConfirm');
 
-  let allRows = [];
-  let filteredRows = [];
+  let currentRows = [];
   let currentPage = 1;
+  let totalPages = 1;
+  let totalItems = 0;
   let activeFilter = '';
   let modalFilters = {
     dateFrom: '',
@@ -65,8 +66,6 @@
   let pendingCaseAction = null;
   let caseActionHandlersBound = false;
   let unsupportedFileReturnToView = false;
-  const AUTO_REFRESH_MS = 30000;
-  let autoRefreshTimeout = null;
   const OFFICIAL_AREA_OPTIONS = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
   const OFFICIAL_SECTOR_OPTIONS = ['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'];
 
@@ -74,13 +73,6 @@
     if (!refreshBtn) return;
     refreshBtn.classList.toggle('is-loading', !!on);
     refreshBtn.disabled = !!on;
-  }
-
-  function scheduleAutoRefresh() {
-    if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
-    autoRefreshTimeout = window.setTimeout(() => {
-      loadList();
-    }, AUTO_REFRESH_MS);
   }
 
   function esc(v) {
@@ -218,9 +210,11 @@
     `).join('');
   }
 
-  function syncFilterOptions() {
-    const complaintTypes = Array.from(new Set(
-      allRows.map((row) => String(row?.complaint_type || '').trim()).filter(Boolean)
+  function syncFilterOptions(complaintTypes = []) {
+    const normalizedComplaintTypes = Array.from(new Set(
+      (Array.isArray(complaintTypes) ? complaintTypes : [])
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
     )).sort((a, b) => a.localeCompare(b));
     const areaNumbers = OFFICIAL_AREA_OPTIONS.slice();
     const sectors = OFFICIAL_SECTOR_OPTIONS.slice();
@@ -230,7 +224,7 @@
       .map((value) => normalizeSectorLabel(value))
       .filter((value) => sectors.includes(value));
 
-    renderFilterChecklist(filterTypeListEl, 'complaint_type', complaintTypes);
+    renderFilterChecklist(filterTypeListEl, 'complaint_type', normalizedComplaintTypes);
     renderFilterChecklist(filterAreaListEl, 'area_number', areaNumbers);
     renderFilterChecklist(filterSectorListEl, 'sector_membership', sectors);
     if (filterDateFromEl) filterDateFromEl.value = modalFilters.dateFrom || '';
@@ -393,11 +387,9 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     `;
   }
 
-  function renderPagination(total) {
+  function renderPagination() {
     if (!paginationEl) return;
-    const perPage = Math.max(1, Number(entriesPerPageInput?.value || 20));
-    const pages = Math.max(1, Math.ceil(total / perPage));
-    currentPage = Math.min(currentPage, pages);
+    currentPage = Math.min(currentPage, totalPages);
     const items = [];
     const makeBtn = (label, page, disabled = false, active = false) => `
       <li class="page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}">
@@ -405,32 +397,48 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       </li>
     `;
     items.push(makeBtn('Prev', currentPage - 1, currentPage <= 1));
-    for (let i = 1; i <= pages; i += 1) {
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    startPage = Math.max(1, endPage - 4);
+
+    if (startPage > 1) {
+      items.push(makeBtn('1', 1, false, currentPage === 1));
+      if (startPage > 2) {
+        items.push(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i += 1) {
       items.push(makeBtn(String(i), i, false, i === currentPage));
     }
-    items.push(makeBtn('Next', currentPage + 1, currentPage >= pages));
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        items.push(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+      }
+      items.push(makeBtn(String(totalPages), totalPages, false, currentPage === totalPages));
+    }
+
+    items.push(makeBtn('Next', currentPage + 1, currentPage >= totalPages));
     paginationEl.innerHTML = items.join('');
     paginationEl.querySelectorAll('button[data-page]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const page = Number(btn.getAttribute('data-page') || 1);
         if (!Number.isFinite(page)) return;
         currentPage = page;
-        renderTable();
+        loadList();
       });
     });
   }
 
   function renderTable() {
     if (!tableBody) return;
-    const perPage = Math.max(1, Number(entriesPerPageInput?.value || 20));
-    const start = (currentPage - 1) * perPage;
-    const pageRows = filteredRows.slice(start, start + perPage);
-    if (!pageRows.length) {
-      tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No blotter records found.</td></tr>`;
+    if (!currentRows.length) {
+      tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No blotter records found.</td></tr>`;
     } else {
-      tableBody.innerHTML = pageRows.map(buildTableRow).join('');
+      tableBody.innerHTML = currentRows.map(buildTableRow).join('');
     }
-    renderPagination(filteredRows.length);
+    renderPagination();
 
     tableBody.querySelectorAll('button[data-view-id]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -449,36 +457,24 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     });
   }
 
-  function applyFilters() {
-    const term = String(searchInput?.value || '').trim().toLowerCase();
-    filteredRows = allRows.filter((row) => {
-      const statusKey = String(row?.status_name || '').trim().toLowerCase();
-      const matchesFilter = !activeFilter || statusKey === activeFilter;
-      if (!matchesFilter) return false;
-      if (!matchesModalFilters(row)) return false;
-
-      if (!term) return true;
-      const hay = [
-        row.blotter_id,
-        row.blotter_number,
-        row.case_id,
-        row.complainant_name,
-        row.respondent_name,
-        row.complaint_type,
-        row.area_number,
-        row.sector_membership,
-        row.status_name,
-        row.level_name
-      ].map((v) => String(v || '').toLowerCase());
-      return hay.some((v) => v.includes(term));
-    });
-    currentPage = 1;
-    renderTable();
+  function buildListUrl() {
+    const params = new URLSearchParams();
+    params.set('action', 'list');
+    params.set('page', String(currentPage));
+    params.set('per_page', String(Math.max(1, Number(entriesPerPageInput?.value || 20))));
+    const searchTerm = String(searchInput?.value || '').trim();
+    if (searchTerm) params.set('search', searchTerm);
+    if (activeFilter) params.set('status', activeFilter);
+    if (modalFilters.dateFrom) params.set('date_from', modalFilters.dateFrom);
+    if (modalFilters.dateTo) params.set('date_to', modalFilters.dateTo);
+    if (modalFilters.complaint_type.length) params.set('complaint_type', modalFilters.complaint_type.join(','));
+    if (modalFilters.area_number.length) params.set('area_number', modalFilters.area_number.join(','));
+    if (modalFilters.sector_membership.length) params.set('sector_membership', modalFilters.sector_membership.join(','));
+    return `${endpoint}?${params.toString()}`;
   }
 
-  function updateActiveBadge() {
+  function updateActiveBadge(count) {
     if (!activeBlotterBadge) return;
-    const count = allRows.filter((row) => String(row?.status_name || '').trim().toLowerCase() === 'active').length;
     activeBlotterBadge.textContent = String(count);
     activeBlotterBadge.classList.toggle('d-none', count <= 0);
   }
@@ -493,16 +489,26 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     return data;
   }
 
+  function applyListResponse(data) {
+    const meta = data?.meta || {};
+    const pagination = meta.pagination || {};
+    currentRows = Array.isArray(data?.items) ? data.items : [];
+    currentPage = Math.max(1, Number(pagination.page || currentPage || 1));
+    totalPages = Math.max(1, Number(pagination.total_pages || 1));
+    totalItems = Math.max(0, Number(pagination.total_items || currentRows.length || 0));
+    updateActiveBadge(Number(meta.badges?.active_count || 0));
+    syncFilterOptions(meta.filters?.complaint_types || []);
+    renderTable();
+  }
+
   async function loadList() {
     if (!tableBody) return;
+    const url = buildListUrl();
     tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">Loading blotter records...</td></tr>`;
     setRefreshLoading(true);
     try {
-      const data = await fetchJson(`${endpoint}?action=list`);
-      allRows = Array.isArray(data.items) ? data.items : [];
-      updateActiveBadge();
-      syncFilterOptions();
-      applyFilters();
+      const data = await fetchJson(url);
+      applyListResponse(data);
     } catch (err) {
       tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
     } finally {
@@ -1051,29 +1057,32 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         btn.classList.toggle('btn-outline-primary', isActive);
         btn.classList.toggle('btn-outline-secondary', !isActive);
       });
-      applyFilters();
+      currentPage = 1;
+      loadList();
     });
   });
 
   searchInput?.addEventListener('input', () => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(applyFilters, 200);
+    searchTimer = setTimeout(() => {
+      currentPage = 1;
+      loadList();
+    }, 200);
   });
 
   entriesPerPageInput?.addEventListener('change', () => {
     currentPage = 1;
-    renderTable();
+    loadList();
   });
 
   refreshBtn?.addEventListener('click', () => {
-    scheduleAutoRefresh();
     loadList();
   });
 
   btnBlotterFilterApply?.addEventListener('click', () => {
     modalFilters = collectModalFilters();
     currentPage = 1;
-    applyFilters();
+    loadList();
     if (filterModalEl) bootstrap.Modal.getInstance(filterModalEl)?.hide();
   });
 
@@ -1091,11 +1100,9 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       checkbox.checked = false;
     });
     currentPage = 1;
-    applyFilters();
+    loadList();
   });
 
   initCaseActionFlow();
   loadList();
-  scheduleAutoRefresh();
 })();
-

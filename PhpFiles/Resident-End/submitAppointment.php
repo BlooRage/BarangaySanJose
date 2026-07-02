@@ -516,7 +516,7 @@ if ($subject === 'other' && $subjectOther === '') {
     appointmentRedirectWithMessage('error', 'Please specify the subject when Other is selected.');
 }
 
-if ($appointmentDate === '' || $appointmentTime === '' || $purpose === '') {
+if ($appointmentDate === '' || $appointmentTime === '') {
     appointmentRedirectWithMessage('error', 'Please complete all required appointment fields.');
 }
 

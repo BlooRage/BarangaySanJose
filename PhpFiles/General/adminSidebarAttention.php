@@ -32,6 +32,65 @@ if (!function_exists('sbatt_default_counts')) {
     }
 }
 
+if (!function_exists('sbatt_shared_cache_path')) {
+    function sbatt_shared_cache_path(string $key): string
+    {
+        $safeKey = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $key) ?? 'cache';
+        return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_' . $safeKey . '.cache';
+    }
+}
+
+if (!function_exists('sbatt_shared_cache_get')) {
+    function sbatt_shared_cache_get(string $key, int $ttlSeconds): ?array
+    {
+        if ($key === '' || $ttlSeconds <= 0) {
+            return null;
+        }
+
+        $path = sbatt_shared_cache_path($key);
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $payload = json_decode($raw, true);
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $createdAt = (int)($payload['created_at'] ?? 0);
+        $value = $payload['value'] ?? null;
+        if ($createdAt <= 0 || (time() - $createdAt) > $ttlSeconds || !is_array($value)) {
+            return null;
+        }
+
+        return $value;
+    }
+}
+
+if (!function_exists('sbatt_shared_cache_put')) {
+    function sbatt_shared_cache_put(string $key, array $value): void
+    {
+        if ($key === '') {
+            return;
+        }
+
+        $payload = json_encode([
+            'created_at' => time(),
+            'value' => $value,
+        ]);
+        if (!is_string($payload) || $payload === '') {
+            return;
+        }
+
+        @file_put_contents(sbatt_shared_cache_path($key), $payload, LOCK_EX);
+    }
+}
+
 if (!function_exists('sbatt_table_exists')) {
     function sbatt_table_exists(mysqli $conn, string $tableName): bool
     {
@@ -695,67 +754,38 @@ if (!function_exists('sbatt_count_pending_complaints')) {
             return 0;
         }
 
-        $sql = "
-            SELECT
-                c.case_id,
-                COALESCE(s.status_name, 'Pending') AS status_name,
-                COALESCE(ct.escalated_to_blotter, 0) AS escalated_to_blotter,
-                br.request_status_name
-            FROM casereportstbl c
-            INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
-            LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
-            LEFT JOIN (
+        return sbatt_scalar_count($conn, "
+            SELECT COUNT(*) AS total
+            FROM (
                 SELECT
-                    br1.complaint_case_id,
-                    COALESCE(s1.status_name, 'Pending') AS request_status_name,
-                    br1.requested_at,
-                    br1.request_id
-                FROM blotterrequeststbl br1
-                LEFT JOIN statuslookuptbl s1 ON s1.status_id = br1.request_status_id
-            ) br ON br.complaint_case_id = c.case_id
-            WHERE c.report_type = 'Complaint'
-            ORDER BY c.case_id ASC, br.requested_at DESC, br.request_id DESC
-        ";
-
-        $res = $conn->query($sql);
-        if (!($res instanceof mysqli_result)) {
-            return 0;
-        }
-
-        $latestRows = [];
-        while ($row = $res->fetch_assoc()) {
-            $caseId = trim((string)($row['case_id'] ?? ''));
-            if ($caseId === '' || isset($latestRows[$caseId])) {
-                continue;
-            }
-            $latestRows[$caseId] = $row;
-        }
-        $res->free();
-
-        $pendingCount = 0;
-        foreach ($latestRows as $row) {
-            $statusName = strtolower(trim((string)($row['status_name'] ?? 'Pending')));
-            $requestStatus = strtolower(trim((string)($row['request_status_name'] ?? '')));
-            $statusKey = 'pending';
-
-            if ((int)($row['escalated_to_blotter'] ?? 0) === 1) {
-                $statusKey = 'escalated';
-            } elseif (in_array($requestStatus, ['pending', 'approved'], true)) {
-                $statusKey = 'escalated';
-            } elseif (strpos($statusName, 'resolved') !== false) {
-                $statusKey = 'resolved';
-            } elseif (strpos($statusName, 'drop') !== false) {
-                $statusKey = 'dropped';
-            } elseif (strpos($statusName, 'endorse') !== false) {
-                $statusKey = 'escalated';
-            }
-
-            if ($statusKey === 'pending') {
-                $pendingCount++;
-            }
-        }
-
-        return $pendingCount;
+                    c.case_id,
+                    CASE
+                        WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'escalated'
+                        WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'escalated'
+                        WHEN LOWER(COALESCE(s.status_name, 'pending')) LIKE '%resolved%' THEN 'resolved'
+                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%drop%' THEN 'dropped'
+                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%endorse%' THEN 'escalated'
+                        ELSE 'pending'
+                    END AS status_key
+                FROM casereportstbl c
+                INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+                LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+                LEFT JOIN (
+                    SELECT
+                        br1.complaint_case_id,
+                        COALESCE(s1.status_name, 'Pending') AS request_status_name
+                    FROM blotterrequeststbl br1
+                    INNER JOIN (
+                        SELECT complaint_case_id, MAX(request_id) AS latest_request_id
+                        FROM blotterrequeststbl
+                        GROUP BY complaint_case_id
+                    ) latest_br ON latest_br.latest_request_id = br1.request_id
+                    LEFT JOIN statuslookuptbl s1 ON s1.status_id = br1.request_status_id
+                ) br ON br.complaint_case_id = c.case_id
+                WHERE c.report_type = 'Complaint'
+            ) complaint_rows
+            WHERE complaint_rows.status_key = 'pending'
+        ");
     }
 }
 
@@ -861,6 +891,16 @@ if (!function_exists('sbatt_get_counts')) {
             }
         }
 
+        $sharedCacheKey = 'admin_sidebar_attention_counts_v1';
+        $sharedCounts = sbatt_shared_cache_get($sharedCacheKey, $ttlSeconds);
+        if (is_array($sharedCounts)) {
+            $_SESSION[$cacheKey] = [
+                'expires_at' => $now + $ttlSeconds,
+                'counts' => $sharedCounts,
+            ];
+            return array_merge($defaults, $sharedCounts);
+        }
+
         try {
             $counts = sbatt_build_counts($conn);
         } catch (Throwable $e) {
@@ -871,6 +911,7 @@ if (!function_exists('sbatt_get_counts')) {
             'expires_at' => $now + $ttlSeconds,
             'counts' => $counts,
         ];
+        sbatt_shared_cache_put($sharedCacheKey, $counts);
 
         return array_merge($defaults, $counts);
     }

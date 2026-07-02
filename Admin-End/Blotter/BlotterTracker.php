@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . "/../../PhpFiles/General/connection.php";
+define('ADMIN_GUARD_LIGHT', true);
+define('ADMIN_SIDEBAR_DEFER_DB', true);
 require_once __DIR__ . "/../includes/admin_guard.php";
 ?>
 <!DOCTYPE html>
@@ -10,7 +11,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blotter Tracker</title>
 
-    <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
+    <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous" defer></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
@@ -429,10 +430,9 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260322-1"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260703-1"></script>
 </body>
 </html>
-
 
 
 

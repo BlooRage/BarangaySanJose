@@ -402,8 +402,8 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                                <textarea class="form-control" name="purpose" rows="4" required><?php echo htmlspecialchars($formValues['purpose'], ENT_QUOTES, 'UTF-8'); ?></textarea>
+                                <label class="top-label">Purpose</label>
+                                <textarea class="form-control" name="purpose" rows="4"><?php echo htmlspecialchars($formValues['purpose'], ENT_QUOTES, 'UTF-8'); ?></textarea>
                             </div>
                         </div>
 

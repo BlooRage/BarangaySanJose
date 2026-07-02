@@ -49,7 +49,12 @@ if (file_exists($sbAttentionHelperPath)) {
     require_once $sbAttentionHelperPath;
 }
 
-if ((!isset($conn) || !($conn instanceof mysqli)) && file_exists(__DIR__ . '/../../PhpFiles/General/connection.php')) {
+$sbDeferDb = defined('ADMIN_SIDEBAR_DEFER_DB') && ADMIN_SIDEBAR_DEFER_DB === true;
+if (
+    !$sbDeferDb
+    && (!isset($conn) || !($conn instanceof mysqli))
+    && file_exists(__DIR__ . '/../../PhpFiles/General/connection.php')
+) {
     require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 }
 
@@ -336,7 +341,7 @@ $sbContentFaqActive = $sbCanAccessContentNavigator
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
 if (isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
-    $sbAttentionCounts = sbatt_get_counts($conn, 180);
+    $sbAttentionCounts = sbatt_get_counts($conn, 300);
 }
 if (!$sbCanReviewContent) {
     $sbAttentionCounts['content_change_request'] = 0;

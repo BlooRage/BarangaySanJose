@@ -71,6 +71,32 @@ if (!function_exists('db_should_retry_connect_error')) {
     }
 }
 
+if (!function_exists('db_should_use_persistent_connection')) {
+    function db_should_use_persistent_connection(): bool
+    {
+        return runtime_bool(
+            runtime_env('DB_USE_PERSISTENT', runtime_config('db.use_persistent', true)),
+            true
+        );
+    }
+}
+
+if (!function_exists('db_connection_host_for_driver')) {
+    function db_connection_host_for_driver(string $host): string
+    {
+        $host = trim($host);
+        if ($host === '') {
+            return '';
+        }
+
+        if (!db_should_use_persistent_connection()) {
+            return $host;
+        }
+
+        return str_starts_with($host, 'p:') ? $host : 'p:' . $host;
+    }
+}
+
 if (!function_exists('db_fail_response')) {
     function db_fail_response(int $statusCode, string $publicMessage, string $logMessage): void
     {
@@ -187,7 +213,7 @@ foreach ($hostCandidates as $candidateHost) {
         if (defined('MYSQLI_OPT_READ_TIMEOUT')) {
             $candidateConn->options(MYSQLI_OPT_READ_TIMEOUT, 10);
         }
-        @mysqli_real_connect($candidateConn, $candidateHost, $user, $pass, $dbname, $port > 0 ? $port : 3306);
+        @mysqli_real_connect($candidateConn, db_connection_host_for_driver($candidateHost), $user, $pass, $dbname, $port > 0 ? $port : 3306);
     }
 
     if ($candidateConn instanceof mysqli && !$candidateConn->connect_error) {

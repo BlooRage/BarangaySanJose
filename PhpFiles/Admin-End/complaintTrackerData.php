@@ -1,18 +1,12 @@
 <?php
-session_start();
-
-require_once "../General/connection.php";
-require_once "../General/caseUserAccountForeignKeys.php";
-require_once "../General/complaintTypeDetails.php";
 require_once "../General/security.php";
-require_once "../General/uniqueIDGenerate.php";
-
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
-cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 header('Content-Type: application/json; charset=utf-8');
 
+$allowedRoles = ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'];
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$requestAction = trim((string)($_GET['action'] ?? 'list'));
+$authChecked = false;
 $jsonInput = [];
 if ($requestMethod === 'POST') {
     $raw = file_get_contents('php://input');
@@ -24,6 +18,111 @@ if ($requestMethod === 'POST') {
     }
 }
 
+function complaintTrackerCachePath(string $key): string
+{
+    $safeKey = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $key) ?? 'cache';
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_complaint_tracker_' . $safeKey . '.cache';
+}
+
+function complaintTrackerCacheGet(string $key, int $ttlSeconds): ?array
+{
+    if ($key === '' || $ttlSeconds <= 0) {
+        return null;
+    }
+
+    $path = complaintTrackerCachePath($key);
+    if (!is_file($path)) {
+        return null;
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+
+    $payload = json_decode($raw, true);
+    if (!is_array($payload)) {
+        return null;
+    }
+
+    $createdAt = (int)($payload['created_at'] ?? 0);
+    if ($createdAt <= 0 || (time() - $createdAt) > $ttlSeconds) {
+        return null;
+    }
+
+    $value = $payload['value'] ?? null;
+    return is_array($value) ? $value : null;
+}
+
+function complaintTrackerCachePut(string $key, array $value): void
+{
+    if ($key === '') {
+        return;
+    }
+
+    $payload = json_encode([
+        'created_at' => time(),
+        'value' => $value,
+    ]);
+    if (!is_string($payload) || $payload === '') {
+        return;
+    }
+
+    @file_put_contents(complaintTrackerCachePath($key), $payload, LOCK_EX);
+}
+
+function complaintTrackerCacheClear(): void
+{
+    $pattern = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_complaint_tracker_*.cache';
+    $matches = glob($pattern);
+    if (!is_array($matches)) {
+        return;
+    }
+
+    foreach ($matches as $path) {
+        if (is_string($path) && is_file($path)) {
+            @unlink($path);
+        }
+    }
+}
+
+function complaintTrackerListCacheKey(array $query, string $userId, string $role): string
+{
+    ksort($query);
+
+    return md5(json_encode([
+        'query' => $query,
+        'user_id' => $userId,
+        'role' => normalizeRoleName($role),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+}
+
+if ($requestMethod === 'GET' && $requestAction === 'list') {
+    requireRoleSession($allowedRoles);
+    $authChecked = true;
+
+    $listCacheKey = complaintTrackerListCacheKey(
+        $_GET,
+        trim((string)($_SESSION['user_id'] ?? '')),
+        (string)($_SESSION['role'] ?? '')
+    );
+    $cachedResponse = complaintTrackerCacheGet($listCacheKey, 60);
+    if (is_array($cachedResponse)) {
+        echo json_encode($cachedResponse, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+}
+
+require_once "../General/connection.php";
+require_once "../General/caseUserAccountForeignKeys.php";
+require_once "../General/complaintTypeDetails.php";
+require_once "../General/uniqueIDGenerate.php";
+
+if (!$authChecked) {
+    requireRoleSession($allowedRoles);
+}
+cuafk_ensure_case_useraccount_foreign_keys($conn);
+
 function respond($success, $payload = [], $message = ''): void
 {
     echo json_encode([
@@ -31,12 +130,25 @@ function respond($success, $payload = [], $message = ''): void
         'message' => $message,
         'items' => $payload['items'] ?? null,
         'detail' => $payload['detail'] ?? null,
+        'meta' => $payload['meta'] ?? null,
     ]);
     exit;
 }
 
 function tableExists(mysqli $conn, string $tableName): bool
 {
+    static $cache = [];
+
+    $tableName = trim($tableName);
+    if ($tableName === '') {
+        return false;
+    }
+
+    $cacheKey = strtolower($tableName);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
     $stmt = $conn->prepare("
         SELECT 1
         FROM information_schema.TABLES
@@ -53,11 +165,24 @@ function tableExists(mysqli $conn, string $tableName): bool
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
 
-    return !empty($row);
+    return $cache[$cacheKey] = !empty($row);
 }
 
 function columnExists(mysqli $conn, string $tableName, string $columnName): bool
 {
+    static $cache = [];
+
+    $tableName = trim($tableName);
+    $columnName = trim($columnName);
+    if ($tableName === '' || $columnName === '') {
+        return false;
+    }
+
+    $cacheKey = strtolower($tableName . '|' . $columnName);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
     $stmt = $conn->prepare("
         SELECT 1
         FROM information_schema.COLUMNS
@@ -73,7 +198,7 @@ function columnExists(mysqli $conn, string $tableName, string $columnName): bool
     $stmt->execute();
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
-    return !empty($row);
+    return $cache[$cacheKey] = !empty($row);
 }
 
 function getStatusId(mysqli $conn, string $statusName, string $statusType): int
@@ -137,6 +262,29 @@ function formatDisplayTimestamp(?string $value): string
     }
 }
 
+function parseCsvValues($value): array
+{
+    $rawValues = is_array($value) ? $value : explode(',', (string)$value);
+    $items = [];
+    foreach ($rawValues as $item) {
+        $item = trim((string)$item);
+        if ($item !== '') {
+            $items[$item] = true;
+        }
+    }
+
+    return array_keys($items);
+}
+
+function bindDynamicParams(mysqli_stmt $stmt, string $types, array $params): void
+{
+    if ($types === '' || empty($params)) {
+        return;
+    }
+
+    $stmt->bind_param($types, ...$params);
+}
+
 function getLatestBlotterRequest(mysqli $conn, string $caseId): ?array
 {
     if (!tableExists($conn, 'blotterrequeststbl')) {
@@ -155,6 +303,7 @@ function getLatestBlotterRequest(mysqli $conn, string $caseId): ?array
         FROM blotterrequeststbl br
         LEFT JOIN statuslookuptbl s ON s.status_id = br.request_status_id
         WHERE br.complaint_case_id = ?
+        ORDER BY br.requested_at DESC, br.request_id DESC
         LIMIT 1
     ");
     if (!$stmt) {
@@ -391,7 +540,28 @@ if ($action === '') {
 }
 
 if ($action === 'list') {
-    $residentSelect = '';
+    $listCacheKey = complaintTrackerListCacheKey(
+        $_GET,
+        trim((string)($_SESSION['user_id'] ?? '')),
+        (string)($_SESSION['role'] ?? '')
+    );
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
+    $offset = ($page - 1) * $perPage;
+    $searchTerm = trim((string)($_GET['search'] ?? ''));
+    $statusFilter = strtolower(trim((string)($_GET['status'] ?? '')));
+    if (!in_array($statusFilter, ['', 'pending', 'resolved', 'dropped', 'escalated'], true)) {
+        $statusFilter = '';
+    }
+    $dateFrom = trim((string)($_GET['date_from'] ?? ''));
+    $dateTo = trim((string)($_GET['date_to'] ?? ''));
+    $complaintTypeFilters = parseCsvValues($_GET['complaint_type'] ?? '');
+    $areaFilters = parseCsvValues($_GET['area_number'] ?? '');
+    $sectorFilters = parseCsvValues($_GET['sector_membership'] ?? '');
+
+    $residentSelect = ",
+            '' AS sector_membership,
+            '' AS area_number";
     $residentJoin = '';
     if (
         tableExists($conn, 'residentinformationtbl')
@@ -403,35 +573,46 @@ if ($action === 'list') {
             COALESCE(ra.area_number, '') AS area_number";
         $residentJoin = "
         LEFT JOIN residentinformationtbl ri ON ri.user_id = c.resident_user_id
-        LEFT JOIN residentaddresstbl ra
-            ON ra.address_id = (
-                SELECT a2.address_id
-                FROM residentaddresstbl a2
-                WHERE a2.resident_id = ri.resident_id
-                ORDER BY a2.address_id DESC
-                LIMIT 1
-            )";
+        LEFT JOIN (
+            SELECT ra1.resident_id, ra1.area_number
+            FROM residentaddresstbl ra1
+            INNER JOIN (
+                SELECT resident_id, MAX(address_id) AS latest_address_id
+                FROM residentaddresstbl
+                GROUP BY resident_id
+            ) latest_ra
+                ON latest_ra.latest_address_id = ra1.address_id
+        ) ra ON ra.resident_id = ri.resident_id";
     }
 
-    $sql = "
+    $baseSql = "
         SELECT
             c.case_id,
             ct.complaint_id,
             c.report_timestamp AS submitted_at_raw,
             c.complaint_type,
-            s.status_name,
-            l.status_name AS level_name,
+            COALESCE(s.status_name, 'Pending') AS status_name,
+            COALESCE(l.status_name, 'Complaint Only') AS level_name,
             ct.subject_display_name,
             ct.subject_kind,
             ct.escalated_to_blotter,
             ct.blotter_id,
             br.request_id,
             br.request_status_name,
+            TRIM(CONCAT_WS(' ', cp.firstname, cp.middlename, cp.lastname, cp.suffix)) AS complainant_name,
             cp.firstname,
             cp.middlename,
             cp.lastname,
             cp.suffix
-            {$residentSelect}
+            {$residentSelect},
+            CASE
+                WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'escalated'
+                WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'escalated'
+                WHEN LOWER(COALESCE(s.status_name, 'pending')) LIKE '%resolved%' THEN 'resolved'
+                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%drop%' THEN 'dropped'
+                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%endorse%' THEN 'escalated'
+                ELSE 'pending'
+            END AS status_key
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
@@ -442,6 +623,12 @@ if ($action === 'list') {
                 br1.request_id,
                 COALESCE(s1.status_name, 'Pending') AS request_status_name
             FROM blotterrequeststbl br1
+            INNER JOIN (
+                SELECT complaint_case_id, MAX(request_id) AS latest_request_id
+                FROM blotterrequeststbl
+                GROUP BY complaint_case_id
+            ) latest_br
+                ON latest_br.latest_request_id = br1.request_id
             LEFT JOIN statuslookuptbl s1 ON s1.status_id = br1.request_status_id
         ) br
             ON br.complaint_case_id = c.case_id
@@ -459,32 +646,129 @@ if ($action === 'list') {
             ON cp.case_id = c.case_id
         {$residentJoin}
         WHERE c.report_type = 'Complaint'
-        ORDER BY c.report_timestamp DESC, c.case_id DESC
     ";
 
-    $stmt = $conn->prepare($sql);
+    $filterSql = '';
+    $filterTypes = '';
+    $filterParams = [];
+
+    if ($statusFilter !== '') {
+        $filterSql .= " AND complaint_rows.status_key = ?";
+        $filterTypes .= 's';
+        $filterParams[] = $statusFilter;
+    }
+
+    if ($dateFrom !== '') {
+        $filterSql .= " AND DATE(complaint_rows.submitted_at_raw) >= ?";
+        $filterTypes .= 's';
+        $filterParams[] = $dateFrom;
+    }
+
+    if ($dateTo !== '') {
+        $filterSql .= " AND DATE(complaint_rows.submitted_at_raw) <= ?";
+        $filterTypes .= 's';
+        $filterParams[] = $dateTo;
+    }
+
+    if (!empty($complaintTypeFilters)) {
+        $placeholders = implode(', ', array_fill(0, count($complaintTypeFilters), '?'));
+        $filterSql .= " AND complaint_rows.complaint_type IN ({$placeholders})";
+        $filterTypes .= str_repeat('s', count($complaintTypeFilters));
+        array_push($filterParams, ...$complaintTypeFilters);
+    }
+
+    if (!empty($areaFilters)) {
+        $placeholders = implode(', ', array_fill(0, count($areaFilters), '?'));
+        $filterSql .= " AND complaint_rows.area_number IN ({$placeholders})";
+        $filterTypes .= str_repeat('s', count($areaFilters));
+        array_push($filterParams, ...$areaFilters);
+    }
+
+    if (!empty($sectorFilters)) {
+        $sectorParts = [];
+        foreach ($sectorFilters as $sectorFilter) {
+            $sectorParts[] = "LOWER(complaint_rows.sector_membership) LIKE ?";
+            $filterTypes .= 's';
+            $filterParams[] = '%' . strtolower($sectorFilter) . '%';
+        }
+        $filterSql .= " AND (" . implode(' OR ', $sectorParts) . ")";
+    }
+
+    if ($searchTerm !== '') {
+        $like = '%' . $searchTerm . '%';
+        $searchColumns = [
+            'complaint_rows.complaint_id',
+            'complaint_rows.case_id',
+            'complaint_rows.complainant_name',
+            'complaint_rows.subject_display_name',
+            'complaint_rows.complaint_type',
+            'complaint_rows.status_name',
+            'complaint_rows.area_number',
+            'complaint_rows.sector_membership',
+        ];
+        $searchParts = [];
+        foreach ($searchColumns as $searchColumn) {
+            $searchParts[] = "{$searchColumn} LIKE ?";
+            $filterTypes .= 's';
+            $filterParams[] = $like;
+        }
+        $filterSql .= " AND (" . implode(' OR ', $searchParts) . ")";
+    }
+
+    $countStmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM ({$baseSql}) complaint_rows
+        WHERE 1=1 {$filterSql}
+    ");
+    if (!$countStmt) {
+        respond(false, [], 'Failed to prepare complaint count query.');
+    }
+    bindDynamicParams($countStmt, $filterTypes, $filterParams);
+    $countStmt->execute();
+    $countRow = $countStmt->get_result()->fetch_assoc();
+    $countStmt->close();
+    $totalItems = (int)($countRow['total'] ?? 0);
+    $totalPages = max(1, (int)ceil($totalItems / $perPage));
+    if ($page > $totalPages) {
+        $page = $totalPages;
+        $offset = ($page - 1) * $perPage;
+    }
+
+    $pendingCount = 0;
+    $pendingCountStmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM ({$baseSql}) complaint_rows
+        WHERE complaint_rows.status_key = 'pending'
+    ");
+    if ($pendingCountStmt) {
+        $pendingCountStmt->execute();
+        $pendingCountRow = $pendingCountStmt->get_result()->fetch_assoc();
+        $pendingCount = (int)($pendingCountRow['total'] ?? 0);
+        $pendingCountStmt->close();
+    }
+
+    $stmt = $conn->prepare("
+        SELECT *
+        FROM ({$baseSql}) complaint_rows
+        WHERE 1=1 {$filterSql}
+        ORDER BY complaint_rows.submitted_at_raw DESC, complaint_rows.case_id DESC
+        LIMIT ? OFFSET ?
+    ");
     if (!$stmt) {
         respond(false, [], 'Failed to prepare complaint list query.');
     }
 
+    $listTypes = $filterTypes . 'ii';
+    $listParams = $filterParams;
+    $listParams[] = $perPage;
+    $listParams[] = $offset;
+    bindDynamicParams($stmt, $listTypes, $listParams);
     $stmt->execute();
     $res = $stmt->get_result();
     $items = [];
     while ($row = $res->fetch_assoc()) {
         $statusName = trim((string)($row['status_name'] ?? 'Pending'));
         $requestStatusName = trim((string)($row['request_status_name'] ?? ''));
-        $statusKey = 'pending';
-        if ((int)($row['escalated_to_blotter'] ?? 0) === 1) {
-            $statusKey = 'escalated';
-        } elseif (in_array(strtolower($requestStatusName), ['pending', 'approved'], true)) {
-            $statusKey = 'escalated';
-        } elseif (stripos($statusName, 'resolved') !== false) {
-            $statusKey = 'resolved';
-        } elseif (stripos($statusName, 'drop') !== false) {
-            $statusKey = 'dropped';
-        } elseif (stripos($statusName, 'endorse') !== false) {
-            $statusKey = 'escalated';
-        }
 
         $items[] = [
             'case_id' => (string)$row['case_id'],
@@ -495,7 +779,7 @@ if ($action === 'list') {
             'area_number' => $row['area_number'] ?? '',
             'sector_membership' => $row['sector_membership'] ?? '',
             'status_name' => $statusName !== '' ? $statusName : 'Pending',
-            'status_key' => $statusKey,
+            'status_key' => $row['status_key'] ?? 'pending',
             'level_name' => $row['level_name'] ?? 'Complaint Only',
             'subject_display_name' => $row['subject_display_name'] ?? '',
             'subject_kind' => $row['subject_kind'] ?? '',
@@ -503,12 +787,55 @@ if ($action === 'list') {
             'blotter_id' => $row['blotter_id'] ?? null,
             'blotter_request_id' => $row['request_id'] ?? null,
             'blotter_request_status' => $requestStatusName !== '' ? $requestStatusName : null,
-            'complainant_name' => participantDisplayName($row),
+            'complainant_name' => $row['complainant_name'] !== '' ? $row['complainant_name'] : participantDisplayName($row),
         ];
     }
     $stmt->close();
 
-    respond(true, ['items' => $items]);
+    $complaintTypes = [];
+    $typeStmt = $conn->prepare("
+        SELECT DISTINCT complaint_type
+        FROM casereportstbl
+        WHERE report_type = 'Complaint'
+          AND TRIM(COALESCE(complaint_type, '')) <> ''
+        ORDER BY complaint_type ASC
+    ");
+    if ($typeStmt) {
+        $typeStmt->execute();
+        $typeRes = $typeStmt->get_result();
+        while ($typeRow = $typeRes->fetch_assoc()) {
+            $complaintTypes[] = (string)$typeRow['complaint_type'];
+        }
+        $typeStmt->close();
+    }
+
+    $responsePayload = [
+        'items' => $items,
+        'meta' => [
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_items' => $totalItems,
+                'total_pages' => $totalPages,
+            ],
+            'badges' => [
+                'pending_count' => $pendingCount,
+            ],
+            'filters' => [
+                'complaint_types' => $complaintTypes,
+            ],
+        ],
+    ];
+
+    complaintTrackerCachePut($listCacheKey, [
+        'success' => true,
+        'message' => '',
+        'items' => $responsePayload['items'],
+        'detail' => null,
+        'meta' => $responsePayload['meta'],
+    ]);
+
+    respond(true, $responsePayload);
 }
 
 if ($action === 'detail') {
@@ -715,6 +1042,7 @@ if ($action === 'update_intake_notes') {
         }
 
         $conn->commit();
+        complaintTrackerCacheClear();
         respond(true, [], 'Intake notes updated.');
     } catch (Throwable $e) {
         $conn->rollback();
@@ -875,6 +1203,7 @@ if ($action === 'update_case_outcome') {
         }
 
         $conn->commit();
+        complaintTrackerCacheClear();
         respond(true, [], 'Complaint updated.');
     } catch (Throwable $e) {
         $conn->rollback();

@@ -1,14 +1,110 @@
 <?php
-session_start();
+require_once "../General/security.php";
+
+header('Content-Type: application/json; charset=utf-8');
+
+$allowedRoles = ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'];
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$requestAction = trim((string)($_GET['action'] ?? 'list'));
+$authChecked = false;
+
+function blotterTrackerCachePath(string $key): string {
+    $safeKey = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $key) ?? 'cache';
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_blotter_tracker_' . $safeKey . '.cache';
+}
+
+function blotterTrackerCacheGet(string $key, int $ttlSeconds): ?array {
+    if ($key === '' || $ttlSeconds <= 0) {
+        return null;
+    }
+
+    $path = blotterTrackerCachePath($key);
+    if (!is_file($path)) {
+        return null;
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+
+    $payload = json_decode($raw, true);
+    if (!is_array($payload)) {
+        return null;
+    }
+
+    $createdAt = (int)($payload['created_at'] ?? 0);
+    if ($createdAt <= 0 || (time() - $createdAt) > $ttlSeconds) {
+        return null;
+    }
+
+    $value = $payload['value'] ?? null;
+    return is_array($value) ? $value : null;
+}
+
+function blotterTrackerCachePut(string $key, array $value): void {
+    if ($key === '') {
+        return;
+    }
+
+    $payload = json_encode([
+        'created_at' => time(),
+        'value' => $value,
+    ]);
+    if (!is_string($payload) || $payload === '') {
+        return;
+    }
+
+    @file_put_contents(blotterTrackerCachePath($key), $payload, LOCK_EX);
+}
+
+function blotterTrackerCacheClear(): void {
+    $pattern = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_blotter_tracker_*.cache';
+    $matches = glob($pattern);
+    if (!is_array($matches)) {
+        return;
+    }
+
+    foreach ($matches as $path) {
+        if (is_string($path) && is_file($path)) {
+            @unlink($path);
+        }
+    }
+}
+
+function blotterTrackerListCacheKey(array $query, string $userId, string $role): string {
+    ksort($query);
+
+    return md5(json_encode([
+        'query' => $query,
+        'user_id' => $userId,
+        'role' => normalizeRoleName($role),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+}
+
+if ($requestMethod === 'GET' && $requestAction === 'list') {
+    requireRoleSession($allowedRoles);
+    $authChecked = true;
+
+    $listCacheKey = blotterTrackerListCacheKey(
+        $_GET,
+        trim((string)($_SESSION['user_id'] ?? '')),
+        (string)($_SESSION['role'] ?? '')
+    );
+    $cachedResponse = blotterTrackerCacheGet($listCacheKey, 60);
+    if (is_array($cachedResponse)) {
+        echo json_encode($cachedResponse, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+}
 
 require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
-require_once "../General/security.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
+if (!$authChecked) {
+    requireRoleSession($allowedRoles);
+}
 cuafk_ensure_case_useraccount_foreign_keys($conn);
-
-header('Content-Type: application/json; charset=utf-8');
 
 function respond($success, $payload = [], $message = '') {
     echo json_encode([
@@ -16,11 +112,11 @@ function respond($success, $payload = [], $message = '') {
         'message' => $message,
         'items' => $payload['items'] ?? null,
         'detail' => $payload['detail'] ?? null,
+        'meta' => $payload['meta'] ?? null,
     ]);
     exit;
 }
 
-$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $jsonInput = [];
 if ($requestMethod === 'POST') {
     $raw = file_get_contents('php://input');
@@ -41,16 +137,33 @@ if ($action === '') {
 }
 
 function tableExists(mysqli $conn, string $tableName): bool {
+    static $cache = [];
+
+    $tableName = trim($tableName);
+    if ($tableName === '') return false;
+
+    $cacheKey = strtolower($tableName);
+    if (array_key_exists($cacheKey, $cache)) return $cache[$cacheKey];
+
     $stmt = $conn->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1");
     if (!$stmt) return false;
     $stmt->bind_param("s", $tableName);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
-    return !empty($row);
+    return $cache[$cacheKey] = !empty($row);
 }
 
 function columnExists(mysqli $conn, string $tableName, string $columnName): bool {
+    static $cache = [];
+
+    $tableName = trim($tableName);
+    $columnName = trim($columnName);
+    if ($tableName === '' || $columnName === '') return false;
+
+    $cacheKey = strtolower($tableName . '|' . $columnName);
+    if (array_key_exists($cacheKey, $cache)) return $cache[$cacheKey];
+
     $stmt = $conn->prepare("
         SELECT 1
         FROM information_schema.COLUMNS
@@ -64,7 +177,7 @@ function columnExists(mysqli $conn, string $tableName, string $columnName): bool
     $stmt->execute();
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
-    return !empty($row);
+    return $cache[$cacheKey] = !empty($row);
 }
 
 function getStatusId(mysqli $conn, string $statusName, string $statusType): int {
@@ -230,8 +343,50 @@ function formatFiledDateTime($dateValue, $timeValue): string {
     return $combined;
 }
 
+function parseCsvValues($value): array {
+    $rawValues = is_array($value) ? $value : explode(',', (string)$value);
+    $items = [];
+    foreach ($rawValues as $item) {
+        $item = trim((string)$item);
+        if ($item !== '') {
+            $items[$item] = true;
+        }
+    }
+    return array_keys($items);
+}
+
+function bindDynamicParams(mysqli_stmt $stmt, string $types, array $params): void {
+    if ($types === '' || empty($params)) {
+        return;
+    }
+
+    $stmt->bind_param($types, ...$params);
+}
+
 if ($action === 'list') {
-    $residentSelect = '';
+    $listCacheKey = blotterTrackerListCacheKey(
+        $_GET,
+        trim((string)($_SESSION['user_id'] ?? '')),
+        (string)($_SESSION['role'] ?? '')
+    );
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
+    $offset = ($page - 1) * $perPage;
+    $searchTerm = trim((string)($_GET['search'] ?? ''));
+    $statusFilter = strtolower(trim((string)($_GET['status'] ?? '')));
+    if (!in_array($statusFilter, ['', 'active', 'endorsed', 'dropped'], true)) {
+        $statusFilter = '';
+    }
+    $dateFrom = trim((string)($_GET['date_from'] ?? ''));
+    $dateTo = trim((string)($_GET['date_to'] ?? ''));
+    $complaintTypeFilters = parseCsvValues($_GET['complaint_type'] ?? '');
+    $areaFilters = parseCsvValues($_GET['area_number'] ?? '');
+    $sectorFilters = parseCsvValues($_GET['sector_membership'] ?? '');
+
+    $residentSelect = ",
+            COALESCE(c.complaint_type, '') AS complaint_type,
+            '' AS sector_membership,
+            '' AS area_number";
     $residentJoin = '';
     if (
         tableExists($conn, 'residentinformationtbl')
@@ -244,34 +399,33 @@ if ($action === 'list') {
             COALESCE(ra.area_number, '') AS area_number";
         $residentJoin = "
         LEFT JOIN residentinformationtbl ri ON ri.user_id = c.resident_user_id
-        LEFT JOIN residentaddresstbl ra
-            ON ra.address_id = (
-                SELECT a2.address_id
-                FROM residentaddresstbl a2
-                WHERE a2.resident_id = ri.resident_id
-                ORDER BY a2.address_id DESC
-                LIMIT 1
-            )";
-    } else {
-        $residentSelect = ",
-            COALESCE(c.complaint_type, '') AS complaint_type,
-            '' AS sector_membership,
-            '' AS area_number";
+        LEFT JOIN (
+            SELECT ra1.resident_id, ra1.area_number
+            FROM residentaddresstbl ra1
+            INNER JOIN (
+                SELECT resident_id, MAX(address_id) AS latest_address_id
+                FROM residentaddresstbl
+                GROUP BY resident_id
+            ) latest_ra
+                ON latest_ra.latest_address_id = ra1.address_id
+        ) ra ON ra.resident_id = ri.resident_id";
     }
 
-    $sql = "
+    $baseSql = "
         SELECT
             c.case_id,
             b.blotter_id,
             b.blotter_number,
             b.date_filed,
             b.time_filed,
-            s.status_name AS status_name,
-            l.status_name AS level_name,
-            cp.firstname,
-            cp.middlename,
-            cp.lastname,
-            cp.suffix,
+            COALESCE(s.status_name, '') AS status_name,
+            COALESCE(l.status_name, '') AS level_name,
+            TRIM(CONCAT_WS(' ', cp.firstname, cp.middlename, cp.lastname, cp.suffix)) AS complainant_name,
+            TRIM(CONCAT_WS(' ', rp.firstname, rp.middlename, rp.lastname, rp.suffix)) AS respondent_name,
+            cp.firstname AS complainant_firstname,
+            cp.middlename AS complainant_middlename,
+            cp.lastname AS complainant_lastname,
+            cp.suffix AS complainant_suffix,
             rp.firstname AS respondent_firstname,
             rp.middlename AS respondent_middlename,
             rp.lastname AS respondent_lastname,
@@ -281,37 +435,152 @@ if ($action === 'list') {
         INNER JOIN barangayblottertbl b ON b.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
         LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
-        LEFT JOIN caseparticipantstbl cp
-            ON cp.case_id = c.case_id
-            AND cp.participant_role = 'Complainant'
-        LEFT JOIN caseparticipantstbl rp
-            ON rp.case_id = c.case_id
-            AND rp.participant_role = 'Respondent'
+        LEFT JOIN (
+            SELECT
+                case_id,
+                MAX(firstname) AS firstname,
+                MAX(middlename) AS middlename,
+                MAX(lastname) AS lastname,
+                MAX(suffix) AS suffix
+            FROM caseparticipantstbl
+            WHERE participant_role = 'Complainant'
+            GROUP BY case_id
+        ) cp ON cp.case_id = c.case_id
+        LEFT JOIN (
+            SELECT
+                case_id,
+                MAX(firstname) AS firstname,
+                MAX(middlename) AS middlename,
+                MAX(lastname) AS lastname,
+                MAX(suffix) AS suffix
+            FROM caseparticipantstbl
+            WHERE participant_role = 'Respondent'
+            GROUP BY case_id
+        ) rp ON rp.case_id = c.case_id
         {$residentJoin}
         WHERE c.report_type = 'Blotter'
-        ORDER BY b.date_filed DESC, b.time_filed DESC, b.blotter_id DESC
     ";
 
-    $stmt = $conn->prepare($sql);
+    $filterSql = '';
+    $filterTypes = '';
+    $filterParams = [];
+
+    if ($statusFilter !== '') {
+        $filterSql .= " AND LOWER(blotter_rows.status_name) = ?";
+        $filterTypes .= 's';
+        $filterParams[] = $statusFilter;
+    }
+
+    if ($dateFrom !== '') {
+        $filterSql .= " AND blotter_rows.date_filed >= ?";
+        $filterTypes .= 's';
+        $filterParams[] = $dateFrom;
+    }
+
+    if ($dateTo !== '') {
+        $filterSql .= " AND blotter_rows.date_filed <= ?";
+        $filterTypes .= 's';
+        $filterParams[] = $dateTo;
+    }
+
+    if (!empty($complaintTypeFilters)) {
+        $placeholders = implode(', ', array_fill(0, count($complaintTypeFilters), '?'));
+        $filterSql .= " AND blotter_rows.complaint_type IN ({$placeholders})";
+        $filterTypes .= str_repeat('s', count($complaintTypeFilters));
+        array_push($filterParams, ...$complaintTypeFilters);
+    }
+
+    if (!empty($areaFilters)) {
+        $placeholders = implode(', ', array_fill(0, count($areaFilters), '?'));
+        $filterSql .= " AND blotter_rows.area_number IN ({$placeholders})";
+        $filterTypes .= str_repeat('s', count($areaFilters));
+        array_push($filterParams, ...$areaFilters);
+    }
+
+    if (!empty($sectorFilters)) {
+        $sectorParts = [];
+        foreach ($sectorFilters as $sectorFilter) {
+            $sectorParts[] = "LOWER(blotter_rows.sector_membership) LIKE ?";
+            $filterTypes .= 's';
+            $filterParams[] = '%' . strtolower($sectorFilter) . '%';
+        }
+        $filterSql .= " AND (" . implode(' OR ', $sectorParts) . ")";
+    }
+
+    if ($searchTerm !== '') {
+        $like = '%' . $searchTerm . '%';
+        $searchColumns = [
+            'blotter_rows.blotter_id',
+            'blotter_rows.blotter_number',
+            'blotter_rows.case_id',
+            'blotter_rows.complainant_name',
+            'blotter_rows.respondent_name',
+            'blotter_rows.complaint_type',
+            'blotter_rows.area_number',
+            'blotter_rows.sector_membership',
+            'blotter_rows.status_name',
+            'blotter_rows.level_name',
+        ];
+        $searchParts = [];
+        foreach ($searchColumns as $searchColumn) {
+            $searchParts[] = "{$searchColumn} LIKE ?";
+            $filterTypes .= 's';
+            $filterParams[] = $like;
+        }
+        $filterSql .= " AND (" . implode(' OR ', $searchParts) . ")";
+    }
+
+    $countStmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM ({$baseSql}) blotter_rows
+        WHERE 1=1 {$filterSql}
+    ");
+    if (!$countStmt) {
+        respond(false, [], "Failed to prepare blotter count query.");
+    }
+    bindDynamicParams($countStmt, $filterTypes, $filterParams);
+    $countStmt->execute();
+    $countRow = $countStmt->get_result()->fetch_assoc();
+    $countStmt->close();
+    $totalItems = (int)($countRow['total'] ?? 0);
+    $totalPages = max(1, (int)ceil($totalItems / $perPage));
+    if ($page > $totalPages) {
+        $page = $totalPages;
+        $offset = ($page - 1) * $perPage;
+    }
+
+    $activeCount = 0;
+    $activeCountStmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM ({$baseSql}) blotter_rows
+        WHERE LOWER(blotter_rows.status_name) = 'active'
+    ");
+    if ($activeCountStmt) {
+        $activeCountStmt->execute();
+        $activeCountRow = $activeCountStmt->get_result()->fetch_assoc();
+        $activeCount = (int)($activeCountRow['total'] ?? 0);
+        $activeCountStmt->close();
+    }
+
+    $stmt = $conn->prepare("
+        SELECT *
+        FROM ({$baseSql}) blotter_rows
+        WHERE 1=1 {$filterSql}
+        ORDER BY blotter_rows.date_filed DESC, blotter_rows.time_filed DESC, blotter_rows.blotter_id DESC
+        LIMIT ? OFFSET ?
+    ");
     if (!$stmt) {
         respond(false, [], "Failed to prepare list query.");
     }
+    $listTypes = $filterTypes . 'ii';
+    $listParams = $filterParams;
+    $listParams[] = $perPage;
+    $listParams[] = $offset;
+    bindDynamicParams($stmt, $listTypes, $listParams);
     $stmt->execute();
     $res = $stmt->get_result();
     $items = [];
     while ($row = $res->fetch_assoc()) {
-        $fullName = trim(implode(' ', array_filter([
-            $row['firstname'] ?? '',
-            $row['middlename'] ?? '',
-            $row['lastname'] ?? '',
-            $row['suffix'] ?? ''
-        ])));
-        $respondentName = trim(implode(' ', array_filter([
-            $row['respondent_firstname'] ?? '',
-            $row['respondent_middlename'] ?? '',
-            $row['respondent_lastname'] ?? '',
-            $row['respondent_suffix'] ?? ''
-        ])));
         $items[] = [
             'case_id' => $row['case_id'],
             'blotter_id' => $row['blotter_id'],
@@ -323,12 +592,12 @@ if ($action === 'list') {
             'sector_membership' => $row['sector_membership'] ?? '',
             'status_name' => $row['status_name'],
             'level_name' => $row['level_name'],
-            'complainant_name' => $fullName,
-            'respondent_name' => $respondentName,
-            'complainant_firstname' => $row['firstname'] ?? '',
-            'complainant_middlename' => $row['middlename'] ?? '',
-            'complainant_lastname' => $row['lastname'] ?? '',
-            'complainant_suffix' => $row['suffix'] ?? '',
+            'complainant_name' => $row['complainant_name'] ?? '',
+            'respondent_name' => $row['respondent_name'] ?? '',
+            'complainant_firstname' => $row['complainant_firstname'] ?? '',
+            'complainant_middlename' => $row['complainant_middlename'] ?? '',
+            'complainant_lastname' => $row['complainant_lastname'] ?? '',
+            'complainant_suffix' => $row['complainant_suffix'] ?? '',
             'respondent_firstname' => $row['respondent_firstname'] ?? '',
             'respondent_middlename' => $row['respondent_middlename'] ?? '',
             'respondent_lastname' => $row['respondent_lastname'] ?? '',
@@ -336,7 +605,51 @@ if ($action === 'list') {
         ];
     }
     $stmt->close();
-    respond(true, ['items' => $items]);
+
+    $complaintTypes = [];
+    $typeStmt = $conn->prepare("
+        SELECT DISTINCT complaint_type
+        FROM casereportstbl
+        WHERE report_type = 'Blotter'
+          AND TRIM(COALESCE(complaint_type, '')) <> ''
+        ORDER BY complaint_type ASC
+    ");
+    if ($typeStmt) {
+        $typeStmt->execute();
+        $typeRes = $typeStmt->get_result();
+        while ($typeRow = $typeRes->fetch_assoc()) {
+            $complaintTypes[] = (string)$typeRow['complaint_type'];
+        }
+        $typeStmt->close();
+    }
+
+    $responsePayload = [
+        'items' => $items,
+        'meta' => [
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_items' => $totalItems,
+                'total_pages' => $totalPages,
+            ],
+            'badges' => [
+                'active_count' => $activeCount,
+            ],
+            'filters' => [
+                'complaint_types' => $complaintTypes,
+            ],
+        ],
+    ];
+
+    blotterTrackerCachePut($listCacheKey, [
+        'success' => true,
+        'message' => '',
+        'items' => $responsePayload['items'],
+        'detail' => null,
+        'meta' => $responsePayload['meta'],
+    ]);
+
+    respond(true, $responsePayload);
 }
 
 if ($action === 'detail') {
@@ -517,6 +830,7 @@ if ($action === 'add_narrative_entry') {
         $updStmt->close();
 
         $conn->commit();
+        blotterTrackerCacheClear();
         respond(true, [], "Narrative entry added.");
     } catch (Exception $e) {
         $conn->rollback();
@@ -630,6 +944,7 @@ if ($action === 'update_case_outcome') {
         $logStmt->close();
 
         $conn->commit();
+        blotterTrackerCacheClear();
         respond(true, [], "Case updated.");
     } catch (Exception $e) {
         $conn->rollback();
@@ -702,6 +1017,7 @@ if ($action === 'add_case_log') {
         $updStmt->close();
 
         $conn->commit();
+        blotterTrackerCacheClear();
         respond(true, [], "Case log added.");
     } catch (Exception $e) {
         $conn->rollback();

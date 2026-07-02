@@ -708,6 +708,64 @@ if (!function_exists('amp_session_cache_put')) {
     }
 }
 
+if (!function_exists('amp_shared_cache_path')) {
+    function amp_shared_cache_path(string $key): string
+    {
+        $safeKey = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $key) ?? 'cache';
+        return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_' . $safeKey . '.cache';
+    }
+}
+
+if (!function_exists('amp_shared_cache_get')) {
+    function amp_shared_cache_get(string $key, int $ttlSeconds)
+    {
+        if ($key === '' || $ttlSeconds <= 0) {
+            return null;
+        }
+
+        $path = amp_shared_cache_path($key);
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $payload = json_decode($raw, true);
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $createdAt = (int)($payload['created_at'] ?? 0);
+        if ($createdAt <= 0 || (time() - $createdAt) > $ttlSeconds) {
+            return null;
+        }
+
+        return $payload['value'] ?? null;
+    }
+}
+
+if (!function_exists('amp_shared_cache_put')) {
+    function amp_shared_cache_put(string $key, $value): void
+    {
+        if ($key === '') {
+            return;
+        }
+
+        $payload = json_encode([
+            'created_at' => time(),
+            'value' => $value,
+        ]);
+        if (!is_string($payload) || $payload === '') {
+            return;
+        }
+
+        @file_put_contents(amp_shared_cache_path($key), $payload, LOCK_EX);
+    }
+}
+
 if (!function_exists('amp_ensure_permission_storage')) {
     function amp_ensure_permission_storage(mysqli $conn): void
     {
@@ -718,6 +776,13 @@ if (!function_exists('amp_ensure_permission_storage')) {
 
         $sessionCacheKey = 'permission_storage_verified_v1';
         if (amp_session_cache_get($sessionCacheKey, 900) === true) {
+            $done = true;
+            return;
+        }
+
+        $sharedCacheKey = 'permission_storage_verified_v1';
+        if (amp_shared_cache_get($sharedCacheKey, 86400) === true) {
+            amp_session_cache_put($sessionCacheKey, true);
             $done = true;
             return;
         }
@@ -870,6 +935,7 @@ if (!function_exists('amp_ensure_permission_storage')) {
         idg_ensure_numeric_generated_key($conn, 'personnelroleaccessprofiletbl', 'role_access_profile_id', 'INT NOT NULL');
 
         amp_session_cache_put($sessionCacheKey, true);
+        amp_shared_cache_put($sharedCacheKey, true);
     }
 }
 
@@ -918,9 +984,15 @@ if (!function_exists('amp_get_official_account_by_user_id')) {
         }
 
         $sessionCacheKey = 'official_account:' . md5($userId);
-        $cached = amp_session_cache_get($sessionCacheKey, 120);
+        $cached = amp_session_cache_get($sessionCacheKey, 1800);
         if (is_array($cached)) {
             return $cached;
+        }
+
+        $sharedCached = amp_shared_cache_get($sessionCacheKey, 1800);
+        if (is_array($sharedCached)) {
+            amp_session_cache_put($sessionCacheKey, $sharedCached);
+            return $sharedCached;
         }
 
         $hasPositionAccess = amp_column_exists($conn, 'officialinformationtbl', 'position_access');
@@ -957,6 +1029,7 @@ if (!function_exists('amp_get_official_account_by_user_id')) {
         $resolved = $row ?: null;
         if (is_array($resolved)) {
             amp_session_cache_put($sessionCacheKey, $resolved);
+            amp_shared_cache_put($sessionCacheKey, $resolved);
         }
         return $resolved;
     }
@@ -1519,10 +1592,17 @@ if (!function_exists('amp_get_allowed_permission_keys')) {
         }
 
         $sessionCacheKey = 'allowed_permissions:' . md5($cacheKey);
-        $sessionCached = amp_session_cache_get($sessionCacheKey, 120);
+        $sessionCached = amp_session_cache_get($sessionCacheKey, 1800);
         if (is_array($sessionCached)) {
             $cache[$cacheKey] = $sessionCached;
             return $sessionCached;
+        }
+
+        $sharedCached = amp_shared_cache_get($sessionCacheKey, 1800);
+        if (is_array($sharedCached)) {
+            $cache[$cacheKey] = $sharedCached;
+            amp_session_cache_put($sessionCacheKey, $sharedCached);
+            return $sharedCached;
         }
 
         $row = $userId !== '' ? amp_get_official_account_by_user_id($conn, $userId) : null;
@@ -1534,12 +1614,14 @@ if (!function_exists('amp_get_allowed_permission_keys')) {
             $allowed = array_fill_keys($keys, true);
             $cache[$cacheKey] = $allowed;
             amp_session_cache_put($sessionCacheKey, $allowed);
+            amp_shared_cache_put($sessionCacheKey, $allowed);
             return $allowed;
         }
 
         $allowed = amp_get_effective_permission_keys_for_row($conn, $row);
         $cache[$cacheKey] = $allowed;
         amp_session_cache_put($sessionCacheKey, $allowed);
+        amp_shared_cache_put($sessionCacheKey, $allowed);
         return $allowed;
     }
 }

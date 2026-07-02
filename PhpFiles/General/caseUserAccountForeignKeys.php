@@ -7,6 +7,64 @@ if (!function_exists('cuafk_is_valid_identifier')) {
     }
 }
 
+if (!function_exists('cuafk_shared_cache_path')) {
+    function cuafk_shared_cache_path(string $key): string
+    {
+        $safeKey = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $key) ?? 'cache';
+        return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_' . $safeKey . '.cache';
+    }
+}
+
+if (!function_exists('cuafk_shared_cache_get')) {
+    function cuafk_shared_cache_get(string $key, int $ttlSeconds): bool
+    {
+        if ($key === '' || $ttlSeconds <= 0) {
+            return false;
+        }
+
+        $path = cuafk_shared_cache_path($key);
+        if (!is_file($path)) {
+            return false;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return false;
+        }
+
+        $payload = json_decode($raw, true);
+        if (!is_array($payload)) {
+            return false;
+        }
+
+        $createdAt = (int)($payload['created_at'] ?? 0);
+        if ($createdAt <= 0 || (time() - $createdAt) > $ttlSeconds) {
+            return false;
+        }
+
+        return !empty($payload['value']);
+    }
+}
+
+if (!function_exists('cuafk_shared_cache_put')) {
+    function cuafk_shared_cache_put(string $key, bool $value): void
+    {
+        if ($key === '') {
+            return;
+        }
+
+        $payload = json_encode([
+            'created_at' => time(),
+            'value' => $value,
+        ]);
+        if (!is_string($payload) || $payload === '') {
+            return;
+        }
+
+        @file_put_contents(cuafk_shared_cache_path($key), $payload, LOCK_EX);
+    }
+}
+
 if (!function_exists('cuafk_escape_identifier')) {
     function cuafk_escape_identifier(string $value): string
     {
@@ -211,6 +269,13 @@ if (!function_exists('cuafk_ensure_case_useraccount_foreign_keys')) {
         if ($done) {
             return;
         }
+
+        $sharedCacheKey = 'case_useraccount_foreign_keys_verified_v1';
+        if (!$strict && cuafk_shared_cache_get($sharedCacheKey, 86400)) {
+            $done = true;
+            return;
+        }
+
         $done = true;
 
         $specs = [
@@ -288,6 +353,10 @@ if (!function_exists('cuafk_ensure_case_useraccount_foreign_keys')) {
 
         foreach ($specs as $spec) {
             cuafk_ensure_foreign_key($conn, $spec, $strict);
+        }
+
+        if (!$strict) {
+            cuafk_shared_cache_put($sharedCacheKey, true);
         }
     }
 }
