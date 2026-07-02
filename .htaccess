@@ -39,12 +39,6 @@ RewriteRule "(^|/).*\.(sql|bak|old|orig|ini|log|env)$" - [F,L,NC]
 RewriteRule ^Guest-End/maintenance/?$ Guest-End/maintenance.php [L,NC]
 RewriteRule ^maintenance/?$ Guest-End/maintenance.php [L,NC]
 
-# Public website maintenance mode: keep Services and Login reachable,
-# but route the rest of the guest-facing public pages to maintenance.
-RewriteRule ^$ Guest-End/maintenance.php [L]
-RewriteRule ^(?:index(?:\.html)?|home|privacy|government|news|faq|contact|transactions|transaction-information|official-onboarding|verify-email)/?$ Guest-End/maintenance.php [L,NC]
-RewriteRule ^Guest-End/(?:government(?:\.html)?|news(?:\.html)?|faq(?:\.html)?|contact(?:\.html)?|TransactionInformation(?:\.html)?|official_onboarding(?:\.php)?|verifyEmail(?:\.php)?)/?$ Guest-End/maintenance.php [L,NC]
-
 RewriteRule ^index/?$ index.html [L,NC]
 RewriteRule ^Guest-End/login/?$ Guest-End/login.php [L,NC]
 RewriteRule ^Guest-End/government/?$ Guest-End/government.html [L,NC]
