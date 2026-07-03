@@ -348,7 +348,15 @@ $areaOptions = [
             color: var(--guest-accent-dark);
         }
 
-        #complaintVerificationStage {
+        .complaint-modal .modal-content {
+            border-radius: 1.35rem;
+            border: 1px solid rgba(254, 153, 60, 0.28);
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        #complaintVerificationStage,
+        .complaint-form-modal {
             z-index: 2000;
         }
 
@@ -364,8 +372,10 @@ $areaOptions = [
         .complaint-modal--otp .modal-content {
             border-radius: 1.9rem;
             border: 1px solid rgba(254, 153, 60, 0.42);
+            background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
             box-shadow: 0 28px 72px rgba(58, 39, 23, 0.22);
             max-height: calc(100vh - 5rem);
+            overflow: hidden;
         }
 
         .complaint-modal--otp .modal-header {
@@ -384,6 +394,12 @@ $areaOptions = [
             width: 1.9rem;
             height: 1.9rem;
             padding: 0;
+            margin: 0;
+            flex: 0 0 auto;
+            border: 1px solid rgba(191, 87, 0, 0.18);
+            border-radius: 999px;
+            background-color: #fff4e8;
+            background-size: 0.85rem;
             opacity: 0.82;
             box-shadow: none;
         }
@@ -394,7 +410,7 @@ $areaOptions = [
         }
 
         .complaint-modal--otp .modal-body {
-            padding: 1.1rem 1.45rem 1.3rem;
+            padding: 1.1rem 1.45rem 1.45rem;
             background: #ffffff;
             overflow-y: auto;
         }
@@ -587,7 +603,7 @@ $areaOptions = [
         }
 
         .otp-cert-card {
-            padding: 0.55rem 0 0;
+            padding: 0.85rem 0 0.2rem;
             border: none;
             border-radius: 0;
             background: transparent;
@@ -1148,7 +1164,7 @@ $areaOptions = [
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../JS-Script-Files/modalHandler.js"></script>
-    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260704-complaint-all-modals"></script>
     <script>
         let topBtn = document.getElementById("goToTop");
 

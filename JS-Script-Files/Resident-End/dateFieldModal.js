@@ -106,6 +106,42 @@
         .resident-date-modal .modal-content {
           border-radius: 18px;
         }
+        .resident-date-modal--complaint .modal-content {
+          border: 1px solid #f2d3b8;
+          border-radius: 20px;
+          box-shadow: 0 24px 48px rgba(77, 45, 12, 0.18);
+          background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+          overflow: hidden;
+        }
+        .resident-date-modal--complaint .modal-header {
+          padding: 20px 22px 14px;
+          border-bottom: 1px solid #f2e3d3;
+          background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+        }
+        .resident-date-modal--complaint .btn-close {
+          opacity: 0.78;
+        }
+        .resident-date-modal--complaint .btn-close:hover,
+        .resident-date-modal--complaint .btn-close:focus {
+          opacity: 1;
+          box-shadow: none;
+        }
+        .resident-date-modal-heading {
+          font-family: 'Charis SIL Bold', serif;
+          font-size: 20px;
+          color: #2f2419;
+          line-height: 1.2;
+        }
+        .resident-date-modal-subheading {
+          margin-top: 4px;
+          color: #6b7280;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .resident-date-modal--complaint .modal-body {
+          padding: 20px 22px 16px;
+          background: #ffffff;
+        }
         .resident-date-modal--calendar .modal-dialog {
           max-width: 760px;
         }
@@ -117,6 +153,11 @@
           color: #111827;
           font-size: 0.85rem;
           font-weight: 600;
+        }
+        .resident-date-modal--complaint .resident-date-modal-preview {
+          background: #fff7ef;
+          color: #7c3f00;
+          border: 1px solid #f2dfcb;
         }
         .resident-date-calendar-shell {
           display: grid;
@@ -149,6 +190,11 @@
           background: #f8fafc;
           border-color: #cbd5e1;
           color: #1e293b;
+        }
+        .resident-date-modal--complaint .resident-date-calendar-nav:hover {
+          background: #fff7ed;
+          border-color: #fdba74;
+          color: #9a3412;
         }
         .resident-date-calendar-nav:disabled {
           cursor: not-allowed;
@@ -184,6 +230,10 @@
         .resident-date-calendar-select:focus {
           border-color: #fb923c;
           box-shadow: 0 0 0 0.2rem rgba(249, 115, 22, 0.12);
+        }
+        .resident-date-modal--complaint .resident-date-calendar-select:focus {
+          border-color: #e8872f;
+          box-shadow: 0 0 0 0.2rem rgba(232, 135, 47, 0.14);
         }
         .resident-date-calendar-weekdays,
         .resident-date-calendar-grid {
@@ -246,6 +296,45 @@
           box-shadow: none;
           transform: none;
         }
+        .resident-date-modal--complaint .modal-footer {
+          padding: 14px 22px 20px;
+          border-top: 1px solid #f2e3d3;
+          background: #fffdfb;
+          gap: 10px;
+        }
+        .resident-date-modal-secondary-btn {
+          min-height: 48px;
+          border-radius: 12px;
+        }
+        .resident-date-modal--complaint .resident-date-modal-secondary-btn {
+          border: 1px solid #d6dce5;
+          background: #ffffff;
+          color: #7c3f00;
+          font-weight: 600;
+        }
+        .resident-date-modal--complaint .resident-date-modal-secondary-btn:hover,
+        .resident-date-modal--complaint .resident-date-modal-secondary-btn:focus {
+          border-color: #e8872f;
+          background: #fff7f0;
+          color: #b75f0d;
+          box-shadow: none;
+        }
+        .resident-date-modal-primary-btn {
+          min-height: 48px;
+          border-radius: 12px;
+        }
+        .resident-date-modal--complaint .resident-date-modal-primary-btn {
+          border: 1px solid #e8872f;
+          background: linear-gradient(135deg, #f59b3d 0%, #e8872f 100%);
+          color: #ffffff;
+          font-weight: 700;
+        }
+        .resident-date-modal--complaint .resident-date-modal-primary-btn:hover,
+        .resident-date-modal--complaint .resident-date-modal-primary-btn:focus {
+          border-color: #cf6f14;
+          background: linear-gradient(135deg, #e8872f 0%, #cf6f14 100%);
+          box-shadow: 0 12px 24px rgba(232, 135, 47, 0.22);
+        }
       `;
       document.head.appendChild(style);
     }
@@ -257,8 +346,8 @@
           <div class="modal-content">
             <div class="modal-header">
               <div>
-                <div class="fw-bold text-dark" id="residentDateModalTitle">Select Date</div>
-                <div class="small text-muted" id="residentDateModalSubtitle">Choose month, day, and year.</div>
+                <div class="resident-date-modal-heading" id="residentDateModalTitle">Select Date</div>
+                <div class="resident-date-modal-subheading" id="residentDateModalSubtitle">Choose month, day, and year.</div>
               </div>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -346,9 +435,9 @@
               <div class="text-danger small mt-2 d-none" id="residentDateModalError"></div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline-secondary" id="residentDateModalClear">Clear</button>
-              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-              <button type="button" class="btn btn-primary" id="residentDateModalApply">Apply</button>
+              <button type="button" class="btn btn-outline-secondary resident-date-modal-secondary-btn" id="residentDateModalClear">Clear</button>
+              <button type="button" class="btn btn-outline-secondary resident-date-modal-secondary-btn" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary resident-date-modal-primary-btn" id="residentDateModalApply">Apply</button>
             </div>
           </div>
         </div>
@@ -394,6 +483,18 @@
       return String(input?.dataset?.dateModalStyle || "").trim().toLowerCase() === "calendar"
         ? "calendar"
         : "select";
+    }
+
+    function isComplaintDateInput(input) {
+      if (!(input instanceof HTMLInputElement)) {
+        return false;
+      }
+
+      if (input.id === "incidentDate" || input.name === "incident_date") {
+        return true;
+      }
+
+      return !!(input.form && input.form.id === "complaintForm");
     }
 
     function getTodayIso() {
@@ -761,6 +862,7 @@
 
       activeInput = input;
       activeProxy = proxy;
+      modalEl.classList.toggle("resident-date-modal--complaint", isComplaintDateInput(input));
 
       const label = document.querySelector(`label[for="${input.id}"]`);
       modalTitle.textContent = label ? label.textContent.replace(/\s+/g, " ").trim() : "Select Date";
