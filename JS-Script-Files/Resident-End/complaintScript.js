@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     })();
     const recaptchaEnabled = String(feedbackData?.dataset.recaptchaEnabled || "") === "1";
     const recaptchaSiteKey = String(feedbackData?.dataset.recaptchaSiteKey || "").trim();
+    const recaptchaAction = String(feedbackData?.dataset.recaptchaAction || "resident_complaint_submit").trim() || "resident_complaint_submit";
     const complainantAddressSystem = document.getElementById("complainantAddressSystem");
     const complainantHouseWrapper = document.getElementById("complainantHouseSystemWrapper");
     const complainantLotWrapper = document.getElementById("complainantLotBlockSystemWrapper");
@@ -110,15 +111,38 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    const isPlus63PhoneInput = (input) => String(input?.dataset.phoneUi || "").trim() === "plus63";
+    const getFeedbackAnchor = (input) => {
+        if (!input) return null;
+        const wrapper = input.closest(".phone-input-group");
+        if (wrapper && wrapper.contains(input)) {
+            return wrapper;
+        }
+        return input;
+    };
+    const getExistingFeedbackEl = (input) => {
+        if (!input) return null;
+        const anchor = getFeedbackAnchor(input);
+        const anchorFeedback = anchor?.nextElementSibling;
+        if (anchorFeedback && anchorFeedback.classList.contains("invalid-feedback")) {
+            return anchorFeedback;
+        }
+        const inputFeedback = input.nextElementSibling;
+        if (inputFeedback && inputFeedback.classList.contains("invalid-feedback")) {
+            return inputFeedback;
+        }
+        return null;
+    };
     const ensureFeedbackEl = (input) => {
         if (!input) return null;
-        let feedback = input.nextElementSibling;
-        if (feedback && feedback.classList.contains("invalid-feedback")) {
+        let feedback = getExistingFeedbackEl(input);
+        if (feedback) {
             return feedback;
         }
         feedback = document.createElement("div");
         feedback.className = "invalid-feedback";
-        input.insertAdjacentElement("afterend", feedback);
+        const anchor = getFeedbackAnchor(input);
+        anchor?.insertAdjacentElement("afterend", feedback);
         return feedback;
     };
 
@@ -184,8 +208,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 field.value = "";
                 field.setCustomValidity("");
                 field.classList.remove("is-invalid");
-                const feedback = field.nextElementSibling;
-                if (feedback && feedback.classList.contains("invalid-feedback")) {
+                const feedback = getExistingFeedbackEl(field);
+                if (feedback) {
                     feedback.textContent = "";
                 }
             }
@@ -499,10 +523,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const normalizePhoneValue = (input) => {
         if (!input) return "";
         let digits = String(input.value || "").replace(/\D/g, "");
-        if (digits.length === 10 && digits.startsWith("9")) {
-            digits = `0${digits}`;
+        if (isPlus63PhoneInput(input)) {
+            if (digits.startsWith("63")) {
+                digits = digits.slice(2);
+            }
+            if (digits.startsWith("0")) {
+                digits = digits.slice(1);
+            }
+            digits = digits.slice(0, 10);
+        } else {
+            if (digits.length === 10 && digits.startsWith("9")) {
+                digits = `0${digits}`;
+            }
+            digits = digits.slice(0, 11);
         }
-        digits = digits.slice(0, 11);
         if (input.value !== digits) {
             input.value = digits;
         }
@@ -517,8 +551,13 @@ document.addEventListener("DOMContentLoaded", () => {
             renderIfTouched(input);
             return true;
         }
-        const isValid = /^09\d{9}$/.test(value);
-        input.setCustomValidity(isValid ? "" : "Contact number must be in the format 09XXXXXXXXX.");
+        const isValid = isPlus63PhoneInput(input)
+            ? /^9\d{9}$/.test(value)
+            : /^09\d{9}$/.test(value);
+        const message = isPlus63PhoneInput(input)
+            ? "Contact number must use +63 followed by 10 digits in the format 9XXXXXXXXX."
+            : "Contact number must be in the format 09XXXXXXXXX.";
+        input.setCustomValidity(isValid ? "" : message);
         renderIfTouched(input);
         return isValid;
     };
@@ -536,7 +575,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const token = await window.grecaptcha.execute(recaptchaSiteKey, {
-            action: "resident_complaint_submit",
+            action: recaptchaAction,
         });
         if (String(token || "").trim() === "") {
             throw new Error("Security verification failed. Please try again.");

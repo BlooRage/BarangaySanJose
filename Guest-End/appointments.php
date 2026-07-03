@@ -572,8 +572,8 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
         }
 
         .guest-main {
-            max-width: 1240px;
-            padding: 2rem 1.25rem 2.75rem;
+            padding-top: 2rem;
+            padding-bottom: 2.75rem;
         }
 
         .page-return-btn {
@@ -727,7 +727,6 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
 
         .guest-card-header p {
             margin: 0.35rem 0 0;
-            max-width: 82ch;
             font-size: 0.97rem;
             line-height: 1.55;
         }
@@ -772,7 +771,6 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
 
         .section-caption {
             margin: 0 0 1.15rem;
-            max-width: 56ch;
             font-size: 0.95rem;
             line-height: 1.6;
             text-align: left;
@@ -1390,7 +1388,8 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
 
         @media (max-width: 767.98px) {
             .guest-main {
-                padding: 1.35rem 1rem 2.5rem;
+                padding-top: 1.35rem;
+                padding-bottom: 2.5rem;
             }
 
             .guest-card-header {
@@ -1469,7 +1468,7 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
     </div>
 
     <div class="guest-shell">
-        <main class="guest-main">
+        <main class="guest-main container">
             <section class="form-shell">
                 <div class="guest-card">
                     <div class="guest-card-header">

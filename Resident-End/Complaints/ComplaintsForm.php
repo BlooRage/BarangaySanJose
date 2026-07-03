@@ -205,6 +205,7 @@ $areaOptions = [
                 data-complaint-type-config="<?= $complaintTypeConfigJson ?>"
                 data-recaptcha-enabled="<?= $complaintRecaptchaEnabled ? '1' : '0' ?>"
                 data-recaptcha-site-key="<?= htmlspecialchars($complaintRecaptchaSiteKey, ENT_QUOTES, 'UTF-8') ?>"
+                data-recaptcha-action="resident_complaint_submit"
                 hidden
             ></div>
 

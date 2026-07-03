@@ -468,6 +468,19 @@
       };
     }
 
+    if (slug === "complaints") {
+      return {
+        href: "../login?service=complaints",
+        requiresLogin: true,
+        eyebrow: "Choose Complaint Access",
+        title: "Login / Register or Submit Complaint as Guest",
+        copy: "Residents can sign in for the resident complaint flow, or continue as a guest for a public complaint submission.",
+        guestHref: "../Guest-End/complaints.php",
+        guestLabel: "Submit Complaint as Guest",
+        hint: "Guests can submit one active complaint at a time per mobile number. Residents will return to the complaint module after authentication."
+      };
+    }
+
     return {
       href: "../login" + (slug ? "?service=" + encodeURIComponent(slug) : ""),
       requiresLogin: true
