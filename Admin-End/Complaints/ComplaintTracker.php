@@ -173,12 +173,10 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
         #viewModal .complaint-attachment-actions {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
         }
 
         #viewModal .complaint-attachment-actions .btn {
-            flex: 1 1 120px;
+            width: 100%;
         }
 
         #attachmentViewerModal .modal-dialog {
@@ -445,8 +443,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="#" class="btn btn-outline-secondary" id="attachmentViewerOpenLink" target="_blank" rel="noopener noreferrer">Open in New Tab</a>
-                <a href="#" class="btn btn-primary" id="attachmentViewerDownloadLink" target="_blank" rel="noopener noreferrer" download>Download</a>
+                <button type="button" class="btn btn-outline-secondary" id="btnAttachmentViewerReturn">Return</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -485,8 +483,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260704-complaint-attachment-viewer"></script>
 </body>
 </html>
-
-
 
 
 

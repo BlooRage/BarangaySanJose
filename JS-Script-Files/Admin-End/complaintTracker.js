@@ -30,8 +30,7 @@
     const attachmentViewerModal = attachmentViewerModalEl ? new bootstrap.Modal(attachmentViewerModalEl) : null;
     const attachmentViewerTitle = document.getElementById("attachmentViewerTitle");
     const attachmentViewerBody = document.getElementById("attachmentViewerBody");
-    const attachmentViewerOpenLink = document.getElementById("attachmentViewerOpenLink");
-    const attachmentViewerDownloadLink = document.getElementById("attachmentViewerDownloadLink");
+    const btnAttachmentViewerReturn = document.getElementById("btnAttachmentViewerReturn");
     const complaintActionButtons = document.getElementById("complaintActionButtons");
     const resolveBtn = document.getElementById("btnComplaintResolve");
     const endorseBtn = document.getElementById("btnComplaintEndorse");
@@ -429,9 +428,6 @@
 
     function openAttachmentViewer(name, url, isImage = true) {
         if (!attachmentViewerModal || !attachmentViewerBody) {
-            if (url) {
-                window.open(url, "_blank", "noopener");
-            }
             return;
         }
 
@@ -440,28 +436,17 @@
         if (attachmentViewerTitle) {
             attachmentViewerTitle.textContent = safeName;
         }
-        if (attachmentViewerOpenLink) {
-            attachmentViewerOpenLink.href = safeUrl || "#";
-            attachmentViewerOpenLink.classList.toggle("disabled", safeUrl === "");
-            attachmentViewerOpenLink.setAttribute("aria-disabled", safeUrl === "" ? "true" : "false");
-        }
-        if (attachmentViewerDownloadLink) {
-            attachmentViewerDownloadLink.href = safeUrl || "#";
-            attachmentViewerDownloadLink.classList.toggle("disabled", safeUrl === "");
-            attachmentViewerDownloadLink.setAttribute("aria-disabled", safeUrl === "" ? "true" : "false");
-            attachmentViewerDownloadLink.setAttribute("download", safeName);
-        }
 
         if (!safeUrl) {
             attachmentViewerBody.innerHTML = '<div class="attachment-viewer-empty">Attachment preview is unavailable.</div>';
-            attachmentViewerModal.show();
+            transitionModal(viewModalEl, viewModal, attachmentViewerModal);
             return;
         }
 
         attachmentViewerBody.innerHTML = isImage
             ? `<img src="${esc(safeUrl)}" alt="${esc(safeName)}">`
             : `<iframe src="${esc(safeUrl)}" title="${esc(safeName)}"></iframe>`;
-        attachmentViewerModal.show();
+        transitionModal(viewModalEl, viewModal, attachmentViewerModal);
     }
 
     function renderAttachmentList(attachments) {
@@ -489,8 +474,7 @@
                     <div class="complaint-attachment-body">
                         <p class="complaint-attachment-name">${esc(name)}</p>
                         <div class="complaint-attachment-actions">
-                            <button type="button" class="btn btn-sm btn-primary" data-attachment-view="true" data-attachment-src="${esc(href)}" data-attachment-name="${esc(name)}" data-attachment-image="${previewable ? "true" : "false"}">View</button>
-                            <a href="${esc(href)}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">Open</a>
+                            <button type="button" class="btn btn-sm btn-primary" data-attachment-view="true" data-attachment-src="${esc(href)}" data-attachment-name="${esc(name)}" data-attachment-image="${previewable ? "true" : "false"}">View Attachment</button>
                         </div>
                     </div>
                 </article>
@@ -744,34 +728,14 @@
         btnComplaintActionConfirm?.addEventListener("click", submitComplaintAction);
     }
 
-    attachmentViewerModalEl?.addEventListener("show.bs.modal", () => {
-        const visibleModalCount = document.querySelectorAll(".modal.show").length;
-        const modalZIndex = 1060 + (visibleModalCount * 20);
-        attachmentViewerModalEl.style.zIndex = String(modalZIndex);
-
-        window.setTimeout(() => {
-            const backdrops = Array.from(document.querySelectorAll(".modal-backdrop"));
-            let backdrop = null;
-            for (let index = backdrops.length - 1; index >= 0; index -= 1) {
-                if (!backdrops[index].classList.contains("attachment-viewer-backdrop")) {
-                    backdrop = backdrops[index];
-                    break;
-                }
-            }
-            if (backdrop) {
-                backdrop.classList.add("attachment-viewer-backdrop");
-                backdrop.style.zIndex = String(modalZIndex - 10);
-            }
-            document.body.classList.add("modal-open");
-        }, 0);
-    });
-
     attachmentViewerModalEl?.addEventListener("hidden.bs.modal", () => {
-        attachmentViewerModalEl.style.zIndex = "";
         if (attachmentViewerBody) {
             attachmentViewerBody.innerHTML = attachmentViewerEmptyState;
         }
-        document.body.classList.add("modal-open");
+    });
+
+    btnAttachmentViewerReturn?.addEventListener("click", () => {
+        transitionModal(attachmentViewerModalEl, attachmentViewerModal, viewModal);
     });
 
     viewDetailsBody?.addEventListener("click", (event) => {
