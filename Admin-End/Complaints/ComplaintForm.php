@@ -23,6 +23,15 @@ $feedbackMessage = !empty($_GET['success'])
     ? (string)$_GET['success']
     : (!empty($_GET['error']) ? (string)$_GET['error'] : '');
 $complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfig(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
+$areaOptions = [
+    'Area 01' => 'San Jose Proper',
+    'Area 1A' => 'Litex Village, Abatex Christine Creek, Med. Heights',
+    'Area 02' => 'VFW, Amychelle, Christine Villa Parnshey, Villa Ana, Zaniga Farm',
+    'Area 03' => 'Relocation',
+    'Area 04' => 'Kasiglahan Phase 1-B, Kasiglahan Phase 1-C, Kasiglahan Phase 1-D, Kasiglahan Phase 1-M, Kasiglahan Phase 1-A',
+    'Area 05' => 'Kasiglahan Phase 1-K, Kasiglahan Phase 1K1, Kasiglahan Phase 1K2, Kasiglahan Phase 1-E, Kasiglahan Phase 1-G',
+    'Area 06' => 'Sub-Urban, Metro Manila Hills',
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -92,7 +101,7 @@ $complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfi
             hidden
         ></div>
 
-        <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Admin-End/complaintManagement.php" class="page-form">
+        <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Admin-End/complaintManagement.php" class="page-form" id="complaintForm">
             <?= csrfTokenField() ?>
             <input type="hidden" name="action" value="submit_complaint">
 
@@ -275,17 +284,47 @@ $complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfi
 
                 <div class="form-row two-col-row">
                     <div>
+                        <label class="top-label">Date of the Incident <span class="required-asterisk">*</span></label>
+                        <input type="date" id="incidentDate" name="incident_date" class="complaint-picker-proxy" required>
+                        <div id="incidentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
+                    </div>
+                    <div>
+                        <label class="top-label">Time of the Incident <i>(recommended)</i></label>
+                        <input type="time" id="incidentTime" name="incident_time" class="d-none">
+                        <input type="text" id="incidentTimeProxy" class="form-control complaint-picker-proxy" placeholder="Select time" readonly>
+                    </div>
+                </div>
+
+                <div class="form-row two-col-row">
+                    <div>
+                        <label class="top-label">Location of the Incident <span class="required-asterisk">*</span></label>
+                        <input type="text" name="incident_location" required>
+                    </div>
+                    <div>
+                        <label class="top-label" for="incidentAreaNumberDisplay">Area Number <span class="required-asterisk">*</span></label>
+                        <input type="hidden" name="incident_area_number" id="incidentAreaNumber">
+                        <input type="text" class="form-control area-picker-input complaint-picker-proxy" id="incidentAreaNumberDisplay" placeholder="Select area" readonly required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width">
                         <label class="top-label">Nature of Complaint <span class="required-asterisk">*</span></label>
                         <select id="natureOfComplaint" name="nature_of_complaint" required>
                             <option value="">Select</option>
                             <option value="Disturbance">Disturbance</option>
                             <option value="Property Dispute">Property Dispute</option>
                             <option value="Noise Complaint">Noise Complaint</option>
-                            <option value="Physical Altercation">Physical Altercation</option>
+                            <option value="Physical Altercation / Violence">Physical Altercation / Violence</option>
+                            <option value="Barangay Safety Hazard">Barangay Safety Hazard</option>
+                            <option value="General Concern">General Concern</option>
                             <option value="Other">Other</option>
                         </select>
                     </div>
-                    <div>
+                </div>
+
+                <div class="form-row d-none" id="natureOtherWrap">
+                    <div class="full-width">
                         <label class="top-label">If Other, please specify <span id="natureOtherAsterisk" class="required-asterisk d-none">*</span></label>
                         <input type="text" id="natureOther" name="nature_other">
                     </div>
@@ -293,29 +332,66 @@ $complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfi
 
                 <div id="complaintTypeDynamicFields" class="d-none"></div>
 
-                <div class="form-row two-col-row">
-                    <div>
-                        <label class="top-label">Date of the Incident <span class="required-asterisk">*</span></label>
-                        <input type="date" id="incidentDate" name="incident_date" required>
-                        <div id="incidentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
-                    </div>
-                    <div>
-                        <label class="top-label">Time of the Incident <i>(recommended)</i></label>
-                        <input type="time" name="incident_time">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="full-width">
-                        <label class="top-label">Location of the Incident <span class="required-asterisk">*</span></label>
-                        <input type="text" name="incident_location" required>
-                    </div>
-                </div>
-
                 <div class="form-row">
                     <div class="full-width">
                         <label class="top-label">Short narration of the incident <span class="required-asterisk">*</span></label>
                         <textarea name="incident_narration" rows="6" required></textarea>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width d-flex justify-content-start">
+                        <button type="button" class="btn complaint-action-btn" id="addComplaintAttachmentBtn">
+                            <i class="fa-regular fa-image" aria-hidden="true"></i>
+                            <span>Add Image</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="complaintAttachmentSection" class="d-none">
+                    <div id="complaintAttachmentRows">
+                        <div class="form-row d-none" data-complaint-attachment-row="1">
+                            <div class="full-width">
+                                <label class="top-label" for="complaintImage1">Attachment 1</label>
+                                <div class="complaint-upload-wrap complaint-upload-wrap--with-close">
+                                    <button type="button" class="attachment-close-btn attachment-row-close-btn" data-attachment-remove-btn aria-label="Remove attachment 1">X</button>
+                                    <label class="upload-dropzone" data-upload-input="complaintImage1" for="complaintImage1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="complaintImagePrompt1">Drag and drop image or click to upload</div>
+                                        <small id="complaintImage1Meta">JPG, JPEG, PNG, or WEBP. Optional.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="complaintImage1" name="complaint_images[]" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" disabled>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row d-none" data-complaint-attachment-row="2">
+                            <div class="full-width">
+                                <label class="top-label" for="complaintImage2">Attachment 2</label>
+                                <div class="complaint-upload-wrap complaint-upload-wrap--with-close">
+                                    <button type="button" class="attachment-close-btn attachment-row-close-btn" data-attachment-remove-btn aria-label="Remove attachment 2">X</button>
+                                    <label class="upload-dropzone" data-upload-input="complaintImage2" for="complaintImage2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="complaintImagePrompt2">Drag and drop additional image or click to upload</div>
+                                        <small id="complaintImage2Meta">JPG, JPEG, PNG, or WEBP. Optional.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="complaintImage2" name="complaint_images[]" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" disabled>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row d-none" data-complaint-attachment-row="3">
+                            <div class="full-width">
+                                <label class="top-label" for="complaintImage3">Attachment 3</label>
+                                <div class="complaint-upload-wrap complaint-upload-wrap--with-close">
+                                    <button type="button" class="attachment-close-btn attachment-row-close-btn" data-attachment-remove-btn aria-label="Remove attachment 3">X</button>
+                                    <label class="upload-dropzone" data-upload-input="complaintImage3" for="complaintImage3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="complaintImagePrompt3">Drag and drop additional image or click to upload</div>
+                                        <small id="complaintImage3Meta">JPG, JPEG, PNG, or WEBP. Optional.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="complaintImage3" name="complaint_images[]" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" disabled>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -326,23 +402,71 @@ $complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfi
                     </div>
                 </div>
 
-                <h2 class="section-title text-center text-dark">Witness Information <span class="text-muted fs-6">(Optional)</span></h2>
-
-                <div class="form-row two-col-row">
-                    <div>
-                        <label class="top-label">Name of Witness (Last Name, First Name Middle Name)</label>
-                        <input type="text" name="witness_name" placeholder="Dela Cruz, Juan Miguel" pattern="^[A-Za-z][A-Za-z'\\s-]*,\\s*[A-Za-z][A-Za-z'\\s-]*\\s+[A-Za-z][A-Za-z'\\s-]*$" title="Use format: Last Name, First Name Middle Name">
-                    </div>
-                    <div>
-                        <label class="top-label">Witness Contact Number</label>
-                        <input type="text" name="witness_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
-                    </div>
-                </div>
+                <h2 class="section-title text-center text-dark">Witness Information</h2>
 
                 <div class="form-row">
                     <div class="full-width">
-                        <label class="top-label">Witness Address</label>
-                        <input type="text" name="witness_address">
+                        <label class="top-label">Do you have a witness? <span class="required-asterisk">*</span></label>
+                        <select class="form-select" id="hasWitnesses" name="has_witnesses" required>
+                            <option value="">Select</option>
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="witnessRowsWrap" class="d-none">
+                    <div class="id-guidance-card mb-3">
+                        <div class="id-guidance-card__title">Witness Guide</div>
+                        <div class="id-guidance-card__meta">You can add up to 3 witnesses. Last name, first name, and contact number are required for each witness you add. Full address is optional.</div>
+                    </div>
+
+                    <?php for ($witnessIndex = 1; $witnessIndex <= 3; $witnessIndex++): ?>
+                        <div class="witness-entry<?= $witnessIndex === 1 ? '' : ' d-none' ?>" data-witness-row="<?= $witnessIndex ?>">
+                            <div class="witness-entry-card complaint-upload-wrap complaint-upload-wrap--with-close">
+                                <button type="button" class="attachment-close-btn witness-remove-btn" data-witness-remove-btn aria-label="Remove witness <?= $witnessIndex ?>">X</button>
+                                <div class="form-row">
+                                    <div>
+                                        <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" name="witness_last_name[]">
+                                    </div>
+                                    <div>
+                                        <label class="top-label">First Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" name="witness_first_name[]">
+                                    </div>
+                                    <div>
+                                        <label class="top-label">Middle Initial</label>
+                                        <input type="text" name="witness_middle_name[]" maxlength="10">
+                                    </div>
+                                    <div>
+                                        <label class="top-label">Suffix</label>
+                                        <select class="form-select" name="witness_suffix[]">
+                                            <option value="">None</option>
+                                            <option value="Jr.">Jr.</option>
+                                            <option value="Sr.">Sr.</option>
+                                            <option value="III">III</option>
+                                            <option value="IV">IV</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row two-col-row pt-0">
+                                    <div>
+                                        <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
+                                        <input type="text" name="witness_contact_number[]" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
+                                    </div>
+                                    <div>
+                                        <label class="top-label">Full Address</label>
+                                        <input type="text" name="witness_address[]">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endfor; ?>
+
+                    <div class="form-row">
+                        <div class="full-width d-flex justify-content-start">
+                            <button type="button" class="btn btn-outline-secondary witness-add-btn" id="addWitnessBtn">Add Another Witness</button>
+                        </div>
                     </div>
                 </div>
 
@@ -356,10 +480,64 @@ $complaintTypeConfigJson = htmlspecialchars(json_encode(complaintTypePublicConfi
         </form>
     </main>
 </div>
+<div class="modal fade" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="fw-bold text-dark">Select Time</div>
+                    <div class="small text-muted">Choose the incident time or use the current time.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="full-width">
+                        <label class="top-label" for="incidentTimePicker">Time of the Incident</label>
+                        <input type="time" class="form-control" id="incidentTimePicker">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary" id="incidentTimeUseNow">Use current time</button>
+                    <div class="small text-muted text-end" id="incidentTimePreview">No time selected yet.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="incidentTimeClearBtn">Clear</button>
+                <button type="button" class="btn btn-primary text-white" id="incidentTimeApplyBtn">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="complaintAreaHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable complaint-area-modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Barangay Area Guide</h5>
+                <button type="button" class="complaint-area-close-btn" data-bs-dismiss="modal" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Choose the barangay area where the incident happened. If the incident is near a boundary, select the nearest known area.</p>
+                <div class="d-flex flex-column gap-2 complaint-area-options">
+                    <?php foreach ($areaOptions as $areaOption => $areaLocation): ?>
+                        <button
+                            type="button"
+                            class="area-guide-option"
+                            data-area-value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>"
+                            data-area-label="<?= htmlspecialchars($areaOption . ' - ' . $areaLocation, ENT_QUOTES, 'UTF-8') ?>"
+                        >
+                            <span class="area-guide-option__title"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
+                            <span class="area-guide-option__meta"><?= htmlspecialchars($areaLocation, ENT_QUOTES, 'UTF-8') ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../JS-Script-Files/modalHandler.js"></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>
 </html>
-

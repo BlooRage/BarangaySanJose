@@ -634,6 +634,31 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       })), 2);
     }
 
+    function renderAttachmentList(attachments) {
+      const clean = (Array.isArray(attachments) ? attachments : []).filter((attachment) => {
+        return attachment && String(attachment.path || "").trim() !== "";
+      });
+      if (!clean.length) return "";
+      return renderFieldGrid([{
+        label: "Image Attachments",
+        value: clean.map((attachment, index) => {
+          const name = String(attachment.name || `Attachment ${index + 1}`).trim() || `Attachment ${index + 1}`;
+          const href = encodeURI(String(attachment.path || "").trim());
+          return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
+        }).join("<br>"),
+        raw: true,
+      }], 1);
+    }
+
+    function displayIncidentPlace(place, areaNumber) {
+      const rawPlace = String(place || "").trim();
+      const rawArea = String(areaNumber || "").trim();
+      if (!rawPlace) return "";
+      if (!rawArea) return rawPlace;
+      const escapedArea = rawArea.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return rawPlace.replace(new RegExp(`^${escapedArea}\\s*-\\s*`, "i"), "").trim() || rawPlace;
+    }
+
     function getFilteredComplaints() {
       const search = String(document.getElementById("complaintSearch").value || "").toLowerCase().trim();
       const status = String(document.getElementById("complaintStatusFilter").value || "").trim().toLowerCase();
@@ -681,8 +706,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             { label: "Incident Time", value: item.incident_time || "-" },
           ], 4),
           renderFieldGrid([
-            { label: "Incident Place", value: item.incident_place || "-" },
-          ], 1),
+            { label: "Incident Place", value: displayIncidentPlace(item.incident_place || "", item.incident_area_number || "") || "-" },
+            { label: "Area Number", value: item.incident_area_number || "-" },
+          ], 2),
         ].join("")),
         formSection("Complainant Information", [
           renderFieldGrid([
@@ -712,6 +738,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         formSection("Witness Information", renderFieldGrid([
           { label: "Witness Summary", value: item.witness_summary || "-" },
         ], 1)),
+        item.attachments && item.attachments.length
+          ? formSection("Attachments", renderAttachmentList(item.attachments))
+          : "",
         formSection("Intake Notes", renderFieldGrid([
           { label: "Intake Notes", value: item.intake_notes || "-" },
         ], 1)),

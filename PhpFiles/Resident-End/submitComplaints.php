@@ -3,6 +3,7 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
 require_once __DIR__ . "/../General/complaintTypeDetails.php";
+require_once __DIR__ . "/../General/recaptcha.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 cuafk_ensure_case_useraccount_foreign_keys($conn);
@@ -347,6 +348,151 @@ function validateIncidentDateTimeOrRedirect(string $path, ?string $incidentDate,
     }
 }
 
+function complaintStoreImageUploadsOrRedirect(string $path, array $files, string $caseId, string $actorUserId): array
+{
+    if (!isset($files['name']) || !is_array($files['name'])) {
+        return [];
+    }
+
+    $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    $maxBytes = 5 * 1024 * 1024;
+    $projectRoot = dirname(__DIR__, 2);
+    $relativeFolder = '/UnifiedFileAttachment/ComplaintEvidence/' . date('Y/m');
+    $absoluteFolder = $projectRoot . $relativeFolder;
+
+    if (!is_dir($absoluteFolder) && !mkdir($absoluteFolder, 0775, true) && !is_dir($absoluteFolder)) {
+        redirectWithMessage($path, 'error', 'Failed to prepare the complaint upload folder.');
+    }
+
+    $saved = [];
+    $fileCount = min(3, count($files['name']));
+    for ($index = 0; $index < $fileCount; $index++) {
+        $errorCode = (int)($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            redirectWithMessage($path, 'error', 'One of the complaint image uploads failed. Please try again.');
+        }
+
+        $originalName = trim((string)($files['name'][$index] ?? ''));
+        $tmpPath = (string)($files['tmp_name'][$index] ?? '');
+        $size = (int)($files['size'][$index] ?? 0);
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        $mimeType = strtolower((string)($files['type'][$index] ?? ''));
+
+        if (!in_array($extension, $allowedExtensions, true) || !in_array($mimeType, $allowedMimeTypes, true)) {
+            redirectWithMessage($path, 'error', 'Complaint images must be JPG, JPEG, PNG, or WEBP.');
+        }
+        if ($size <= 0 || $size > $maxBytes) {
+            redirectWithMessage($path, 'error', 'Each complaint image must be 5 MB or smaller.');
+        }
+        if (!is_uploaded_file($tmpPath)) {
+            redirectWithMessage($path, 'error', 'Invalid complaint image upload detected.');
+        }
+
+        $safeStem = preg_replace('/[^a-zA-Z0-9_-]+/', '-', pathinfo($originalName, PATHINFO_FILENAME)) ?: 'complaint-image';
+        $targetName = sprintf(
+            '%s_%s_%d_%s.%s',
+            preg_replace('/[^A-Za-z0-9]/', '', $caseId),
+            preg_replace('/[^A-Za-z0-9]/', '', $actorUserId ?: 'user'),
+            $index + 1,
+            bin2hex(random_bytes(4)),
+            $extension
+        );
+        $targetPath = $absoluteFolder . '/' . $targetName;
+        if (!move_uploaded_file($tmpPath, $targetPath)) {
+            redirectWithMessage($path, 'error', 'Failed to save one of the complaint images.');
+        }
+        @chmod($targetPath, 0664);
+
+        $saved[] = [
+            'name' => $originalName !== '' ? $originalName : ($safeStem . '.' . $extension),
+            'path' => $relativeFolder . '/' . $targetName,
+            'type' => $mimeType,
+        ];
+    }
+
+    return $saved;
+}
+
+function complaintCollectWitnessesOrRedirect(string $path, array $source): array
+{
+    $hasWitnesses = trim((string)($source['has_witnesses'] ?? ''));
+    if (!in_array($hasWitnesses, ['Yes', 'No'], true)) {
+        redirectWithMessage($path, 'error', 'Please select whether there is a witness.');
+    }
+    if ($hasWitnesses === 'No') {
+        return [];
+    }
+
+    $lastNames = is_array($source['witness_last_name'] ?? null) ? $source['witness_last_name'] : [];
+    $firstNames = is_array($source['witness_first_name'] ?? null) ? $source['witness_first_name'] : [];
+    $middleNames = is_array($source['witness_middle_name'] ?? null) ? $source['witness_middle_name'] : [];
+    $suffixes = is_array($source['witness_suffix'] ?? null) ? $source['witness_suffix'] : [];
+    $contacts = is_array($source['witness_contact_number'] ?? null) ? $source['witness_contact_number'] : [];
+    $addresses = is_array($source['witness_address'] ?? null) ? $source['witness_address'] : [];
+
+    $witnesses = [];
+    for ($index = 0; $index < 3; $index++) {
+        $last = str_field($lastNames[$index] ?? '');
+        $first = str_field($firstNames[$index] ?? '');
+        $middle = str_field($middleNames[$index] ?? '');
+        $suffix = str_field($suffixes[$index] ?? '');
+        $contactRaw = $contacts[$index] ?? '';
+        $address = str_field($addresses[$index] ?? '');
+        $hasAnyValue = $last || $first || $middle || $suffix || trim((string)$contactRaw) !== '' || $address;
+
+        if ($index === 0 && !$hasAnyValue) {
+            redirectWithMessage($path, 'error', 'Please enter at least one witness.');
+        }
+        if (!$hasAnyValue) {
+            continue;
+        }
+        if (!$last || !$first) {
+            redirectWithMessage($path, 'error', 'Witness last name and first name are required.');
+        }
+
+        $contact = validateComplaintPhoneOrRedirect($path, $contactRaw, true, 'Witness contact number');
+        $witnesses[] = [
+            'lastname' => $last,
+            'firstname' => $first,
+            'middlename' => $middle,
+            'suffix' => $suffix,
+            'contact_number' => $contact,
+            'address' => $address,
+        ];
+    }
+
+    return $witnesses;
+}
+
+function complaintBuildWitnessSummary(array $witnesses): ?string
+{
+    if ($witnesses === []) {
+        return null;
+    }
+
+    $parts = [];
+    foreach ($witnesses as $index => $witness) {
+        $fullName = trim(implode(' ', array_filter([
+            $witness['firstname'] ?? '',
+            $witness['middlename'] ?? '',
+            $witness['lastname'] ?? '',
+            $witness['suffix'] ?? '',
+        ])));
+        $line = array_filter([
+            'Witness ' . ($index + 1) . ': ' . ($fullName !== '' ? $fullName : 'Unnamed'),
+            !empty($witness['contact_number']) ? 'Contact: ' . $witness['contact_number'] : null,
+            !empty($witness['address']) ? 'Address: ' . $witness['address'] : null,
+        ]);
+        $parts[] = implode(' | ', $line);
+    }
+
+    return implode("\n", $parts);
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     exit('Method not allowed.');
@@ -363,6 +509,19 @@ if ($action !== 'submit_complaint') {
 requireRoleSession(['Resident'], false);
 verifyCsrfToken(false);
 
+$complainantPath = '/Resident-End/Complaints/ComplaintsForm.php';
+$recaptchaToken = trim((string)($_POST['recaptcha_token'] ?? ''));
+if (recaptcha_v3_should_enforce()) {
+    $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, 'resident_complaint_submit');
+    if (empty($recaptchaCheck['success'])) {
+        redirectWithMessage(
+            $complainantPath,
+            'error',
+            (string)($recaptchaCheck['message'] ?? 'Security verification failed. Please try again.')
+        );
+    }
+}
+
 if (!tableExists($conn, 'complaintstbl')) {
     http_response_code(500);
     exit('Complaint table is not available. Run the complaint migration first.');
@@ -372,27 +531,24 @@ $complainantLast = str_field($_POST['complainant_last_name'] ?? '');
 $complainantFirst = str_field($_POST['complainant_first_name'] ?? '');
 $complainantMiddle = str_field($_POST['complainant_middle_name'] ?? '');
 $complainantSuffix = str_field($_POST['complainant_suffix'] ?? '');
-$complainantPath = '/Resident-End/Complaints/ComplaintsForm.php';
 $complainantContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['complainant_contact_number'] ?? '', true, 'Complainant contact number');
 $complainantAge = str_field($_POST['complainant_age'] ?? '');
 $complainantSex = str_field($_POST['complainant_sex'] ?? '');
 $complainantAddress = str_field($_POST['complainant_address'] ?? '');
 
-$subjectName = str_field($_POST['subject_name'] ?? '');
-$subjectKind = resolveSubjectKind($_POST['subject_kind'] ?? '', $subjectName);
-$subjectContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['subject_contact_number'] ?? '', false, 'Subject contact number');
-$subjectAddress = str_field($_POST['subject_address'] ?? '');
+$subjectName = null;
+$subjectKind = '';
+$subjectContact = null;
+$subjectAddress = null;
 
 $natureOfComplaint = str_field($_POST['nature_of_complaint'] ?? '');
 $natureOther = str_field($_POST['nature_other'] ?? '');
 $incidentDate = str_field($_POST['incident_date'] ?? '');
 $incidentTime = str_field($_POST['incident_time'] ?? '');
 $incidentLocation = str_field($_POST['incident_location'] ?? '');
+$incidentAreaNumber = str_field($_POST['incident_area_number'] ?? '');
 $incidentNarration = str_field($_POST['incident_narration'] ?? '');
-
-$witnessName = str_field($_POST['witness_name'] ?? '');
-$witnessContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['witness_contact_number'] ?? '', false, 'Witness contact number');
-$witnessAddress = str_field($_POST['witness_address'] ?? '');
+$witnesses = complaintCollectWitnessesOrRedirect($complainantPath, $_POST);
 
 try {
     $complaintTypeMeta = complaintTypeValidateAndCollect($natureOfComplaint, $natureOther, $_POST);
@@ -400,23 +556,14 @@ try {
     redirectWithMessage($complainantPath, 'error', $e->getMessage());
 }
 $complaintType = str_field($complaintTypeMeta['complaint_type'] ?? '');
-$caseDetails = complaintTypeBuildCaseDetails($incidentNarration, $complaintTypeMeta);
 
-if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentNarration) {
+if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentAreaNumber || !$incidentNarration) {
     redirectWithMessage($complainantPath, 'error', 'Missing required complaint fields.');
 }
 
 validateIncidentDateTimeOrRedirect($complainantPath, $incidentDate, $incidentTime);
-
-$witnessSummaryParts = array_filter([
-    $witnessName ? 'Name: ' . $witnessName : null,
-    $witnessContact ? 'Contact: ' . $witnessContact : null,
-    $witnessAddress ? 'Address: ' . $witnessAddress : null,
-]);
-$witnessSummary = !empty($witnessSummaryParts) ? implode(' | ', $witnessSummaryParts) : null;
-
-[$respondentLast, $respondentFirst, $respondentMiddle, $respondentSuffix] = parseParticipantName($subjectName);
-[$witnessLast, $witnessFirst, $witnessMiddle, $witnessSuffix] = parseParticipantName($witnessName);
+$incidentPlace = trim($incidentAreaNumber . ' - ' . $incidentLocation);
+$witnessSummary = complaintBuildWitnessSummary($witnesses);
 
 $residentUserId = $actorUserId !== '' ? $actorUserId : null;
 
@@ -433,6 +580,12 @@ try {
     if (!$complaintId) {
         throw new Exception("Failed to generate complaint ID.");
     }
+
+    $imageAttachments = complaintStoreImageUploadsOrRedirect($complainantPath, $_FILES['complaint_images'] ?? [], $caseId, $actorUserId);
+    $caseDetails = complaintTypeBuildCaseDetails($incidentNarration, $complaintTypeMeta, [
+        'incident_area_number' => $incidentAreaNumber,
+        'attachments' => $imageAttachments,
+    ]);
 
     $caseRemarks = 'Complaint submitted via resident portal.';
     $stmtCase = $conn->prepare("
@@ -452,7 +605,7 @@ try {
         $residentUserId,
         $incidentDate,
         $incidentTime,
-        $incidentLocation,
+        $incidentPlace,
         $complaintType,
         $caseDetails,
         $caseRemarks,
@@ -501,35 +654,20 @@ try {
         null
     );
 
-    insertParticipant(
-        $conn,
-        $caseId,
-        'Respondent',
-        $respondentLast,
-        $respondentFirst,
-        $respondentMiddle,
-        $respondentSuffix,
-        $subjectContact,
-        $subjectAddress,
-        null,
-        null,
-        'Complaint subject recorded from resident portal submission.'
-    );
-
-    if ($witnessName || $witnessContact || $witnessAddress) {
+    foreach ($witnesses as $index => $witness) {
         insertParticipant(
             $conn,
             $caseId,
             'Witness',
-            $witnessLast,
-            $witnessFirst,
-            $witnessMiddle,
-            $witnessSuffix,
-            $witnessContact,
-            $witnessAddress,
+            $witness['lastname'] ?? null,
+            $witness['firstname'] ?? null,
+            $witness['middlename'] ?? null,
+            $witness['suffix'] ?? null,
+            $witness['contact_number'] ?? null,
+            $witness['address'] ?? null,
             null,
             null,
-            'Witness details recorded from complaint submission.'
+            'Witness ' . ($index + 1) . ' details recorded from complaint submission.'
         );
     }
 

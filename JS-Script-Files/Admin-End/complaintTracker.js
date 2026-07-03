@@ -400,6 +400,52 @@
         })), 2);
     }
 
+    function renderAttachmentList(attachments) {
+        const clean = (Array.isArray(attachments) ? attachments : []).filter((attachment) => attachment && String(attachment.path ?? "").trim() !== "");
+        if (!clean.length) return "";
+        const items = clean.map((attachment, index) => {
+            const name = String(attachment.name || `Attachment ${index + 1}`).trim() || `Attachment ${index + 1}`;
+            const href = encodeURI(String(attachment.path || "").trim());
+            return `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(name)}</a>`;
+        });
+        return renderFieldGrid([
+            {
+                label: "Image Attachments",
+                value: items.join("<br>"),
+                raw: true,
+            },
+        ], 1);
+    }
+
+    function renderWitnessSection(witnesses, witnessSummary) {
+        const clean = (Array.isArray(witnesses) ? witnesses : []).filter((witness) => {
+            return witness && (
+                String(witness.full_name ?? "").trim() !== ""
+                || String(witness.contact_number ?? "").trim() !== ""
+                || String(witness.address ?? "").trim() !== ""
+            );
+        });
+
+        if (!clean.length) {
+            return renderFieldGrid([
+                { label: "Witness Summary", value: witnessSummary || "-" },
+            ], 1);
+        }
+
+        return clean.map((witness, index) => {
+            return [
+                `<div class="small fw-semibold text-uppercase text-muted mb-2">Witness ${index + 1}</div>`,
+                renderFieldGrid([
+                    { label: "Full Name", value: witness.full_name || "-" },
+                    { label: "Contact Number", value: witness.contact_number || "-" },
+                ], 2),
+                renderFieldGrid([
+                    { label: "Address", value: witness.address || "-" },
+                ], 1),
+            ].join("");
+        }).join('<div class="mt-3"></div>');
+    }
+
     function formSection(title, content) {
         return `
             <section class="tracker-form-section">
@@ -459,6 +505,16 @@
         return orderedLabels
             .filter((label) => parsed.has(label))
             .map((label) => ({ label, value: parsed.get(label) || "" }));
+    }
+
+    function displayIncidentPlace(place, areaNumber) {
+        const rawPlace = String(place || "").trim();
+        const rawArea = String(areaNumber || "").trim();
+        if (!rawPlace) return "";
+        if (!rawArea) return rawPlace;
+
+        const escapedArea = rawArea.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return rawPlace.replace(new RegExp(`^${escapedArea}\\s*-\\s*`, "i"), "").trim() || rawPlace;
     }
 
     function renderIntakeNotesEditor(value) {
@@ -634,8 +690,9 @@
                 { label: "Incident Time", value: d.incident_time || "-" },
             ], 4);
             const summaryPlaceGrid = renderFieldGrid([
-                { label: "Incident Place", value: d.incident_place || "-" },
-            ], 1);
+                { label: "Incident Place", value: displayIncidentPlace(d.incident_place || "", d.incident_area_number || "") || "-" },
+                { label: "Area Number", value: d.incident_area_number || "-" },
+            ], 2);
 
             const complainantGrid = [
                 renderParticipantGrid(d.complainant || {}),
@@ -654,16 +711,9 @@
                 ], 1),
             ].join("");
 
-            const witnessGrid = [
-                renderFieldGrid([
-                    { label: "Witness Name", value: d.witness?.full_name || "-" },
-                    { label: "Witness Contact", value: d.witness?.contact_number || "-" },
-                ], 2),
-                renderFieldGrid([
-                    { label: "Witness Address", value: d.witness?.address || "-" },
-                ], 1),
-            ].join("");
+            const witnessGrid = renderWitnessSection(d.witnesses || [], d.witness_summary || "");
             const complaintSpecificGrid = renderComplaintSpecificFieldGrid(d.complaint_detail_fields || []);
+            const attachmentGrid = renderAttachmentList(d.attachments || []);
 
             const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
             const blotterRequestNotice = buildBlotterRequestNotice(d);
@@ -700,6 +750,7 @@
                 formSection("Subject Information", subjectGrid),
                 complaintSpecificGrid ? formSection("Complaint-Specific Information", complaintSpecificGrid) : "",
                 formSection("Witness Information", witnessGrid),
+                attachmentGrid ? formSection("Attachments", attachmentGrid) : "",
                 intakeNotesSection,
                 formSection("Narration and Notes", notesGrid),
             ].join("");

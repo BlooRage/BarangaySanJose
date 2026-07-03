@@ -71,4 +71,14 @@ return [
         'endpoint' => 'https://api.semaphore.co/api/v4/messages',
         'otp_endpoint' => 'https://api.semaphore.co/api/v4/otp',
     ],
+
+    'captcha' => [
+        'recaptcha_v3' => [
+            'site_key' => 'your_recaptcha_v3_site_key',
+            'secret_key' => 'your_recaptcha_v3_secret_key',
+            'min_score' => 0.5,
+            // Leave false when your key is registered only for the live domain.
+            'allow_localhost' => false,
+        ],
+    ],
 ];

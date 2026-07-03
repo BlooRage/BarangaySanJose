@@ -3,6 +3,12 @@ header('Content-Type: application/json');
 require_once '../General/connection.php';
 require_once '../General/sendSMS.php';
 require_once '../General/uniqueIDGenerate.php';
+require_once '../General/appointmentSubmissionShared.php';
+require_once '../General/recaptcha.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // ===== Validate input =====
 if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
@@ -13,6 +19,8 @@ if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
 $rawRecipient = trim($_POST['recipient']);
 $purpose      = trim($_POST['purpose']);
 $user_id      = $_POST['user_id'] ?? null;
+$captchaAnswer = trim((string)($_POST['captcha_answer'] ?? ''));
+$recaptchaToken = trim((string)($_POST['recaptcha_token'] ?? ''));
 
 // ===== Normalize recipient to 10 digits ONLY for DB =====
 // Accepts: 09XXXXXXXXX or 9XXXXXXXXX
@@ -23,6 +31,37 @@ if (preg_match('/^09\d{9}$/', $rawRecipient)) {
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid phone number format']);
     exit;
+}
+
+if ($purpose === 'guest_appointment') {
+    if (recaptcha_v3_should_enforce()) {
+        $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, 'guest_appointment_otp');
+        if (empty($recaptchaCheck['success'])) {
+            echo json_encode([
+                'success' => false,
+                'error' => (string)($recaptchaCheck['message'] ?? 'Security verification failed. Please try again.'),
+            ]);
+            exit;
+        }
+    }
+
+    $activeAppointment = apsh_find_active_appointment_by_phone($conn, '0' . $recipient_db);
+    if (is_array($activeAppointment)) {
+        echo json_encode(['success' => false, 'error' => apsh_active_appointment_phone_message($activeAppointment)]);
+        exit;
+    }
+
+    $recentOtpRequest = apsh_guest_appointment_recent_otp_request($conn, $recipient_db, 60);
+    if (is_array($recentOtpRequest)) {
+        $remainingSeconds = (int)($recentOtpRequest['remaining_seconds'] ?? 0);
+        echo json_encode([
+            'success' => false,
+            'error' => $remainingSeconds > 0
+                ? "Please wait {$remainingSeconds} seconds before requesting another OTP."
+                : 'Please wait before requesting another OTP.',
+        ]);
+        exit;
+    }
 }
 
 // ===== Generate 6-digit OTP =====

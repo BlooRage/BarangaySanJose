@@ -5,6 +5,8 @@ require_once __DIR__ . '/../PhpFiles/General/appointmentCouncilMembers.php';
 require_once __DIR__ . '/../PhpFiles/General/appointmentSettings.php';
 require_once __DIR__ . '/../PhpFiles/General/appointmentOfficialSchedules.php';
 require_once __DIR__ . '/../PhpFiles/General/appointmentTimeSlots.php';
+require_once __DIR__ . '/../PhpFiles/General/appointmentSubmissionShared.php';
+require_once __DIR__ . '/../PhpFiles/General/recaptcha.php';
 
 apos_schedule_ensure_storage($conn);
 
@@ -74,6 +76,8 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
 } elseif (!preg_match('/^9\d{9}$/', $contactNumberFieldValue)) {
     $contactNumberFieldValue = '';
 }
+$guestAppointmentUsesRecaptcha = recaptcha_v3_frontend_enabled();
+$guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v3_site_key() : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -85,6 +89,9 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <?php if ($guestAppointmentUsesRecaptcha): ?>
+        <script src="https://www.google.com/recaptcha/api.js?render=<?= htmlspecialchars($guestAppointmentRecaptchaSiteKey, ENT_QUOTES, 'UTF-8') ?>"></script>
+    <?php endif; ?>
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
@@ -1135,6 +1142,45 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             color: var(--guest-ink);
         }
 
+        .otp-captcha-wrap {
+            margin-top: 1rem;
+            display: grid;
+            gap: 0.45rem;
+            justify-items: center;
+        }
+
+        .otp-captcha-label {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--guest-muted);
+        }
+
+        .otp-captcha-prompt {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--guest-ink);
+            text-align: center;
+        }
+
+        .otp-captcha-input {
+            max-width: 168px;
+            min-height: 50px;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #fff !important;
+        }
+
+        .otp-security-note {
+            margin: 0.85rem 0 0;
+            color: var(--guest-muted);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            text-align: center;
+        }
+
         .otp-link-btn {
             appearance: none;
             -webkit-appearance: none;
@@ -1649,6 +1695,10 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                                                     </div>
                                                 </div>
 
+                                                <?php if ($guestAppointmentUsesRecaptcha): ?>
+                                                    <p class="otp-security-note">Protected by reCAPTCHA. OTP requests are screened automatically before sending.</p>
+                                                <?php endif; ?>
+
                                                 <div class="otp-verify-row" id="otpVerifyRow" hidden>
                                                     <div>
                                                         <div class="otp-code-field">
@@ -1842,9 +1892,12 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             const resendOtpBtn = document.getElementById("resendOtpBtn");
             const otpVerifyRow = document.getElementById("otpVerifyRow");
             const otpInput = document.getElementById("guestOtpInput");
+            const otpCaptchaInput = document.getElementById("guestAppointmentCaptcha");
             const otpBoxes = Array.from(document.querySelectorAll("#guestOtpBoxes .otp-code-box"));
             const otpFeedback = document.getElementById("otpFeedback");
             const otpError = document.getElementById("otpError");
+            const recaptchaEnabled = <?= $guestAppointmentUsesRecaptcha ? 'true' : 'false' ?>;
+            const recaptchaSiteKey = <?= json_encode($guestAppointmentRecaptchaSiteKey, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
             const officialScheduleMap = <?= json_encode($officialScheduleMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const bookedSlotMap = <?= json_encode($bookedSlotMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const appointmentGlobalScheduleConfig = <?= json_encode([
@@ -2296,6 +2349,47 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 return true;
             };
 
+            const validateOtpCaptcha = () => {
+                if (recaptchaEnabled) {
+                    return true;
+                }
+                if (!otpCaptchaInput) {
+                    return true;
+                }
+                const normalized = String(otpCaptchaInput.value || "").replace(/\D+/g, "").slice(0, 2);
+                if (otpCaptchaInput.value !== normalized) {
+                    otpCaptchaInput.value = normalized;
+                }
+                if (normalized === "") {
+                    otpCaptchaInput.setCustomValidity("Please answer the security check before requesting an OTP.");
+                    return false;
+                }
+                otpCaptchaInput.setCustomValidity("");
+                return true;
+            };
+
+            const executeAppointmentRecaptcha = async () => {
+                if (!recaptchaEnabled) {
+                    return "";
+                }
+                if (!(window.grecaptcha && typeof window.grecaptcha.execute === "function")) {
+                    throw new Error("Security check is still loading. Please try again.");
+                }
+
+                await new Promise((resolve) => {
+                    window.grecaptcha.ready(resolve);
+                });
+
+                const token = await window.grecaptcha.execute(recaptchaSiteKey, {
+                    action: "guest_appointment_otp",
+                });
+                if (String(token || "").trim() === "") {
+                    throw new Error("Security verification failed. Please try again.");
+                }
+
+                return token;
+            };
+
             const syncOtpRecipientPreview = () => {
                 if (!otpRecipientPreview) {
                     return;
@@ -2497,6 +2591,10 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                     contactNumberInput?.reportValidity();
                     return;
                 }
+                if (!validateOtpCaptcha()) {
+                    otpCaptchaInput?.reportValidity();
+                    return;
+                }
 
                 const recipient = normalizePhone(contactNumberInput?.value || "");
                 if (recipient === "") {
@@ -2511,9 +2609,14 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
                 }
 
                 try {
+                    const recaptchaToken = await executeAppointmentRecaptcha();
                     const formData = new FormData();
                     formData.append("recipient", recipient);
                     formData.append("purpose", "guest_appointment");
+                    formData.append("captcha_answer", String(otpCaptchaInput?.value || "").trim());
+                    if (recaptchaToken !== "") {
+                        formData.append("recaptcha_token", recaptchaToken);
+                    }
 
                     const response = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
                         method: "POST",
@@ -2607,6 +2710,10 @@ if (preg_match('/^63(9\d{9})$/', $contactNumberFieldValue, $phoneMatch)) {
             });
             contactNumberInput?.addEventListener("blur", validateContactNumber);
             contactNumberInput?.addEventListener("change", validateContactNumber);
+            otpCaptchaInput?.addEventListener("input", () => {
+                validateOtpCaptcha();
+                clearOtpMessages();
+            });
             otpInput?.addEventListener("input", () => {
                 syncOtpBoxes();
                 const otpValue = String(otpInput?.value || "").trim();

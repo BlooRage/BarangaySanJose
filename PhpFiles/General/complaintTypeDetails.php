@@ -7,15 +7,11 @@ function complaintTypeDefinitions(): array
             'label' => 'Disturbance',
             'fields' => [
                 ['name' => 'disturbance_source', 'label' => 'Source of Disturbance', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. Neighbor, group, gathering'],
-                ['name' => 'disturbance_frequency', 'label' => 'How Often It Happens', 'type' => 'select', 'required' => true, 'options' => ['One-time', 'Occasional', 'Frequent', 'Ongoing']],
-                ['name' => 'disturbance_time_pattern', 'label' => 'Usual Time or Schedule', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. Late at night, every weekend'],
             ],
         ],
         'Property Dispute' => [
             'label' => 'Property Dispute',
             'fields' => [
-                ['name' => 'property_involved', 'label' => 'Property or Area Involved', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. Fence line, parking space, lot boundary'],
-                ['name' => 'property_relationship', 'label' => 'Relationship to the Property', 'type' => 'select', 'required' => true, 'options' => ['Owner', 'Tenant', 'Neighbor', 'Caretaker', 'Relative', 'Other']],
                 ['name' => 'property_dispute_issue', 'label' => 'Main Issue', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. Encroachment, access blockage, boundary conflict'],
             ],
         ],
@@ -23,24 +19,31 @@ function complaintTypeDefinitions(): array
             'label' => 'Noise Complaint',
             'fields' => [
                 ['name' => 'noise_source', 'label' => 'Source of Noise', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. Videoke, construction, vehicle, event'],
-                ['name' => 'noise_frequency', 'label' => 'How Often It Happens', 'type' => 'select', 'required' => true, 'options' => ['One-time', 'Occasional', 'Frequent', 'Ongoing']],
-                ['name' => 'noise_time_pattern', 'label' => 'Usual Time or Schedule', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. 10:00 PM onwards, early morning'],
             ],
         ],
-        'Physical Altercation' => [
-            'label' => 'Physical Altercation',
+        'Physical Altercation / Violence' => [
+            'label' => 'Physical Altercation / Violence',
             'fields' => [
-                ['name' => 'altercation_injuries', 'label' => 'Were There Any Injuries?', 'type' => 'select', 'required' => true, 'options' => ['Yes', 'No', 'Unsure']],
-                ['name' => 'altercation_medical_help', 'label' => 'Was Medical Assistance Needed?', 'type' => 'select', 'required' => true, 'options' => ['Yes', 'No', 'Unsure']],
-                ['name' => 'altercation_weapons', 'label' => 'Were Any Weapons or Dangerous Objects Involved?', 'type' => 'select', 'required' => true, 'options' => ['Yes', 'No', 'Unsure']],
+                ['name' => 'altercation_weapons', 'label' => 'Were dangerous weapons involved?', 'type' => 'select', 'required' => true, 'options' => ['Yes', 'No', 'Unsure']],
+                ['name' => 'altercation_injuries', 'label' => 'Were there anyone injured?', 'type' => 'select', 'required' => true, 'options' => ['Yes', 'No', 'Unsure']],
+            ],
+        ],
+        'Barangay Safety Hazard' => [
+            'label' => 'Barangay Safety Hazard',
+            'fields' => [
+                ['name' => 'hazard_type', 'label' => 'Type of Hazard', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. Open canal, exposed wiring, debris, broken post'],
+            ],
+        ],
+        'General Concern' => [
+            'label' => 'General Concern',
+            'fields' => [
+                ['name' => 'general_specific_concern', 'label' => 'Specific Concern', 'type' => 'text', 'required' => true, 'placeholder' => 'Describe the concern briefly'],
             ],
         ],
         'Other' => [
             'label' => 'Other',
             'fields' => [
                 ['name' => 'other_specific_concern', 'label' => 'Specific Concern', 'type' => 'text', 'required' => true, 'placeholder' => 'Describe the concern briefly'],
-                ['name' => 'other_how_long', 'label' => 'How Long Has This Been Happening?', 'type' => 'text', 'required' => true, 'placeholder' => 'e.g. 2 weeks, since last month'],
-                ['name' => 'other_impact', 'label' => 'Impact on You or the Community', 'type' => 'textarea', 'required' => true, 'placeholder' => 'Describe the effect or harm caused'],
             ],
         ],
     ];
@@ -108,7 +111,7 @@ function complaintTypeValidateAndCollect(?string $natureOfComplaint, ?string $na
     ];
 }
 
-function complaintTypeBuildCaseDetails(?string $narration, array $meta): string
+function complaintTypeBuildCaseDetails(?string $narration, array $meta, array $extra = []): string
 {
     $payload = [
         'version' => 1,
@@ -118,6 +121,20 @@ function complaintTypeBuildCaseDetails(?string $narration, array $meta): string
             return is_array($field) && trim((string)($field['label'] ?? '')) !== '' && trim((string)($field['value'] ?? '')) !== '';
         })),
     ];
+
+    $incidentAreaNumber = trim((string)($extra['incident_area_number'] ?? ''));
+    if ($incidentAreaNumber !== '') {
+        $payload['incident_area_number'] = $incidentAreaNumber;
+    }
+
+    $attachments = array_values(array_filter($extra['attachments'] ?? [], static function ($attachment): bool {
+        return is_array($attachment)
+            && trim((string)($attachment['path'] ?? '')) !== ''
+            && trim((string)($attachment['name'] ?? '')) !== '';
+    }));
+    if ($attachments !== []) {
+        $payload['attachments'] = $attachments;
+    }
 
     $narration = trim((string)$narration);
     $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -174,5 +191,9 @@ function complaintTypeParseCaseDetails(?string $caseDetails): array
         'narration' => $narration,
         'meta' => $decoded,
         'fields' => $fields,
+        'incident_area_number' => trim((string)($decoded['incident_area_number'] ?? '')),
+        'attachments' => array_values(array_filter($decoded['attachments'] ?? [], static function ($attachment): bool {
+            return is_array($attachment) && trim((string)($attachment['path'] ?? '')) !== '';
+        })),
     ];
 }

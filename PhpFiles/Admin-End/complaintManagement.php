@@ -162,6 +162,151 @@ function validateIncidentDateTimeOrRedirect(?string $incidentDate, ?string $inci
     }
 }
 
+function complaintStoreImageUploadsOrRedirect(array $files, string $caseId, string $actorUserId): array
+{
+    if (!isset($files['name']) || !is_array($files['name'])) {
+        return [];
+    }
+
+    $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    $maxBytes = 5 * 1024 * 1024;
+    $projectRoot = dirname(__DIR__, 2);
+    $relativeFolder = '/UnifiedFileAttachment/ComplaintEvidence/' . date('Y/m');
+    $absoluteFolder = $projectRoot . $relativeFolder;
+
+    if (!is_dir($absoluteFolder) && !mkdir($absoluteFolder, 0775, true) && !is_dir($absoluteFolder)) {
+        redirectWithMessage('error', 'Failed to prepare the complaint upload folder.');
+    }
+
+    $saved = [];
+    $fileCount = min(3, count($files['name']));
+    for ($index = 0; $index < $fileCount; $index++) {
+        $errorCode = (int)($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            redirectWithMessage('error', 'One of the complaint image uploads failed. Please try again.');
+        }
+
+        $originalName = trim((string)($files['name'][$index] ?? ''));
+        $tmpPath = (string)($files['tmp_name'][$index] ?? '');
+        $size = (int)($files['size'][$index] ?? 0);
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        $mimeType = strtolower((string)($files['type'][$index] ?? ''));
+
+        if (!in_array($extension, $allowedExtensions, true) || !in_array($mimeType, $allowedMimeTypes, true)) {
+            redirectWithMessage('error', 'Complaint images must be JPG, JPEG, PNG, or WEBP.');
+        }
+        if ($size <= 0 || $size > $maxBytes) {
+            redirectWithMessage('error', 'Each complaint image must be 5 MB or smaller.');
+        }
+        if (!is_uploaded_file($tmpPath)) {
+            redirectWithMessage('error', 'Invalid complaint image upload detected.');
+        }
+
+        $safeStem = preg_replace('/[^a-zA-Z0-9_-]+/', '-', pathinfo($originalName, PATHINFO_FILENAME)) ?: 'complaint-image';
+        $targetName = sprintf(
+            '%s_%s_%d_%s.%s',
+            preg_replace('/[^A-Za-z0-9]/', '', $caseId),
+            preg_replace('/[^A-Za-z0-9]/', '', $actorUserId ?: 'user'),
+            $index + 1,
+            bin2hex(random_bytes(4)),
+            $extension
+        );
+        $targetPath = $absoluteFolder . '/' . $targetName;
+        if (!move_uploaded_file($tmpPath, $targetPath)) {
+            redirectWithMessage('error', 'Failed to save one of the complaint images.');
+        }
+        @chmod($targetPath, 0664);
+
+        $saved[] = [
+            'name' => $originalName !== '' ? $originalName : ($safeStem . '.' . $extension),
+            'path' => $relativeFolder . '/' . $targetName,
+            'type' => $mimeType,
+        ];
+    }
+
+    return $saved;
+}
+
+function complaintCollectWitnessesOrRedirect(array $source): array
+{
+    $hasWitnesses = trim((string)($source['has_witnesses'] ?? ''));
+    if (!in_array($hasWitnesses, ['Yes', 'No'], true)) {
+        redirectWithMessage('error', 'Please select whether there is a witness.');
+    }
+    if ($hasWitnesses === 'No') {
+        return [];
+    }
+
+    $lastNames = is_array($source['witness_last_name'] ?? null) ? $source['witness_last_name'] : [];
+    $firstNames = is_array($source['witness_first_name'] ?? null) ? $source['witness_first_name'] : [];
+    $middleNames = is_array($source['witness_middle_name'] ?? null) ? $source['witness_middle_name'] : [];
+    $suffixes = is_array($source['witness_suffix'] ?? null) ? $source['witness_suffix'] : [];
+    $contacts = is_array($source['witness_contact_number'] ?? null) ? $source['witness_contact_number'] : [];
+    $addresses = is_array($source['witness_address'] ?? null) ? $source['witness_address'] : [];
+
+    $witnesses = [];
+    for ($index = 0; $index < 3; $index++) {
+        $last = str_field($lastNames[$index] ?? '');
+        $first = str_field($firstNames[$index] ?? '');
+        $middle = str_field($middleNames[$index] ?? '');
+        $suffix = str_field($suffixes[$index] ?? '');
+        $contactRaw = $contacts[$index] ?? '';
+        $address = str_field($addresses[$index] ?? '');
+        $hasAnyValue = $last || $first || $middle || $suffix || trim((string)$contactRaw) !== '' || $address;
+
+        if ($index === 0 && !$hasAnyValue) {
+            redirectWithMessage('error', 'Please enter at least one witness.');
+        }
+        if (!$hasAnyValue) {
+            continue;
+        }
+        if (!$last || !$first) {
+            redirectWithMessage('error', 'Witness last name and first name are required.');
+        }
+
+        $contact = validateComplaintPhoneOrRedirect($contactRaw, true, 'Witness contact number');
+        $witnesses[] = [
+            'lastname' => $last,
+            'firstname' => $first,
+            'middlename' => $middle,
+            'suffix' => $suffix,
+            'contact_number' => $contact,
+            'address' => $address,
+        ];
+    }
+
+    return $witnesses;
+}
+
+function complaintBuildWitnessSummary(array $witnesses): ?string
+{
+    if ($witnesses === []) {
+        return null;
+    }
+
+    $parts = [];
+    foreach ($witnesses as $index => $witness) {
+        $fullName = trim(implode(' ', array_filter([
+            $witness['firstname'] ?? '',
+            $witness['middlename'] ?? '',
+            $witness['lastname'] ?? '',
+            $witness['suffix'] ?? '',
+        ])));
+        $line = array_filter([
+            'Witness ' . ($index + 1) . ': ' . ($fullName !== '' ? $fullName : 'Unnamed'),
+            !empty($witness['contact_number']) ? 'Contact: ' . $witness['contact_number'] : null,
+            !empty($witness['address']) ? 'Address: ' . $witness['address'] : null,
+        ]);
+        $parts[] = implode(' | ', $line);
+    }
+
+    return implode("\n", $parts);
+}
+
 function tableExists(mysqli $conn, string $tableName): bool
 {
     $stmt = $conn->prepare("
@@ -370,12 +515,10 @@ $natureOther = str_field($_POST['nature_other'] ?? '');
 $incidentDate = str_field($_POST['incident_date'] ?? '');
 $incidentTime = str_field($_POST['incident_time'] ?? '');
 $incidentLocation = str_field($_POST['incident_location'] ?? '');
+$incidentAreaNumber = str_field($_POST['incident_area_number'] ?? '');
 $incidentNarration = str_field($_POST['incident_narration'] ?? '');
 $initialNotes = str_field($_POST['initial_notes'] ?? '');
-
-$witnessName = str_field($_POST['witness_name'] ?? '');
-$witnessContact = validateComplaintPhoneOrRedirect($_POST['witness_contact_number'] ?? '', false, 'Witness contact number');
-$witnessAddress = str_field($_POST['witness_address'] ?? '');
+$witnesses = complaintCollectWitnessesOrRedirect($_POST);
 
 try {
     $complaintTypeMeta = complaintTypeValidateAndCollect($natureOfComplaint, $natureOther, $_POST);
@@ -383,22 +526,15 @@ try {
     redirectWithMessage('error', $e->getMessage());
 }
 $complaintType = str_field($complaintTypeMeta['complaint_type'] ?? '');
-$caseDetails = complaintTypeBuildCaseDetails($incidentNarration, $complaintTypeMeta);
 
-if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentNarration) {
+if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentAreaNumber || !$incidentNarration) {
     redirectWithMessage('error', 'Missing required complaint fields.');
 }
 
 validateIncidentDateTimeOrRedirect($incidentDate, $incidentTime);
-
-$witnessSummaryParts = array_filter([
-    $witnessName ? 'Name: ' . $witnessName : null,
-    $witnessContact ? 'Contact: ' . $witnessContact : null,
-    $witnessAddress ? 'Address: ' . $witnessAddress : null,
-]);
-$witnessSummary = !empty($witnessSummaryParts) ? implode(' | ', $witnessSummaryParts) : null;
+$incidentPlace = trim($incidentAreaNumber . ' - ' . $incidentLocation);
+$witnessSummary = complaintBuildWitnessSummary($witnesses);
 [$respondentLast, $respondentFirst, $respondentMiddle, $respondentSuffix] = parseParticipantName($subjectName);
-[$witnessLast, $witnessFirst, $witnessMiddle, $witnessSuffix] = parseParticipantName($witnessName);
 $actorUserId = (string)($_SESSION['user_id'] ?? '');
 $residentUserId = null;
 
@@ -416,6 +552,12 @@ try {
         throw new Exception("Failed to generate complaint ID.");
     }
 
+    $imageAttachments = complaintStoreImageUploadsOrRedirect($_FILES['complaint_images'] ?? [], $caseId, $actorUserId);
+    $caseDetails = complaintTypeBuildCaseDetails($incidentNarration, $complaintTypeMeta, [
+        'incident_area_number' => $incidentAreaNumber,
+        'attachments' => $imageAttachments,
+    ]);
+
     $caseRemarks = 'Complaint encoded by admin.';
     $stmtCase = $conn->prepare("
         INSERT INTO casereportstbl
@@ -427,7 +569,7 @@ try {
     if (!$stmtCase) {
         throw new Exception("Prepare failed (case insert): " . $conn->error);
     }
-    $stmtCase->bind_param("ssssssssiis", $caseId, $residentUserId, $incidentDate, $incidentTime, $incidentLocation, $complaintType, $caseDetails, $caseRemarks, $statusId, $levelId, $actorUserId);
+    $stmtCase->bind_param("ssssssssiis", $caseId, $residentUserId, $incidentDate, $incidentTime, $incidentPlace, $complaintType, $caseDetails, $caseRemarks, $statusId, $levelId, $actorUserId);
     $stmtCase->execute();
     $stmtCase->close();
 
@@ -447,8 +589,8 @@ try {
     insertParticipant($conn, $caseId, 'Complainant', $complainantLast, $complainantFirst, $complainantMiddle, $complainantSuffix, $complainantContact, $complainantAddress, $complainantAge, $complainantSex, 'Complaint encoded by admin.');
     insertParticipant($conn, $caseId, 'Respondent', $respondentLast, $respondentFirst, $respondentMiddle, $respondentSuffix, $subjectContact, $subjectAddress, null, null, 'Complaint subject recorded from admin complaint entry.');
 
-    if ($witnessName || $witnessContact || $witnessAddress) {
-        insertParticipant($conn, $caseId, 'Witness', $witnessLast, $witnessFirst, $witnessMiddle, $witnessSuffix, $witnessContact, $witnessAddress, null, null, 'Witness details recorded from admin complaint entry.');
+    foreach ($witnesses as $index => $witness) {
+        insertParticipant($conn, $caseId, 'Witness', $witness['lastname'] ?? null, $witness['firstname'] ?? null, $witness['middlename'] ?? null, $witness['suffix'] ?? null, $witness['contact_number'] ?? null, $witness['address'] ?? null, null, null, 'Witness ' . ($index + 1) . ' details recorded from admin complaint entry.');
     }
 
     $conn->commit();

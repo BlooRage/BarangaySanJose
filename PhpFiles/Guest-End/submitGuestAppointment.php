@@ -41,6 +41,11 @@ if ($firstName === '' || $lastName === '' || $contactNumber === null || $current
     apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please complete all required appointment fields.');
 }
 
+$activeAppointment = apsh_find_active_appointment_by_phone($conn, $contactNumber);
+if (is_array($activeAppointment)) {
+    apsh_redirect_with_message('/Guest-End/appointments.php', 'error', apsh_active_appointment_phone_message($activeAppointment));
+}
+
 if (!in_array($subject, ['follow_up', 'consultation', 'event_coordination', 'other'], true)) {
     apsh_redirect_with_message('/Guest-End/appointments.php', 'error', 'Please select a valid subject of appointment.');
 }

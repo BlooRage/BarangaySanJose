@@ -149,6 +149,59 @@ if (!function_exists('apsh_phone_otp_key')) {
     }
 }
 
+if (!function_exists('apsh_guest_appointment_captcha_issue')) {
+    function apsh_guest_appointment_captcha_issue(bool $forceNew = false): array
+    {
+        $existing = $_SESSION['guest_appointment_captcha'] ?? null;
+        if (
+            !$forceNew
+            && is_array($existing)
+            && isset($existing['left'], $existing['right'], $existing['answer'], $existing['generated_at'])
+            && (time() - (int)$existing['generated_at']) <= 1800
+        ) {
+            return [
+                'left' => (int)$existing['left'],
+                'right' => (int)$existing['right'],
+            ];
+        }
+
+        $left = random_int(2, 9);
+        $right = random_int(1, 9);
+        $_SESSION['guest_appointment_captcha'] = [
+            'left' => $left,
+            'right' => $right,
+            'answer' => $left + $right,
+            'generated_at' => time(),
+        ];
+
+        return [
+            'left' => $left,
+            'right' => $right,
+        ];
+    }
+}
+
+if (!function_exists('apsh_guest_appointment_captcha_is_valid')) {
+    function apsh_guest_appointment_captcha_is_valid(string $answer): bool
+    {
+        $challenge = $_SESSION['guest_appointment_captcha'] ?? null;
+        if (
+            !is_array($challenge)
+            || !isset($challenge['answer'], $challenge['generated_at'])
+            || (time() - (int)$challenge['generated_at']) > 1800
+        ) {
+            return false;
+        }
+
+        $normalized = trim($answer);
+        if ($normalized === '' || preg_match('/^-?\d+$/', $normalized) !== 1) {
+            return false;
+        }
+
+        return hash_equals((string)((int)$challenge['answer']), (string)((int)$normalized));
+    }
+}
+
 if (!function_exists('apsh_normalize_email')) {
     function apsh_normalize_email(string $value): string
     {
@@ -158,6 +211,154 @@ if (!function_exists('apsh_normalize_email')) {
         }
 
         return $email;
+    }
+}
+
+if (!function_exists('apsh_appointment_status_key')) {
+    function apsh_appointment_status_key(string $statusName): string
+    {
+        return preg_replace('/[\s_-]+/', '', strtolower(trim($statusName)));
+    }
+}
+
+if (!function_exists('apsh_appointment_status_is_inactive')) {
+    function apsh_appointment_status_is_inactive(string $statusName): bool
+    {
+        $key = apsh_appointment_status_key($statusName);
+        return in_array($key, [
+            'completed',
+            'denied',
+            'cancelled',
+            'cancelledbyresident',
+            'cancelledbyadmin',
+            'noshow',
+            'closed',
+        ], true);
+    }
+}
+
+if (!function_exists('apsh_find_active_appointment_by_phone')) {
+    function apsh_find_active_appointment_by_phone(mysqli $conn, string $contactNumber): ?array
+    {
+        $normalizedPhone = apsh_normalize_phone($contactNumber);
+        if ($normalizedPhone === null) {
+            return null;
+        }
+
+        $appointmentColumns = apsh_get_table_columns($conn, 'appointmentstbl');
+        if (!isset($appointmentColumns['contact_number'])) {
+            return null;
+        }
+
+        $statusJoin = '';
+        $statusSelect = "''";
+        if (apsh_table_exists($conn, 'statuslookuptbl') && isset($appointmentColumns['appointment_status_id'])) {
+            $statusJoin = "
+                LEFT JOIN statuslookuptbl s
+                    ON s.status_id = a.appointment_status_id
+            ";
+            $statusSelect = "COALESCE(s.status_name, '')";
+        }
+
+        $scheduleSelect = [];
+        foreach (['confirmed_schedule_timestamp', 'preferred_schedule_timestamp', 'schedule_timestamp'] as $column) {
+            if (isset($appointmentColumns[$column])) {
+                $scheduleSelect[] = "a.{$column}";
+            }
+        }
+        $scheduleSql = $scheduleSelect !== []
+            ? 'COALESCE(' . implode(', ', $scheduleSelect) . ')'
+            : "''";
+
+        $stmt = $conn->prepare("
+            SELECT a.appointment_id,
+                   {$statusSelect} AS status_name,
+                   {$scheduleSql} AS schedule_timestamp
+            FROM appointmentstbl a
+            {$statusJoin}
+            WHERE a.contact_number = ?
+            ORDER BY {$scheduleSql} DESC, a.appointment_id DESC
+            LIMIT 25
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to validate existing appointments for this mobile number.');
+        }
+
+        $stmt->bind_param('s', $normalizedPhone);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $statusName = trim((string)($row['status_name'] ?? ''));
+            if (!apsh_appointment_status_is_inactive($statusName)) {
+                $stmt->close();
+                return [
+                    'appointment_id' => trim((string)($row['appointment_id'] ?? '')),
+                    'status_name' => $statusName !== '' ? $statusName : 'Approved',
+                    'schedule_timestamp' => trim((string)($row['schedule_timestamp'] ?? '')),
+                ];
+            }
+        }
+        $stmt->close();
+
+        return null;
+    }
+}
+
+if (!function_exists('apsh_active_appointment_phone_message')) {
+    function apsh_active_appointment_phone_message(array $appointment): string
+    {
+        $appointmentId = trim((string)($appointment['appointment_id'] ?? ''));
+        $statusName = trim((string)($appointment['status_name'] ?? 'Active'));
+        $message = 'This mobile number already has an active appointment';
+        if ($appointmentId !== '') {
+            $message .= ' (' . $appointmentId . ')';
+        }
+        $message .= ' with status ' . $statusName . '. Please wait until it is completed, cancelled, or denied before booking another.';
+
+        return $message;
+    }
+}
+
+if (!function_exists('apsh_guest_appointment_recent_otp_request')) {
+    function apsh_guest_appointment_recent_otp_request(mysqli $conn, string $recipientPhoneKey, int $cooldownSeconds = 60): ?array
+    {
+        $recipientPhoneKey = trim($recipientPhoneKey);
+        if ($recipientPhoneKey === '' || !apsh_table_exists($conn, 'otprequesttbl')) {
+            return null;
+        }
+
+        $stmt = $conn->prepare("
+            SELECT request_timestamp
+            FROM otprequesttbl
+            WHERE recipient = ?
+              AND purpose = 'guest_appointment'
+            ORDER BY request_timestamp DESC
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return null;
+        }
+
+        $stmt->bind_param('s', $recipientPhoneKey);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $requestTimestamp = trim((string)($row['request_timestamp'] ?? ''));
+        $lastRequestAt = $requestTimestamp !== '' ? strtotime($requestTimestamp) : false;
+        if ($lastRequestAt === false) {
+            return null;
+        }
+
+        $remaining = $cooldownSeconds - max(0, time() - $lastRequestAt);
+        if ($remaining <= 0) {
+            return null;
+        }
+
+        return [
+            'remaining_seconds' => $remaining,
+            'request_timestamp' => $requestTimestamp,
+        ];
     }
 }
 

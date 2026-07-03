@@ -909,11 +909,11 @@ if ($action === 'detail') {
     $participants = [
         'Complainant' => null,
         'Respondent' => null,
-        'Witness' => null,
+        'Witness' => [],
     ];
     while ($row = $res->fetch_assoc()) {
         $role = (string)($row['participant_role'] ?? '');
-        $participants[$role] = [
+        $participantPayload = [
             'full_name' => participantDisplayName($row),
             'contact_number' => $row['contact_number'] ?? '',
             'address' => $row['address'] ?? '',
@@ -921,6 +921,11 @@ if ($action === 'detail') {
             'sex' => $row['sex'] ?? '',
             'remarks' => $row['remarks'] ?? '',
         ];
+        if ($role === 'Witness') {
+            $participants['Witness'][] = $participantPayload;
+            continue;
+        }
+        $participants[$role] = $participantPayload;
     }
     $stmt->close();
 
@@ -934,10 +939,12 @@ if ($action === 'detail') {
             'incident_date' => $detail['incident_date'] ?? '',
             'incident_time' => $detail['incident_time'] ?? '',
             'incident_place' => $detail['incident_place'] ?? '',
+            'incident_area_number' => $parsedCaseDetails['incident_area_number'] ?? '',
             'complaint_type' => $detail['complaint_type'] ?? '',
             'case_details' => $detail['case_details'] ?? '',
             'complaint_narration' => $parsedCaseDetails['narration'] ?? '',
             'complaint_detail_fields' => $parsedCaseDetails['fields'] ?? [],
+            'attachments' => $parsedCaseDetails['attachments'] ?? [],
             'case_remarks' => $detail['case_remarks'] ?? '',
             'status_name' => $detail['status_name'] ?? 'Pending',
             'level_name' => $detail['level_name'] ?? 'Complaint Only',
@@ -959,7 +966,7 @@ if ($action === 'detail') {
             'complaint_origin' => $detail['complaint_origin'] ?? '',
             'complainant' => $participants['Complainant'] ?? null,
             'respondent' => $participants['Respondent'] ?? null,
-            'witness' => $participants['Witness'] ?? null,
+            'witnesses' => $participants['Witness'] ?? [],
         ]
     ]);
 }

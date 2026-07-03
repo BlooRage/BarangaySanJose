@@ -1,10 +1,22 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const form = document.querySelector("form");
+    const form = document.getElementById("complaintForm") || document.querySelector("form");
     const submitBtn = form?.querySelector(".submit-btn");
     const incidentDateInput = document.getElementById("incidentDate");
     const incidentDateError = document.getElementById("incidentDateError");
-    const incidentTimeInput = form?.querySelector('input[name="incident_time"]') || null;
+    const incidentTimeInput = document.getElementById("incidentTime");
+    const incidentTimeProxy = document.getElementById("incidentTimeProxy");
+    const incidentTimeModalEl = document.getElementById("complaintTimeModal");
+    const incidentTimePicker = document.getElementById("incidentTimePicker");
+    const incidentTimePreview = document.getElementById("incidentTimePreview");
+    const incidentTimeApplyBtn = document.getElementById("incidentTimeApplyBtn");
+    const incidentTimeClearBtn = document.getElementById("incidentTimeClearBtn");
+    const incidentTimeUseNowBtn = document.getElementById("incidentTimeUseNow");
+    const incidentAreaInput = document.getElementById("incidentAreaNumber");
+    const incidentAreaProxy = document.getElementById("incidentAreaNumberDisplay");
+    const incidentAreaModalEl = document.getElementById("complaintAreaHelpModal");
+    const incidentAreaOptionButtons = Array.from(document.querySelectorAll("[data-area-value]"));
     const feedbackData = document.getElementById("complaintFeedbackData");
+    const recaptchaTokenInput = document.getElementById("complaintRecaptchaToken");
     const complaintTypeConfig = (() => {
         try {
             return JSON.parse(feedbackData?.dataset.complaintTypeConfig || "{}");
@@ -12,6 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return {};
         }
     })();
+    const recaptchaEnabled = String(feedbackData?.dataset.recaptchaEnabled || "") === "1";
+    const recaptchaSiteKey = String(feedbackData?.dataset.recaptchaSiteKey || "").trim();
     const complainantAddressSystem = document.getElementById("complainantAddressSystem");
     const complainantHouseWrapper = document.getElementById("complainantHouseSystemWrapper");
     const complainantLotWrapper = document.getElementById("complainantLotBlockSystemWrapper");
@@ -20,12 +34,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const complainantLotNumber = document.getElementById("complainantLotNumber");
     const complainantBlockNumber = document.getElementById("complainantBlockNumber");
     const complainantPhaseNumber = document.getElementById("complainantPhaseNumber");
-    const natureOfComplaint = document.getElementById("natureOfComplaint") || form?.querySelector('select[name="nature_of_complaint"]') || null;
-    const natureOther = document.getElementById("natureOther") || form?.querySelector('input[name="nature_other"]') || null;
+    const natureOfComplaint = document.getElementById("natureOfComplaint");
+    const natureOther = document.getElementById("natureOther");
+    const natureOtherWrap = document.getElementById("natureOtherWrap");
     const natureOtherAsterisk = document.getElementById("natureOtherAsterisk");
     const complaintTypeDynamicFields = document.getElementById("complaintTypeDynamicFields");
-    const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="subject_contact_number"], input[name="witness_contact_number"]') || [];
+    const hasWitnesses = document.getElementById("hasWitnesses");
+    const witnessRowsWrap = document.getElementById("witnessRowsWrap");
+    const witnessRows = Array.from(document.querySelectorAll("[data-witness-row]"));
+    const addWitnessBtn = document.getElementById("addWitnessBtn");
+    const witnessRemoveButtons = Array.from(document.querySelectorAll("[data-witness-remove-btn]"));
+    const complaintAttachmentSection = document.getElementById("complaintAttachmentSection");
+    const complaintAttachmentCloseButtons = Array.from(document.querySelectorAll("[data-attachment-remove-btn]"));
+    const attachmentRows = Array.from(document.querySelectorAll("[data-complaint-attachment-row]"));
+    const addComplaintAttachmentBtn = document.getElementById("addComplaintAttachmentBtn");
+    const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="witness_contact_number[]"]') || [];
+    const incidentTimeModal = incidentTimeModalEl && window.bootstrap ? new bootstrap.Modal(incidentTimeModalEl) : null;
+    const incidentAreaModal = incidentAreaModalEl && window.bootstrap ? new bootstrap.Modal(incidentAreaModalEl) : null;
     let isSubmitting = false;
+    let recaptchaSubmitPending = false;
     let renderedComplaintType = "";
     const touchedFields = new WeakSet();
 
@@ -52,11 +79,27 @@ document.addEventListener("DOMContentLoaded", () => {
         hour: "numeric",
         minute: "2-digit",
     });
+    const formatTimeDisplay = (value) => {
+        const raw = String(value || "").trim();
+        const match = raw.match(/^(\d{2}):(\d{2})$/);
+        if (!match) return "";
+        const sample = new Date();
+        sample.setHours(Number(match[1]), Number(match[2]), 0, 0);
+        return sample.toLocaleTimeString(undefined, {
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    };
     const getOldestAllowed = () => {
         const oldest = getNow();
         oldest.setMonth(oldest.getMonth() - 6);
         return oldest;
     };
+    const escAttr = (value) => String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
     const setRequired = (element, isRequired) => {
         if (!element) return;
@@ -66,12 +109,6 @@ document.addEventListener("DOMContentLoaded", () => {
             element.removeAttribute("required");
         }
     };
-
-    const escAttr = (value) => String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
 
     const ensureFeedbackEl = (input) => {
         if (!input) return null;
@@ -132,6 +169,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
+    const isVisibleField = (field) => {
+        if (!field || field.disabled) return false;
+        if (field.type === "hidden") return false;
+        return !field.closest(".d-none");
+    };
+
     const setWrapperState = (wrapper, show) => {
         if (!wrapper) return;
         wrapper.classList.toggle("d-none", !show);
@@ -165,18 +208,44 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const syncNatureOfComplaint = () => {
-        if (!natureOfComplaint || !natureOther) return;
-        const isOther = String(natureOfComplaint.value || "").trim() === "Other";
-        natureOther.disabled = !isOther;
-        setRequired(natureOther, isOther);
-        natureOtherAsterisk?.classList.toggle("d-none", !isOther);
-        if (!isOther) {
-            natureOther.value = "";
-            natureOther.setCustomValidity("");
-            natureOther.classList.remove("is-invalid");
-            const feedback = ensureFeedbackEl(natureOther);
-            if (feedback) feedback.textContent = "";
+        const isOther = String(natureOfComplaint?.value || "").trim() === "Other";
+        if (natureOtherWrap) {
+            natureOtherWrap.classList.toggle("d-none", !isOther);
         }
+        if (natureOther) {
+            natureOther.disabled = !isOther;
+            setRequired(natureOther, isOther);
+            if (!isOther) {
+                natureOther.value = "";
+                natureOther.setCustomValidity("");
+                natureOther.classList.remove("is-invalid");
+            }
+        }
+        natureOtherAsterisk?.classList.toggle("d-none", !isOther);
+    };
+
+    const bindFieldValidation = (field) => {
+        if (!field) return;
+        field.addEventListener("input", () => {
+            touchedFields.add(field);
+            if (isVisibleField(field)) {
+                renderValidity(field);
+            }
+            updateState();
+        });
+        field.addEventListener("change", () => {
+            touchedFields.add(field);
+            if (isVisibleField(field)) {
+                renderValidity(field);
+            }
+            updateState();
+        });
+        field.addEventListener("blur", () => {
+            touchedFields.add(field);
+            if (isVisibleField(field)) {
+                renderValidity(field);
+            }
+        });
     };
 
     const renderComplaintTypeFields = () => {
@@ -196,25 +265,26 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        complaintTypeDynamicFields.classList.remove("d-none");
         const renderField = (field, forceFullWidth = false) => {
             const name = String(field.name || "");
             const label = String(field.label || name);
             const required = !!field.required;
             const asterisk = required ? ' <span class="required-asterisk">*</span>' : "";
             const wrapperClass = forceFullWidth ? ' class="full-width"' : "";
+
             if (String(field.type || "text") === "select") {
                 const options = Array.isArray(field.options) ? field.options : [];
                 return `
                     <div${wrapperClass}>
                         <label class="top-label" for="${escAttr(name)}">${label}${asterisk}</label>
-                        <select id="${escAttr(name)}" name="${escAttr(name)}" data-dynamic-complaint-field="true">
+                        <select class="form-select" id="${escAttr(name)}" name="${escAttr(name)}" data-dynamic-complaint-field="true">
                             <option value="">Select</option>
                             ${options.map((option) => `<option value="${escAttr(option)}">${option}</option>`).join("")}
                         </select>
                     </div>
                 `;
             }
+
             if (String(field.type || "text") === "textarea") {
                 return `
                     <div class="full-width">
@@ -223,6 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 `;
             }
+
             return `
                 <div${wrapperClass}>
                     <label class="top-label" for="${escAttr(name)}">${label}${asterisk}</label>
@@ -238,83 +309,51 @@ document.addEventListener("DOMContentLoaded", () => {
             const fieldType = String(field?.type || "text");
 
             if (fieldType === "textarea") {
-                htmlParts.push(`
-                    <div class="form-row">
-                        ${renderField(field, true)}
-                    </div>
-                `);
+                htmlParts.push(`<div class="form-row">${renderField(field, true)}</div>`);
                 continue;
             }
 
             if (!nextField) {
-                htmlParts.push(`
-                    <div class="form-row">
-                        ${renderField(field, true)}
-                    </div>
-                `);
+                htmlParts.push(`<div class="form-row">${renderField(field, true)}</div>`);
                 continue;
             }
 
-            const nextIsTextarea = String(nextField?.type || "text") === "textarea";
-            if (nextIsTextarea) {
-                htmlParts.push(`
-                    <div class="form-row">
-                        ${renderField(field, true)}
-                    </div>
-                `);
-                htmlParts.push(`
-                    <div class="form-row">
-                        ${renderField(nextField, true)}
-                    </div>
-                `);
+            if (String(nextField?.type || "text") === "textarea") {
+                htmlParts.push(`<div class="form-row">${renderField(field, true)}</div>`);
+                htmlParts.push(`<div class="form-row">${renderField(nextField, true)}</div>`);
                 continue;
             }
 
             htmlParts.push(`
                 <div class="form-row two-col-row">
-                    ${renderField(field, false)}
-                    ${renderField(nextField, false)}
+                    ${renderField(field)}
+                    ${renderField(nextField)}
                 </div>
             `);
         }
 
         complaintTypeDynamicFields.innerHTML = htmlParts.join("");
+        complaintTypeDynamicFields.classList.remove("d-none");
 
-        complaintTypeDynamicFields.querySelectorAll("[data-dynamic-complaint-field='true']").forEach((field, index) => {
+        complaintTypeDynamicFields.querySelectorAll("[data-dynamic-complaint-field='true']").forEach((field) => {
             const fieldName = String(field.getAttribute("name") || "");
             const fieldDef = fields.find((item) => String(item.name || "") === fieldName);
             setRequired(field, !!fieldDef?.required);
-            field.addEventListener("input", () => {
-                touchedFields.add(field);
-                renderValidity(field);
-                updateState();
-            });
-            field.addEventListener("change", () => {
-                touchedFields.add(field);
-                renderValidity(field);
-                updateState();
-            });
-            field.addEventListener("blur", () => {
-                touchedFields.add(field);
-                renderValidity(field);
-            });
-            if (index === 0) {
-                field.autocomplete = "off";
-            }
+            bindFieldValidation(field);
         });
+
         renderedComplaintType = selectedType;
     };
 
-    const isVisibleField = (field) => {
-        if (!field || field.disabled) return false;
-        return !field.closest(".d-none");
+    const ensureDefaultIncidentDate = () => {
+        if (!incidentDateInput) return;
+        if (String(incidentDateInput.value || "").trim() === "") {
+            incidentDateInput.value = toIsoDate(getNow());
+        }
     };
 
     const validateIncidentDate = () => {
-        if (!incidentDateInput) {
-            return true;
-        }
-
+        if (!incidentDateInput) return true;
         const now = getNow();
         const todayIso = toIsoDate(now);
         const todayDisplay = now.toLocaleDateString(undefined, {
@@ -361,10 +400,33 @@ document.addEventListener("DOMContentLoaded", () => {
         return true;
     };
 
+    const updateTimePreview = (value) => {
+        if (!incidentTimePreview) return;
+        const formatted = formatTimeDisplay(value);
+        incidentTimePreview.textContent = formatted ? `Selected: ${formatted}` : "No time selected yet.";
+    };
+
+    const syncIncidentTimeProxy = () => {
+        if (!incidentTimeProxy || !incidentTimeInput) return;
+        const formatted = formatTimeDisplay(incidentTimeInput.value);
+        incidentTimeProxy.value = formatted;
+        incidentTimeProxy.placeholder = "Select time";
+        updateTimePreview(incidentTimeInput.value);
+    };
+
+    const findAreaOption = (value) => {
+        return incidentAreaOptionButtons.find((button) => String(button.dataset.areaValue || "") === String(value || ""));
+    };
+
+    const syncIncidentAreaProxy = () => {
+        if (!incidentAreaProxy || !incidentAreaInput) return;
+        const option = findAreaOption(incidentAreaInput.value);
+        incidentAreaProxy.value = option?.dataset.areaLabel || "";
+        incidentAreaProxy.placeholder = "Select area";
+    };
+
     const validateIncidentTime = () => {
-        if (!incidentTimeInput) {
-            return true;
-        }
+        if (!incidentTimeInput) return true;
         const dateValue = String(incidentDateInput?.value || "").trim();
         const timeValue = String(incidentTimeInput.value || "").trim();
         const now = getNow();
@@ -397,6 +459,43 @@ document.addEventListener("DOMContentLoaded", () => {
         validateIncidentTime();
     };
 
+    const openTimeModal = () => {
+        if (!incidentTimePicker || !incidentTimeModal) return;
+        incidentTimePicker.value = String(incidentTimeInput?.value || "").trim();
+        updateTimePreview(incidentTimePicker.value);
+        incidentTimeModal.show();
+    };
+
+    const openAreaModal = () => {
+        if (!incidentAreaModal) return;
+        incidentAreaModal.show();
+    };
+
+    const applyPickedTime = () => {
+        if (!incidentTimeInput || !incidentTimePicker) return;
+        incidentTimeInput.value = String(incidentTimePicker.value || "").trim();
+        touchedFields.add(incidentTimeInput);
+        syncIncidentTimeProxy();
+        validateIncidentTime();
+        renderIfTouched(incidentTimeInput);
+        updateState();
+    };
+
+    const useCurrentTime = () => {
+        const nowValue = toTimeValue(getNow());
+        if (incidentTimePicker) {
+            incidentTimePicker.value = nowValue;
+            updateTimePreview(nowValue);
+        }
+        if (incidentTimeInput) {
+            incidentTimeInput.value = nowValue;
+            touchedFields.add(incidentTimeInput);
+        }
+        syncIncidentTimeProxy();
+        validateIncidentTime();
+        updateState();
+    };
+
     const normalizePhoneValue = (input) => {
         if (!input) return "";
         let digits = String(input.value || "").replace(/\D/g, "");
@@ -424,23 +523,225 @@ document.addEventListener("DOMContentLoaded", () => {
         return isValid;
     };
 
+    const executeComplaintRecaptcha = async () => {
+        if (!recaptchaEnabled) {
+            return "";
+        }
+        if (!(window.grecaptcha && typeof window.grecaptcha.execute === "function")) {
+            throw new Error("Security check is still loading. Please try again.");
+        }
+
+        await new Promise((resolve) => {
+            window.grecaptcha.ready(resolve);
+        });
+
+        const token = await window.grecaptcha.execute(recaptchaSiteKey, {
+            action: "resident_complaint_submit",
+        });
+        if (String(token || "").trim() === "") {
+            throw new Error("Security verification failed. Please try again.");
+        }
+
+        return token;
+    };
+
+    const bindDropzone = (inputEl) => {
+        if (!inputEl) return;
+        const zone = document.querySelector(`.upload-dropzone[data-upload-input="${inputEl.id}"]`);
+        const meta = document.getElementById(inputEl.id + "Meta");
+        if (!zone) return;
+        const defaultMetaText = meta ? meta.textContent : "";
+        if (meta && !meta.dataset.defaultText) {
+            meta.dataset.defaultText = defaultMetaText;
+        }
+        const acceptTokens = String(inputEl.getAttribute("accept") || "")
+            .split(",")
+            .map((token) => token.trim().toLowerCase())
+            .filter(Boolean);
+
+        const fileMatchesAccept = (file) => {
+            if (!file || !acceptTokens.length) return true;
+            const fileName = String(file.name || "");
+            const fileExt = fileName.includes(".")
+                ? "." + fileName.split(".").pop().toLowerCase()
+                : "";
+            const fileType = String(file.type || "").toLowerCase();
+
+            return acceptTokens.some((token) => {
+                if (token.startsWith(".")) {
+                    return token === fileExt;
+                }
+                if (token.endsWith("/*")) {
+                    return fileType.startsWith(token.slice(0, -1));
+                }
+                return fileType === token;
+            });
+        };
+
+        const resetInputSelection = () => {
+            inputEl.value = "";
+            if (meta) {
+                meta.textContent = defaultMetaText;
+            }
+        };
+
+        const validateSelectedFile = () => {
+            const file = inputEl.files && inputEl.files.length ? inputEl.files[0] : null;
+            if (!file) return true;
+            if (fileMatchesAccept(file)) return true;
+            resetInputSelection();
+            alert(defaultMetaText || "Please upload a supported image file.");
+            updateState();
+            return false;
+        };
+
+        const setMeta = () => {
+            if (!meta) return;
+            const files = inputEl.files ? Array.from(inputEl.files) : [];
+            meta.textContent = files.length === 1 ? files[0].name : defaultMetaText;
+        };
+
+        inputEl.addEventListener("change", () => {
+            if (!validateSelectedFile()) return;
+            setMeta();
+            updateState();
+        });
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+            zone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                zone.classList.add("is-dragging");
+            });
+        });
+
+        ["dragleave", "dragend", "drop"].forEach((eventName) => {
+            zone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                zone.classList.remove("is-dragging");
+            });
+        });
+
+        zone.addEventListener("drop", (event) => {
+            const files = event.dataTransfer?.files;
+            if (!files?.length) return;
+            const transfer = new DataTransfer();
+            transfer.items.add(files[0]);
+            inputEl.files = transfer.files;
+            if (!validateSelectedFile()) return;
+            setMeta();
+            updateState();
+        });
+    };
+
+    const resetAttachmentRow = (row) => {
+        if (!row) return;
+        row.classList.add("d-none");
+        row.querySelectorAll('input[type="file"]').forEach((inputEl) => {
+            inputEl.value = "";
+            inputEl.disabled = true;
+            inputEl.classList.remove("is-invalid");
+            const meta = document.getElementById(inputEl.id + "Meta");
+            if (meta) {
+                meta.textContent = meta.dataset.defaultText || meta.textContent;
+            }
+        });
+    };
+
+    const syncAttachmentRows = () => {
+        const visibleRows = attachmentRows.filter((row) => !row.classList.contains("d-none")).length;
+        if (complaintAttachmentSection) {
+            complaintAttachmentSection.classList.toggle("d-none", visibleRows === 0);
+        }
+        if (addComplaintAttachmentBtn) {
+            addComplaintAttachmentBtn.disabled = visibleRows >= attachmentRows.length;
+            addComplaintAttachmentBtn.classList.toggle("d-none", attachmentRows.length <= 1 || visibleRows >= attachmentRows.length);
+            addComplaintAttachmentBtn.textContent = visibleRows === 0 ? "Add Image" : "Add Another Image";
+        }
+    };
+
+    const syncWitnessRows = () => {
+        const enabled = String(hasWitnesses?.value || "") === "Yes";
+        if (witnessRowsWrap) {
+            witnessRowsWrap.classList.toggle("d-none", !enabled);
+        }
+
+        const visibleWitnessCount = witnessRows.filter((row) => !row.classList.contains("d-none")).length;
+
+        witnessRows.forEach((row, index) => {
+            const isVisible = enabled && !row.classList.contains("d-none");
+            row.querySelectorAll("input, select").forEach((field) => {
+                field.disabled = !enabled || !isVisible;
+                field.classList.remove("is-invalid");
+            });
+            const lastNameInput = row.querySelector('input[name="witness_last_name[]"]');
+            const firstNameInput = row.querySelector('input[name="witness_first_name[]"]');
+            const contactInput = row.querySelector('input[name="witness_contact_number[]"]');
+            setRequired(lastNameInput, isVisible);
+            setRequired(firstNameInput, isVisible);
+            setRequired(contactInput, isVisible);
+            if (!enabled && index > 0) {
+                row.classList.add("d-none");
+            }
+        });
+
+        if (enabled && witnessRows.length && visibleWitnessCount === 0) {
+            witnessRows[0].classList.remove("d-none");
+            witnessRows[0].querySelectorAll("input, select").forEach((field) => {
+                field.disabled = false;
+            });
+        }
+
+        const currentVisibleWitnessCount = witnessRows.filter((row) => !row.classList.contains("d-none")).length;
+        if (addWitnessBtn) {
+            addWitnessBtn.disabled = !enabled || currentVisibleWitnessCount >= witnessRows.length;
+            addWitnessBtn.classList.toggle("d-none", !enabled || currentVisibleWitnessCount >= witnessRows.length);
+        }
+    };
+
+    const resetWitnessRow = (row) => {
+        if (!row) return;
+        row.classList.add("d-none");
+        row.querySelectorAll("input, select").forEach((field) => {
+            if (field.tagName === "SELECT") {
+                field.selectedIndex = 0;
+            } else {
+                field.value = "";
+            }
+            field.disabled = true;
+            field.classList.remove("is-invalid");
+        });
+        const lastNameInput = row.querySelector('input[name="witness_last_name[]"]');
+        const firstNameInput = row.querySelector('input[name="witness_first_name[]"]');
+        const contactInput = row.querySelector('input[name="witness_contact_number[]"]');
+        setRequired(lastNameInput, false);
+        setRequired(firstNameInput, false);
+        setRequired(contactInput, false);
+    };
+
     const updateState = () => {
         if (isSubmitting) {
             submitBtn.disabled = true;
             return;
         }
+
         applyAddressSystem();
         syncNatureOfComplaint();
         renderComplaintTypeFields();
+        syncWitnessRows();
+        syncAttachmentRows();
         syncIncidentBounds();
         validateIncidentDate();
         validateIncidentTime();
+        syncIncidentTimeProxy();
+        syncIncidentAreaProxy();
         phoneInputs.forEach((input) => syncPhoneValidation(input));
+
         form.querySelectorAll("input, select, textarea").forEach((field) => {
             if (touchedFields.has(field) && isVisibleField(field)) {
                 renderValidity(field);
             }
         });
+
         const hasInvalidVisibleRequired = Array.from(form.elements || []).some((field) => {
             if (!isVisibleField(field) || !field.required) return false;
             return !field.checkValidity();
@@ -452,6 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("change", updateState);
     complainantAddressSystem?.addEventListener("change", updateState);
     natureOfComplaint?.addEventListener("change", updateState);
+    hasWitnesses?.addEventListener("change", updateState);
     incidentDateInput?.addEventListener("input", updateState);
     incidentDateInput?.addEventListener("change", updateState);
     incidentDateInput?.addEventListener("keyup", validateIncidentDate);
@@ -464,26 +766,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderValidity(incidentTimeInput);
     });
 
-    form.querySelectorAll("input, select, textarea").forEach((field) => {
-        field.addEventListener("input", () => {
-            touchedFields.add(field);
-            if (isVisibleField(field)) {
-                renderValidity(field);
-            }
-        });
-        field.addEventListener("change", () => {
-            touchedFields.add(field);
-            if (isVisibleField(field)) {
-                renderValidity(field);
-            }
-        });
-        field.addEventListener("blur", () => {
-            touchedFields.add(field);
-            if (isVisibleField(field)) {
-                renderValidity(field);
-            }
-        });
-    });
+    form.querySelectorAll("input, select, textarea").forEach((field) => bindFieldValidation(field));
 
     phoneInputs.forEach((input) => {
         input.addEventListener("keypress", (event) => {
@@ -498,14 +781,100 @@ document.addEventListener("DOMContentLoaded", () => {
                 event.preventDefault();
             }
         });
-        input.addEventListener("input", () => {
-            syncPhoneValidation(input);
+    });
+
+    if (incidentTimeProxy) {
+        incidentTimeProxy.addEventListener("click", openTimeModal);
+        incidentTimeProxy.addEventListener("focus", () => {
+            incidentTimeProxy.blur();
+            openTimeModal();
+        });
+    }
+
+    if (incidentAreaProxy) {
+        incidentAreaProxy.addEventListener("click", openAreaModal);
+        incidentAreaProxy.addEventListener("focus", () => {
+            incidentAreaProxy.blur();
+            openAreaModal();
+        });
+    }
+
+    incidentAreaOptionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            if (!incidentAreaInput || !incidentAreaProxy) return;
+            incidentAreaInput.value = String(button.dataset.areaValue || "").trim();
+            incidentAreaProxy.value = String(button.dataset.areaLabel || "").trim();
+            touchedFields.add(incidentAreaProxy);
+            incidentAreaProxy.setCustomValidity("");
+            renderIfTouched(incidentAreaProxy);
+            incidentAreaModal?.hide();
             updateState();
         });
-        input.addEventListener("blur", () => {
-            syncPhoneValidation(input);
+    });
+
+    incidentTimeUseNowBtn?.addEventListener("click", useCurrentTime);
+    incidentTimePicker?.addEventListener("input", () => updateTimePreview(incidentTimePicker.value));
+    incidentTimeApplyBtn?.addEventListener("click", () => {
+        applyPickedTime();
+        incidentTimeModal?.hide();
+    });
+    incidentTimeClearBtn?.addEventListener("click", () => {
+        if (incidentTimePicker) incidentTimePicker.value = "";
+        if (incidentTimeInput) incidentTimeInput.value = "";
+        syncIncidentTimeProxy();
+        validateIncidentTime();
+        updateState();
+    });
+
+    addComplaintAttachmentBtn?.addEventListener("click", () => {
+        const nextRow = attachmentRows.find((row) => row.classList.contains("d-none"));
+        if (!nextRow) return;
+        nextRow.classList.remove("d-none");
+        if (complaintAttachmentSection) {
+            complaintAttachmentSection.classList.remove("d-none");
+        }
+        nextRow.querySelectorAll("input").forEach((field) => {
+            field.disabled = false;
+        });
+        syncAttachmentRows();
+        updateState();
+    });
+
+    complaintAttachmentCloseButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const row = button.closest("[data-complaint-attachment-row]");
+            resetAttachmentRow(row);
+            syncAttachmentRows();
             updateState();
         });
+    });
+
+    addWitnessBtn?.addEventListener("click", () => {
+        const nextRow = witnessRows.find((row) => row.classList.contains("d-none"));
+        if (!nextRow) return;
+        nextRow.classList.remove("d-none");
+        nextRow.querySelectorAll("input, select").forEach((field) => {
+            field.disabled = false;
+        });
+        syncWitnessRows();
+        updateState();
+    });
+
+    witnessRemoveButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const row = button.closest("[data-witness-row]");
+            const visibleRows = witnessRows.filter((item) => !item.classList.contains("d-none"));
+            resetWitnessRow(row);
+            if (visibleRows.length <= 1 && hasWitnesses) {
+                hasWitnesses.value = "No";
+            }
+            syncWitnessRows();
+            updateState();
+        });
+    });
+
+    attachmentRows.forEach((row) => {
+        row.querySelectorAll('input[type="file"]').forEach((input) => bindDropzone(input));
     });
 
     form.addEventListener("submit", (event) => {
@@ -514,7 +883,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!validateIncidentDate()) {
                 incidentDateInput?.focus();
             } else {
-                incidentTimeInput?.focus();
+                incidentTimeProxy?.focus();
             }
             updateState();
             return;
@@ -533,13 +902,55 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        if (recaptchaEnabled && !recaptchaSubmitPending) {
+            event.preventDefault();
+            isSubmitting = true;
+            submitBtn.disabled = true;
+
+            executeComplaintRecaptcha()
+                .then((token) => {
+                    if (recaptchaTokenInput) {
+                        recaptchaTokenInput.value = token;
+                    }
+                    recaptchaSubmitPending = true;
+                    if (typeof form.requestSubmit === "function") {
+                        form.requestSubmit(submitBtn);
+                    } else {
+                        form.submit();
+                    }
+                })
+                .catch((error) => {
+                    isSubmitting = false;
+                    recaptchaSubmitPending = false;
+                    submitBtn.disabled = false;
+                    updateState();
+
+                    const message = error instanceof Error ? error.message : "Security verification failed. Please try again.";
+                    if (window.UniversalModal) {
+                        window.UniversalModal.open({
+                            title: "Security Check Failed",
+                            message,
+                            buttons: [{ label: "OK", class: "btn btn-danger" }],
+                        });
+                        return;
+                    }
+                    alert(message);
+                });
+            return;
+        }
+
+        recaptchaSubmitPending = false;
         isSubmitting = true;
         submitBtn.disabled = true;
     });
 
+    ensureDefaultIncidentDate();
     syncIncidentBounds();
     syncNatureOfComplaint();
     renderComplaintTypeFields();
+    syncWitnessRows();
+    syncAttachmentRows();
+    syncIncidentTimeProxy();
     updateState();
 
     window.addEventListener("pageshow", () => {
@@ -559,6 +970,3 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
-
-
-
