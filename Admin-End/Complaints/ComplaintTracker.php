@@ -111,6 +111,130 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             justify-content: flex-end;
         }
 
+        #viewModal .complaint-attachment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        #viewModal .complaint-attachment-card {
+            border: 1px solid #f0d8c0;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #fffdf9 0%, #fff7ef 100%);
+            overflow: hidden;
+            box-shadow: 0 12px 30px rgba(42, 28, 12, 0.08);
+        }
+
+        #viewModal .complaint-attachment-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 180px;
+            width: 100%;
+            padding: 0;
+            border: 0;
+            background: #fff4e8;
+            cursor: pointer;
+        }
+
+        #viewModal .complaint-attachment-preview img {
+            display: block;
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+        }
+
+        #viewModal .complaint-attachment-preview-placeholder {
+            display: grid;
+            gap: 8px;
+            justify-items: center;
+            padding: 22px;
+            color: #8b5e34;
+            text-align: center;
+        }
+
+        #viewModal .complaint-attachment-preview-placeholder i {
+            font-size: 1.65rem;
+        }
+
+        #viewModal .complaint-attachment-body {
+            display: grid;
+            gap: 10px;
+            padding: 14px;
+        }
+
+        #viewModal .complaint-attachment-name {
+            margin: 0;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #2f2419;
+            word-break: break-word;
+        }
+
+        #viewModal .complaint-attachment-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        #viewModal .complaint-attachment-actions .btn {
+            flex: 1 1 120px;
+        }
+
+        #attachmentViewerModal .modal-dialog {
+            max-width: min(1080px, calc(100vw - 2rem));
+        }
+
+        #attachmentViewerModal .modal-content {
+            border-radius: 18px;
+            overflow: hidden;
+        }
+
+        #attachmentViewerModal .modal-body {
+            background: #f5f7fb;
+            padding: 1rem;
+        }
+
+        #attachmentViewerBody {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: min(70vh, 760px);
+            border-radius: 14px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        #attachmentViewerBody img,
+        #attachmentViewerBody iframe {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: min(70vh, 760px);
+            border: 0;
+        }
+
+        #attachmentViewerBody img {
+            object-fit: contain;
+            background: #ffffff;
+        }
+
+        #attachmentViewerBody .attachment-viewer-empty {
+            padding: 2rem;
+            color: #6c757d;
+            text-align: center;
+        }
+
+        @media (max-width: 767.98px) {
+            #viewModal .complaint-attachment-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #viewModal .complaint-attachment-actions .btn {
+                flex-basis: 100%;
+            }
+        }
+
 
 
     </style>
@@ -305,6 +429,29 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     </div>
 </div>
 
+<div class="modal fade" id="attachmentViewerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="attachmentViewerTitle">Attachment Viewer</h5>
+                    <div class="text-muted small" id="attachmentViewerSubtitle">Review uploaded complaint attachments.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="attachmentViewerBody">
+                    <div class="attachment-viewer-empty">Select an attachment to preview.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-outline-secondary" id="attachmentViewerOpenLink" target="_blank" rel="noopener noreferrer">Open in New Tab</a>
+                <a href="#" class="btn btn-primary" id="attachmentViewerDownloadLink" target="_blank" rel="noopener noreferrer" download>Download</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="complaintActionConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -335,10 +482,9 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260703-1"></script>
+<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260704-complaint-attachment-viewer"></script>
 </body>
 </html>
-
 
 
 
