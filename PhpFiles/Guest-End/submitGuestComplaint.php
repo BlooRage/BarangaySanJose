@@ -29,6 +29,16 @@ function guestComplaintNormalizePhone($value): ?string
     return $digits;
 }
 
+function guestComplaintOtpPhoneKey($value): ?string
+{
+    $normalized = guestComplaintNormalizePhone($value);
+    if ($normalized === null || !preg_match('/^09\d{9}$/', $normalized)) {
+        return null;
+    }
+
+    return substr($normalized, 1);
+}
+
 function guestComplaintTableExists(mysqli $conn, string $tableName): bool
 {
     $stmt = $conn->prepare("
@@ -459,17 +469,6 @@ if ($action !== 'submit_complaint') {
 verifyCsrfToken(false);
 
 $complainantPath = '/Guest-End/complaints.php';
-$recaptchaToken = trim((string)($_POST['recaptcha_token'] ?? ''));
-if (recaptcha_v3_should_enforce()) {
-    $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, 'guest_complaint_submit');
-    if (empty($recaptchaCheck['success'])) {
-        guestComplaintRedirectWithMessage(
-            $complainantPath,
-            'error',
-            (string)($recaptchaCheck['message'] ?? 'Security verification failed. Please try again.')
-        );
-    }
-}
 
 if (!guestComplaintTableExists($conn, 'complaintstbl')) {
     http_response_code(500);
@@ -515,6 +514,20 @@ if (is_array($activeComplaint)) {
         'error',
         'This mobile number already has an active complaint under review. Please wait until it is completed before submitting another one.' . $referenceText
     );
+}
+
+$otpSession = $_SESSION['guest_complaint_otp_verified'] ?? null;
+$otpPhoneKey = guestComplaintOtpPhoneKey($complainantContact);
+if (
+    !is_array($otpSession)
+    || !isset($otpSession['phone'], $otpSession['verified_at'])
+    || !is_string($otpSession['phone'])
+    || $otpPhoneKey === null
+    || !hash_equals((string)$otpSession['phone'], $otpPhoneKey)
+    || (time() - (int)$otpSession['verified_at']) > 900
+) {
+    unset($_SESSION['guest_complaint_otp_verified']);
+    guestComplaintRedirectWithMessage($complainantPath, 'error', 'Please verify your mobile number through OTP before submitting your complaint.');
 }
 
 guestComplaintValidateIncidentDateTimeOrRedirect($complainantPath, $incidentDate, $incidentTime);
@@ -636,6 +649,7 @@ try {
 
     guestComplaintLogCaseUpdate($conn, $caseId, 'Complaint submitted through guest portal.', null);
     $conn->commit();
+    unset($_SESSION['guest_complaint_otp_verified']);
 
     guestComplaintRedirectWithMessage($complainantPath, 'success', 'Complaint submitted successfully.', [
         'case_id' => $caseId,

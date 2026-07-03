@@ -130,5 +130,13 @@ if ($purpose === 'guest_appointment') {
     ];
 }
 
+if ($purpose === 'guest_complaint') {
+    $_SESSION['guest_complaint_otp_verified'] = [
+        'phone' => (string)$recipient,
+        'otp_id' => (int)$otp_id,
+        'verified_at' => time(),
+    ];
+}
+
 echo json_encode(['success' => true]);
 ?>

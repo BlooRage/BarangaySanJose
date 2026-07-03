@@ -10,6 +10,102 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+function otpHandlerTableExists(mysqli $conn, string $tableName): bool
+{
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("s", $tableName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return !empty($row);
+}
+
+function otpHandlerGuestComplaintFindActiveByPhone(mysqli $conn, string $phone): ?array
+{
+    if (
+        !otpHandlerTableExists($conn, 'casereportstbl') ||
+        !otpHandlerTableExists($conn, 'complaintstbl') ||
+        !otpHandlerTableExists($conn, 'caseparticipantstbl')
+    ) {
+        return null;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT
+            ct.complaint_id,
+            c.case_id,
+            COALESCE(s.status_name, 'Pending') AS status_name
+        FROM caseparticipantstbl cp
+        INNER JOIN casereportstbl c ON c.case_id = cp.case_id
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        WHERE c.report_type = 'Complaint'
+          AND cp.participant_role = 'Complainant'
+          AND cp.contact_number = ?
+          AND LOWER(COALESCE(s.status_name, 'pending')) NOT IN ('resolved', 'dropped')
+        ORDER BY c.case_id DESC
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param("s", $phone);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return is_array($row) ? $row : null;
+}
+
+function otpHandlerRecentOtpRequest(mysqli $conn, string $recipient, string $purpose, int $windowSeconds): ?array
+{
+    $stmt = $conn->prepare("
+        SELECT request_timestamp
+        FROM otprequesttbl
+        WHERE recipient = ? AND purpose = ?
+        ORDER BY request_timestamp DESC
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param("ss", $recipient, $purpose);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!is_array($row) || empty($row['request_timestamp'])) {
+        return null;
+    }
+
+    $requestTimestamp = strtotime((string)$row['request_timestamp']);
+    if ($requestTimestamp === false) {
+        return null;
+    }
+
+    $elapsed = time() - $requestTimestamp;
+    if ($elapsed >= $windowSeconds) {
+        return null;
+    }
+
+    return [
+        'remaining_seconds' => max(1, $windowSeconds - $elapsed),
+    ];
+}
+
 // ===== Validate input =====
 if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
     echo json_encode(['success' => false, 'error' => 'Missing parameters']);
@@ -33,9 +129,10 @@ if (preg_match('/^09\d{9}$/', $rawRecipient)) {
     exit;
 }
 
-if ($purpose === 'guest_appointment') {
+if ($purpose === 'guest_appointment' || $purpose === 'guest_complaint') {
     if (recaptcha_v3_should_enforce()) {
-        $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, 'guest_appointment_otp');
+        $recaptchaAction = $purpose === 'guest_complaint' ? 'guest_complaint_otp' : 'guest_appointment_otp';
+        $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, $recaptchaAction);
         if (empty($recaptchaCheck['success'])) {
             echo json_encode([
                 'success' => false,
@@ -44,7 +141,34 @@ if ($purpose === 'guest_appointment') {
             exit;
         }
     }
+}
 
+if ($purpose === 'guest_complaint') {
+    $activeComplaint = otpHandlerGuestComplaintFindActiveByPhone($conn, '0' . $recipient_db);
+    if (is_array($activeComplaint)) {
+        $reference = trim((string)($activeComplaint['complaint_id'] ?? $activeComplaint['case_id'] ?? ''));
+        $referenceText = $reference !== '' ? " Reference: {$reference}." : '';
+        echo json_encode([
+            'success' => false,
+            'error' => 'This mobile number already has an active complaint under review. Please wait until it is completed before submitting another one.' . $referenceText,
+        ]);
+        exit;
+    }
+
+    $recentOtpRequest = otpHandlerRecentOtpRequest($conn, $recipient_db, $purpose, 60);
+    if (is_array($recentOtpRequest)) {
+        $remainingSeconds = (int)($recentOtpRequest['remaining_seconds'] ?? 0);
+        echo json_encode([
+            'success' => false,
+            'error' => $remainingSeconds > 0
+                ? "Please wait {$remainingSeconds} seconds before requesting another OTP."
+                : 'Please wait before requesting another OTP.',
+        ]);
+        exit;
+    }
+}
+
+if ($purpose === 'guest_appointment') {
     $activeAppointment = apsh_find_active_appointment_by_phone($conn, '0' . $recipient_db);
     if (is_array($activeAppointment)) {
         echo json_encode(['success' => false, 'error' => apsh_active_appointment_phone_message($activeAppointment)]);

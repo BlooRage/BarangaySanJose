@@ -134,7 +134,7 @@ $areaOptions = [
     <?php endif; ?>
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css?v=20260704-area-guide-modal">
     <style>
         body {
             background: #fffdfb;

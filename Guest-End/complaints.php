@@ -35,7 +35,7 @@ $areaOptions = [
     <?php endif; ?>
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css?v=20260704-area-guide-modal">
     <style>
         :root {
             --guest-paper: #ffffff;
@@ -253,6 +253,35 @@ $areaOptions = [
             box-shadow: 0 0 0 0.18rem rgba(254, 153, 60, 0.16);
         }
 
+        .otp-feedback {
+            color: #1f7a4f;
+        }
+
+        .otp-error {
+            color: #b42318;
+        }
+
+        .otp-verify-row[hidden] {
+            display: none !important;
+        }
+
+        .process-stage-actions {
+            margin-top: 1.5rem;
+            padding-top: 1.2rem;
+            border-top: 1px solid rgba(254, 153, 60, 0.16);
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .process-stage-note {
+            margin: 0.55rem 0 0;
+            color: var(--guest-muted);
+            line-height: 1.6;
+        }
+
         .agreement-row {
             margin-top: 1.3rem;
             padding-top: 1.15rem;
@@ -278,7 +307,12 @@ $areaOptions = [
             flex: 0 0 auto;
         }
 
+        .process-next-btn,
         .submit-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
             min-width: 210px;
             padding: 0.9rem 1.5rem;
             border-radius: 0.95rem;
@@ -288,13 +322,280 @@ $areaOptions = [
             font-weight: 700;
         }
 
+        .process-next-btn:not(:disabled):hover,
         .submit-btn:not(:disabled):hover {
             box-shadow: 0 14px 28px rgba(222, 113, 12, 0.24);
         }
 
+        .process-next-btn:disabled,
         .submit-btn:disabled {
             opacity: 0.72;
             cursor: not-allowed;
+        }
+
+        .appointment-outline-btn {
+            border-radius: 0.9rem;
+            border: 1px solid var(--guest-accent);
+            background: #ffffff;
+            color: var(--guest-accent-dark);
+            font-weight: 700;
+        }
+
+        .appointment-outline-btn:hover,
+        .appointment-outline-btn:focus {
+            background: #fff4e6;
+            border-color: var(--guest-accent-dark);
+            color: var(--guest-accent-dark);
+        }
+
+        #complaintVerificationStage {
+            z-index: 2000;
+        }
+
+        .modal-backdrop.show {
+            z-index: 1990;
+        }
+
+        .complaint-modal--otp .modal-dialog {
+            max-width: 820px;
+            margin: 1.5rem auto;
+        }
+
+        .complaint-modal--otp .modal-content {
+            border-radius: 1.9rem;
+            border: 1px solid rgba(254, 153, 60, 0.42);
+            box-shadow: 0 28px 72px rgba(58, 39, 23, 0.22);
+            max-height: calc(100vh - 5rem);
+        }
+
+        .complaint-modal--otp .modal-header {
+            padding: 1.1rem 1.45rem 0.9rem;
+            border-bottom: 1px solid rgba(254, 153, 60, 0.16);
+        }
+
+        .complaint-modal--otp .modal-title {
+            font-family: "Charis SIL Bold", Georgia, serif;
+            font-size: clamp(1.45rem, 2vw, 1.95rem);
+            line-height: 1.08;
+            color: var(--guest-accent-dark);
+        }
+
+        .complaint-modal--otp .btn-close {
+            width: 1.9rem;
+            height: 1.9rem;
+            padding: 0;
+            opacity: 0.82;
+            box-shadow: none;
+        }
+
+        .complaint-modal--otp .btn-close:hover,
+        .complaint-modal--otp .btn-close:focus {
+            opacity: 1;
+        }
+
+        .complaint-modal--otp .modal-body {
+            padding: 1.1rem 1.45rem 1.3rem;
+            background: #ffffff;
+            overflow-y: auto;
+        }
+
+        .otp-modal-shell {
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .otp-simple-hero {
+            display: grid;
+            justify-items: center;
+            gap: 0.7rem;
+            text-align: center;
+        }
+
+        .otp-simple-icon {
+            width: clamp(68px, 7vw, 84px);
+            height: auto;
+        }
+
+        .otp-modal-intro {
+            margin: 0;
+            max-width: 39rem;
+            color: var(--guest-muted);
+            font-size: 0.92rem;
+            line-height: 1.55;
+            text-align: center;
+        }
+
+        .otp-modal-card {
+            padding: 0.15rem 0 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .otp-simple-number {
+            margin: 0;
+            text-align: center;
+            color: var(--guest-muted);
+            font-size: 0.95rem;
+            line-height: 1.45;
+        }
+
+        .otp-recipient-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--guest-ink);
+        }
+
+        .otp-recipient-value.is-empty {
+            color: var(--guest-muted);
+        }
+
+        .otp-security-note {
+            margin: 0.85rem 0 0;
+            color: var(--guest-muted);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .otp-send-actions,
+        .otp-resend-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        .otp-send-btn {
+            min-width: 160px;
+            min-height: 52px;
+            padding-inline: 1.35rem;
+        }
+
+        .complaint-modal--otp .otp-actions,
+        .complaint-modal--otp .otp-verify-row {
+            display: grid;
+            gap: 0.7rem;
+            grid-template-columns: 1fr;
+            justify-items: center;
+        }
+
+        .complaint-modal--otp .otp-actions {
+            align-items: start;
+        }
+
+        .complaint-modal--otp .otp-verify-row {
+            padding: 0;
+            margin-top: 0.1rem;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+
+        .complaint-modal--otp .otp-verify-row > div:first-child {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .otp-code-field {
+            position: relative;
+            width: 100%;
+            max-width: 22.5rem;
+        }
+
+        .otp-code-boxes {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.55rem;
+            width: 100%;
+        }
+
+        .otp-code-box {
+            width: 100%;
+            min-width: 42px;
+            min-height: 56px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.9rem;
+            border: 1px solid rgba(120, 96, 72, 0.24);
+            background: #ffffff;
+            color: var(--guest-ink);
+            font-size: 1.25rem;
+            font-weight: 800;
+            line-height: 1;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+        }
+
+        .otp-code-box.is-filled {
+            border-color: rgba(254, 153, 60, 0.42);
+            background: linear-gradient(180deg, #ffffff 0%, #fff9f2 100%);
+        }
+
+        .otp-code-box.is-active {
+            border-color: rgba(254, 153, 60, 0.82);
+            box-shadow: 0 0 0 0.18rem rgba(254, 153, 60, 0.14);
+            transform: translateY(-1px);
+        }
+
+        .otp-code-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: text;
+            z-index: 2;
+        }
+
+        .complaint-modal--otp .otp-feedback,
+        .complaint-modal--otp .otp-error {
+            margin-top: 0.25rem;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            text-align: center;
+            background: transparent;
+        }
+
+        .otp-link-btn {
+            appearance: none;
+            -webkit-appearance: none;
+            display: inline;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--guest-accent-dark);
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 0.2rem;
+            box-shadow: none !important;
+        }
+
+        .otp-link-btn:hover,
+        .otp-link-btn:focus {
+            color: var(--guest-accent);
+            background: transparent;
+        }
+
+        .otp-link-btn:disabled {
+            color: var(--guest-muted);
+            cursor: default;
+            opacity: 1;
+        }
+
+        .otp-cert-card {
+            padding: 0.55rem 0 0;
+            border: none;
+            border-radius: 0;
+            background: transparent;
+            text-align: center;
+        }
+
+        .complaint-modal--otp .submit-btn {
+            min-width: 280px;
         }
 
         .guest-footer-note {
@@ -327,8 +628,23 @@ $areaOptions = [
                 align-items: stretch;
             }
 
+            .process-stage-actions {
+                align-items: stretch;
+            }
+
+            .process-next-btn,
             .submit-btn {
                 width: 100%;
+            }
+
+            .complaint-modal--otp .modal-header,
+            .complaint-modal--otp .modal-body {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .complaint-modal--otp .submit-btn {
+                min-width: 0;
             }
         }
     </style>
@@ -395,9 +711,9 @@ $areaOptions = [
                         data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
                         data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
                         data-complaint-type-config="<?= $complaintTypeConfigJson ?>"
-                        data-recaptcha-enabled="<?= $complaintRecaptchaEnabled ? '1' : '0' ?>"
+                        data-recaptcha-enabled="0"
                         data-recaptcha-site-key="<?= htmlspecialchars($complaintRecaptchaSiteKey, ENT_QUOTES, 'UTF-8') ?>"
-                        data-recaptcha-action="guest_complaint_submit"
+                        data-recaptcha-action="guest_complaint_otp"
                         hidden
                     ></div>
 
@@ -665,9 +981,75 @@ $areaOptions = [
                         <input type="checkbox" id="agreementComplaint" name="certify" required>
                         I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                     </label>
-                    <button type="submit" class="submit-btn">SUBMIT</button>
+                </div>
+
+                <div class="process-stage-actions" id="complaintDetailsActions">
+                    <div>
+                        <p class="process-stage-note">Confirm the statement above, then continue to OTP verification before submitting the complaint.</p>
+                    </div>
+                    <button type="button" class="btn process-next-btn" id="complaintNextBtn">NEXT</button>
                 </div>
                         </section>
+
+                        <div class="modal fade" id="complaintVerificationStage" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                            <div class="modal-dialog modal-dialog-centered complaint-modal complaint-modal--otp">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Mobile OTP Verification</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="otp-modal-shell">
+                                            <div class="otp-simple-hero">
+                                                <img src="<?= htmlspecialchars(appUrl('/Images/SMS-OTP.png'), ENT_QUOTES, 'UTF-8') ?>" alt="OTP Icon" class="otp-simple-icon">
+                                                <p class="otp-modal-intro">Check your phone. We’ll send a 6-digit code to the mobile number below before you can submit the complaint.</p>
+                                            </div>
+
+                                            <div class="otp-panel otp-modal-card">
+                                                <div class="otp-actions">
+                                                    <div>
+                                                        <p class="otp-simple-number">OTP will be sent to <span class="otp-recipient-value" id="complaintOtpRecipientPreview">+63 •••••• XXXX</span></p>
+                                                    </div>
+                                                    <div class="otp-send-actions">
+                                                        <button type="button" class="btn appointment-outline-btn otp-send-btn" id="complaintSendOtpBtn">Send OTP</button>
+                                                    </div>
+                                                </div>
+
+                                                <?php if ($complaintRecaptchaEnabled): ?>
+                                                    <p class="otp-security-note">Protected by reCAPTCHA. OTP requests are screened automatically before sending.</p>
+                                                <?php endif; ?>
+
+                                                <div class="otp-verify-row" id="complaintOtpVerifyRow" hidden>
+                                                    <div>
+                                                        <div class="otp-code-field">
+                                                            <input type="text" class="otp-code-input" id="guestComplaintOtpInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" aria-label="6-digit OTP">
+                                                            <div class="otp-code-boxes" id="guestComplaintOtpBoxes" aria-hidden="true">
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                                <span class="otp-code-box"></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="otp-feedback d-none" id="complaintOtpFeedback" aria-live="polite"></div>
+                                                <div class="otp-error d-none" id="complaintOtpError" aria-live="polite"></div>
+                                                <div class="otp-resend-row">
+                                                    <button type="button" class="otp-link-btn d-none" id="complaintResendOtpBtn">Resend OTP</button>
+                                                </div>
+                                            </div>
+
+                                            <div class="otp-cert-card">
+                                                <button type="submit" class="submit-btn" id="complaintSubmitBtn">SUBMIT COMPLAINT</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </form>
 
                     <p class="guest-footer-note">Guest complaints are subject to review and verification by barangay personnel.</p>
@@ -809,5 +1191,466 @@ $areaOptions = [
         });
     </script>
     <script src="../JS-Script-Files/Resident-End/complaintScript.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("complaintForm");
+            const contactNumberInput = form?.querySelector('input[name="complainant_contact_number"]');
+            const nextBtn = document.getElementById("complaintNextBtn");
+            const submitBtn = document.getElementById("complaintSubmitBtn");
+            const verificationStage = document.getElementById("complaintVerificationStage");
+            const verificationModal = verificationStage && window.bootstrap
+                ? bootstrap.Modal.getOrCreateInstance(verificationStage, {
+                    backdrop: "static",
+                    keyboard: true,
+                })
+                : null;
+            const sendOtpBtn = document.getElementById("complaintSendOtpBtn");
+            const resendOtpBtn = document.getElementById("complaintResendOtpBtn");
+            const otpVerifyRow = document.getElementById("complaintOtpVerifyRow");
+            const otpInput = document.getElementById("guestComplaintOtpInput");
+            const otpBoxes = Array.from(document.querySelectorAll("#guestComplaintOtpBoxes .otp-code-box"));
+            const otpFeedback = document.getElementById("complaintOtpFeedback");
+            const otpError = document.getElementById("complaintOtpError");
+            const otpRecipientPreview = document.getElementById("complaintOtpRecipientPreview");
+            const recaptchaEnabled = <?= $complaintRecaptchaEnabled ? 'true' : 'false' ?>;
+            const recaptchaSiteKey = <?= json_encode($complaintRecaptchaSiteKey, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+            if (!form || !contactNumberInput || !nextBtn || !submitBtn) {
+                return;
+            }
+
+            let otpSent = false;
+            let otpVerified = false;
+            let otpSentRecipient = "";
+            let otpCountdown = 0;
+            let otpCountdownTimer = null;
+            let otpStageVisible = false;
+            let otpVerificationInFlight = false;
+            let focusOtpOnModalOpen = false;
+
+            const normalizePhoneDraft = (value) => {
+                let digits = String(value || "").replace(/\D/g, "");
+                if (digits.startsWith("63")) {
+                    digits = digits.slice(2);
+                }
+                if (digits.startsWith("0")) {
+                    digits = digits.slice(1);
+                }
+                return digits.slice(0, 10);
+            };
+
+            const normalizePhone = (value) => {
+                const digits = normalizePhoneDraft(value);
+                return /^9\d{9}$/.test(digits) ? digits : "";
+            };
+
+            const clearOtpMessages = () => {
+                if (otpFeedback) {
+                    otpFeedback.textContent = "";
+                    otpFeedback.classList.add("d-none");
+                }
+                if (otpError) {
+                    otpError.textContent = "";
+                    otpError.classList.add("d-none");
+                }
+            };
+
+            const showOtpFeedback = (message, isError = false) => {
+                const target = isError ? otpError : otpFeedback;
+                const other = isError ? otpFeedback : otpError;
+                if (other) {
+                    other.textContent = "";
+                    other.classList.add("d-none");
+                }
+                if (target) {
+                    target.textContent = String(message || "").trim();
+                    target.classList.toggle("d-none", target.textContent === "");
+                }
+            };
+
+            const syncOtpBoxes = () => {
+                if (!otpInput) {
+                    return;
+                }
+                const value = String(otpInput.value || "").replace(/\D/g, "").slice(0, 6);
+                if (otpInput.value !== value) {
+                    otpInput.value = value;
+                }
+
+                otpBoxes.forEach((box, index) => {
+                    const digit = value[index] || "";
+                    box.textContent = digit;
+                    box.classList.toggle("is-filled", digit !== "");
+                    box.classList.remove("is-active");
+                });
+
+                if (document.activeElement === otpInput && !otpVerified) {
+                    const activeIndex = Math.min(value.length, Math.max(otpBoxes.length - 1, 0));
+                    const activeBox = otpBoxes[activeIndex] || otpBoxes[otpBoxes.length - 1] || null;
+                    activeBox?.classList.add("is-active");
+                }
+            };
+
+            const syncOtpRecipientPreview = () => {
+                if (!otpRecipientPreview) {
+                    return;
+                }
+                const normalized = normalizePhone(contactNumberInput.value || "");
+                if (normalized !== "") {
+                    otpRecipientPreview.textContent = `+63 ${normalized}`;
+                    otpRecipientPreview.classList.remove("is-empty");
+                    return;
+                }
+                otpRecipientPreview.textContent = "Enter your mobile number above first.";
+                otpRecipientPreview.classList.add("is-empty");
+            };
+
+            const executeComplaintRecaptcha = async () => {
+                if (!recaptchaEnabled) {
+                    return "";
+                }
+                if (!(window.grecaptcha && typeof window.grecaptcha.execute === "function")) {
+                    throw new Error("Security check is still loading. Please try again.");
+                }
+
+                await new Promise((resolve) => {
+                    window.grecaptcha.ready(resolve);
+                });
+
+                const token = await window.grecaptcha.execute(recaptchaSiteKey, {
+                    action: "guest_complaint_otp",
+                });
+                if (String(token || "").trim() === "") {
+                    throw new Error("Security verification failed. Please try again.");
+                }
+
+                return token;
+            };
+
+            const getDetailFields = () => Array.from(form.querySelectorAll("input, select, textarea")).filter((field) => {
+                if (!(field instanceof HTMLElement)) {
+                    return false;
+                }
+                if (verificationStage?.contains(field)) {
+                    return false;
+                }
+                if ("disabled" in field && field.disabled) {
+                    return false;
+                }
+                if (field instanceof HTMLInputElement && field.type === "hidden") {
+                    return false;
+                }
+                return true;
+            });
+
+            const validateDetailsStep = () => {
+                const firstInvalidField = getDetailFields().find((field) => {
+                    if (typeof field.checkValidity !== "function") {
+                        return false;
+                    }
+                    return !field.checkValidity();
+                });
+                if (!firstInvalidField) {
+                    return true;
+                }
+                firstInvalidField.reportValidity();
+                firstInvalidField.focus();
+                return false;
+            };
+
+            const hasInvalidDetails = () => getDetailFields().some((field) => {
+                if (typeof field.checkValidity !== "function") {
+                    return false;
+                }
+                return !field.checkValidity();
+            });
+
+            const updateOtpButtons = () => {
+                const canUseCurrentNumber = normalizePhone(contactNumberInput.value || "") !== "" && contactNumberInput.checkValidity();
+                if (sendOtpBtn) {
+                    sendOtpBtn.classList.toggle("d-none", otpSent || otpVerified);
+                    sendOtpBtn.disabled = otpVerified || otpSent || !canUseCurrentNumber;
+                    if (!otpSent) {
+                        sendOtpBtn.textContent = "Send OTP";
+                    }
+                }
+                if (resendOtpBtn) {
+                    resendOtpBtn.classList.toggle("d-none", !otpSent || otpVerified);
+                    resendOtpBtn.textContent = otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend OTP";
+                    resendOtpBtn.disabled = otpVerified || otpCountdown > 0 || !canUseCurrentNumber;
+                }
+            };
+
+            const startOtpCountdown = (seconds) => {
+                otpCountdown = Math.max(0, Number(seconds || 0));
+                if (otpCountdownTimer) {
+                    window.clearInterval(otpCountdownTimer);
+                }
+                updateOtpButtons();
+                if (otpCountdown <= 0) {
+                    return;
+                }
+                otpCountdownTimer = window.setInterval(() => {
+                    otpCountdown = Math.max(0, otpCountdown - 1);
+                    updateOtpButtons();
+                    if (otpCountdown <= 0 && otpCountdownTimer) {
+                        window.clearInterval(otpCountdownTimer);
+                        otpCountdownTimer = null;
+                    }
+                }, 1000);
+            };
+
+            const updateStageState = () => {
+                syncOtpRecipientPreview();
+                updateOtpButtons();
+                submitBtn.disabled = !otpVerified || hasInvalidDetails();
+            };
+
+            const setOtpVerifiedState = (verified) => {
+                otpVerified = verified === true;
+                contactNumberInput.readOnly = otpVerified;
+                if (otpVerifyRow) {
+                    otpVerifyRow.hidden = otpVerified;
+                }
+                if (otpInput) {
+                    otpInput.disabled = otpVerified;
+                }
+                syncOtpBoxes();
+                updateStageState();
+            };
+
+            const resetOtpVerification = () => {
+                otpVerified = false;
+                otpSent = false;
+                otpSentRecipient = "";
+                otpCountdown = 0;
+                if (otpCountdownTimer) {
+                    window.clearInterval(otpCountdownTimer);
+                    otpCountdownTimer = null;
+                }
+                contactNumberInput.readOnly = false;
+                if (otpInput) {
+                    otpInput.value = "";
+                    otpInput.disabled = false;
+                }
+                if (otpVerifyRow) {
+                    otpVerifyRow.hidden = true;
+                }
+                clearOtpMessages();
+                syncOtpBoxes();
+                updateStageState();
+            };
+
+            const showVerificationStage = (focusOtp = false) => {
+                otpStageVisible = true;
+                focusOtpOnModalOpen = focusOtp;
+                updateStageState();
+                if (verificationModal) {
+                    verificationModal.show();
+                    return;
+                }
+                window.setTimeout(() => {
+                    if (focusOtp) {
+                        sendOtpBtn?.focus();
+                    }
+                }, 180);
+            };
+
+            const advanceToVerificationStage = () => {
+                if (!validateDetailsStep()) {
+                    return false;
+                }
+                showVerificationStage(true);
+                return true;
+            };
+
+            const verifyOtpCode = async () => {
+                if (otpVerificationInFlight) {
+                    return;
+                }
+
+                const recipient = normalizePhone(contactNumberInput.value || "");
+                const otpValue = String(otpInput?.value || "").trim();
+                if (recipient === "") {
+                    contactNumberInput.reportValidity();
+                    return;
+                }
+                if (!/^\d{6}$/.test(otpValue)) {
+                    showOtpFeedback("Please enter the 6-digit OTP code.", true);
+                    otpInput?.focus();
+                    return;
+                }
+
+                clearOtpMessages();
+                otpVerificationInFlight = true;
+
+                try {
+                    const formData = new FormData();
+                    formData.append("recipient", recipient);
+                    formData.append("purpose", "guest_complaint");
+                    formData.append("otp", otpValue);
+
+                    const response = await fetch("../PhpFiles/OTPHandlers/verify_otp.php", {
+                        method: "POST",
+                        body: formData,
+                        credentials: "same-origin",
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(String(data.error || "Failed to verify OTP."));
+                    }
+
+                    setOtpVerifiedState(true);
+                    showOtpFeedback("Mobile number verified. You can now submit the complaint.");
+                } catch (error) {
+                    showOtpFeedback(error instanceof Error ? error.message : "Failed to verify OTP.", true);
+                } finally {
+                    otpVerificationInFlight = false;
+                }
+            };
+
+            nextBtn.addEventListener("click", () => {
+                advanceToVerificationStage();
+            });
+
+            sendOtpBtn?.addEventListener("click", async () => {
+                if (!validateDetailsStep()) {
+                    return;
+                }
+
+                const recipient = normalizePhone(contactNumberInput.value || "");
+                if (recipient === "") {
+                    contactNumberInput.reportValidity();
+                    return;
+                }
+
+                clearOtpMessages();
+                sendOtpBtn.disabled = true;
+                sendOtpBtn.textContent = "Sending...";
+                if (resendOtpBtn) {
+                    resendOtpBtn.disabled = true;
+                }
+
+                try {
+                    const recaptchaToken = await executeComplaintRecaptcha();
+                    const formData = new FormData();
+                    formData.append("recipient", recipient);
+                    formData.append("purpose", "guest_complaint");
+                    if (recaptchaToken !== "") {
+                        formData.append("recaptcha_token", recaptchaToken);
+                    }
+
+                    const response = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
+                        method: "POST",
+                        body: formData,
+                        credentials: "same-origin",
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(String(data.error || "Failed to send OTP. Please try again."));
+                    }
+
+                    otpSent = true;
+                    otpSentRecipient = recipient;
+                    if (otpVerifyRow) {
+                        otpVerifyRow.hidden = false;
+                    }
+                    showOtpFeedback("OTP sent successfully. Enter the 6-digit code to verify your mobile number.");
+                    startOtpCountdown(60);
+                    updateStageState();
+                    otpInput?.focus();
+                } catch (error) {
+                    showOtpFeedback(error instanceof Error ? error.message : "Failed to send OTP. Please try again.", true);
+                    updateStageState();
+                } finally {
+                    if (sendOtpBtn) {
+                        sendOtpBtn.textContent = "Send OTP";
+                    }
+                }
+            });
+
+            resendOtpBtn?.addEventListener("click", () => {
+                if (resendOtpBtn.disabled) {
+                    return;
+                }
+                sendOtpBtn?.click();
+            });
+
+            contactNumberInput.addEventListener("input", () => {
+                const draftValue = normalizePhoneDraft(contactNumberInput.value);
+                if (contactNumberInput.value !== draftValue) {
+                    contactNumberInput.value = draftValue;
+                }
+                if (!otpVerified && otpSent && normalizePhone(contactNumberInput.value) !== otpSentRecipient) {
+                    resetOtpVerification();
+                } else {
+                    clearOtpMessages();
+                    updateStageState();
+                }
+            });
+
+            contactNumberInput.addEventListener("change", updateStageState);
+            contactNumberInput.addEventListener("blur", updateStageState);
+
+            otpInput?.addEventListener("input", () => {
+                syncOtpBoxes();
+                const otpValue = String(otpInput.value || "").trim();
+                if (/^\d{6}$/.test(otpValue) && !otpVerified && !otpVerificationInFlight) {
+                    void verifyOtpCode();
+                }
+            });
+            otpInput?.addEventListener("focus", syncOtpBoxes);
+            otpInput?.addEventListener("blur", syncOtpBoxes);
+
+            verificationStage?.addEventListener("shown.bs.modal", () => {
+                otpStageVisible = true;
+                updateStageState();
+                if (focusOtpOnModalOpen) {
+                    window.setTimeout(() => {
+                        sendOtpBtn?.focus();
+                    }, 120);
+                }
+                focusOtpOnModalOpen = false;
+            });
+
+            verificationStage?.addEventListener("hidden.bs.modal", () => {
+                otpStageVisible = false;
+                focusOtpOnModalOpen = false;
+            });
+
+            form.addEventListener("submit", (event) => {
+                if (otpVerified) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                if (!otpStageVisible) {
+                    advanceToVerificationStage();
+                    return;
+                }
+
+                if (!validateDetailsStep()) {
+                    return;
+                }
+
+                showOtpFeedback("Please verify your mobile number through OTP before submitting the complaint.", true);
+                if (!otpSent) {
+                    sendOtpBtn?.focus();
+                    return;
+                }
+                otpInput?.focus();
+            }, true);
+
+            form.addEventListener("input", updateStageState);
+            form.addEventListener("change", updateStageState);
+
+            syncOtpRecipientPreview();
+            resetOtpVerification();
+            syncOtpBoxes();
+            updateStageState();
+        });
+    </script>
 </body>
 </html>
