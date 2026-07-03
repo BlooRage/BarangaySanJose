@@ -357,49 +357,84 @@ body {
     opacity: 1;
 }
 
-#complaintTimeModal .modal-dialog {
-    max-width: 680px;
-}
-
-#complaintTimeModal .modal-content {
+.complaint-form-modal .modal-content {
     border: 1px solid #f2d3b8;
     border-radius: 20px;
     box-shadow: 0 24px 48px rgba(77, 45, 12, 0.18);
     overflow: hidden;
 }
 
-#complaintTimeModal .modal-header {
+.complaint-form-modal .modal-header {
     padding: 20px 22px 14px;
     border-bottom: 1px solid #f2e3d3;
     background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
 }
 
-#complaintTimeModal .modal-header .fw-bold {
-    font-family: 'Charis SIL Bold', serif;
-    font-size: 20px;
-    color: #2f2419 !important;
-}
-
-#complaintTimeModal .modal-header .small {
-    margin-top: 4px;
-    color: #6b7280 !important;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-#complaintTimeModal .btn-close {
+.complaint-form-modal .btn-close {
     opacity: 0.78;
 }
 
-#complaintTimeModal .btn-close:hover,
-#complaintTimeModal .btn-close:focus {
+.complaint-form-modal .btn-close:hover,
+.complaint-form-modal .btn-close:focus {
     opacity: 1;
     box-shadow: none;
 }
 
-#complaintTimeModal .modal-body {
+.complaint-form-modal__heading {
+    font-family: 'Charis SIL Bold', serif;
+    font-size: 20px;
+    color: #2f2419;
+    line-height: 1.2;
+}
+
+.complaint-form-modal__subheading {
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.complaint-form-modal__body {
     padding: 20px 22px 16px;
     background: #ffffff;
+}
+
+.complaint-form-modal__secondary-btn {
+    min-height: 48px;
+    border: 1px solid #d6dce5;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #7c3f00;
+    font-weight: 600;
+}
+
+.complaint-form-modal__secondary-btn:hover,
+.complaint-form-modal__secondary-btn:focus {
+    border-color: #e8872f;
+    background: #fff7f0;
+    color: #b75f0d;
+    box-shadow: none;
+}
+
+.complaint-form-modal__primary-btn {
+    min-height: 48px;
+    padding: 0 22px;
+    border: 1px solid #e8872f;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f59b3d 0%, #e8872f 100%);
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.complaint-form-modal__primary-btn:hover,
+.complaint-form-modal__primary-btn:focus {
+    border-color: #cf6f14;
+    background: linear-gradient(135deg, #e8872f 0%, #cf6f14 100%);
+    box-shadow: 0 12px 24px rgba(232, 135, 47, 0.22);
+}
+
+#complaintTimeModal .modal-dialog {
+    max-width: 680px;
 }
 
 #complaintTimeModal .modal-body .form-row {
@@ -424,26 +459,6 @@ body {
     font-size: 14px;
 }
 
-#complaintTimeModal #incidentTimeUseNow,
-#complaintTimeModal #incidentTimeClearBtn {
-    min-height: 48px;
-    border: 1px solid #d6dce5;
-    border-radius: 12px;
-    background: #ffffff;
-    color: #7c3f00;
-    font-weight: 600;
-}
-
-#complaintTimeModal #incidentTimeUseNow:hover,
-#complaintTimeModal #incidentTimeUseNow:focus,
-#complaintTimeModal #incidentTimeClearBtn:hover,
-#complaintTimeModal #incidentTimeClearBtn:focus {
-    border-color: #e8872f;
-    background: #fff7f0;
-    color: #b75f0d;
-    box-shadow: none;
-}
-
 #complaintTimeModal .modal-footer {
     padding: 14px 22px 20px;
     border-top: 1px solid #f2e3d3;
@@ -451,29 +466,8 @@ body {
     gap: 10px;
 }
 
-#complaintTimeModal #incidentTimeApplyBtn {
-    min-height: 48px;
-    padding: 0 22px;
-    border: 1px solid #e8872f;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #f59b3d 0%, #e8872f 100%);
-    color: #ffffff !important;
-    font-weight: 700;
-}
-
-#complaintTimeModal #incidentTimeApplyBtn:hover,
-#complaintTimeModal #incidentTimeApplyBtn:focus {
-    border-color: #cf6f14;
-    background: linear-gradient(135deg, #e8872f 0%, #cf6f14 100%);
-    box-shadow: 0 12px 24px rgba(232, 135, 47, 0.22);
-}
-
 .complaint-area-modal-dialog {
     max-width: 640px;
-}
-
-.complaint-area-modal-dialog .modal-content {
-    border-radius: 18px;
 }
 
 .complaint-area-modal-dialog .modal-header {

@@ -134,7 +134,7 @@ $areaOptions = [
     <?php endif; ?>
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css?v=20260704-complaint-time-modal">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css?v=20260704-complaint-all-modals">
     <style>
         body {
             background: #fffdfb;
@@ -456,17 +456,17 @@ $areaOptions = [
             </form>
         </main>
     </div>
-    <div class="modal fade" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <div class="fw-bold text-dark">Select Time</div>
-                        <div class="small text-muted">Choose the incident time or use the current time.</div>
+                        <div class="complaint-form-modal__heading">Select Time</div>
+                        <div class="complaint-form-modal__subheading">Choose the incident time or use the current time.</div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body complaint-form-modal__body">
                     <div class="form-row">
                         <div class="full-width">
                             <label class="top-label" for="incidentTimePicker">Time of the Incident</label>
@@ -474,25 +474,25 @@ $areaOptions = [
                         </div>
                     </div>
                     <div class="d-flex justify-content-between align-items-center gap-2">
-                        <button type="button" class="btn btn-outline-secondary" id="incidentTimeUseNow">Use current time</button>
+                        <button type="button" class="btn complaint-form-modal__secondary-btn" id="incidentTimeUseNow">Use current time</button>
                         <div class="small text-muted text-end" id="incidentTimePreview">No time selected yet.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" id="incidentTimeClearBtn">Clear</button>
-                    <button type="button" class="btn btn-primary text-white" id="incidentTimeApplyBtn">Apply</button>
+                    <button type="button" class="btn complaint-form-modal__secondary-btn" id="incidentTimeClearBtn">Clear</button>
+                    <button type="button" class="btn complaint-form-modal__primary-btn" id="incidentTimeApplyBtn">Apply</button>
                 </div>
             </div>
         </div>
     </div>
-    <div class="modal fade" id="complaintAreaHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade complaint-form-modal" id="complaintAreaHelpModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable complaint-area-modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Barangay Area Guide</h5>
+                    <h5 class="modal-title complaint-form-modal__heading">Barangay Area Guide</h5>
                     <button type="button" class="complaint-area-close-btn" data-bs-dismiss="modal" aria-label="Close">×</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body complaint-form-modal__body">
                     <p class="mb-3">Choose the barangay area where the incident happened. If the incident is near a boundary, select the nearest known area.</p>
                     <div class="d-flex flex-column gap-2 complaint-area-options">
                         <?php foreach ($areaOptions as $areaOption => $areaLocation): ?>
