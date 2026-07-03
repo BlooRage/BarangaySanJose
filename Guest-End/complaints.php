@@ -286,25 +286,30 @@ $areaOptions = [
             margin-top: 1.3rem;
             padding-top: 1.15rem;
             border-top: 1px solid rgba(254, 153, 60, 0.16);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            flex-wrap: wrap;
+            display: block;
         }
 
         .agreement-row .check-item {
             display: flex;
             align-items: flex-start;
             gap: 0.65rem;
-            flex: 1 1 320px;
+            width: 100%;
+            max-width: 42rem;
             line-height: 1.6;
             color: var(--guest-muted);
         }
 
         .agreement-row .check-item input {
             margin-top: 0.2rem;
-            flex: 0 0 auto;
+            flex: 0 0 58px;
+            width: 58px;
+            height: 28px;
+        }
+
+        .agreement-copy {
+            display: block;
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .process-next-btn,
@@ -331,6 +336,31 @@ $areaOptions = [
         .submit-btn:disabled {
             opacity: 0.72;
             cursor: not-allowed;
+        }
+
+        .submit-btn.is-loading {
+            pointer-events: none;
+        }
+
+        .submit-btn-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .submit-btn-spinner {
+            width: 1rem;
+            height: 1rem;
+            display: none;
+            flex: 0 0 auto;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #ffffff;
+            border-radius: 999px;
+            animation: complaintSubmitSpin 0.8s linear infinite;
+        }
+
+        .submit-btn.is-loading .submit-btn-spinner {
+            display: inline-block;
         }
 
         .appointment-outline-btn {
@@ -621,6 +651,15 @@ $areaOptions = [
             text-align: center;
         }
 
+        @keyframes complaintSubmitSpin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         @media (max-width: 767.98px) {
             .guest-main {
                 padding-top: 1.35rem;
@@ -641,16 +680,38 @@ $areaOptions = [
             }
 
             .agreement-row {
-                align-items: stretch;
+                margin-top: 1rem;
+                padding-top: 1rem;
+            }
+
+            .agreement-row .check-item {
+                gap: 0.85rem;
+            }
+
+            .agreement-copy {
+                font-size: 0.98rem;
+                line-height: 1.6;
             }
 
             .process-stage-actions {
                 align-items: stretch;
             }
 
+            .process-stage-actions > div {
+                width: 100%;
+            }
+
+            .process-stage-note {
+                margin-top: 0;
+            }
+
             .process-next-btn,
             .submit-btn {
                 width: 100%;
+            }
+
+            #goToTop {
+                display: none !important;
             }
 
             .complaint-modal--otp .modal-header,
@@ -995,7 +1056,7 @@ $areaOptions = [
                 <div class="agreement-row">
                     <label class="agreement-text check-item" for="agreementComplaint">
                         <input type="checkbox" id="agreementComplaint" name="certify" required>
-                        I hereby certify that the above information is true and correct to the best of my knowledge and belief.
+                        <span class="agreement-copy">I hereby certify that the above information is true and correct to the best of my knowledge and belief.</span>
                     </label>
                 </div>
 
@@ -1059,7 +1120,16 @@ $areaOptions = [
                                             </div>
 
                                             <div class="otp-cert-card">
-                                                <button type="submit" class="submit-btn" id="complaintSubmitBtn">SUBMIT COMPLAINT</button>
+                                                <button
+                                                    type="submit"
+                                                    class="submit-btn"
+                                                    id="complaintSubmitBtn"
+                                                    data-default-label="SUBMIT COMPLAINT"
+                                                    data-loading-label="Submitting complaint..."
+                                                >
+                                                    <span class="submit-btn-label">SUBMIT COMPLAINT</span>
+                                                    <span class="submit-btn-spinner" aria-hidden="true"></span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1206,7 +1276,7 @@ $areaOptions = [
             }
         });
     </script>
-    <script src="../JS-Script-Files/Resident-End/complaintScript.js"></script>
+    <script src="../JS-Script-Files/Resident-End/complaintScript.js?v=20260704-complaint-submit-loading"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.getElementById("complaintForm");
@@ -1417,6 +1487,10 @@ $areaOptions = [
             };
 
             const updateStageState = () => {
+                if (form.getAttribute("aria-busy") === "true" || submitBtn.classList.contains("is-loading")) {
+                    submitBtn.disabled = true;
+                    return;
+                }
                 syncOtpRecipientPreview();
                 updateOtpButtons();
                 submitBtn.disabled = !otpVerified || hasInvalidDetails();

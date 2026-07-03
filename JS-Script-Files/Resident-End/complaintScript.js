@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("complaintForm") || document.querySelector("form");
     const submitBtn = form?.querySelector(".submit-btn");
+    const submitBtnLabel = submitBtn?.querySelector(".submit-btn-label") || null;
     const incidentDateInput = document.getElementById("incidentDate");
     const incidentDateError = document.getElementById("incidentDateError");
     const incidentTimeInput = document.getElementById("incidentTime");
@@ -60,6 +61,25 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!form || !submitBtn) {
         return;
     }
+
+    const defaultSubmitLabel = String(
+        submitBtn.dataset.defaultLabel || submitBtnLabel?.textContent || submitBtn.textContent || "Submit"
+    ).trim() || "Submit";
+    const loadingSubmitLabel = String(submitBtn.dataset.loadingLabel || "Submitting...").trim() || "Submitting...";
+
+    const setSubmittingState = (submitting) => {
+        isSubmitting = submitting === true;
+        form.setAttribute("aria-busy", isSubmitting ? "true" : "false");
+        submitBtn.classList.toggle("is-loading", isSubmitting);
+        submitBtn.disabled = isSubmitting;
+
+        if (submitBtnLabel) {
+            submitBtnLabel.textContent = isSubmitting ? loadingSubmitLabel : defaultSubmitLabel;
+            return;
+        }
+
+        submitBtn.textContent = isSubmitting ? loadingSubmitLabel : defaultSubmitLabel;
+    };
 
     const getNow = () => new Date();
     const toIsoDate = (date) => {
@@ -943,8 +963,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (recaptchaEnabled && !recaptchaSubmitPending) {
             event.preventDefault();
-            isSubmitting = true;
-            submitBtn.disabled = true;
+            setSubmittingState(true);
 
             executeComplaintRecaptcha()
                 .then((token) => {
@@ -959,9 +978,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 })
                 .catch((error) => {
-                    isSubmitting = false;
+                    setSubmittingState(false);
                     recaptchaSubmitPending = false;
-                    submitBtn.disabled = false;
                     updateState();
 
                     const message = error instanceof Error ? error.message : "Security verification failed. Please try again.";
@@ -979,8 +997,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         recaptchaSubmitPending = false;
-        isSubmitting = true;
-        submitBtn.disabled = true;
+        setSubmittingState(true);
     });
 
     ensureDefaultIncidentDate();
@@ -993,7 +1010,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateState();
 
     window.addEventListener("pageshow", () => {
-        isSubmitting = false;
+        setSubmittingState(false);
         updateState();
     });
 
