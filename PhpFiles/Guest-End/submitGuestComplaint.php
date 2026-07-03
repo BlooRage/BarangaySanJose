@@ -60,6 +60,89 @@ function guestComplaintTableExists(mysqli $conn, string $tableName): bool
     return !empty($row);
 }
 
+function guestComplaintEnumOptions(mysqli $conn, string $tableName, string $columnName): array
+{
+    static $cache = [];
+    $cacheKey = strtolower($tableName . '.' . $columnName);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    $stmt = $conn->prepare("
+        SELECT COLUMN_TYPE
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return $cache[$cacheKey] = [];
+    }
+
+    $stmt->bind_param("ss", $tableName, $columnName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $columnType = trim((string)($row['COLUMN_TYPE'] ?? ''));
+    if (!preg_match('/^enum\((.*)\)$/i', $columnType, $matches)) {
+        return $cache[$cacheKey] = [];
+    }
+
+    $options = str_getcsv($matches[1], ',', "'", "\\");
+    return $cache[$cacheKey] = array_values(array_filter(array_map(
+        static fn($value) => trim((string)$value),
+        is_array($options) ? $options : []
+    ), static fn($value) => $value !== ''));
+}
+
+function guestComplaintResolveOrigin(mysqli $conn): string
+{
+    $options = guestComplaintEnumOptions($conn, 'complaintstbl', 'complaint_origin');
+    if (in_array('GuestPortal', $options, true)) {
+        return 'GuestPortal';
+    }
+    if (in_array('ResidentPortal', $options, true)) {
+        return 'ResidentPortal';
+    }
+    if (!empty($options)) {
+        return (string)$options[0];
+    }
+
+    return 'ResidentPortal';
+}
+
+function guestComplaintResolveSubjectKind(mysqli $conn): string
+{
+    $options = guestComplaintEnumOptions($conn, 'complaintstbl', 'subject_kind');
+    foreach (['Unknown', 'GeneralConcern', 'NonResident', 'Resident', 'Business', 'Organization'] as $candidate) {
+        if (in_array($candidate, $options, true)) {
+            return $candidate;
+        }
+    }
+    if (!empty($options)) {
+        return (string)$options[0];
+    }
+
+    return 'Unknown';
+}
+
+function guestComplaintClearTrackerCache(): void
+{
+    $pattern = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_complaint_tracker_*.cache';
+    $matches = glob($pattern);
+    if (!is_array($matches)) {
+        return;
+    }
+
+    foreach ($matches as $path) {
+        if (is_string($path) && is_file($path)) {
+            @unlink($path);
+        }
+    }
+}
+
 function guestComplaintGetStatusId(mysqli $conn, string $name, string $type): ?int
 {
     $stmt = $conn->prepare("
@@ -582,11 +665,16 @@ try {
         $levelId,
         $recordedByUserId
     );
-    $stmtCase->execute();
+    if (!$stmtCase->execute()) {
+        $error = $stmtCase->error ?: $conn->error;
+        $stmtCase->close();
+        throw new Exception("Failed to insert complaint case: " . $error);
+    }
     $stmtCase->close();
 
-    $subjectName = null;
-    $subjectKind = '';
+    $complaintOrigin = guestComplaintResolveOrigin($conn);
+    $subjectName = 'Not specified';
+    $subjectKind = guestComplaintResolveSubjectKind($conn);
     $subjectContact = null;
     $subjectAddress = null;
 
@@ -594,23 +682,28 @@ try {
         INSERT INTO complaintstbl
             (complaint_id, case_id, complaint_origin, subject_kind, subject_display_name, subject_contact_number, subject_address, witness_summary)
         VALUES
-            (?, ?, 'GuestPortal', ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmtComplaint) {
         throw new Exception("Prepare failed (complaint insert): " . $conn->error);
     }
 
     $stmtComplaint->bind_param(
-        "sssssss",
+        "ssssssss",
         $complaintId,
         $caseId,
+        $complaintOrigin,
         $subjectKind,
         $subjectName,
         $subjectContact,
         $subjectAddress,
         $witnessSummary
     );
-    $stmtComplaint->execute();
+    if (!$stmtComplaint->execute()) {
+        $error = $stmtComplaint->error ?: $conn->error;
+        $stmtComplaint->close();
+        throw new Exception("Failed to insert complaint details: " . $error);
+    }
     $stmtComplaint->close();
 
     guestComplaintInsertParticipant(
@@ -650,6 +743,7 @@ try {
     guestComplaintLogCaseUpdate($conn, $caseId, 'Complaint submitted through guest portal.', null);
     $conn->commit();
     unset($_SESSION['guest_complaint_otp_verified']);
+    guestComplaintClearTrackerCache();
 
     guestComplaintRedirectWithMessage($complainantPath, 'success', 'Complaint submitted successfully.', [
         'case_id' => $caseId,

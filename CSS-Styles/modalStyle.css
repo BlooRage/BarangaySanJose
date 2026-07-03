@@ -23,6 +23,10 @@
     max-width: 420px;
 }
 
+.uniform-modal {
+    z-index: 2010;
+}
+
 .uniform-modal .modal-content {
     background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
     border: 1px solid rgba(222, 113, 12, 0.14);
