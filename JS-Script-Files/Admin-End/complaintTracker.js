@@ -12,7 +12,7 @@
     const entriesPerPageInput = document.getElementById("entriesPerPageInput");
     const paginationEl = document.getElementById("complaintPagination");
     const refreshBtn = document.getElementById("btnComplaintTableRefresh");
-    const filterButtons = Array.from(document.querySelectorAll(".status-filter-btn"));
+    const filterButtons = Array.from(document.querySelectorAll(".complaint-status-scope-tab"));
     const pendingComplaintBadge = document.getElementById("pendingComplaintBadge");
     const filterModalEl = document.getElementById("modalComplaintFilter");
     const filterDateFromEl = document.getElementById("complaintFilterDateFrom");
@@ -32,9 +32,12 @@
     const attachmentViewerBody = document.getElementById("attachmentViewerBody");
     const btnAttachmentViewerReturn = document.getElementById("btnAttachmentViewerReturn");
     const complaintActionButtons = document.getElementById("complaintActionButtons");
+    const complaintActionToggle = complaintActionButtons?.querySelector(".dropdown-toggle") || null;
+    const investigateBtn = document.getElementById("btnComplaintInvestigate");
+    const actionInProgressBtn = document.getElementById("btnComplaintActionInProgress");
     const resolveBtn = document.getElementById("btnComplaintResolve");
+    const closeBtn = document.getElementById("btnComplaintClose");
     const endorseBtn = document.getElementById("btnComplaintEndorse");
-    const dropBtn = document.getElementById("btnComplaintDrop");
     const complaintActionModalEl = document.getElementById("complaintActionModal");
     const complaintActionModal = complaintActionModalEl ? new bootstrap.Modal(complaintActionModalEl) : null;
     const complaintActionModalTitle = document.getElementById("complaintActionModalTitle");
@@ -65,15 +68,18 @@
     let pendingComplaintAction = null;
     const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
     const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
+    const complaintActionButtonsByType = {
+        under_investigation: investigateBtn,
+        action_in_progress: actionInProgressBtn,
+        resolved: resolveBtn,
+        closed: closeBtn,
+        endorsement: endorseBtn,
+    };
 
     function setRefreshLoading(on) {
         if (!refreshBtn) return;
         refreshBtn.classList.toggle("is-loading", !!on);
         refreshBtn.disabled = !!on;
-    }
-
-    if (endorseBtn) {
-        endorseBtn.textContent = "Send for Blotter Review";
     }
 
     function esc(v) {
@@ -199,28 +205,108 @@
         return true;
     }
 
+    function normalizeComplaintStatus(value) {
+        const status = String(value || "").trim().toLowerCase();
+        if (status === "" || status === "active" || status === "pending") return "pending";
+        if (status.includes("under investigation")) return "under_investigation";
+        if (status.includes("action in progress")) return "action_in_progress";
+        if (status.includes("resolved") || status.includes("completed")) return "resolved";
+        if (status.includes("closed")) return "closed";
+        if (status.includes("drop")) return "dropped";
+        if (status.includes("endorse")) return "endorsed";
+        return status.replace(/[^a-z0-9]+/g, "_");
+    }
+
+    function complaintActionConfig(actionType) {
+        const map = {
+            under_investigation: {
+                title: "Start Investigation",
+                actionText: "start investigation for this complaint",
+            },
+            action_in_progress: {
+                title: "Start Action",
+                actionText: "move this complaint to Action in Progress",
+            },
+            resolved: {
+                title: "Mark Complaint Resolved",
+                actionText: "mark this complaint as resolved",
+            },
+            closed: {
+                title: "Close Complaint",
+                actionText: "close this complaint",
+            },
+            endorsement: {
+                title: "Send Complaint for Blotter Review",
+                actionText: "send this complaint for blotter review",
+            },
+        };
+        return map[actionType] || {
+            title: "Update Complaint",
+            actionText: "update this complaint",
+        };
+    }
+
     function setActionButtonsState(detail) {
         if (!complaintActionButtons) return;
+
+        Object.values(complaintActionButtonsByType).forEach((button) => {
+            button?.classList.add("d-none");
+        });
+        if (complaintActionToggle) {
+            complaintActionToggle.disabled = false;
+        }
+
         if (!detail) {
             complaintActionButtons.classList.add("d-none");
             return;
         }
-        const status = String(detail?.status_name || "").trim().toLowerCase();
+
+        if (!isComplaintClassificationReady(detail)) {
+            complaintActionButtons.classList.add("d-none");
+            if (complaintActionToggle) {
+                complaintActionToggle.disabled = true;
+            }
+            return;
+        }
+
+        const statusKey = normalizeComplaintStatus(detail?.status_name || "");
         const hasLinkedBlotter = String(detail?.blotter_id || "").trim() !== "";
         const requestStatus = String(detail?.blotter_request_status || "").trim().toLowerCase();
         const hasOpenRequest = ["pending", "approved"].includes(requestStatus);
-        const isFinal = ["resolved", "dropped"].includes(status) || (status === "endorsed" && hasLinkedBlotter) || hasOpenRequest;
+        const isFinal = ["resolved", "closed", "dropped"].includes(statusKey) || (statusKey === "endorsed" && hasLinkedBlotter) || hasOpenRequest;
         complaintActionButtons.classList.toggle("d-none", isFinal);
+        if (isFinal) {
+            return;
+        }
+
+        const visibleActions = new Set(["endorsement", "closed"]);
+        if (statusKey === "pending") {
+            visibleActions.add("under_investigation");
+        } else if (statusKey === "under_investigation") {
+            visibleActions.add("action_in_progress");
+            visibleActions.add("resolved");
+        } else if (statusKey === "action_in_progress") {
+            visibleActions.add("resolved");
+        } else {
+            visibleActions.add("under_investigation");
+            visibleActions.add("action_in_progress");
+            visibleActions.add("resolved");
+        }
+
+        visibleActions.forEach((actionType) => {
+            complaintActionButtonsByType[actionType]?.classList.remove("d-none");
+        });
     }
 
     function toneForStatus(row) {
-        if (Number(row?.escalated_to_blotter || 0) === 1) return "info";
-        const status = String(row?.status_name || "").trim().toLowerCase();
-        if (status === "pending" || status === "active") return "pending";
-        if (status.includes("review")) return "pending";
-        if (status.includes("resolved") || status.includes("completed")) return "approved";
-        if (status.includes("endorse")) return "info";
-        if (status.includes("drop")) return "archived";
+        const requestStatus = String(row?.blotter_request_status || "").trim().toLowerCase();
+        if (Number(row?.escalated_to_blotter || 0) === 1 || ["pending", "approved"].includes(requestStatus)) return "info";
+
+        const statusKey = normalizeComplaintStatus(row?.status_name || "");
+        if (statusKey === "pending") return "pending";
+        if (statusKey === "under_investigation" || statusKey === "action_in_progress" || statusKey === "endorsed") return "info";
+        if (statusKey === "resolved") return "approved";
+        if (statusKey === "closed" || statusKey === "dropped") return "archived";
         return "archived";
     }
 
@@ -449,7 +535,7 @@
         transitionModal(viewModalEl, viewModal, attachmentViewerModal);
     }
 
-    function renderAttachmentList(attachments) {
+    function renderAttachmentList(attachments, submittedAt = "") {
         const clean = (Array.isArray(attachments) ? attachments : []).filter((attachment) => attachment && String(attachment.path ?? "").trim() !== "");
         if (!clean.length) return "";
         return `
@@ -458,24 +544,17 @@
             const name = String(attachment.name || `Attachment ${index + 1}`).trim() || `Attachment ${index + 1}`;
             const href = resolveAttachmentUrl(attachment.path || "");
             const previewable = isImageAttachment(attachment);
-            const previewShell = previewable
-                ? `<button type="button" class="complaint-attachment-preview" data-attachment-view="true" data-attachment-src="${esc(href)}" data-attachment-name="${esc(name)}" data-attachment-image="true">
-                        <img src="${esc(href)}" alt="${esc(name)}" loading="lazy">
-                   </button>`
-                : `<button type="button" class="complaint-attachment-preview" data-attachment-view="true" data-attachment-src="${esc(href)}" data-attachment-name="${esc(name)}" data-attachment-image="false">
-                        <div class="complaint-attachment-preview-placeholder">
-                            <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
-                            <span>Preview attachment</span>
-                        </div>
-                   </button>`;
+            const uploadedText = String(submittedAt || "").trim() !== ""
+                ? `Uploaded: ${submittedAt}`
+                : `Attachment ${previewable ? "image" : "file"} ready for viewing`;
             return `
                 <article class="complaint-attachment-card">
-                    ${previewShell}
                     <div class="complaint-attachment-body">
                         <p class="complaint-attachment-name">${esc(name)}</p>
-                        <div class="complaint-attachment-actions">
-                            <button type="button" class="btn btn-sm btn-primary" data-attachment-view="true" data-attachment-src="${esc(href)}" data-attachment-name="${esc(name)}" data-attachment-image="${previewable ? "true" : "false"}">View Attachment</button>
-                        </div>
+                        <p class="complaint-attachment-meta">${esc(uploadedText)}</p>
+                    </div>
+                    <div class="complaint-attachment-actions">
+                        <button type="button" class="btn btn-sm btn-primary" data-attachment-view="true" data-attachment-src="${esc(href)}" data-attachment-name="${esc(name)}" data-attachment-image="${previewable ? "true" : "false"}">View</button>
                     </div>
                 </article>
             `;
@@ -493,13 +572,11 @@
             );
         });
 
-        if (!clean.length) {
-            return renderFieldGrid([
+        const witnessListHtml = !clean.length
+            ? renderFieldGrid([
                 { label: "Witness Summary", value: witnessSummary || "-" },
-            ], 1);
-        }
-
-        return clean.map((witness, index) => {
+            ], 1)
+            : clean.map((witness, index) => {
             return [
                 `<div class="small fw-semibold text-uppercase text-muted mb-2">Witness ${index + 1}</div>`,
                 renderFieldGrid([
@@ -511,6 +588,40 @@
                 ], 1),
             ].join("");
         }).join('<div class="mt-3"></div>');
+
+        return `
+            <div class="complaint-witness-section">
+                ${witnessListHtml}
+                <div class="complaint-witness-trigger">
+                    <button type="button" class="btn btn-outline-primary" id="btnAddComplaintWitness">Add Witness</button>
+                </div>
+                <div class="complaint-witness-editor d-none" id="complaintWitnessEditor">
+                    <div class="complaint-admin-helper">Admins can add witness details here as they are confirmed during complaint handling.</div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="tracker-form-label" for="complaintWitnessFullName">Witness Full Name</label>
+                            <input type="text" id="complaintWitnessFullName" class="form-control" placeholder="Enter witness full name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="tracker-form-label" for="complaintWitnessContactNumber">Contact Number <span class="text-danger">*</span></label>
+                            <input type="text" id="complaintWitnessContactNumber" class="form-control" placeholder="Enter witness contact number">
+                        </div>
+                        <div class="col-12">
+                            <label class="tracker-form-label" for="complaintWitnessAddress">Address</label>
+                            <input type="text" id="complaintWitnessAddress" class="form-control" placeholder="Optional">
+                        </div>
+                        <div class="col-12">
+                            <label class="tracker-form-label" for="complaintWitnessRemarks">Remarks</label>
+                            <textarea id="complaintWitnessRemarks" class="form-control" rows="3" placeholder="Optional witness notes"></textarea>
+                        </div>
+                    </div>
+                    <div class="complaint-witness-editor-actions mt-2">
+                        <button type="button" class="btn btn-outline-secondary" id="btnCancelComplaintWitness">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btnSaveComplaintWitness">Save Witness</button>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     function formSection(title, content) {
@@ -584,6 +695,47 @@
         return rawPlace.replace(new RegExp(`^${escapedArea}\\s*-\\s*`, "i"), "").trim() || rawPlace;
     }
 
+    function getClassificationOptions(detail) {
+        return Array.from(new Set(
+            (Array.isArray(detail?.classification_options) ? detail.classification_options : [])
+                .map((value) => String(value || "").trim())
+                .filter(Boolean)
+        ));
+    }
+
+    function isComplaintClassificationReady(detail) {
+        const current = String(detail?.complaint_type || "").trim();
+        return current !== "" && getClassificationOptions(detail).includes(current);
+    }
+
+    function renderClassificationEditor(detail) {
+        const options = getClassificationOptions(detail);
+        const currentValue = String(detail?.complaint_type || "").trim();
+        const isStandard = isComplaintClassificationReady(detail);
+        const selectedValue = isStandard ? currentValue : "";
+        const warningHtml = !isStandard
+            ? `<div class="complaint-admin-warning">Select the official complaint classification before status updates so records and reports stay consistent.${currentValue ? ` Current saved value: ${esc(currentValue)}.` : ""}</div>`
+            : `<div class="complaint-admin-helper">This classification is used in complaint filters and generated reports.</div>`;
+
+        return `
+            <div class="complaint-admin-editor">
+                ${warningHtml}
+                <div class="complaint-admin-editor-row">
+                    <div class="complaint-admin-editor-field">
+                        <label class="tracker-form-label" for="complaintAdminClassification">Admin Classification</label>
+                        <select id="complaintAdminClassification" class="form-select">
+                            <option value="">Select classification</option>
+                            ${options.map((option) => `<option value="${esc(option)}" ${selectedValue === option ? "selected" : ""}>${esc(option)}</option>`).join("")}
+                        </select>
+                    </div>
+                    <div class="complaint-admin-editor-actions">
+                        <button type="button" class="btn btn-primary" id="btnSaveComplaintClassification">Save Classification</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     function renderIntakeNotesEditor(value) {
         const normalizedValue = String(value ?? "").trim();
         return `
@@ -595,6 +747,162 @@
                         <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveComplaintIntakeNotes">Save Intake Notes</button>
                     </div>
                 </div>
+            </div>
+        `;
+    }
+
+    function parseComplaintStageNotes(detail) {
+        const caseRemarks = String(detail?.case_remarks || "").trim();
+        const screeningNotes = String(detail?.screening_notes || "").trim();
+        const statusKey = normalizeComplaintStatus(detail?.status_name || "");
+
+        const result = {
+            residentNarration: String(detail?.complaint_narration || detail?.case_details || "").trim(),
+            initialInvestigation: "",
+            progressedAction: "",
+            resolution: "",
+            caseSummary: "",
+            screeningNotes,
+        };
+
+        if (caseRemarks !== "") {
+            const summaryParts = [];
+            caseRemarks
+                .split(/\r?\n+/)
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .forEach((line) => {
+                    const match = line.match(/^Screening notes \(([^)]+)\):\s*(.+)$/i);
+                    if (!match) {
+                        summaryParts.push(line);
+                        return;
+                    }
+
+                    const stageLabel = normalizeComplaintStatus(match[1] || "");
+                    const noteValue = String(match[2] || "").trim();
+                    if (!noteValue) {
+                        return;
+                    }
+
+                    if (stageLabel === "under_investigation") {
+                        result.initialInvestigation = noteValue;
+                        return;
+                    }
+                    if (stageLabel === "action_in_progress") {
+                        result.progressedAction = noteValue;
+                        return;
+                    }
+                    if (["resolved", "closed", "dropped"].includes(stageLabel)) {
+                        result.resolution = noteValue;
+                        return;
+                    }
+
+                    summaryParts.push(line);
+                });
+
+            result.caseSummary = summaryParts.join("\n").trim();
+        }
+
+        if (result.initialInvestigation === "" && statusKey === "under_investigation" && screeningNotes !== "") {
+            result.initialInvestigation = screeningNotes;
+        }
+        if (result.progressedAction === "" && statusKey === "action_in_progress" && screeningNotes !== "") {
+            result.progressedAction = screeningNotes;
+        }
+        if (result.resolution === "" && ["resolved", "closed", "dropped"].includes(statusKey) && screeningNotes !== "") {
+            result.resolution = screeningNotes;
+        }
+        if (result.initialInvestigation === "" && screeningNotes !== "" && result.progressedAction === "" && result.resolution === "") {
+            result.initialInvestigation = screeningNotes;
+        }
+
+        return result;
+    }
+
+    function renderComplaintNoteCard(title, subtitle, body, toneClass) {
+        const normalizedBody = String(body || "").trim() || "No notes added yet.";
+        const subtitleHtml = String(subtitle || "").trim() !== ""
+            ? `<p class="complaint-note-card-subtitle">${esc(subtitle)}</p>`
+            : "";
+        return `
+            <article class="complaint-note-card ${esc(toneClass)}">
+                <div class="complaint-note-card-header">
+                    <h6 class="complaint-note-card-title">${esc(title)}</h6>
+                    ${subtitleHtml}
+                </div>
+                <p class="complaint-note-card-body">${esc(normalizedBody)}</p>
+            </article>
+        `;
+    }
+
+    function renderComplaintMetaCard(label, value) {
+        const normalizedValue = String(value || "").trim() || "-";
+        return `
+            <article class="complaint-note-meta-card">
+                <p class="complaint-note-meta-label">${esc(label)}</p>
+                <p class="complaint-note-meta-value">${esc(normalizedValue)}</p>
+            </article>
+        `;
+    }
+
+    function renderNarrationNotesSection(detail, blotterRequestNotice, showBlotterRequestDetails) {
+        const notes = parseComplaintStageNotes(detail);
+        const rows = [
+            renderComplaintNoteCard(
+                "Resident Narration",
+                "Original complaint details from the resident or guest submitter",
+                notes.residentNarration,
+                "is-resident"
+            ),
+            renderComplaintNoteCard(
+                "Initial Investigation",
+                "First documented assessment and validation notes",
+                notes.initialInvestigation,
+                "is-investigation"
+            ),
+            renderComplaintNoteCard(
+                "Progressed Action",
+                "Actions already being carried out by the barangay team",
+                notes.progressedAction,
+                "is-progress"
+            ),
+            renderComplaintNoteCard(
+                "Resolution",
+                "Final findings, closure, or settlement notes",
+                notes.resolution,
+                "is-resolution"
+            ),
+        ];
+
+        const metaCards = [];
+
+        if (notes.caseSummary !== "") {
+            rows.push(renderComplaintMetaCard("Case Summary", notes.caseSummary));
+        }
+
+        if (showBlotterRequestDetails) {
+            metaCards.push(renderComplaintMetaCard("Blotter Request", [
+                detail?.blotter_request_id || "-",
+                detail?.blotter_request_status || "-",
+                detail?.blotter_request_requested_at ? `Submitted: ${detail.blotter_request_requested_at}` : "",
+                detail?.blotter_request_reviewed_at ? `Reviewed: ${detail.blotter_request_reviewed_at}` : "",
+            ].filter(Boolean).join("\n")));
+        }
+
+        if (detail?.blotter_request_notes) {
+            metaCards.push(renderComplaintMetaCard("Request Review Notes", detail.blotter_request_notes));
+        } else if (blotterRequestNotice) {
+            metaCards.push(renderComplaintMetaCard("Blotter Request Note", blotterRequestNotice));
+        }
+
+        if (Number(detail?.escalated_to_blotter || 0) === 1) {
+            metaCards.push(renderComplaintMetaCard("Escalated to Blotter", `Yes${detail?.blotter_id ? ` (${detail.blotter_id})` : ""}`));
+        }
+
+        return `
+            <div class="complaint-notes-layout complaint-note-stack">
+                ${rows.join("")}
+                ${metaCards.join("")}
             </div>
         `;
     }
@@ -649,14 +957,15 @@
 
     function openComplaintActionModal(actionType) {
         if (!complaintActionModal || !currentViewCaseId) return;
+        if (!isComplaintClassificationReady(currentDetail)) {
+            window.alert("Set the admin complaint classification first before updating the complaint status.");
+            return;
+        }
         pendingComplaintAction = actionType;
         if (complaintActionRemarks) complaintActionRemarks.value = "";
 
-        let title = "Update Complaint";
-        if (actionType === "resolved") title = "Mark Complaint Resolved";
-        if (actionType === "endorsement") title = "Send Complaint for Blotter Review";
-        if (actionType === "dropped") title = "Drop Complaint";
-        if (complaintActionModalTitle) complaintActionModalTitle.textContent = title;
+        const config = complaintActionConfig(actionType);
+        if (complaintActionModalTitle) complaintActionModalTitle.textContent = config.title;
 
         transitionModal(viewModalEl, viewModal, complaintActionModal);
     }
@@ -665,7 +974,7 @@
         if (!pendingComplaintAction || !currentViewCaseId) return;
         const remarks = String(complaintActionRemarks?.value || "").trim();
         if (!remarks) {
-            window.alert("Screening notes are required.");
+            window.alert("Update notes are required.");
             return;
         }
 
@@ -696,9 +1005,11 @@
     }
 
     function initComplaintActionFlow() {
+        investigateBtn?.addEventListener("click", () => openComplaintActionModal("under_investigation"));
+        actionInProgressBtn?.addEventListener("click", () => openComplaintActionModal("action_in_progress"));
         resolveBtn?.addEventListener("click", () => openComplaintActionModal("resolved"));
+        closeBtn?.addEventListener("click", () => openComplaintActionModal("closed"));
         endorseBtn?.addEventListener("click", () => openComplaintActionModal("endorsement"));
-        dropBtn?.addEventListener("click", () => openComplaintActionModal("dropped"));
 
         btnComplaintActionReturn?.addEventListener("click", () => {
             transitionModal(complaintActionModalEl, complaintActionModal, viewModal);
@@ -707,16 +1018,13 @@
         btnComplaintActionProceed?.addEventListener("click", () => {
             const remarks = String(complaintActionRemarks?.value || "").trim();
             if (!remarks) {
-                window.alert("Screening notes are required.");
+                window.alert("Update notes are required.");
                 return;
             }
 
-            let actionText = "update this complaint";
-            if (pendingComplaintAction === "resolved") actionText = "mark this complaint as resolved";
-            if (pendingComplaintAction === "endorsement") actionText = "send this complaint to blotter review";
-            if (pendingComplaintAction === "dropped") actionText = "drop this complaint";
+            const config = complaintActionConfig(pendingComplaintAction);
             if (complaintActionConfirmText) {
-                complaintActionConfirmText.textContent = `Are you sure you want to ${actionText}?`;
+                complaintActionConfirmText.textContent = `Are you sure you want to ${config.actionText}?`;
             }
             transitionModal(complaintActionModalEl, complaintActionModal, complaintActionConfirmModal);
         });
@@ -789,46 +1097,15 @@
                 renderAddressFieldGrid(parseStructuredAddress(d.complainant?.address || "")),
             ].join("");
 
-            const subjectGrid = [
-                renderFieldGrid([
-                    { label: "Subject", value: d.subject_display_name || "-" },
-                    { label: "Subject Kind", value: d.subject_kind || "-" },
-                    { label: "Contact Number", value: d.subject_contact_number || "-" },
-                    { label: "Complaint Type", value: d.complaint_type || "-" },
-                ], 2),
-                renderFieldGrid([
-                    { label: "Known Address / Location", value: d.subject_address || "-" },
-                ], 1),
-            ].join("");
-
             const witnessGrid = renderWitnessSection(d.witnesses || [], d.witness_summary || "");
-            const complaintSpecificGrid = renderComplaintSpecificFieldGrid(d.complaint_detail_fields || []);
-            const attachmentGrid = renderAttachmentList(d.attachments || []);
+            const attachmentGrid = renderAttachmentList(d.attachments || [], d.submitted_at || "");
 
+            const classificationSection = formSection("Administrative Classification", renderClassificationEditor(d));
             const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
             const blotterRequestNotice = buildBlotterRequestNotice(d);
             const showBlotterRequestDetails = hasVisibleBlotterRequestDetails(d);
 
-            const notesGrid = [
-                renderFieldGrid([
-                    { label: "Case Remarks", value: d.case_remarks || "-" },
-                    { label: "Escalated to Blotter", value: Number(d.escalated_to_blotter || 0) === 1 ? `Yes${d.blotter_id ? ` (${d.blotter_id})` : ""}` : "No" },
-                ], 2),
-                showBlotterRequestDetails ? renderFieldGrid([
-                    { label: "Blotter Request ID", value: d.blotter_request_id || "-" },
-                    { label: "Blotter Request Status", value: d.blotter_request_status || "-" },
-                    { label: "Request Submitted", value: d.blotter_request_requested_at || "-" },
-                    { label: "Request Reviewed", value: d.blotter_request_reviewed_at || "-" },
-                ], 2) : "",
-                renderFieldGrid([
-                    { label: "Resident Narration", value: d.complaint_narration || d.case_details || "-" },
-                ], 1),
-                renderFieldGrid([
-                    { label: "Screening Notes", value: d.screening_notes || "-" },
-                    ...(showBlotterRequestDetails ? [{ label: "Request Review Notes", value: d.blotter_request_notes || "-" }] : []),
-                    ...(blotterRequestNotice ? [{ label: "Blotter Request Note", value: blotterRequestNotice }] : []),
-                ], 1),
-            ].join("");
+            const notesGrid = renderNarrationNotesSection(d, blotterRequestNotice, showBlotterRequestDetails);
 
             const html = [
                 formSection("Complaint Summary", [
@@ -836,9 +1113,8 @@
                     summaryMetaGrid,
                     summaryPlaceGrid,
                 ].join("")),
+                classificationSection,
                 formSection("Complainant Information", complainantGrid),
-                formSection("Subject Information", subjectGrid),
-                complaintSpecificGrid ? formSection("Complaint-Specific Information", complaintSpecificGrid) : "",
                 formSection("Witness Information", witnessGrid),
                 attachmentGrid ? formSection("Attachments", attachmentGrid) : "",
                 intakeNotesSection,
@@ -851,6 +1127,93 @@
 
             const intakeNotesField = document.getElementById("complaintIntakeNotes");
             const saveIntakeNotesBtn = document.getElementById("btnSaveComplaintIntakeNotes");
+            const complaintAdminClassification = document.getElementById("complaintAdminClassification");
+            const saveComplaintClassificationBtn = document.getElementById("btnSaveComplaintClassification");
+            const showWitnessFormBtn = document.getElementById("btnAddComplaintWitness");
+            const witnessEditor = document.getElementById("complaintWitnessEditor");
+            const witnessFullNameField = document.getElementById("complaintWitnessFullName");
+            const witnessContactField = document.getElementById("complaintWitnessContactNumber");
+            const witnessAddressField = document.getElementById("complaintWitnessAddress");
+            const witnessRemarksField = document.getElementById("complaintWitnessRemarks");
+            const cancelWitnessBtn = document.getElementById("btnCancelComplaintWitness");
+            const saveWitnessBtn = document.getElementById("btnSaveComplaintWitness");
+
+            saveComplaintClassificationBtn?.addEventListener("click", async () => {
+                const complaintType = String(complaintAdminClassification?.value || "").trim();
+                if (!complaintType) {
+                    window.alert("Select the official complaint classification first.");
+                    return;
+                }
+
+                try {
+                    saveComplaintClassificationBtn.disabled = true;
+                    await postJson({
+                        action: "update_case_classification",
+                        case_id: currentViewCaseId,
+                        complaint_type: complaintType,
+                    });
+                    await loadList();
+                    await openViewModal(currentViewCaseId);
+                } catch (error) {
+                    window.alert(error.message || error);
+                } finally {
+                    saveComplaintClassificationBtn.disabled = false;
+                }
+            });
+
+            const resetWitnessForm = () => {
+                if (witnessFullNameField) witnessFullNameField.value = "";
+                if (witnessContactField) witnessContactField.value = "";
+                if (witnessAddressField) witnessAddressField.value = "";
+                if (witnessRemarksField) witnessRemarksField.value = "";
+            };
+
+            showWitnessFormBtn?.addEventListener("click", () => {
+                witnessEditor?.classList.remove("d-none");
+                showWitnessFormBtn.classList.add("d-none");
+                witnessFullNameField?.focus();
+            });
+
+            cancelWitnessBtn?.addEventListener("click", () => {
+                resetWitnessForm();
+                witnessEditor?.classList.add("d-none");
+                showWitnessFormBtn?.classList.remove("d-none");
+            });
+
+            saveWitnessBtn?.addEventListener("click", async () => {
+                const fullName = String(witnessFullNameField?.value || "").trim();
+                const contactNumber = String(witnessContactField?.value || "").trim();
+                const address = String(witnessAddressField?.value || "").trim();
+                const remarks = String(witnessRemarksField?.value || "").trim();
+
+                if (!fullName) {
+                    window.alert("Witness full name is required.");
+                    return;
+                }
+                if (!contactNumber) {
+                    window.alert("Witness contact number is required.");
+                    return;
+                }
+
+                try {
+                    saveWitnessBtn.disabled = true;
+                    await postJson({
+                        action: "add_witness",
+                        case_id: currentViewCaseId,
+                        full_name: fullName,
+                        contact_number: contactNumber,
+                        address,
+                        remarks,
+                    });
+                    await loadList();
+                    await openViewModal(currentViewCaseId);
+                } catch (error) {
+                    window.alert(error.message || error);
+                } finally {
+                    saveWitnessBtn.disabled = false;
+                }
+            });
+
             saveIntakeNotesBtn?.addEventListener("click", async () => {
                 const intakeNotes = String(intakeNotesField?.value || "").trim();
                 try {
@@ -935,11 +1298,9 @@
     filterButtons.forEach((button) => {
         button.addEventListener("click", () => {
             filterButtons.forEach((btn) => {
-                btn.classList.remove("btn-outline-primary", "active");
-                btn.classList.add("btn-outline-secondary");
+                btn.classList.remove("active");
             });
-            button.classList.remove("btn-outline-secondary");
-            button.classList.add("btn-outline-primary", "active");
+            button.classList.add("active");
             activeFilter = String(button.dataset.filter || "").trim().toLowerCase();
             currentPage = 1;
             loadList();

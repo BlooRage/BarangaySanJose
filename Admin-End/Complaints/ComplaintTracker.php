@@ -22,6 +22,44 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             margin: 0 auto;
         }
 
+        #complaintTrackerPageTabs .nav-link {
+            color: #d76f12;
+            font-weight: 600;
+        }
+
+        #complaintTrackerPageTabs .nav-link:hover,
+        #complaintTrackerPageTabs .nav-link:focus-visible {
+            color: #b45309;
+        }
+
+        #complaintTrackerPageTabs .nav-link.active,
+        #complaintTrackerPageTabs .nav-link.active:hover,
+        #complaintTrackerPageTabs .nav-link.active:focus-visible {
+            color: #d76f12;
+        }
+
+        #div-tableContainer {
+            border-top-left-radius: 0 !important;
+        }
+
+        .complaint-tracker-shell .admin-list-toolbar {
+            overflow-x: visible;
+            overflow-y: visible;
+            flex-wrap: wrap;
+            row-gap: 14px;
+            align-items: center;
+        }
+
+        .complaint-tracker-shell .admin-list-actions .input-group-text,
+        .complaint-tracker-shell .admin-list-actions .form-control {
+            height: 38px;
+        }
+
+        .complaint-tracker-shell .admin-search {
+            min-width: 320px;
+            max-width: 420px;
+        }
+
         #viewModal .modal-content {
             border: 1px solid #e9ecef;
             border-radius: 16px;
@@ -111,72 +149,367 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             justify-content: flex-end;
         }
 
+        #viewModal .complaint-admin-editor,
+        #viewModal .complaint-witness-editor {
+            display: grid;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid #dde3ea;
+            border-radius: 14px;
+            background: #fff;
+        }
+
+        #viewModal .complaint-admin-editor-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        #viewModal .complaint-admin-editor-field {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        #viewModal .complaint-admin-editor-actions,
+        #viewModal .complaint-witness-editor-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        #viewModal .complaint-admin-helper {
+            margin: 0;
+            color: #5f6b7a;
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+
+        #viewModal .complaint-admin-warning {
+            margin: 0;
+            padding: 10px 12px;
+            border: 1px solid #f4d29b;
+            border-radius: 12px;
+            background: #fff7e8;
+            color: #8a5406;
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+
+        #viewModal .complaint-witness-section {
+            display: grid;
+            gap: 14px;
+        }
+
+        #viewModal .complaint-witness-trigger {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-menu {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: stretch;
+            width: fit-content;
+            min-width: 0;
+            max-width: calc(100vw - 2rem);
+            margin-top: 0.7rem;
+            margin-bottom: 0.7rem;
+            padding: 0.7rem 0.45rem;
+            border: 1px solid #eadac9;
+            border-radius: 18px;
+            box-shadow: 0 22px 46px rgba(39, 28, 18, 0.16);
+            background: #fffdfa;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            align-items: center;
+            gap: 12px;
+            width: auto;
+            inline-size: max-content;
+            max-width: 100%;
+            margin-bottom: 0.25rem;
+            padding: 0.8rem 0.95rem;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            font-weight: 700;
+            text-align: left;
+            transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item:last-child {
+            margin-bottom: 0;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-menu li + li {
+            margin-top: 0.35rem;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item:hover,
+        #viewModal .complaint-action-dropdown .dropdown-item:focus,
+        #viewModal .complaint-action-dropdown .dropdown-item:active {
+            transform: translateX(2px);
+            box-shadow: 0 8px 18px rgba(39, 28, 18, 0.08);
+        }
+
+        #viewModal .complaint-action-dropdown .complaint-action-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.98rem;
+            border: 1px solid transparent;
+        }
+
+        #viewModal .complaint-action-dropdown .complaint-action-copy {
+            display: grid;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        #viewModal .complaint-action-dropdown .complaint-action-label {
+            font-size: 0.98rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        #viewModal .complaint-action-dropdown .complaint-action-hint {
+            font-size: 0.77rem;
+            font-weight: 500;
+            line-height: 1.35;
+            opacity: 0.82;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-investigate {
+            color: #9a5b05;
+            background: #fff8ec;
+            border-color: #f2d8ab;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-investigate .complaint-action-icon {
+            background: #ffe8bf;
+            border-color: #f4d29b;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-investigate:hover,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-investigate:focus,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-investigate:active {
+            color: #7a4702;
+            background: #ffefcf;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-progress {
+            color: #0f5f78;
+            background: #f1fbfe;
+            border-color: #cbe8f0;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-progress .complaint-action-icon {
+            background: #d8f4fb;
+            border-color: #b9e3ee;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-progress:hover,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-progress:focus,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-progress:active {
+            color: #0a4d62;
+            background: #def5fb;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-resolve {
+            color: #166534;
+            background: #f2fbf4;
+            border-color: #cfe6d4;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-resolve .complaint-action-icon {
+            background: #daf3df;
+            border-color: #badfc4;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-resolve:hover,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-resolve:focus,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-resolve:active {
+            color: #12542b;
+            background: #e0f5e5;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-endorse {
+            color: #1d4ed8;
+            background: #f2f6ff;
+            border-color: #d5e1ff;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-endorse .complaint-action-icon {
+            background: #deebff;
+            border-color: #c8d9ff;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-endorse:hover,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-endorse:focus,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-endorse:active {
+            color: #1e40af;
+            background: #e2ecff;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-close {
+            color: #475467;
+            background: #f8fafc;
+            border-color: #dde4ec;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-close .complaint-action-icon {
+            background: #edf2f7;
+            border-color: #d9e0e8;
+        }
+
+        #viewModal .complaint-action-dropdown .dropdown-item.action-close:hover,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-close:focus,
+        #viewModal .complaint-action-dropdown .dropdown-item.action-close:active {
+            color: #344054;
+            background: #eef3f8;
+        }
+
+        #viewModal .complaint-notes-layout {
+            display: grid;
+            gap: 14px;
+        }
+
+        #viewModal .complaint-note-card {
+            border: 1px solid #dde3ea;
+            border-radius: 14px;
+            padding: 16px 18px;
+            background: #ffffff;
+            box-shadow: none;
+        }
+
+        #viewModal .complaint-note-card.is-resident {
+            border-color: #dde3ea;
+            background: #ffffff;
+        }
+
+        #viewModal .complaint-note-card.is-investigation {
+            border-color: #dde3ea;
+            background: #ffffff;
+        }
+
+        #viewModal .complaint-note-card.is-progress {
+            border-color: #dde3ea;
+            background: #ffffff;
+        }
+
+        #viewModal .complaint-note-card.is-resolution {
+            border-color: #dde3ea;
+            background: #ffffff;
+        }
+
+        #viewModal .complaint-note-card-header {
+            display: grid;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+
+        #viewModal .complaint-note-card-title {
+            margin: 0;
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #2c241c;
+        }
+
+        #viewModal .complaint-note-card-subtitle {
+            margin: 2px 0 0;
+            font-size: 0.82rem;
+            color: #7a6d61;
+        }
+
+        #viewModal .complaint-note-card-body {
+            margin: 0;
+            color: #2a3342;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        #viewModal .complaint-note-stack {
+            display: grid;
+            gap: 14px;
+        }
+
+        #viewModal .complaint-note-meta-card {
+            border: 1px solid #dde3ea;
+            border-radius: 14px;
+            padding: 14px 16px;
+            background: #fff;
+            box-shadow: none;
+        }
+
+        #viewModal .complaint-note-meta-label {
+            margin: 0 0 6px;
+            font-size: 0.83rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #746659;
+        }
+
+        #viewModal .complaint-note-meta-value {
+            margin: 0;
+            color: #243041;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         #viewModal .complaint-attachment-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 14px;
         }
 
         #viewModal .complaint-attachment-card {
-            border: 1px solid #f0d8c0;
-            border-radius: 16px;
-            background: linear-gradient(180deg, #fffdf9 0%, #fff7ef 100%);
-            overflow: hidden;
-            box-shadow: 0 12px 30px rgba(42, 28, 12, 0.08);
-        }
-
-        #viewModal .complaint-attachment-preview {
             display: flex;
             align-items: center;
-            justify-content: center;
-            min-height: 180px;
-            width: 100%;
-            padding: 0;
-            border: 0;
-            background: #fff4e8;
-            cursor: pointer;
-        }
-
-        #viewModal .complaint-attachment-preview img {
-            display: block;
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-        }
-
-        #viewModal .complaint-attachment-preview-placeholder {
-            display: grid;
-            gap: 8px;
-            justify-items: center;
-            padding: 22px;
-            color: #8b5e34;
-            text-align: center;
-        }
-
-        #viewModal .complaint-attachment-preview-placeholder i {
-            font-size: 1.65rem;
+            justify-content: space-between;
+            gap: 1rem;
+            border: 1px solid #d7dee8;
+            border-radius: 18px;
+            background: #ffffff;
+            padding: 1rem 1.15rem;
         }
 
         #viewModal .complaint-attachment-body {
             display: grid;
-            gap: 10px;
-            padding: 14px;
+            gap: 0.3rem;
+            min-width: 0;
         }
 
         #viewModal .complaint-attachment-name {
             margin: 0;
-            font-size: 0.92rem;
-            font-weight: 700;
-            color: #2f2419;
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #1f2937;
+            word-break: break-word;
+        }
+
+        #viewModal .complaint-attachment-meta {
+            margin: 0;
+            color: #5f6b7a;
+            line-height: 1.4;
             word-break: break-word;
         }
 
         #viewModal .complaint-attachment-actions {
             display: flex;
+            flex-shrink: 0;
+            align-items: center;
         }
 
         #viewModal .complaint-attachment-actions .btn {
-            width: 100%;
+            min-width: 100px;
         }
 
         #attachmentViewerModal .modal-dialog {
@@ -224,12 +557,49 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         }
 
         @media (max-width: 767.98px) {
-            #viewModal .complaint-attachment-grid {
+            #complaintTrackerPageTabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scrollbar-width: thin;
+            }
+
+            #complaintTrackerPageTabs .nav-item {
+                flex: 0 0 auto;
+            }
+
+            #complaintTrackerPageTabs .nav-link {
+                white-space: nowrap;
+            }
+
+            .complaint-tracker-shell .admin-search {
+                min-width: 0;
+                max-width: none;
+                width: 100%;
+            }
+
+            #viewModal .complaint-action-dropdown .dropdown-menu {
+                width: calc(100vw - 1.5rem);
+                margin-top: 0.55rem;
+                margin-bottom: 0.55rem;
+            }
+
+            #viewModal .complaint-admin-editor-row {
                 grid-template-columns: 1fr;
             }
 
+            #viewModal .complaint-admin-editor-actions .btn,
+            #viewModal .complaint-witness-editor-actions .btn {
+                width: 100%;
+            }
+
+            #viewModal .complaint-attachment-card {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
             #viewModal .complaint-attachment-actions .btn {
-                flex-basis: 100%;
+                width: 100%;
             }
         }
 
@@ -248,18 +618,23 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         </h2>
         <hr><br>
 
+        <ul class="nav nav-tabs mb-0" id="complaintTrackerPageTabs" style="border-bottom:0">
+            <li class="nav-item">
+                <button class="nav-link complaint-status-scope-tab active fw-semibold" type="button" data-filter="">All</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="active">Active</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="resolved">Resolved</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="closed">Closed</button>
+            </li>
+        </ul>
+
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
-                <div class="admin-list-tabs">
-                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="resolved">&nbsp;&nbsp;Resolved&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="escalated">&nbsp;&nbsp;Escalated&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" type="button" data-filter="pending">
-                        &nbsp;&nbsp;Pending
-                        <span class="pending-count-badge d-none" id="pendingComplaintBadge">0</span>
-                    </button>
-                </div>
-
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
                         <input type="text" id="searchInput" class="form-control" placeholder="Complaint ID, complainant, subject, complaint type">
@@ -396,10 +771,57 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
             <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <div class="d-flex flex-wrap gap-2 ms-auto justify-content-end" id="complaintActionButtons">
-                    <button type="button" class="btn btn-danger" id="btnComplaintDrop">Drop Complaint</button>
-                    <button type="button" class="btn btn-primary" id="btnComplaintEndorse">Endorse to Blotter</button>
-                    <button type="button" class="btn btn-success" id="btnComplaintResolve">Mark Resolved</button>
+                <div class="dropdown complaint-action-dropdown ms-auto" id="complaintActionButtons">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        Action
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button type="button" class="dropdown-item action-investigate" id="btnComplaintInvestigate">
+                                <span class="complaint-action-icon"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>
+                                <span class="complaint-action-copy">
+                                    <span class="complaint-action-label">Start Investigation</span>
+                                    <span class="complaint-action-hint">Review and validate the complaint details.</span>
+                                </span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item action-progress" id="btnComplaintActionInProgress">
+                                <span class="complaint-action-icon"><i class="fa-solid fa-person-walking-arrow-right" aria-hidden="true"></i></span>
+                                <span class="complaint-action-copy">
+                                    <span class="complaint-action-label">Start Action</span>
+                                    <span class="complaint-action-hint">Record that barangay action is already ongoing.</span>
+                                </span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item action-resolve" id="btnComplaintResolve">
+                                <span class="complaint-action-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+                                <span class="complaint-action-copy">
+                                    <span class="complaint-action-label">Mark Resolved</span>
+                                    <span class="complaint-action-hint">Finish the complaint with a successful outcome.</span>
+                                </span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item action-endorse" id="btnComplaintEndorse">
+                                <span class="complaint-action-icon"><i class="fa-solid fa-share-from-square" aria-hidden="true"></i></span>
+                                <span class="complaint-action-copy">
+                                    <span class="complaint-action-label">Send for Blotter Review</span>
+                                    <span class="complaint-action-hint">Escalate this complaint for blotter evaluation.</span>
+                                </span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item action-close" id="btnComplaintClose">
+                                <span class="complaint-action-icon"><i class="fa-solid fa-folder-closed" aria-hidden="true"></i></span>
+                                <span class="complaint-action-copy">
+                                    <span class="complaint-action-label">Close Complaint</span>
+                                    <span class="complaint-action-hint">End the complaint without marking it resolved.</span>
+                                </span>
+                            </button>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -415,8 +837,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
             <div class="modal-body">
                 <div class="mb-0">
-                    <label for="complaintActionRemarks" class="form-label">Screening Notes</label>
-                    <textarea id="complaintActionRemarks" class="form-control" rows="4" placeholder="Add screening notes..."></textarea>
+                    <label for="complaintActionRemarks" class="form-label">Case Update Notes</label>
+                    <textarea id="complaintActionRemarks" class="form-control" rows="4" placeholder="Add status update notes..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -480,11 +902,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260704-complaint-attachment-viewer"></script>
+<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260704-complaint-top-tabs-exact"></script>
 </body>
 </html>
-
-
-
-
-

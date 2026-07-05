@@ -219,6 +219,47 @@ function getStatusId(mysqli $conn, string $statusName, string $statusType): int
     return isset($row['status_id']) ? (int)$row['status_id'] : 0;
 }
 
+function ensureStatusId(mysqli $conn, string $statusName, string $statusType): int
+{
+    $existingId = getStatusId($conn, $statusName, $statusType);
+    if ($existingId > 0) {
+        return $existingId;
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO statuslookuptbl (status_name, status_type)
+        VALUES (?, ?)
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to create status lookup entry.');
+    }
+
+    $stmt->bind_param("ss", $statusName, $statusType);
+    $stmt->execute();
+    $statusId = (int)$conn->insert_id;
+    $stmt->close();
+
+    return $statusId;
+}
+
+function ensureComplaintWorkflowLookups(mysqli $conn): array
+{
+    $statusIds = [];
+    foreach (['Pending', 'Under Investigation', 'Action in Progress', 'Resolved', 'Closed', 'Endorsed'] as $statusName) {
+        $statusIds[$statusName] = ensureStatusId($conn, $statusName, 'Complaint');
+    }
+
+    $levelIds = [];
+    foreach (['Complaint Only', 'Endorsed to Blotter'] as $levelName) {
+        $levelIds[$levelName] = ensureStatusId($conn, $levelName, 'ComplaintLevel');
+    }
+
+    return [
+        'status' => $statusIds,
+        'level' => $levelIds,
+    ];
+}
+
 function appendMultilineNote(?string $existing, string $newNote): string
 {
     $existing = trim((string)$existing);
@@ -274,6 +315,65 @@ function parseCsvValues($value): array
     }
 
     return array_keys($items);
+}
+
+function complaintClassificationOptions(): array
+{
+    $definitions = function_exists('complaintTypeDefinitions')
+        ? complaintTypeDefinitions()
+        : [];
+
+    $options = [];
+    foreach ($definitions as $key => $definition) {
+        $label = trim((string)($definition['label'] ?? $key));
+        if ($label !== '') {
+            $options[$label] = $label;
+        }
+    }
+
+    return array_values($options);
+}
+
+function isValidComplaintClassification(string $value): bool
+{
+    $value = trim($value);
+    if ($value === '') {
+        return false;
+    }
+
+    return in_array($value, complaintClassificationOptions(), true);
+}
+
+function syncComplaintCaseDetailsClassification(?string $caseDetails, string $classification): string
+{
+    $classification = trim($classification);
+    $rawCaseDetails = (string)$caseDetails;
+    if ($classification === '' || !function_exists('complaintTypeParseCaseDetails') || !function_exists('complaintTypeBuildCaseDetails')) {
+        return $rawCaseDetails;
+    }
+
+    $parsed = complaintTypeParseCaseDetails($rawCaseDetails);
+    if (!is_array($parsed) || !is_array($parsed['meta'] ?? null)) {
+        return $rawCaseDetails;
+    }
+
+    $selectedType = isValidComplaintClassification($classification) ? $classification : trim((string)($parsed['meta']['selected_type'] ?? ''));
+    if ($selectedType === '') {
+        $selectedType = 'Other';
+    }
+
+    return complaintTypeBuildCaseDetails(
+        (string)($parsed['narration'] ?? ''),
+        [
+            'selected_type' => $selectedType,
+            'complaint_type' => $classification,
+            'fields' => $parsed['fields'] ?? [],
+        ],
+        [
+            'incident_area_number' => (string)($parsed['incident_area_number'] ?? ''),
+            'attachments' => is_array($parsed['attachments'] ?? null) ? $parsed['attachments'] : [],
+        ]
+    );
 }
 
 function bindDynamicParams(mysqli_stmt $stmt, string $types, array $params): void
@@ -550,7 +650,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
     $searchTerm = trim((string)($_GET['search'] ?? ''));
     $statusFilter = strtolower(trim((string)($_GET['status'] ?? '')));
-    if (!in_array($statusFilter, ['', 'pending', 'resolved', 'dropped', 'escalated'], true)) {
+    if (!in_array($statusFilter, ['', 'active', 'resolved', 'closed'], true)) {
         $statusFilter = '';
     }
     $dateFrom = trim((string)($_GET['date_from'] ?? ''));
@@ -608,7 +708,10 @@ if ($action === 'list') {
             CASE
                 WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'escalated'
                 WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'escalated'
+                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%under investigation%' THEN 'under_investigation'
+                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%action in progress%' THEN 'action_in_progress'
                 WHEN LOWER(COALESCE(s.status_name, 'pending')) LIKE '%resolved%' THEN 'resolved'
+                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%closed%' THEN 'closed'
                 WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%drop%' THEN 'dropped'
                 WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%endorse%' THEN 'escalated'
                 ELSE 'pending'
@@ -652,7 +755,11 @@ if ($action === 'list') {
     $filterTypes = '';
     $filterParams = [];
 
-    if ($statusFilter !== '') {
+    if ($statusFilter === 'active') {
+        $filterSql .= " AND complaint_rows.status_key IN ('pending', 'under_investigation', 'action_in_progress', 'escalated')";
+    } elseif ($statusFilter === 'closed') {
+        $filterSql .= " AND complaint_rows.status_key IN ('closed', 'dropped')";
+    } elseif ($statusFilter === 'resolved') {
         $filterSql .= " AND complaint_rows.status_key = ?";
         $filterTypes .= 's';
         $filterParams[] = $statusFilter;
@@ -892,6 +999,8 @@ if ($action === 'detail') {
 
     $detail['submitted_at'] = formatDisplayTimestamp($detail['submitted_at_raw'] ?? '');
     $parsedCaseDetails = complaintTypeParseCaseDetails($detail['case_details'] ?? '');
+    $classificationOptions = complaintClassificationOptions();
+    $currentClassification = trim((string)($detail['complaint_type'] ?? ''));
 
     $stmt = $conn->prepare("
         SELECT participant_role, firstname, middlename, lastname, suffix, contact_number, address, age, sex, remarks
@@ -941,6 +1050,8 @@ if ($action === 'detail') {
             'incident_place' => $detail['incident_place'] ?? '',
             'incident_area_number' => $parsedCaseDetails['incident_area_number'] ?? '',
             'complaint_type' => $detail['complaint_type'] ?? '',
+            'classification_options' => $classificationOptions,
+            'complaint_type_is_standard' => isValidComplaintClassification($currentClassification),
             'case_details' => $detail['case_details'] ?? '',
             'complaint_narration' => $parsedCaseDetails['narration'] ?? '',
             'complaint_detail_fields' => $parsedCaseDetails['fields'] ?? [],
@@ -969,6 +1080,179 @@ if ($action === 'detail') {
             'witnesses' => $participants['Witness'] ?? [],
         ]
     ]);
+}
+
+if ($action === 'update_case_classification') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = trim((string)($jsonInput['case_id'] ?? ''));
+    $classification = trim((string)($jsonInput['complaint_type'] ?? ''));
+    if ($caseId === '') {
+        respond(false, [], 'Invalid case ID.');
+    }
+    if (!isValidComplaintClassification($classification)) {
+        respond(false, [], 'Please select a valid complaint classification.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $existsStmt = $conn->prepare("
+        SELECT complaint_type, case_details
+        FROM casereportstbl
+        WHERE case_id = ? AND report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        respond(false, [], 'Failed to validate complaint case.');
+    }
+    $existsStmt->bind_param("s", $caseId);
+    $existsStmt->execute();
+    $existingCase = $existsStmt->get_result()->fetch_assoc();
+    $existsStmt->close();
+    if (!$existingCase) {
+        respond(false, [], 'Complaint case not found.');
+    }
+
+    $updatedCaseDetails = syncComplaintCaseDetailsClassification($existingCase['case_details'] ?? '', $classification);
+
+    $conn->begin_transaction();
+    try {
+        $updateCaseStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET complaint_type = ?,
+                case_details = ?,
+                user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateCaseStmt) {
+            throw new Exception('Failed to prepare complaint classification update.');
+        }
+        $updateCaseStmt->bind_param("ssss", $classification, $updatedCaseDetails, $actorUserId, $caseId);
+        $updateCaseStmt->execute();
+        $updateCaseStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare complaint classification log.');
+            }
+            $logEntry = 'Complaint classification updated to: ' . $classification;
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        complaintTrackerCacheClear();
+        respond(true, [], 'Complaint classification updated.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        respond(false, [], 'Failed to update complaint classification.');
+    }
+}
+
+if ($action === 'add_witness') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = trim((string)($jsonInput['case_id'] ?? ''));
+    $fullName = trim((string)($jsonInput['full_name'] ?? ''));
+    $contactNumber = trim((string)($jsonInput['contact_number'] ?? ''));
+    $address = trim((string)($jsonInput['address'] ?? ''));
+    $remarks = trim((string)($jsonInput['remarks'] ?? ''));
+
+    if ($caseId === '') {
+        respond(false, [], 'Invalid case ID.');
+    }
+    if ($fullName === '') {
+        respond(false, [], 'Witness full name is required.');
+    }
+    if ($contactNumber === '') {
+        respond(false, [], 'Witness contact number is required.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $existsStmt = $conn->prepare("
+        SELECT 1
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        respond(false, [], 'Failed to validate complaint case.');
+    }
+    $existsStmt->bind_param("s", $caseId);
+    $existsStmt->execute();
+    $exists = $existsStmt->get_result()->fetch_row();
+    $existsStmt->close();
+    if (!$exists) {
+        respond(false, [], 'Complaint case not found.');
+    }
+
+    $conn->begin_transaction();
+    try {
+        $insertStmt = $conn->prepare("
+            INSERT INTO caseparticipantstbl
+                (case_id, participant_role, lastname, firstname, middlename, suffix, contact_number, email, address, age, sex, remarks)
+            VALUES
+                (?, 'Witness', '', ?, '', '', ?, '', ?, '', '', ?)
+        ");
+        if (!$insertStmt) {
+            throw new Exception('Failed to prepare witness insert.');
+        }
+        $insertStmt->bind_param("sssss", $caseId, $fullName, $contactNumber, $address, $remarks);
+        $insertStmt->execute();
+        $insertStmt->close();
+
+        $updateCaseStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateCaseStmt) {
+            throw new Exception('Failed to prepare complaint updater.');
+        }
+        $updateCaseStmt->bind_param("ss", $actorUserId, $caseId);
+        $updateCaseStmt->execute();
+        $updateCaseStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare witness log.');
+            }
+            $logEntry = 'Witness added to complaint: ' . $fullName;
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        complaintTrackerCacheClear();
+        respond(true, [], 'Witness added to complaint.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        respond(false, [], 'Failed to add witness.');
+    }
 }
 
 if ($action === 'update_intake_notes') {
@@ -1072,7 +1356,7 @@ if ($action === 'update_case_outcome') {
     if ($remarks === '') {
         respond(false, [], 'Remarks are required.');
     }
-    if (!in_array($actionType, ['resolved', 'endorsement', 'dropped'], true)) {
+    if (!in_array($actionType, ['under_investigation', 'action_in_progress', 'resolved', 'endorsement', 'closed'], true)) {
         respond(false, [], 'Invalid action type.');
     }
 
@@ -1115,13 +1399,16 @@ if ($action === 'update_case_outcome') {
     if (!$oldRow) {
         respond(false, [], 'Complaint case not found.');
     }
+    if (!isValidComplaintClassification((string)($oldRow['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before updating the complaint status.');
+    }
 
     $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Pending'));
     $oldLevelName = trim((string)($oldRow['old_level_name'] ?? 'Complaint Only'));
     $existingBlotterId = trim((string)($oldRow['blotter_id'] ?? ''));
     $existingRequest = getLatestBlotterRequest($conn, $caseId);
     $existingRequestStatus = strtolower(trim((string)($existingRequest['request_status_name'] ?? '')));
-    if (in_array(strtolower($oldStatusName), ['resolved', 'dropped'], true)) {
+    if (in_array(strtolower($oldStatusName), ['resolved', 'closed', 'dropped'], true)) {
         respond(false, [], 'Complaint status is already finalized and cannot be changed again.');
     }
     if ($actionType === 'endorsement' && $existingBlotterId !== '') {
@@ -1137,10 +1424,16 @@ if ($action === 'update_case_outcome') {
     $newStatusName = '';
     $newLevelName = 'Complaint Only';
     $markEscalated = 0;
-    if ($actionType === 'resolved') {
+    ensureComplaintWorkflowLookups($conn);
+
+    if ($actionType === 'under_investigation') {
+        $newStatusName = 'Under Investigation';
+    } elseif ($actionType === 'action_in_progress') {
+        $newStatusName = 'Action in Progress';
+    } elseif ($actionType === 'resolved') {
         $newStatusName = 'Resolved';
-    } elseif ($actionType === 'dropped') {
-        $newStatusName = 'Dropped';
+    } elseif ($actionType === 'closed') {
+        $newStatusName = 'Closed';
     } else {
         $newLevelName = 'Endorsed to Blotter';
         $newStatusName = $oldStatusName !== '' ? $oldStatusName : 'Pending';

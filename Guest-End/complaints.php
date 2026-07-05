@@ -861,7 +861,6 @@ $areaOptions = [
                                 required
                             >
                         </div>
-                        <div class="field-helper">Use your mobile number after +63. This will help barangay personnel reach you for complaint updates or verification.</div>
                     </div>
                 </div>
 

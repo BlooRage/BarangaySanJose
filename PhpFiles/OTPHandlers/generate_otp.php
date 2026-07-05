@@ -53,7 +53,7 @@ function otpHandlerGuestComplaintFindActiveByPhone(mysqli $conn, string $phone):
         WHERE c.report_type = 'Complaint'
           AND cp.participant_role = 'Complainant'
           AND cp.contact_number = ?
-          AND LOWER(COALESCE(s.status_name, 'pending')) NOT IN ('resolved', 'dropped')
+          AND LOWER(COALESCE(s.status_name, 'pending')) NOT IN ('resolved', 'closed', 'dropped')
         ORDER BY c.case_id DESC
         LIMIT 1
     ");

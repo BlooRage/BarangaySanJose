@@ -762,7 +762,10 @@ if (!function_exists('sbatt_count_pending_complaints')) {
                     CASE
                         WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'escalated'
                         WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'escalated'
+                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%under investigation%' THEN 'under_investigation'
+                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%action in progress%' THEN 'action_in_progress'
                         WHEN LOWER(COALESCE(s.status_name, 'pending')) LIKE '%resolved%' THEN 'resolved'
+                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%closed%' THEN 'closed'
                         WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%drop%' THEN 'dropped'
                         WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%endorse%' THEN 'escalated'
                         ELSE 'pending'
