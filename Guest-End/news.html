@@ -363,6 +363,8 @@
             });
         }
 
+        const NEWS_TILE_PLACEHOLDER_SRC = "../Images/News_Placeholder.png";
+
         function attachMediaFallbacks(rootEl) {
             if (!rootEl || !rootEl.querySelectorAll) {
                 return;
@@ -374,6 +376,23 @@
                 }
                 imgEl.dataset.fallbackBound = '1';
                 imgEl.addEventListener('error', function () {
+                    const newsArchiveMedia = imgEl.closest('.newsArchiveMedia');
+                    if (newsArchiveMedia) {
+                        const currentSrc = String(imgEl.getAttribute('src') || '').trim();
+                        if (currentSrc !== NEWS_TILE_PLACEHOLDER_SRC) {
+                            imgEl.setAttribute('src', NEWS_TILE_PLACEHOLDER_SRC);
+                            imgEl.setAttribute('alt', 'News placeholder image');
+                            return;
+                        }
+
+                        const newsTile = newsArchiveMedia.closest('.newsArchiveTile');
+                        newsArchiveMedia.remove();
+                        if (newsTile) {
+                            newsTile.classList.add('is-text-only');
+                        }
+                        return;
+                    }
+
                     const featureMedia = imgEl.closest('.landingAnnouncementFeatureMedia, .landingAnnouncementStackMedia, .announcementThumb, .newsArchiveMedia');
                     if (featureMedia) {
                         const interactiveCard = featureMedia.closest('.landingAnnouncementFeature, .landingAnnouncementStackItem, .announcementCardInner');
@@ -783,7 +802,7 @@
             refs.sectionEl.style.display = "";
             refs.listEl.innerHTML = visibleItems.map(function (item) {
                 const rawImageSrc = String(item.image_url || '').trim();
-                const imageSrc = rawImageSrc || '../Images/News_Placeholder.png';
+                const imageSrc = rawImageSrc || NEWS_TILE_PLACEHOLDER_SRC;
                 const imageAlt = rawImageSrc
                     ? (item.title || 'News image')
                     : 'News placeholder image';

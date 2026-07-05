@@ -35,6 +35,24 @@ function announcements_ensure_schema(): void
     @$conn->query($sql);
   }
 
+  $statusColumn = $conn->query("
+    SELECT COLUMN_TYPE
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = '{$table}'
+      AND COLUMN_NAME = 'status'
+    LIMIT 1
+  ");
+  $statusType = '';
+  if ($statusColumn instanceof mysqli_result) {
+    $statusRow = $statusColumn->fetch_assoc();
+    $statusType = strtolower((string)($statusRow['COLUMN_TYPE'] ?? ''));
+    $statusColumn->free();
+  }
+  if ($statusType !== '' && strpos($statusType, "'archived'") === false) {
+    @$conn->query("ALTER TABLE {$table} MODIFY COLUMN status ENUM('draft','pending','approved','archived') NOT NULL DEFAULT 'draft'");
+  }
+
   $done = true;
 }
 
@@ -434,7 +452,6 @@ function announcement_generate_id(): string
     return 'ann_' . date('YmdHis') . '_' . mt_rand(1000, 9999);
   }
 }
-
 
 
 

@@ -1172,7 +1172,7 @@ $contentToolsDescription = $isNewsManagementView
                         ? 'pending'
                         : ($displayStatus === 'denied'
                           ? 'denied'
-                          : ($displayStatus === 'archived' ? 'archived' : 'archived')));
+                          : ($displayStatus === 'archived' ? 'archived' : 'draft')));
                     $orderedChannels = announcement_ordered_channels((array)$item['channels']);
                     $channelsText = implode(', ', array_map(function ($ch) use ($channelLabels) {
                       return $channelLabels[$ch] ?? strtoupper($ch);
