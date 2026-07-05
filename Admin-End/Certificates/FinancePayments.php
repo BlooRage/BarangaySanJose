@@ -568,21 +568,49 @@ if ($financeSection === 'fees') {
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <style>
     .finance-fee-shell {
-      max-width: 1360px;
+      max-width: var(--admin-table-shell-max-width);
       margin: 0 auto;
+    }
+    #feesTabs {
+      max-width: var(--admin-table-shell-max-width);
+      margin: 0 auto -1px;
+      padding-left: 0;
+      border-bottom: 0;
+      position: relative;
+      z-index: 2;
+      gap: 0.15rem;
+    }
+    body.admin-sidebar-collapsed .finance-fee-shell,
+    body.admin-sidebar-collapsed #feesTabs,
+    body.admin-sidebar-collapsed #clearanceFeesPanel,
+    body.admin-sidebar-collapsed #pendingRequestsPanel {
+      max-width: var(--admin-table-shell-max-width-collapsed);
+      margin-left: auto;
+      margin-right: auto;
     }
     #feesTabs .nav-link {
       color: #d76f12;
       font-weight: 600;
+      border: 1px solid transparent;
+      border-bottom-color: transparent;
+      border-top-left-radius: 0.75rem;
+      border-top-right-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: transparent;
     }
     #feesTabs .nav-link:hover,
     #feesTabs .nav-link:focus-visible {
       color: #b45309;
+      border-color: transparent;
     }
     #feesTabs .nav-link.active,
     #feesTabs .nav-link.active:hover,
     #feesTabs .nav-link.active:focus-visible {
       color: #d76f12;
+      background: #ffffff;
+      border-color: #dee2e6;
+      border-bottom-color: #ffffff;
+      box-shadow: none;
     }
     .finance-fee-card {
       border: 1px solid #ececec;
@@ -640,7 +668,7 @@ if ($financeSection === 'fees') {
       color: #6b7280;
     }
     .certificate-tracker-shell {
-      max-width: 1340px;
+      max-width: var(--admin-table-shell-max-width);
       margin: 0 auto;
     }
     .certificate-tracker-shell .admin-list-toolbar {
@@ -910,8 +938,15 @@ if ($financeSection === 'fees') {
     #pendingRequestsPanel {
       border-top-left-radius: 0 !important;
     }
+    #clearanceFeesPanel,
+    #pendingRequestsPanel {
+      max-width: var(--admin-table-shell-max-width);
+      margin-left: auto;
+      margin-right: auto;
+    }
     @media (max-width: 767.98px) {
       #feesTabs {
+        margin-bottom: 0.75rem;
         flex-wrap: nowrap;
         overflow-x: auto;
         overflow-y: hidden;

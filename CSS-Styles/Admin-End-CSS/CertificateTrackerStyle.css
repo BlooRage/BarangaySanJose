@@ -1,5 +1,5 @@
     .certificate-tracker-shell {
-      max-width: 1340px;
+      max-width: var(--admin-table-shell-max-width);
       margin: 0 auto;
     }
     .certificate-tracker-shell .admin-list-toolbar {

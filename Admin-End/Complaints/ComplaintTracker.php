@@ -18,12 +18,12 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
     <style>
         .complaint-tracker-shell {
-            max-width: 1340px;
+            max-width: var(--admin-table-shell-max-width);
             margin: 0 auto;
         }
 
         #complaintTrackerPageTabs {
-            max-width: 1340px;
+            max-width: var(--admin-table-shell-max-width);
             margin: 0 auto -1px;
             padding-left: 0;
             border-bottom: 0;
@@ -34,7 +34,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
         body.admin-sidebar-collapsed .complaint-tracker-shell,
         body.admin-sidebar-collapsed #complaintTrackerPageTabs {
-            max-width: 1520px;
+            max-width: var(--admin-table-shell-max-width-collapsed);
         }
 
         #complaintTrackerPageTabs .nav-link {
@@ -238,6 +238,50 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             gap: 14px;
         }
 
+        #viewModal .complaint-witness-entries {
+            display: grid;
+            gap: 12px;
+        }
+
+        #viewModal .complaint-witness-entry {
+            display: block;
+        }
+
+        #viewModal .complaint-witness-editor--row {
+            position: relative;
+            padding-top: 2.35rem;
+        }
+
+        #viewModal .complaint-witness-editor--row .witness-remove-btn {
+            position: absolute;
+            top: 0.85rem;
+            right: 0.85rem;
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border: 1px solid rgba(191, 87, 0, 0.18);
+            border-radius: 999px;
+            background: #fff;
+            color: #b75f0d;
+            font-size: 1.1rem;
+            font-weight: 700;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(207, 111, 20, 0.12);
+            transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
+
+        #viewModal .complaint-witness-editor--row .witness-remove-btn:hover,
+        #viewModal .complaint-witness-editor--row .witness-remove-btn:focus-visible {
+            border-color: #cf6f14;
+            background: #fff4e8;
+            color: #9f4f08;
+            transform: translateY(-1px);
+            outline: none;
+        }
+
         #viewModal .complaint-witness-trigger {
             display: flex;
             justify-content: flex-end;
@@ -247,8 +291,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             display: inline-flex;
             flex-direction: column;
             align-items: stretch;
-            width: fit-content;
-            min-width: 0;
+            width: min(100vw - 2rem, 360px);
+            min-width: 320px;
             max-width: calc(100vw - 2rem);
             margin-top: 0.7rem;
             margin-bottom: 0.7rem;
@@ -264,8 +308,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             grid-template-columns: 42px minmax(0, 1fr);
             align-items: center;
             gap: 12px;
-            width: auto;
-            inline-size: max-content;
+            width: 100%;
+            inline-size: 100%;
             max-width: 100%;
             margin-bottom: 0.25rem;
             padding: 0.8rem 0.95rem;

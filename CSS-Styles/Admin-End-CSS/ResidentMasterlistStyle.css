@@ -872,6 +872,52 @@ h2.section-title {
     z-index: 2;
 }
 
+:root {
+    --admin-table-shell-max-width: 1540px;
+    --admin-table-shell-max-width-collapsed: 1640px;
+    --admin-table-min-width-wide: 1100px;
+}
+
+.resident-masterlist-shell,
+.edit-requests-shell,
+.complaint-tracker-shell,
+.appointment-tracker-shell,
+.certificate-tracker-shell,
+.finance-fee-shell,
+.blotter-tracker-shell,
+.business-monitoring-shell,
+.officials-masterlist-shell,
+.invite-history-shell,
+.household-member-verification-shell,
+.hof-shell,
+.audit-shell,
+.user-masterlist-shell,
+.cms-request-tracker-shell,
+.appointment-shell {
+    width: min(100%, var(--admin-table-shell-max-width));
+    margin-left: auto;
+    margin-right: auto;
+}
+
+body.admin-sidebar-collapsed .resident-masterlist-shell,
+body.admin-sidebar-collapsed .edit-requests-shell,
+body.admin-sidebar-collapsed .complaint-tracker-shell,
+body.admin-sidebar-collapsed .appointment-tracker-shell,
+body.admin-sidebar-collapsed .certificate-tracker-shell,
+body.admin-sidebar-collapsed .finance-fee-shell,
+body.admin-sidebar-collapsed .blotter-tracker-shell,
+body.admin-sidebar-collapsed .business-monitoring-shell,
+body.admin-sidebar-collapsed .officials-masterlist-shell,
+body.admin-sidebar-collapsed .invite-history-shell,
+body.admin-sidebar-collapsed .household-member-verification-shell,
+body.admin-sidebar-collapsed .hof-shell,
+body.admin-sidebar-collapsed .audit-shell,
+body.admin-sidebar-collapsed .user-masterlist-shell,
+body.admin-sidebar-collapsed .cms-request-tracker-shell,
+body.admin-sidebar-collapsed .appointment-shell {
+    width: min(100%, var(--admin-table-shell-max-width-collapsed));
+}
+
 .compact-admin-table-shell {
     border: 1px solid #eceff3;
     border-radius: 8px;
@@ -890,7 +936,7 @@ h2.section-title {
 }
 
 .compact-admin-table--wide {
-    min-width: 980px;
+    min-width: var(--admin-table-min-width-wide);
 }
 
 .compact-admin-table--wide th:last-child,

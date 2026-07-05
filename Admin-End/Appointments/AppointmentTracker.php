@@ -782,8 +782,23 @@ foreach ($appointmentCouncilMembers as $member) {
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
     <style>
         .appointment-tracker-shell {
-            max-width: 1340px;
+            max-width: var(--admin-table-shell-max-width);
             margin: 0 auto;
+        }
+
+        #appointmentTrackerPageTabs {
+            max-width: var(--admin-table-shell-max-width);
+            margin: 0 auto -1px;
+            padding-left: 0;
+            border-bottom: 0;
+            position: relative;
+            z-index: 2;
+            gap: 0.15rem;
+        }
+
+        body.admin-sidebar-collapsed .appointment-tracker-shell,
+        body.admin-sidebar-collapsed #appointmentTrackerPageTabs {
+            max-width: var(--admin-table-shell-max-width-collapsed);
         }
 
         .appointment-cell-main {
@@ -803,17 +818,28 @@ foreach ($appointmentCouncilMembers as $member) {
         #appointmentTrackerPageTabs .nav-link {
             color: #d76f12;
             font-weight: 600;
+            border: 1px solid transparent;
+            border-bottom-color: transparent;
+            border-top-left-radius: 0.75rem;
+            border-top-right-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: transparent;
         }
 
         #appointmentTrackerPageTabs .nav-link:hover,
         #appointmentTrackerPageTabs .nav-link:focus-visible {
             color: #b45309;
+            border-color: transparent;
         }
 
         #appointmentTrackerPageTabs .nav-link.active,
         #appointmentTrackerPageTabs .nav-link.active:hover,
         #appointmentTrackerPageTabs .nav-link.active:focus-visible {
             color: #d76f12;
+            background: #ffffff;
+            border-color: #dee2e6;
+            border-bottom-color: #ffffff;
+            box-shadow: none;
         }
 
         #appointmentTrackerPanel {
@@ -880,6 +906,7 @@ foreach ($appointmentCouncilMembers as $member) {
 
         @media (max-width: 767.98px) {
             #appointmentTrackerPageTabs {
+                margin-bottom: 0.75rem;
                 gap: 0.5rem;
             }
 

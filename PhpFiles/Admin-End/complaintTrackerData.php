@@ -201,6 +201,85 @@ function columnExists(mysqli $conn, string $tableName, string $columnName): bool
     return $cache[$cacheKey] = !empty($row);
 }
 
+function complaintTrackerWitnessCount(mysqli $conn, string $caseId): int
+{
+    $stmt = $conn->prepare("
+        SELECT COUNT(*)
+        FROM caseparticipantstbl
+        WHERE case_id = ?
+          AND participant_role = 'Witness'
+    ");
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param("s", $caseId);
+    $stmt->execute();
+    $count = (int)($stmt->get_result()->fetch_row()[0] ?? 0);
+    $stmt->close();
+
+    return $count;
+}
+
+function complaintTrackerFetchWitnesses(mysqli $conn, string $caseId): array
+{
+    $stmt = $conn->prepare("
+        SELECT firstname, middlename, lastname, suffix, contact_number, address, remarks
+        FROM caseparticipantstbl
+        WHERE case_id = ?
+          AND participant_role = 'Witness'
+        ORDER BY participant_id ASC
+    ");
+    if (!$stmt) {
+        return [];
+    }
+
+    $stmt->bind_param("s", $caseId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $witnesses = [];
+    while ($row = $result->fetch_assoc()) {
+        $witnesses[] = [
+            'firstname' => trim((string)($row['firstname'] ?? '')),
+            'middlename' => trim((string)($row['middlename'] ?? '')),
+            'lastname' => trim((string)($row['lastname'] ?? '')),
+            'suffix' => trim((string)($row['suffix'] ?? '')),
+            'contact_number' => trim((string)($row['contact_number'] ?? '')),
+            'address' => trim((string)($row['address'] ?? '')),
+            'remarks' => trim((string)($row['remarks'] ?? '')),
+        ];
+    }
+    $stmt->close();
+
+    return $witnesses;
+}
+
+function complaintTrackerBuildWitnessSummary(array $witnesses): ?string
+{
+    if ($witnesses === []) {
+        return null;
+    }
+
+    $parts = [];
+    foreach ($witnesses as $index => $witness) {
+        $fullName = trim(implode(' ', array_filter([
+            $witness['firstname'] ?? '',
+            $witness['middlename'] ?? '',
+            $witness['lastname'] ?? '',
+            $witness['suffix'] ?? '',
+        ])));
+        $line = array_filter([
+            'Witness ' . ($index + 1) . ': ' . ($fullName !== '' ? $fullName : 'Unnamed'),
+            !empty($witness['contact_number']) ? 'Contact: ' . $witness['contact_number'] : null,
+            !empty($witness['address']) ? 'Address: ' . $witness['address'] : null,
+            !empty($witness['remarks']) ? 'Remarks: ' . $witness['remarks'] : null,
+        ]);
+        $parts[] = implode(' | ', $line);
+    }
+
+    return implode("\n", $parts);
+}
+
 function getStatusId(mysqli $conn, string $statusName, string $statusType): int
 {
     $stmt = $conn->prepare("
@@ -1203,6 +1282,12 @@ if ($action === 'add_witness') {
     if (!$exists) {
         respond(false, [], 'Complaint case not found.');
     }
+    if (complaintTrackerWitnessCount($conn, $caseId) >= 10) {
+        respond(false, [], 'A maximum of 10 witnesses is allowed for each complaint.');
+    }
+    if (!preg_match('/^09\d{9}$/', $contactNumber)) {
+        respond(false, [], 'Witness contact number must use the format 09XXXXXXXXX.');
+    }
 
     $conn->begin_transaction();
     try {
@@ -1218,6 +1303,20 @@ if ($action === 'add_witness') {
         $insertStmt->bind_param("sssss", $caseId, $fullName, $contactNumber, $address, $remarks);
         $insertStmt->execute();
         $insertStmt->close();
+
+        $witnessSummary = complaintTrackerBuildWitnessSummary(complaintTrackerFetchWitnesses($conn, $caseId));
+        $updateComplaintStmt = $conn->prepare("
+            UPDATE complaintstbl
+            SET witness_summary = ?
+            WHERE case_id = ?
+            LIMIT 1
+        ");
+        if (!$updateComplaintStmt) {
+            throw new Exception('Failed to prepare witness summary update.');
+        }
+        $updateComplaintStmt->bind_param("ss", $witnessSummary, $caseId);
+        $updateComplaintStmt->execute();
+        $updateComplaintStmt->close();
 
         $updateCaseStmt = $conn->prepare("
             UPDATE casereportstbl
@@ -1252,6 +1351,168 @@ if ($action === 'add_witness') {
     } catch (Throwable $e) {
         $conn->rollback();
         respond(false, [], 'Failed to add witness.');
+    }
+}
+
+if ($action === 'add_witnesses') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = trim((string)($jsonInput['case_id'] ?? ''));
+    $rawWitnesses = is_array($jsonInput['witnesses'] ?? null) ? $jsonInput['witnesses'] : [];
+    if ($caseId === '') {
+        respond(false, [], 'Invalid case ID.');
+    }
+    if ($rawWitnesses === []) {
+        respond(false, [], 'Add at least one witness before saving.');
+    }
+
+    $witnesses = [];
+    foreach ($rawWitnesses as $index => $witness) {
+        if (!is_array($witness)) {
+            respond(false, [], 'Invalid witness payload.');
+        }
+        $lastName = trim((string)($witness['lastname'] ?? ''));
+        $firstName = trim((string)($witness['firstname'] ?? ''));
+        $middleName = trim((string)($witness['middlename'] ?? ''));
+        $suffix = trim((string)($witness['suffix'] ?? ''));
+        $contactNumber = preg_replace('/\D+/', '', (string)($witness['contact_number'] ?? '')) ?? '';
+        $address = trim((string)($witness['address'] ?? ''));
+        $remarks = trim((string)($witness['remarks'] ?? ''));
+
+        if ($lastName === '') {
+            respond(false, [], 'Witness ' . ($index + 1) . ' last name is required.');
+        }
+        if ($firstName === '') {
+            respond(false, [], 'Witness ' . ($index + 1) . ' first name is required.');
+        }
+        if (!preg_match('/^09\d{9}$/', $contactNumber)) {
+            respond(false, [], 'Witness ' . ($index + 1) . ' contact number must use the format 09XXXXXXXXX.');
+        }
+
+        $witnesses[] = [
+            'lastname' => $lastName,
+            'firstname' => $firstName,
+            'middlename' => $middleName,
+            'suffix' => $suffix,
+            'contact_number' => $contactNumber,
+            'address' => $address,
+            'remarks' => $remarks,
+        ];
+    }
+
+    if (count($witnesses) > 10) {
+        respond(false, [], 'You can only save up to 10 witnesses at a time.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $existsStmt = $conn->prepare("
+        SELECT 1
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        respond(false, [], 'Failed to validate complaint case.');
+    }
+    $existsStmt->bind_param("s", $caseId);
+    $existsStmt->execute();
+    $exists = $existsStmt->get_result()->fetch_row();
+    $existsStmt->close();
+    if (!$exists) {
+        respond(false, [], 'Complaint case not found.');
+    }
+
+    $existingWitnessCount = complaintTrackerWitnessCount($conn, $caseId);
+    if (($existingWitnessCount + count($witnesses)) > 10) {
+        respond(false, [], 'This complaint can only have up to 10 witnesses in total.');
+    }
+
+    $conn->begin_transaction();
+    try {
+        $insertStmt = $conn->prepare("
+            INSERT INTO caseparticipantstbl
+                (case_id, participant_role, lastname, firstname, middlename, suffix, contact_number, email, address, age, sex, remarks)
+            VALUES
+                (?, 'Witness', ?, ?, ?, ?, ?, '', ?, '', '', ?)
+        ");
+        if (!$insertStmt) {
+            throw new Exception('Failed to prepare witness insert.');
+        }
+
+        foreach ($witnesses as $witness) {
+            $lastName = $witness['lastname'];
+            $firstName = $witness['firstname'];
+            $middleName = $witness['middlename'];
+            $suffix = $witness['suffix'];
+            $contactNumber = $witness['contact_number'];
+            $address = $witness['address'];
+            $remarks = $witness['remarks'];
+            $insertStmt->bind_param("ssssssss", $caseId, $lastName, $firstName, $middleName, $suffix, $contactNumber, $address, $remarks);
+            $insertStmt->execute();
+        }
+        $insertStmt->close();
+
+        $witnessSummary = complaintTrackerBuildWitnessSummary(complaintTrackerFetchWitnesses($conn, $caseId));
+        $updateComplaintStmt = $conn->prepare("
+            UPDATE complaintstbl
+            SET witness_summary = ?
+            WHERE case_id = ?
+            LIMIT 1
+        ");
+        if (!$updateComplaintStmt) {
+            throw new Exception('Failed to prepare witness summary update.');
+        }
+        $updateComplaintStmt->bind_param("ss", $witnessSummary, $caseId);
+        $updateComplaintStmt->execute();
+        $updateComplaintStmt->close();
+
+        $updateCaseStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateCaseStmt) {
+            throw new Exception('Failed to prepare complaint updater.');
+        }
+        $updateCaseStmt->bind_param("ss", $actorUserId, $caseId);
+        $updateCaseStmt->execute();
+        $updateCaseStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare witness log.');
+            }
+            $logEntry = count($witnesses) === 1
+                ? 'Witness added to complaint: ' . trim(implode(' ', array_filter([
+                    $witnesses[0]['firstname'] ?? '',
+                    $witnesses[0]['middlename'] ?? '',
+                    $witnesses[0]['lastname'] ?? '',
+                    $witnesses[0]['suffix'] ?? '',
+                ])))
+                : count($witnesses) . ' witnesses added to complaint.';
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        complaintTrackerCacheClear();
+        respond(true, [], count($witnesses) === 1 ? 'Witness added to complaint.' : 'Witnesses added to complaint.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        respond(false, [], 'Failed to add witnesses.');
     }
 }
 

@@ -50,6 +50,7 @@
     const btnComplaintActionConfirmReturn = document.getElementById("btnComplaintActionConfirmReturn");
     const btnComplaintActionConfirm = document.getElementById("btnComplaintActionConfirm");
     const attachmentViewerEmptyState = '<div class="attachment-viewer-empty">Select an attachment to preview.</div>';
+    const MAX_COMPLAINT_WITNESSES = 10;
 
     let currentRows = [];
     let currentPage = 1;
@@ -75,6 +76,9 @@
         closed: closeBtn,
         endorsement: endorseBtn,
     };
+    const complaintActionItemsByType = Object.fromEntries(
+        Object.entries(complaintActionButtonsByType).map(([actionType, button]) => [actionType, button?.closest("li") || null])
+    );
 
     function setRefreshLoading(on) {
         if (!refreshBtn) return;
@@ -249,8 +253,9 @@
     function setActionButtonsState(detail) {
         if (!complaintActionButtons) return;
 
-        Object.values(complaintActionButtonsByType).forEach((button) => {
+        Object.entries(complaintActionButtonsByType).forEach(([actionType, button]) => {
             button?.classList.add("d-none");
+            complaintActionItemsByType[actionType]?.classList.add("d-none");
         });
         if (complaintActionToggle) {
             complaintActionToggle.disabled = false;
@@ -295,6 +300,7 @@
 
         visibleActions.forEach((actionType) => {
             complaintActionButtonsByType[actionType]?.classList.remove("d-none");
+            complaintActionItemsByType[actionType]?.classList.remove("d-none");
         });
     }
 
@@ -571,6 +577,8 @@
                 || String(witness.address ?? "").trim() !== ""
             );
         });
+        const existingCount = clean.length;
+        const remainingSlots = Math.max(0, MAX_COMPLAINT_WITNESSES - existingCount);
 
         const witnessListHtml = !clean.length
             ? renderFieldGrid([
@@ -586,42 +594,93 @@
                 renderFieldGrid([
                     { label: "Address", value: witness.address || "-" },
                 ], 1),
+                renderFieldGrid([
+                    { label: "Remarks", value: witness.remarks || "-" },
+                ], 1),
             ].join("");
         }).join('<div class="mt-3"></div>');
+
+        const witnessRowsHtml = Array.from({ length: remainingSlots }, (_, index) => {
+            const witnessNumber = existingCount + index + 1;
+            return `
+                <div class="complaint-witness-entry${index === 0 ? "" : " d-none"}" data-complaint-witness-row="${index}">
+                    <div class="complaint-witness-editor complaint-witness-editor--row">
+                        <button type="button" class="attachment-close-btn witness-remove-btn" data-complaint-witness-remove aria-label="Remove witness ${witnessNumber}">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <div class="small fw-semibold text-uppercase text-muted">Witness ${witnessNumber}</div>
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-4">
+                                <label class="tracker-form-label" for="complaintWitnessLastName_${index}">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" id="complaintWitnessLastName_${index}" class="form-control" data-complaint-witness-last-name placeholder="Enter last name">
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                <label class="tracker-form-label" for="complaintWitnessFirstName_${index}">First Name <span class="text-danger">*</span></label>
+                                <input type="text" id="complaintWitnessFirstName_${index}" class="form-control" data-complaint-witness-first-name placeholder="Enter first name">
+                            </div>
+                            <div class="col-12 col-lg-2">
+                                <label class="tracker-form-label" for="complaintWitnessMiddleName_${index}">Middle Initial</label>
+                                <input type="text" id="complaintWitnessMiddleName_${index}" class="form-control" data-complaint-witness-middle-name maxlength="10" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-lg-2">
+                                <label class="tracker-form-label" for="complaintWitnessSuffix_${index}">Suffix</label>
+                                <select id="complaintWitnessSuffix_${index}" class="form-select" data-complaint-witness-suffix>
+                                    <option value="">None</option>
+                                    <option value="Jr.">Jr.</option>
+                                    <option value="Sr.">Sr.</option>
+                                    <option value="III">III</option>
+                                    <option value="IV">IV</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                <label class="tracker-form-label" for="complaintWitnessContactNumber_${index}">Contact Number <span class="text-danger">*</span></label>
+                                <input type="text" id="complaintWitnessContactNumber_${index}" class="form-control" data-complaint-witness-contact inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX">
+                            </div>
+                            <div class="col-12">
+                                <label class="tracker-form-label" for="complaintWitnessAddress_${index}">Address</label>
+                                <input type="text" id="complaintWitnessAddress_${index}" class="form-control" data-complaint-witness-address placeholder="Optional">
+                            </div>
+                            <div class="col-12">
+                                <label class="tracker-form-label" for="complaintWitnessRemarks_${index}">Remarks</label>
+                                <textarea id="complaintWitnessRemarks_${index}" class="form-control" data-complaint-witness-remarks rows="3" placeholder="Optional witness notes"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        const addButtonLabel = existingCount > 0 ? "Add More Witnesses" : "Add Witness";
 
         return `
             <div class="complaint-witness-section">
                 ${witnessListHtml}
                 <div class="complaint-witness-trigger">
-                    <button type="button" class="btn btn-outline-primary" id="btnAddComplaintWitness">Add Witness</button>
+                    ${remainingSlots > 0
+                        ? `<button type="button" class="btn btn-outline-primary" id="btnAddComplaintWitness">${addButtonLabel}</button>`
+                        : `<div class="complaint-admin-warning">The maximum of ${MAX_COMPLAINT_WITNESSES} witnesses has already been reached for this complaint.</div>`}
                 </div>
-                <div class="complaint-witness-editor d-none" id="complaintWitnessEditor">
-                    <div class="complaint-admin-helper">Admins can add witness details here as they are confirmed during complaint handling.</div>
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <label class="tracker-form-label" for="complaintWitnessFullName">Witness Full Name</label>
-                            <input type="text" id="complaintWitnessFullName" class="form-control" placeholder="Enter witness full name">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="tracker-form-label" for="complaintWitnessContactNumber">Contact Number <span class="text-danger">*</span></label>
-                            <input type="text" id="complaintWitnessContactNumber" class="form-control" placeholder="Enter witness contact number">
-                        </div>
-                        <div class="col-12">
-                            <label class="tracker-form-label" for="complaintWitnessAddress">Address</label>
-                            <input type="text" id="complaintWitnessAddress" class="form-control" placeholder="Optional">
-                        </div>
-                        <div class="col-12">
-                            <label class="tracker-form-label" for="complaintWitnessRemarks">Remarks</label>
-                            <textarea id="complaintWitnessRemarks" class="form-control" rows="3" placeholder="Optional witness notes"></textarea>
+                ${remainingSlots > 0 ? `
+                    <div class="complaint-witness-editor d-none" id="complaintWitnessEditor">
+                        <div class="complaint-admin-helper">Admins can add confirmed witness details here. Up to ${MAX_COMPLAINT_WITNESSES} witnesses are allowed per complaint. ${remainingSlots} slot${remainingSlots === 1 ? "" : "s"} remaining.</div>
+                        <div class="complaint-witness-entries" id="complaintWitnessEntries">${witnessRowsHtml}</div>
+                        <div class="complaint-witness-editor-actions mt-2">
+                            ${remainingSlots > 1 ? '<button type="button" class="btn btn-outline-secondary" id="btnAddAnotherComplaintWitness">Add Another Witness</button>' : ""}
+                            <button type="button" class="btn btn-outline-secondary" id="btnCancelComplaintWitness">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="btnSaveComplaintWitness">Save Witnesses</button>
                         </div>
                     </div>
-                    <div class="complaint-witness-editor-actions mt-2">
-                        <button type="button" class="btn btn-outline-secondary" id="btnCancelComplaintWitness">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="btnSaveComplaintWitness">Save Witness</button>
-                    </div>
-                </div>
+                ` : ""}
             </div>
         `;
+    }
+
+    function normalizeComplaintWitnessContact(value) {
+        return String(value || "").replace(/\D+/g, "").slice(0, 11);
+    }
+
+    function isValidComplaintWitnessContact(value) {
+        return /^09\d{9}$/.test(String(value || "").trim());
     }
 
     function formSection(title, content) {
@@ -820,7 +879,10 @@
     }
 
     function renderComplaintNoteCard(title, subtitle, body, toneClass) {
-        const normalizedBody = String(body || "").trim() || "No notes added yet.";
+        const normalizedBody = String(body || "").trim();
+        if (normalizedBody === "") {
+            return "";
+        }
         const subtitleHtml = String(subtitle || "").trim() !== ""
             ? `<p class="complaint-note-card-subtitle">${esc(subtitle)}</p>`
             : "";
@@ -872,7 +934,7 @@
                 notes.resolution,
                 "is-resolution"
             ),
-        ];
+        ].filter(Boolean);
 
         const metaCards = [];
 
@@ -1131,10 +1193,8 @@
             const saveComplaintClassificationBtn = document.getElementById("btnSaveComplaintClassification");
             const showWitnessFormBtn = document.getElementById("btnAddComplaintWitness");
             const witnessEditor = document.getElementById("complaintWitnessEditor");
-            const witnessFullNameField = document.getElementById("complaintWitnessFullName");
-            const witnessContactField = document.getElementById("complaintWitnessContactNumber");
-            const witnessAddressField = document.getElementById("complaintWitnessAddress");
-            const witnessRemarksField = document.getElementById("complaintWitnessRemarks");
+            const witnessEntries = Array.from(document.querySelectorAll("[data-complaint-witness-row]"));
+            const addAnotherWitnessBtn = document.getElementById("btnAddAnotherComplaintWitness");
             const cancelWitnessBtn = document.getElementById("btnCancelComplaintWitness");
             const saveWitnessBtn = document.getElementById("btnSaveComplaintWitness");
 
@@ -1161,49 +1221,154 @@
                 }
             });
 
-            const resetWitnessForm = () => {
-                if (witnessFullNameField) witnessFullNameField.value = "";
-                if (witnessContactField) witnessContactField.value = "";
-                if (witnessAddressField) witnessAddressField.value = "";
-                if (witnessRemarksField) witnessRemarksField.value = "";
+            const visibleWitnessEntries = () => witnessEntries.filter((row) => !row.classList.contains("d-none"));
+
+            const resetWitnessRow = (row, hideRow = true) => {
+                if (!row) return;
+                row.querySelectorAll("input, textarea").forEach((field) => {
+                    field.value = "";
+                    field.classList.remove("is-invalid");
+                });
+                if (hideRow) {
+                    row.classList.add("d-none");
+                }
+            };
+
+            const syncWitnessEditorState = () => {
+                const visibleCount = visibleWitnessEntries().length;
+                if (addAnotherWitnessBtn) {
+                    const canAddMore = visibleCount < witnessEntries.length;
+                    addAnotherWitnessBtn.disabled = !canAddMore;
+                    addAnotherWitnessBtn.classList.toggle("d-none", !canAddMore);
+                }
+            };
+
+            const ensureWitnessEditorHasVisibleRow = () => {
+                const visibleCount = visibleWitnessEntries().length;
+                if (visibleCount > 0) {
+                    syncWitnessEditorState();
+                    return;
+                }
+                const firstRow = witnessEntries[0] || null;
+                if (!firstRow) return;
+                firstRow.classList.remove("d-none");
+                syncWitnessEditorState();
             };
 
             showWitnessFormBtn?.addEventListener("click", () => {
                 witnessEditor?.classList.remove("d-none");
                 showWitnessFormBtn.classList.add("d-none");
-                witnessFullNameField?.focus();
+                ensureWitnessEditorHasVisibleRow();
+                visibleWitnessEntries()[0]?.querySelector("[data-complaint-witness-last-name]")?.focus();
             });
 
             cancelWitnessBtn?.addEventListener("click", () => {
-                resetWitnessForm();
+                witnessEntries.forEach((row) => resetWitnessRow(row, true));
                 witnessEditor?.classList.add("d-none");
                 showWitnessFormBtn?.classList.remove("d-none");
+                syncWitnessEditorState();
+            });
+
+            witnessEntries.forEach((row) => {
+                row.querySelectorAll("[data-complaint-witness-contact]").forEach((field) => {
+                    field.addEventListener("input", () => {
+                        field.value = normalizeComplaintWitnessContact(field.value);
+                    });
+                });
+                row.querySelector("[data-complaint-witness-remove]")?.addEventListener("click", () => {
+                    resetWitnessRow(row, true);
+                    if (!visibleWitnessEntries().length) {
+                        witnessEditor?.classList.add("d-none");
+                        showWitnessFormBtn?.classList.remove("d-none");
+                    }
+                    syncWitnessEditorState();
+                });
+            });
+
+            addAnotherWitnessBtn?.addEventListener("click", () => {
+                const nextRow = witnessEntries.find((row) => row.classList.contains("d-none"));
+                if (!nextRow) return;
+                nextRow.classList.remove("d-none");
+                syncWitnessEditorState();
+                nextRow.querySelector("[data-complaint-witness-last-name]")?.focus();
             });
 
             saveWitnessBtn?.addEventListener("click", async () => {
-                const fullName = String(witnessFullNameField?.value || "").trim();
-                const contactNumber = String(witnessContactField?.value || "").trim();
-                const address = String(witnessAddressField?.value || "").trim();
-                const remarks = String(witnessRemarksField?.value || "").trim();
+                const witnessesToSave = [];
+                let firstInvalidField = null;
 
-                if (!fullName) {
-                    window.alert("Witness full name is required.");
+                visibleWitnessEntries().forEach((row) => {
+                    const lastNameField = row.querySelector("[data-complaint-witness-last-name]");
+                    const firstNameField = row.querySelector("[data-complaint-witness-first-name]");
+                    const middleNameField = row.querySelector("[data-complaint-witness-middle-name]");
+                    const suffixField = row.querySelector("[data-complaint-witness-suffix]");
+                    const contactField = row.querySelector("[data-complaint-witness-contact]");
+                    const addressField = row.querySelector("[data-complaint-witness-address]");
+                    const remarksField = row.querySelector("[data-complaint-witness-remarks]");
+                    const lastName = String(lastNameField?.value || "").trim();
+                    const firstName = String(firstNameField?.value || "").trim();
+                    const middleName = String(middleNameField?.value || "").trim();
+                    const suffix = String(suffixField?.value || "").trim();
+                    const contactNumber = normalizeComplaintWitnessContact(contactField?.value || "");
+                    const address = String(addressField?.value || "").trim();
+                    const remarks = String(remarksField?.value || "").trim();
+
+                    if (contactField) {
+                        contactField.value = contactNumber;
+                    }
+
+                    lastNameField?.classList.remove("is-invalid");
+                    firstNameField?.classList.remove("is-invalid");
+                    contactField?.classList.remove("is-invalid");
+
+                    let rowValid = true;
+                    if (!lastName) {
+                        lastNameField?.classList.add("is-invalid");
+                        firstInvalidField = firstInvalidField || lastNameField;
+                        rowValid = false;
+                    }
+                    if (!firstName) {
+                        firstNameField?.classList.add("is-invalid");
+                        firstInvalidField = firstInvalidField || firstNameField;
+                        rowValid = false;
+                    }
+                    if (!isValidComplaintWitnessContact(contactNumber)) {
+                        contactField?.classList.add("is-invalid");
+                        firstInvalidField = firstInvalidField || contactField;
+                        rowValid = false;
+                    }
+                    if (!rowValid) {
+                        return;
+                    }
+
+                    witnessesToSave.push({
+                        lastname: lastName,
+                        firstname: firstName,
+                        middlename: middleName,
+                        suffix,
+                        contact_number: contactNumber,
+                        address,
+                        remarks,
+                    });
+                });
+
+                if (firstInvalidField) {
+                    firstInvalidField.focus();
+                    window.alert("Each witness needs a last name, first name, and a valid contact number in the format 09XXXXXXXXX.");
                     return;
                 }
-                if (!contactNumber) {
-                    window.alert("Witness contact number is required.");
+                if (!witnessesToSave.length) {
+                    window.alert("Add at least one witness before saving.");
                     return;
                 }
 
                 try {
                     saveWitnessBtn.disabled = true;
+                    addAnotherWitnessBtn && (addAnotherWitnessBtn.disabled = true);
                     await postJson({
-                        action: "add_witness",
+                        action: "add_witnesses",
                         case_id: currentViewCaseId,
-                        full_name: fullName,
-                        contact_number: contactNumber,
-                        address,
-                        remarks,
+                        witnesses: witnessesToSave,
                     });
                     await loadList();
                     await openViewModal(currentViewCaseId);
@@ -1211,6 +1376,7 @@
                     window.alert(error.message || error);
                 } finally {
                     saveWitnessBtn.disabled = false;
+                    addAnotherWitnessBtn && (addAnotherWitnessBtn.disabled = false);
                 }
             });
 
