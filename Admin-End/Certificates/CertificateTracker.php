@@ -36,6 +36,19 @@ if ($certificateLaunchStage === 'release') {
       max-width: 1340px;
       margin: 0 auto;
     }
+    #certTrackerPageTabs .nav-link {
+      color: #d76f12;
+      font-weight: 600;
+    }
+    #certTrackerPageTabs .nav-link:hover,
+    #certTrackerPageTabs .nav-link:focus-visible {
+      color: #b45309;
+    }
+    #certTrackerPageTabs .nav-link.active,
+    #certTrackerPageTabs .nav-link.active:hover,
+    #certTrackerPageTabs .nav-link.active:focus-visible {
+      color: #d76f12;
+    }
     .certificate-tracker-shell .admin-list-toolbar {
       overflow-x: visible;
       overflow-y: visible;
@@ -145,6 +158,20 @@ if ($certificateLaunchStage === 'release') {
       color: #fff;
       border-color: #bb2d3b;
       background: #bb2d3b;
+    }
+    @media (max-width: 767.98px) {
+      #certTrackerPageTabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+      }
+      #certTrackerPageTabs .nav-item {
+        flex: 0 0 auto;
+      }
+      #certTrackerPageTabs .nav-link {
+        white-space: nowrap;
+      }
     }
     #table-certificateTracker {
       table-layout: auto;

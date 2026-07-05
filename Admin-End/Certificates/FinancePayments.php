@@ -571,6 +571,19 @@ if ($financeSection === 'fees') {
       max-width: 1360px;
       margin: 0 auto;
     }
+    #feesTabs .nav-link {
+      color: #d76f12;
+      font-weight: 600;
+    }
+    #feesTabs .nav-link:hover,
+    #feesTabs .nav-link:focus-visible {
+      color: #b45309;
+    }
+    #feesTabs .nav-link.active,
+    #feesTabs .nav-link.active:hover,
+    #feesTabs .nav-link.active:focus-visible {
+      color: #d76f12;
+    }
     .finance-fee-card {
       border: 1px solid #ececec;
       border-radius: 24px;
@@ -891,8 +904,25 @@ if ($financeSection === 'fees') {
         min-width: 118px;
       }
     }
-    #paymentsPanel {
+    #paymentsPanel,
+    #generalFeesPanel,
+    #clearanceFeesPanel,
+    #pendingRequestsPanel {
       border-top-left-radius: 0 !important;
+    }
+    @media (max-width: 767.98px) {
+      #feesTabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+      }
+      #feesTabs .nav-item {
+        flex: 0 0 auto;
+      }
+      #feesTabs .nav-link {
+        white-space: nowrap;
+      }
     }
     #feeTypesTableBody tr { cursor: default; }
     @media print {
