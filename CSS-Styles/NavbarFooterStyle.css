@@ -56,10 +56,15 @@ h5 {
     padding: 0.75rem 0;
 }
 .navbarWrapper .container-fluid {
-    max-width: 1440px;
-    margin: 0 auto;
-    padding-left: clamp(16px, 2.6vw, 34px);
-    padding-right: clamp(16px, 2.6vw, 34px);
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding-left: clamp(12px, 1.8vw, 24px);
+    padding-right: clamp(12px, 1.8vw, 24px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
 }
 .label {
     display: block;
@@ -86,6 +91,9 @@ h5 {
     align-items: center;
     gap: 12px;
     line-height: 1;
+    margin-right: auto;
+    flex: 0 0 auto;
+    text-align: left;
 }
 #navbarBrand {
     font-family: 'Charis SIL Regular', serif;
@@ -93,10 +101,18 @@ h5 {
     letter-spacing: -0.02em;
     color: #000000;
 }
+.navbar-collapse {
+    flex: 0 0 auto;
+    margin-left: auto;
+    justify-content: flex-end;
+}
 #navbarLinks {
     font-family: 'Geist', sans-serif;
     font-size: 18px;
     font-weight: 500;
+    margin-left: auto !important;
+    justify-content: flex-end;
+    width: auto;
 }
 #navbarLinks a {
     color: #000000;
@@ -272,6 +288,9 @@ h5 {
     .navbarWrapper .navbar {
         min-height: 74px;
     }
+    .navbarWrapper .container-fluid {
+        gap: 0.75rem;
+    }
     .navbar-collapse {
         text-align: center;
         padding-top: 0.65rem;
@@ -313,6 +332,23 @@ h5 {
     }
     #navbarLinks .nav-item:last-child .nav-link::after {
         display: none;
+    }
+}
+
+@media (min-width: 1200px) {
+    .navbar-collapse {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
+
+    #navbarLinks {
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        width: auto;
     }
 }
 

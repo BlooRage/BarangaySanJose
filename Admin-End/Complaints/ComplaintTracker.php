@@ -22,20 +22,46 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             margin: 0 auto;
         }
 
+        #complaintTrackerPageTabs {
+            max-width: 1340px;
+            margin: 0 auto -1px;
+            padding-left: 0;
+            border-bottom: 0;
+            position: relative;
+            z-index: 2;
+            gap: 0.15rem;
+        }
+
+        body.admin-sidebar-collapsed .complaint-tracker-shell,
+        body.admin-sidebar-collapsed #complaintTrackerPageTabs {
+            max-width: 1520px;
+        }
+
         #complaintTrackerPageTabs .nav-link {
             color: #d76f12;
             font-weight: 600;
+            border: 1px solid transparent;
+            border-bottom-color: transparent;
+            border-top-left-radius: 0.75rem;
+            border-top-right-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: transparent;
         }
 
         #complaintTrackerPageTabs .nav-link:hover,
         #complaintTrackerPageTabs .nav-link:focus-visible {
             color: #b45309;
+            border-color: transparent;
         }
 
         #complaintTrackerPageTabs .nav-link.active,
         #complaintTrackerPageTabs .nav-link.active:hover,
         #complaintTrackerPageTabs .nav-link.active:focus-visible {
             color: #d76f12;
+            background: #ffffff;
+            border-color: #dee2e6;
+            border-bottom-color: #ffffff;
+            box-shadow: none;
         }
 
         #complaintTrackerPanel {
@@ -568,6 +594,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
         @media (max-width: 767.98px) {
             #complaintTrackerPageTabs {
+                margin-bottom: 0.75rem;
                 gap: 0.5rem;
             }
 
