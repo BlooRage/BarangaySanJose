@@ -571,27 +571,9 @@ if ($financeSection === 'fees') {
       max-width: 1360px;
       margin: 0 auto;
     }
-    #feesTabs {
-      align-items: flex-end;
-      gap: clamp(1rem, 2vw, 2rem);
-      border-bottom: 1px solid #d9e0e7 !important;
-      padding-left: 0.15rem;
-    }
-    #feesTabs .nav-item {
-      margin-bottom: -1px;
-    }
     #feesTabs .nav-link {
-      border: 0;
-      border-radius: 16px 16px 0 0;
-      background: transparent;
       color: #d76f12;
-      font-size: clamp(1rem, 1.1vw, 1.18rem);
-      font-weight: 700;
-      line-height: 1.1;
-      padding: 1rem 0.3rem 1.05rem;
-    }
-    #feesTabs .nav-link i {
-      color: inherit;
+      font-weight: 600;
     }
     #feesTabs .nav-link:hover,
     #feesTabs .nav-link:focus-visible {
@@ -600,13 +582,7 @@ if ($financeSection === 'fees') {
     #feesTabs .nav-link.active,
     #feesTabs .nav-link.active:hover,
     #feesTabs .nav-link.active:focus-visible {
-      background: #fff;
-      border: 1px solid #d9e0e7;
-      border-bottom-color: #fff;
       color: #d76f12;
-      padding-left: 1.75rem;
-      padding-right: 1.75rem;
-      box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.95);
     }
     .finance-fee-card {
       border: 1px solid #ececec;
@@ -936,22 +912,16 @@ if ($financeSection === 'fees') {
     }
     @media (max-width: 767.98px) {
       #feesTabs {
-        gap: 0.5rem;
-        padding-left: 0;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
       }
       #feesTabs .nav-item {
-        width: 100%;
+        flex: 0 0 auto;
       }
       #feesTabs .nav-link {
-        width: 100%;
-        padding: 0.95rem 1rem;
-        text-align: center;
-      }
-      #feesTabs .nav-link.active,
-      #feesTabs .nav-link.active:hover,
-      #feesTabs .nav-link.active:focus-visible {
-        padding-left: 1rem;
-        padding-right: 1rem;
+        white-space: nowrap;
       }
     }
     #feeTypesTableBody tr { cursor: default; }
