@@ -1930,6 +1930,12 @@ if ($editingAnnouncementId !== '') {
       setHeadlineImagePreview(String(headlineImageUrlInput?.value || "").trim());
       renderPreview();
 
+      [previewModalEl, scheduleModalEl].forEach(function (modalEl) {
+        if (modalEl && modalEl.parentElement !== document.body) {
+          document.body.appendChild(modalEl);
+        }
+      });
+
       if (previewModalEl && window.bootstrap?.Modal) {
         previewModal = new bootstrap.Modal(previewModalEl);
       }
