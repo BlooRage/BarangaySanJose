@@ -38,8 +38,18 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             color: #d76f12;
         }
 
-        #div-tableContainer {
+        #complaintTrackerPanel {
             border-top-left-radius: 0 !important;
+        }
+
+        .complaint-tracker-shell .btn,
+        #complaintTrackerPageTabs .nav-link {
+            transition: opacity 0.16s ease, transform 0.16s ease;
+        }
+
+        .complaint-tracker-shell .btn:disabled,
+        #complaintTrackerPageTabs .nav-link:disabled {
+            cursor: wait;
         }
 
         .complaint-tracker-shell .admin-list-toolbar {
@@ -558,18 +568,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
         @media (max-width: 767.98px) {
             #complaintTrackerPageTabs {
-                flex-wrap: nowrap;
-                overflow-x: auto;
-                overflow-y: hidden;
-                scrollbar-width: thin;
+                gap: 0.5rem;
             }
 
             #complaintTrackerPageTabs .nav-item {
-                flex: 0 0 auto;
+                width: 100%;
             }
 
             #complaintTrackerPageTabs .nav-link {
-                white-space: nowrap;
+                width: 100%;
             }
 
             .complaint-tracker-shell .admin-search {
@@ -633,7 +640,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </li>
         </ul>
 
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell resident-masterlist-shell">
+        <div id="complaintTrackerPanel" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
