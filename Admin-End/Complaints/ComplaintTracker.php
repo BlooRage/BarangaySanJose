@@ -22,9 +22,26 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             margin: 0 auto;
         }
 
+        #complaintTrackerPageTabs {
+            align-items: flex-end;
+            gap: clamp(1rem, 2vw, 2rem);
+            border-bottom: 1px solid #d9e0e7 !important;
+            padding-left: 0.15rem;
+        }
+
+        #complaintTrackerPageTabs .nav-item {
+            margin-bottom: -1px;
+        }
+
         #complaintTrackerPageTabs .nav-link {
+            border: 0;
+            border-radius: 16px 16px 0 0;
+            background: transparent;
             color: #d76f12;
-            font-weight: 600;
+            font-size: clamp(1rem, 1.1vw, 1.18rem);
+            font-weight: 700;
+            line-height: 1.1;
+            padding: 1rem 0.3rem 1.05rem;
         }
 
         #complaintTrackerPageTabs .nav-link:hover,
@@ -35,7 +52,13 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         #complaintTrackerPageTabs .nav-link.active,
         #complaintTrackerPageTabs .nav-link.active:hover,
         #complaintTrackerPageTabs .nav-link.active:focus-visible {
+            background: #fff;
+            border: 1px solid #d9e0e7;
+            border-bottom-color: #fff;
             color: #d76f12;
+            padding-left: 1.75rem;
+            padding-right: 1.75rem;
+            box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.95);
         }
 
         #complaintTrackerPanel {
@@ -44,7 +67,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
         .complaint-tracker-shell .btn,
         #complaintTrackerPageTabs .nav-link {
-            transition: opacity 0.16s ease, transform 0.16s ease;
+            transition: color 0.16s ease, opacity 0.16s ease, transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
         }
 
         .complaint-tracker-shell .btn:disabled,
@@ -569,6 +592,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         @media (max-width: 767.98px) {
             #complaintTrackerPageTabs {
                 gap: 0.5rem;
+                padding-left: 0;
             }
 
             #complaintTrackerPageTabs .nav-item {
@@ -577,6 +601,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
             #complaintTrackerPageTabs .nav-link {
                 width: 100%;
+                padding: 0.95rem 1rem;
+                text-align: center;
+            }
+
+            #complaintTrackerPageTabs .nav-link.active,
+            #complaintTrackerPageTabs .nav-link.active:hover,
+            #complaintTrackerPageTabs .nav-link.active:focus-visible {
+                padding-left: 1rem;
+                padding-right: 1rem;
             }
 
             .complaint-tracker-shell .admin-search {
