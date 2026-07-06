@@ -50,6 +50,8 @@
     const btnComplaintActionConfirmReturn = document.getElementById("btnComplaintActionConfirmReturn");
     const btnComplaintActionConfirm = document.getElementById("btnComplaintActionConfirm");
     const attachmentViewerEmptyState = '<div class="attachment-viewer-empty">Select an attachment to preview.</div>';
+    const MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD = 3;
+    const MAX_COMPLAINT_ATTACHMENTS_TOTAL = 6;
     const MAX_COMPLAINT_WITNESSES = 10;
 
     let currentRows = [];
@@ -524,6 +526,30 @@
         return /\.(png|jpe?g|webp|gif|bmp|svg)(?:$|\?)/i.test(source);
     }
 
+    function formatAttachmentMetaText(attachment, fallbackSubmittedAt = "") {
+        const uploadedAt = String(attachment?.uploaded_at || "").trim();
+        const uploadedBy = String(attachment?.uploaded_by || "").trim();
+        const source = String(attachment?.source || "").trim();
+        const metaParts = [];
+
+        if (uploadedAt) {
+            metaParts.push(`Uploaded: ${uploadedAt}`);
+        } else if (String(fallbackSubmittedAt || "").trim() !== "") {
+            metaParts.push(`Uploaded: ${fallbackSubmittedAt}`);
+        }
+
+        if (source) {
+            metaParts.push(`Source: ${source}`);
+        }
+        if (uploadedBy) {
+            metaParts.push(`By: ${uploadedBy}`);
+        }
+
+        return metaParts.length
+            ? metaParts.join(" | ")
+            : `Attachment ${isImageAttachment(attachment) ? "image" : "file"} ready for viewing`;
+    }
+
     function openAttachmentViewer(name, url, isImage = true) {
         if (!attachmentViewerModal || !attachmentViewerBody) {
             return;
@@ -556,9 +582,7 @@
             const name = String(attachment.name || `Attachment ${index + 1}`).trim() || `Attachment ${index + 1}`;
             const href = resolveAttachmentUrl(attachment.path || "");
             const previewable = isImageAttachment(attachment);
-            const uploadedText = String(submittedAt || "").trim() !== ""
-                ? `Uploaded: ${submittedAt}`
-                : `Attachment ${previewable ? "image" : "file"} ready for viewing`;
+            const uploadedText = formatAttachmentMetaText(attachment, submittedAt);
             return `
                 <article class="complaint-attachment-card">
                     <div class="complaint-attachment-body">
@@ -681,6 +705,35 @@
         `;
     }
 
+    function renderAttachmentUploadEditor(detail) {
+        const attachments = (Array.isArray(detail?.attachments) ? detail.attachments : []).filter((attachment) => attachment && String(attachment.path ?? "").trim() !== "");
+        const remainingSlots = Math.max(0, MAX_COMPLAINT_ATTACHMENTS_TOTAL - attachments.length);
+        if (!remainingSlots) {
+            return `<div class="complaint-admin-warning">This complaint already has the maximum of ${MAX_COMPLAINT_ATTACHMENTS_TOTAL} attachments.</div>`;
+        }
+
+        const classificationReady = isComplaintClassificationReady(detail);
+        const helperText = !classificationReady
+            ? "Set the official complaint classification first before uploading admin attachments."
+            : `Admins can upload up to ${Math.min(MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD, remainingSlots)} image attachment${Math.min(MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD, remainingSlots) === 1 ? "" : "s"} right now. ${remainingSlots} total slot${remainingSlots === 1 ? "" : "s"} remaining.`;
+
+        return `
+            <div class="complaint-admin-editor">
+                <div class="${classificationReady ? "complaint-admin-helper" : "complaint-admin-warning"}">${esc(helperText)}</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-lg-8">
+                        <label class="tracker-form-label" for="complaintAdminAttachments">Add Admin Attachments</label>
+                        <input type="file" id="complaintAdminAttachments" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple ${classificationReady ? "" : "disabled"}>
+                        <div class="small text-muted mt-2" id="complaintAdminAttachmentSelection">JPG, JPEG, PNG, or WEBP only. Max 5 MB each.</div>
+                    </div>
+                    <div class="col-12 col-lg-4 d-grid">
+                        <button type="button" class="btn btn-outline-primary" id="btnSaveComplaintAttachments" ${classificationReady ? "" : "disabled"}>Upload Attachments</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     function normalizeComplaintWitnessContact(value) {
         return String(value || "").replace(/\D+/g, "").slice(0, 11);
     }
@@ -779,7 +832,7 @@
         const isStandard = isComplaintClassificationReady(detail);
         const selectedValue = isStandard ? currentValue : "";
         const warningHtml = !isStandard
-            ? `<div class="complaint-admin-warning">Select the official complaint classification before status updates so records and reports stay consistent.${currentValue ? ` Current saved value: ${esc(currentValue)}.` : ""}</div>`
+            ? `<div class="complaint-admin-warning">Select the official complaint classification before any admin action so records and reports stay consistent.${currentValue ? ` Current saved value: ${esc(currentValue)}.` : ""}</div>`
             : `<div class="complaint-admin-helper">This classification is used in complaint filters and generated reports.</div>`;
 
         return `
@@ -1012,6 +1065,18 @@
         return data;
     }
 
+    async function postFormData(formData) {
+        const res = await fetch(endpoint, {
+            method: "POST",
+            body: formData,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+            throw new Error(data.message || "Request failed.");
+        }
+        return data;
+    }
+
     function transitionModal(fromEl, fromModal, toModal) {
         if (fromEl && fromEl.classList.contains("show") && fromModal) {
             fromEl.addEventListener("hidden.bs.modal", () => {
@@ -1169,6 +1234,7 @@
 
             const witnessGrid = renderWitnessSection(d.witnesses || [], d.witness_summary || "");
             const attachmentGrid = renderAttachmentList(d.attachments || [], d.submitted_at || "");
+            const attachmentEditor = renderAttachmentUploadEditor(d);
 
             const classificationSection = formSection("Administrative Classification", renderClassificationEditor(d));
             const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
@@ -1186,7 +1252,7 @@
                 classificationSection,
                 formSection("Complainant Information", complainantGrid),
                 formSection("Witness Information", witnessGrid),
-                attachmentGrid ? formSection("Attachments", attachmentGrid) : "",
+                formSection("Attachments", [attachmentGrid, attachmentEditor].filter(Boolean).join("")),
                 intakeNotesSection,
                 formSection("Narration and Notes", notesGrid),
             ].join("");
@@ -1205,6 +1271,9 @@
             const addAnotherWitnessBtn = document.getElementById("btnAddAnotherComplaintWitness");
             const cancelWitnessBtn = document.getElementById("btnCancelComplaintWitness");
             const saveWitnessBtn = document.getElementById("btnSaveComplaintWitness");
+            const complaintAdminAttachments = document.getElementById("complaintAdminAttachments");
+            const complaintAdminAttachmentSelection = document.getElementById("complaintAdminAttachmentSelection");
+            const saveComplaintAttachmentsBtn = document.getElementById("btnSaveComplaintAttachments");
 
             saveComplaintClassificationBtn?.addEventListener("click", async () => {
                 const complaintType = String(complaintAdminClassification?.value || "").trim();
@@ -1264,6 +1333,10 @@
             };
 
             showWitnessFormBtn?.addEventListener("click", () => {
+                if (!isComplaintClassificationReady(currentDetail)) {
+                    window.alert("Set the admin complaint classification first before adding witness details.");
+                    return;
+                }
                 witnessEditor?.classList.remove("d-none");
                 showWitnessFormBtn.classList.add("d-none");
                 ensureWitnessEditorHasVisibleRow();
@@ -1294,6 +1367,10 @@
             });
 
             addAnotherWitnessBtn?.addEventListener("click", () => {
+                if (!isComplaintClassificationReady(currentDetail)) {
+                    window.alert("Set the admin complaint classification first before adding witness details.");
+                    return;
+                }
                 const nextRow = witnessEntries.find((row) => row.classList.contains("d-none"));
                 if (!nextRow) return;
                 nextRow.classList.remove("d-none");
@@ -1301,7 +1378,64 @@
                 nextRow.querySelector("[data-complaint-witness-last-name]")?.focus();
             });
 
+            complaintAdminAttachments?.addEventListener("change", () => {
+                const files = Array.from(complaintAdminAttachments.files || []);
+                if (!complaintAdminAttachmentSelection) return;
+                if (!files.length) {
+                    complaintAdminAttachmentSelection.textContent = "JPG, JPEG, PNG, or WEBP only. Max 5 MB each.";
+                    return;
+                }
+                complaintAdminAttachmentSelection.textContent = files.map((file) => file.name).join(", ");
+            });
+
+            saveComplaintAttachmentsBtn?.addEventListener("click", async () => {
+                if (!isComplaintClassificationReady(currentDetail)) {
+                    window.alert("Set the admin complaint classification first before uploading attachments.");
+                    return;
+                }
+
+                const files = Array.from(complaintAdminAttachments?.files || []);
+                const currentAttachments = (Array.isArray(currentDetail?.attachments) ? currentDetail.attachments : []).filter((attachment) => attachment && String(attachment.path ?? "").trim() !== "");
+                const remainingSlots = Math.max(0, MAX_COMPLAINT_ATTACHMENTS_TOTAL - currentAttachments.length);
+
+                if (!files.length) {
+                    window.alert("Select at least one image attachment before uploading.");
+                    return;
+                }
+                if (files.length > MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD) {
+                    window.alert(`You can only upload up to ${MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD} images at a time.`);
+                    return;
+                }
+                if (files.length > remainingSlots) {
+                    window.alert(`This complaint only has ${remainingSlots} attachment slot${remainingSlots === 1 ? "" : "s"} remaining.`);
+                    return;
+                }
+
+                try {
+                    saveComplaintAttachmentsBtn.disabled = true;
+                    if (complaintAdminAttachments) complaintAdminAttachments.disabled = true;
+
+                    const formData = new FormData();
+                    formData.append("action", "add_attachments");
+                    formData.append("case_id", currentViewCaseId);
+                    files.forEach((file) => formData.append("complaint_images[]", file));
+
+                    await postFormData(formData);
+                    await loadList();
+                    await openViewModal(currentViewCaseId);
+                } catch (error) {
+                    window.alert(error.message || error);
+                } finally {
+                    if (saveComplaintAttachmentsBtn) saveComplaintAttachmentsBtn.disabled = false;
+                    if (complaintAdminAttachments) complaintAdminAttachments.disabled = false;
+                }
+            });
+
             saveWitnessBtn?.addEventListener("click", async () => {
+                if (!isComplaintClassificationReady(currentDetail)) {
+                    window.alert("Set the admin complaint classification first before saving witness details.");
+                    return;
+                }
                 const witnessesToSave = [];
                 let firstInvalidField = null;
 
@@ -1389,6 +1523,10 @@
             });
 
             saveIntakeNotesBtn?.addEventListener("click", async () => {
+                if (!isComplaintClassificationReady(currentDetail)) {
+                    window.alert("Set the admin complaint classification first before saving intake notes.");
+                    return;
+                }
                 const intakeNotes = String(intakeNotesField?.value || "").trim();
                 try {
                     if (saveIntakeNotesBtn) saveIntakeNotesBtn.disabled = true;

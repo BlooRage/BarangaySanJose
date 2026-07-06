@@ -648,7 +648,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         value: clean.map((attachment, index) => {
           const name = String(attachment.name || `Attachment ${index + 1}`).trim() || `Attachment ${index + 1}`;
           const href = encodeURI(String(attachment.path || "").trim());
-          return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
+          const meta = [
+            String(attachment.uploaded_at || "").trim() ? `Uploaded: ${String(attachment.uploaded_at || "").trim()}` : "",
+            String(attachment.source || "").trim() ? `Source: ${String(attachment.source || "").trim()}` : "",
+          ].filter(Boolean).join(" | ");
+          return meta
+            ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a><br><span class="text-muted small">${escapeHtml(meta)}</span>`
+            : `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
         }).join("<br>"),
         raw: true,
       }], 1);

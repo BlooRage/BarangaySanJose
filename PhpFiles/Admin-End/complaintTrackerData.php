@@ -511,6 +511,139 @@ function syncComplaintCaseDetailsClassification(?string $caseDetails, string $cl
     );
 }
 
+function complaintTrackerFilterAttachments(array $attachments): array
+{
+    return array_values(array_filter($attachments, static function ($attachment): bool {
+        return is_array($attachment)
+            && trim((string)($attachment['path'] ?? '')) !== ''
+            && trim((string)($attachment['name'] ?? '')) !== '';
+    }));
+}
+
+function syncComplaintCaseDetailsAttachments(?string $caseDetails, array $attachments, string $fallbackClassification = ''): string
+{
+    $rawCaseDetails = (string)$caseDetails;
+    if (!function_exists('complaintTypeParseCaseDetails') || !function_exists('complaintTypeBuildCaseDetails')) {
+        return $rawCaseDetails;
+    }
+
+    $parsed = complaintTypeParseCaseDetails($rawCaseDetails);
+    $cleanAttachments = complaintTrackerFilterAttachments($attachments);
+    $meta = is_array($parsed['meta'] ?? null) ? $parsed['meta'] : [];
+
+    $classification = trim($fallbackClassification);
+    if ($classification === '') {
+        $classification = trim((string)($meta['complaint_type'] ?? ''));
+    }
+
+    $selectedType = trim((string)($meta['selected_type'] ?? ''));
+    if ($selectedType === '') {
+        $selectedType = isValidComplaintClassification($classification) ? $classification : 'Other';
+    }
+
+    if ($classification === '') {
+        $classification = $selectedType;
+    }
+
+    return complaintTypeBuildCaseDetails(
+        (string)($parsed['narration'] ?? $rawCaseDetails),
+        [
+            'selected_type' => $selectedType,
+            'complaint_type' => $classification,
+            'fields' => $parsed['fields'] ?? [],
+        ],
+        [
+            'incident_area_number' => (string)($parsed['incident_area_number'] ?? ''),
+            'attachments' => $cleanAttachments,
+        ]
+    );
+}
+
+function complaintTrackerStoreImageUploads(array $files, string $caseId, string $actorUserId, array &$savedAbsolutePaths = []): array
+{
+    if (!isset($files['name']) || !is_array($files['name'])) {
+        return [];
+    }
+
+    $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    $maxBytes = 5 * 1024 * 1024;
+    $projectRoot = dirname(__DIR__, 2);
+    $relativeFolder = '/UnifiedFileAttachment/ComplaintEvidence/' . date('Y/m');
+    $absoluteFolder = $projectRoot . $relativeFolder;
+    $selectedCount = count(array_filter($files['name'], static function ($name): bool {
+        return trim((string)$name) !== '';
+    }));
+
+    if ($selectedCount > 3) {
+        throw new RuntimeException('You can only upload up to 3 complaint images at a time.');
+    }
+
+    if (!is_dir($absoluteFolder) && !mkdir($absoluteFolder, 0775, true) && !is_dir($absoluteFolder)) {
+        throw new RuntimeException('Failed to prepare the complaint upload folder.');
+    }
+
+    $saved = [];
+    $fileCount = min(3, count($files['name']));
+    for ($index = 0; $index < $fileCount; $index++) {
+        $errorCode = (int)($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('One of the complaint image uploads failed. Please try again.');
+        }
+
+        $originalName = trim((string)($files['name'][$index] ?? ''));
+        $tmpPath = (string)($files['tmp_name'][$index] ?? '');
+        $size = (int)($files['size'][$index] ?? 0);
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if ($extension === '' || !in_array($extension, $allowedExtensions, true)) {
+            throw new RuntimeException('Complaint images must be JPG, JPEG, PNG, or WEBP.');
+        }
+        if ($size <= 0 || $size > $maxBytes) {
+            throw new RuntimeException('Each complaint image must be 5 MB or smaller.');
+        }
+        if (!is_uploaded_file($tmpPath)) {
+            throw new RuntimeException('Invalid complaint image upload detected.');
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $detectedMimeType = $finfo ? strtolower((string)finfo_file($finfo, $tmpPath)) : '';
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        if (!in_array($detectedMimeType, $allowedMimeTypes, true)) {
+            throw new RuntimeException('Complaint images must be JPG, JPEG, PNG, or WEBP.');
+        }
+
+        $safeStem = preg_replace('/[^a-zA-Z0-9_-]+/', '-', pathinfo($originalName, PATHINFO_FILENAME)) ?: 'complaint-image';
+        $targetName = sprintf(
+            '%s_%s_admin_%d_%s.%s',
+            preg_replace('/[^A-Za-z0-9]/', '', $caseId),
+            preg_replace('/[^A-Za-z0-9]/', '', $actorUserId ?: 'user'),
+            $index + 1,
+            bin2hex(random_bytes(4)),
+            $extension
+        );
+        $targetPath = $absoluteFolder . '/' . $targetName;
+        if (!move_uploaded_file($tmpPath, $targetPath)) {
+            throw new RuntimeException('Failed to save one of the complaint images.');
+        }
+        @chmod($targetPath, 0664);
+        $savedAbsolutePaths[] = $targetPath;
+
+        $saved[] = [
+            'name' => $originalName !== '' ? $originalName : ($safeStem . '.' . $extension),
+            'path' => $relativeFolder . '/' . $targetName,
+            'type' => $detectedMimeType,
+        ];
+    }
+
+    return $saved;
+}
+
 function bindDynamicParams(mysqli_stmt $stmt, string $types, array $params): void
 {
     if ($types === '' || empty($params)) {
@@ -1294,6 +1427,135 @@ if ($action === 'update_case_classification') {
     }
 }
 
+if ($action === 'add_attachments') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = trim((string)($_POST['case_id'] ?? $jsonInput['case_id'] ?? ''));
+    if ($caseId === '') {
+        respond(false, [], 'Invalid case ID.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $existsStmt = $conn->prepare("
+        SELECT c.complaint_type, c.case_details
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        respond(false, [], 'Failed to validate complaint case.');
+    }
+    $existsStmt->bind_param("s", $caseId);
+    $existsStmt->execute();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
+    $existsStmt->close();
+    if (!$existingComplaint) {
+        respond(false, [], 'Complaint case not found.');
+    }
+    $currentClassification = trim((string)($existingComplaint['complaint_type'] ?? ''));
+    if (!isValidComplaintClassification($currentClassification)) {
+        respond(false, [], 'Complaint classification must be set by admin before uploading attachments.');
+    }
+
+    $parsedCaseDetails = complaintTypeParseCaseDetails((string)($existingComplaint['case_details'] ?? ''));
+    $existingAttachments = complaintTrackerFilterAttachments(is_array($parsedCaseDetails['attachments'] ?? null) ? $parsedCaseDetails['attachments'] : []);
+    $maxTotalAttachments = 6;
+    if (count($existingAttachments) >= $maxTotalAttachments) {
+        respond(false, [], 'This complaint already has the maximum number of attachments.');
+    }
+
+    $savedAbsolutePaths = [];
+    try {
+        $uploadedAttachments = complaintTrackerStoreImageUploads($_FILES['complaint_images'] ?? [], $caseId, $actorUserId, $savedAbsolutePaths);
+    } catch (Throwable $e) {
+        respond(false, [], $e->getMessage() ?: 'Failed to upload complaint attachments.');
+    }
+
+    if ($uploadedAttachments === []) {
+        respond(false, [], 'Select at least one complaint image to upload.');
+    }
+    if ((count($existingAttachments) + count($uploadedAttachments)) > $maxTotalAttachments) {
+        foreach ($savedAbsolutePaths as $path) {
+            if (is_string($path) && is_file($path)) {
+                @unlink($path);
+            }
+        }
+        respond(false, [], 'A complaint can only keep up to 6 attachments in total.');
+    }
+
+    $uploadedAt = date('Y-m-d H:i:s');
+    $uploadedBy = trim((string)($_SESSION['fullname'] ?? $_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+    if ($uploadedBy === '') {
+        $uploadedBy = $actorUserId;
+    }
+
+    $newAttachments = array_map(static function (array $attachment) use ($uploadedAt, $uploadedBy): array {
+        $attachment['source'] = 'Admin';
+        $attachment['uploaded_at'] = $uploadedAt;
+        $attachment['uploaded_by'] = $uploadedBy;
+        return $attachment;
+    }, $uploadedAttachments);
+
+    $updatedAttachments = array_values(array_merge($existingAttachments, $newAttachments));
+    $updatedCaseDetails = syncComplaintCaseDetailsAttachments(
+        (string)($existingComplaint['case_details'] ?? ''),
+        $updatedAttachments,
+        $currentClassification
+    );
+
+    $conn->begin_transaction();
+    try {
+        $updateCaseStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET case_details = ?,
+                user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateCaseStmt) {
+            throw new Exception('Failed to prepare complaint attachment update.');
+        }
+        $updateCaseStmt->bind_param("sss", $updatedCaseDetails, $actorUserId, $caseId);
+        $updateCaseStmt->execute();
+        $updateCaseStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare complaint attachment log.');
+            }
+            $logEntry = count($newAttachments) === 1
+                ? 'Admin attachment added to complaint: ' . trim((string)($newAttachments[0]['name'] ?? 'Attachment'))
+                : count($newAttachments) . ' admin attachments added to complaint.';
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        complaintTrackerCacheClear();
+        respond(true, [], count($newAttachments) === 1 ? 'Attachment added to complaint.' : 'Attachments added to complaint.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        foreach ($savedAbsolutePaths as $path) {
+            if (is_string($path) && is_file($path)) {
+                @unlink($path);
+            }
+        }
+        respond(false, [], 'Failed to add complaint attachments.');
+    }
+}
+
 if ($action === 'add_witness') {
     if ($requestMethod !== 'POST') {
         respond(false, [], 'Method not allowed.');
@@ -1321,7 +1583,7 @@ if ($action === 'add_witness') {
     }
 
     $existsStmt = $conn->prepare("
-        SELECT 1
+        SELECT c.complaint_type
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
@@ -1332,10 +1594,13 @@ if ($action === 'add_witness') {
     }
     $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
-    $exists = $existsStmt->get_result()->fetch_row();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
     $existsStmt->close();
-    if (!$exists) {
+    if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
+    }
+    if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before adding witness details.');
     }
     if (complaintTrackerWitnessCount($conn, $caseId) >= 10) {
         respond(false, [], 'A maximum of 10 witnesses is allowed for each complaint.');
@@ -1467,7 +1732,7 @@ if ($action === 'add_witnesses') {
     }
 
     $existsStmt = $conn->prepare("
-        SELECT 1
+        SELECT c.complaint_type
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
@@ -1478,10 +1743,13 @@ if ($action === 'add_witnesses') {
     }
     $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
-    $exists = $existsStmt->get_result()->fetch_row();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
     $existsStmt->close();
-    if (!$exists) {
+    if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
+    }
+    if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before adding witness details.');
     }
 
     $existingWitnessCount = complaintTrackerWitnessCount($conn, $caseId);
@@ -1589,7 +1857,7 @@ if ($action === 'update_intake_notes') {
     }
 
     $existsStmt = $conn->prepare("
-        SELECT 1
+        SELECT c.complaint_type
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
@@ -1600,10 +1868,13 @@ if ($action === 'update_intake_notes') {
     }
     $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
-    $exists = $existsStmt->get_result()->fetch_row();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
     $existsStmt->close();
-    if (!$exists) {
+    if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
+    }
+    if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before updating intake notes.');
     }
 
     $conn->begin_transaction();
