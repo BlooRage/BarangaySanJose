@@ -106,7 +106,7 @@ if ($reportModule === 'document_requests') {
 }
 $areaManagementTab = strtolower(trim((string)($_GET['tab'] ?? 'summary')));
 $areaManagementArea = trim((string)($_GET['area'] ?? ''));
-$isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
+$isSuperAdminSidebar = (strtolower(trim((string)($_SESSION['role'] ?? ''))) === 'superadmin');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
 $certificateTab = strtolower(trim((string)($_GET['tab'] ?? 'tracker')));
 $certificateDocument = strtolower(trim((string)($_GET['document'] ?? '')));
