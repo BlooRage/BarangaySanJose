@@ -508,9 +508,15 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     const mobileHeaderEl = ensureMobileHeader();
     const desktopQuery = window.matchMedia("(min-width: 769px)");
+    const mobileQuery = window.matchMedia("(max-width: 768px)");
     const storageKey = "residentSidebarCollapsed";
     const isCollapsibleViewport = () => {
       return desktopQuery.matches && (!mobileHeaderEl || window.getComputedStyle(mobileHeaderEl).display === "none");
+    };
+
+    const syncMobileSidebarState = () => {
+      const isOpen = mobileQuery.matches && !!sidebarEl?.classList.contains("show");
+      document.body.classList.toggle("resident-sidebar-open", isOpen);
     };
 
     const applySidebarState = (collapsed) => {
@@ -531,6 +537,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     const syncSidebarMode = () => {
       const collapsed = localStorage.getItem(storageKey) === "1";
       applySidebarState(collapsed);
+      if (!mobileQuery.matches) {
+        sidebarEl?.classList.remove("show");
+      }
+      syncMobileSidebarState();
     };
 
     if (toggleBtn) {
@@ -550,6 +560,38 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         event.preventDefault();
         window.location.href = fallbackHref;
       });
+    }
+
+    document.addEventListener("click", (event) => {
+      if (!mobileQuery.matches || !sidebarEl?.classList.contains("show")) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (sidebarEl.contains(target) || (target instanceof Element && target.closest("#btn-burger"))) {
+        return;
+      }
+
+      sidebarEl.classList.remove("show");
+      syncMobileSidebarState();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !mobileQuery.matches || !sidebarEl?.classList.contains("show")) {
+        return;
+      }
+
+      sidebarEl.classList.remove("show");
+      syncMobileSidebarState();
+    });
+
+    if (sidebarEl && typeof MutationObserver !== "undefined") {
+      const observer = new MutationObserver(syncMobileSidebarState);
+      observer.observe(sidebarEl, { attributes: true, attributeFilter: ["class"] });
     }
 
     if (typeof desktopQuery.addEventListener === "function") {

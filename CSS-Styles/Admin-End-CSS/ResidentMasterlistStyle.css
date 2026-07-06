@@ -142,6 +142,50 @@ html, body {
     }
 }
 
+@media (max-width: 575.98px) {
+    .admin-list-toolbar {
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .admin-list-tabs {
+        gap: 8px;
+    }
+
+    .admin-list-tabs .btn,
+    .admin-list-actions .btn,
+    .admin-list-actions .form-select,
+    .admin-list-actions .input-group {
+        width: 100%;
+    }
+
+    .admin-list-actions .btn-icon {
+        width: 44px;
+        height: 44px;
+        flex-basis: 44px;
+    }
+
+    .compact-admin-table thead th,
+    .compact-admin-table tbody td {
+        padding: 0.72rem 0.68rem;
+        font-size: 0.88rem;
+    }
+
+    .compact-admin-table .status-pill {
+        font-size: 0.75rem;
+    }
+
+    .resident-table-footer {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .resident-table-footer .pagination {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}
+
 /* "Filter" (slate) + "Columns" (blue) + "Refresh" (orange) button styling shared across admin list pages. */
 .admin-filter {
     border-color: rgba(108, 117, 125, 0.28);

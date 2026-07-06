@@ -520,6 +520,10 @@ if (isset($conn) && $conn instanceof mysqli) {
             .downloads-card {
                 padding: 0.9rem !important;
             }
+            .admin-list-actions {
+                width: 100%;
+                gap: 0.6rem;
+            }
             .table-responsive {
                 display: none;
             }
@@ -557,16 +561,28 @@ if (isset($conn) && $conn instanceof mysqli) {
             }
         }
         @media (max-width: 480px) {
-            .downloads-table {
-                min-width: 820px;
-            }
-            .downloads-table td,
-            .downloads-table th {
-                font-size: 0.875rem;
-            }
             .downloads-summary {
                 width: 100%;
                 justify-content: space-between;
+            }
+            .admin-list-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .download-card {
+                padding: 0.8rem;
+            }
+            .download-card-header {
+                gap: 0.55rem;
+            }
+            #downloadViewerModal .modal-header,
+            #downloadViewerModal .modal-body,
+            #downloadViewerModal .modal-footer {
+                padding-left: 0.9rem;
+                padding-right: 0.9rem;
+            }
+            .download-preview-frame {
+                height: 56vh;
             }
         }
         @media (max-width: 1160px) {

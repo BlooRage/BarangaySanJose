@@ -851,6 +851,37 @@
 }
 
 @media (max-width: 767px) {
+    html,
+    body {
+        overflow-x: hidden;
+    }
+
+    #main-display {
+        width: 100%;
+        min-width: 0;
+        padding: 1rem !important;
+    }
+
+    #main-display > .bg-white.rounded-4,
+    #main-display > .bg-white.rounded-5,
+    #main-display .bg-white.rounded-4,
+    #main-display .bg-white.rounded-5,
+    #main-display .chart-panel,
+    #main-display .dashboard-hero,
+    #main-display .dashboard-attention-panel,
+    #main-display .dashboard-module-section {
+        border-radius: 18px !important;
+    }
+
+    #main-display .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #main-display .modal-dialog {
+        margin: 0.75rem auto;
+        max-width: calc(100vw - 1rem);
+    }
+
     .dashboard-section-head {
         flex-direction: column;
     }
@@ -1013,6 +1044,10 @@
 }
 
 @media (max-width: 575.98px) {
+    #main-display {
+        padding: 0.85rem !important;
+    }
+
     .chart-panel {
         border-radius: 20px;
         padding: 0.95rem;

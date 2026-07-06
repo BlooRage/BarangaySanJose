@@ -858,6 +858,25 @@ body {
 
 /* ===== MOBILE INTERFACES ===== */
 @media (max-width: 768px) {
+    html,
+    body {
+        overflow-x: hidden;
+    }
+
+    body.resident-sidebar-open {
+        overflow: hidden;
+        touch-action: none;
+    }
+
+    body.resident-sidebar-open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 1095;
+        background: rgba(15, 23, 42, 0.38);
+        backdrop-filter: blur(2px);
+    }
+
     .sidebar-edge-toggle {
         display: none;
     }
@@ -871,25 +890,80 @@ body {
         z-index: 1200;
     }
 
+    #mobile-header .d-flex {
+        min-height: 58px;
+        gap: 0.6rem;
+        padding-left: 0.9rem !important;
+        padding-right: 0.9rem !important;
+    }
+
+    #mobile-header #btn-burger,
+    #mobile-header .btn {
+        width: 44px;
+        height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border-radius: 12px;
+    }
+
     #div-sidebarWrapper {
         position: fixed;
         top: 0;
         left: 0;
         height: 100vh;
-        width: 100%;
+        width: min(88vw, 360px);
         min-width: 0;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
-        z-index: 1100;
+        z-index: 1110;
         background: #fff;
         overflow-y: auto;
+        border-right: 1px solid rgba(215, 221, 229, 0.9);
+        box-shadow: 0 22px 44px rgba(15, 23, 42, 0.18);
     }
+
     #div-mainDisplay {
         margin-left: 0;
+        width: 100%;
+        min-width: 0;
+        padding: 1rem !important;
     }
 
     #div-sidebarWrapper.show {
         transform: translateX(0);
+    }
+
+    #div-mainDisplay .bg-white.rounded-4,
+    #div-mainDisplay .bg-white.rounded-5,
+    #div-mainDisplay .application-card {
+        border-radius: 18px !important;
+    }
+
+    #div-mainDisplay .table-responsive {
+        border-radius: 16px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #div-mainDisplay table {
+        font-size: 0.92rem;
+    }
+
+    #div-mainDisplay .modal-dialog {
+        margin: 0.75rem auto;
+        max-width: calc(100vw - 1rem);
+    }
+
+    .profile-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .profile-tabs .nav-link {
+        white-space: nowrap;
+        flex: 0 0 auto;
     }
 
     body {
@@ -914,6 +988,25 @@ body {
 .logout-btn-col {
     flex: 0 0 50% !important;
     max-width: 50% !important;
+}
+
+@media (max-width: 480px) {
+    #div-mainDisplay {
+        padding: 0.85rem !important;
+    }
+
+    #mobile-header .logo-name {
+        font-size: 0.88rem;
+    }
+
+    .logout-btn-row {
+        flex-wrap: wrap !important;
+    }
+
+    .logout-btn-col {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
 }
 
 .main-head {
