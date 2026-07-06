@@ -2507,6 +2507,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
   <title><?= $isPrintView ? htmlspecialchars($currentLabel).' — Barangay San Jose' : 'Reports' ?></title>
   <?php if (!$isPrintView): ?>
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>

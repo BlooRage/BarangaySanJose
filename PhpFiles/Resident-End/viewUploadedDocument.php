@@ -16,6 +16,7 @@ function renderViewerError(string $title, string $message, int $status = 404): v
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="<?= htmlspecialchars(appUrl('Images/favicon_sanjose.png?v=20260211'), ENT_QUOTES, 'UTF-8') ?>">
   <title>{$safeTitle}</title>
   <style>
     :root {

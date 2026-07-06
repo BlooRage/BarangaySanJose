@@ -7614,6 +7614,7 @@ if ($action === 'view_issued_card') {
     header('Content-Type: text/html; charset=UTF-8');
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8">';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<link rel="icon" href="' . htmlspecialchars($baseUrl . '/Images/favicon_sanjose.png?v=20260211', ENT_QUOTES, 'UTF-8') . '">';
     echo '<title>Digital Barangay ID</title>';
     echo '<style>
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }

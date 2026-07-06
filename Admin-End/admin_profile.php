@@ -65,6 +65,36 @@ function ap_to_db_web_path(string $absolutePath): string
     return ltrim($absolutePath, "/");
 }
 
+function ap_profile_defaults(): array
+{
+    return [
+        'lastname' => '',
+        'firstname' => '',
+        'middlename' => '',
+        'suffix' => '',
+        'birthdate' => '',
+        'sex' => '',
+        'civil_status' => '',
+        'department' => '',
+        'role_access' => '',
+        'position_access' => '',
+        'emergency_contact_name' => '',
+        'emergency_contact_relationship' => '',
+        'emergency_contact_phone' => '',
+        'emergency_contact_address' => '',
+        'address_mode' => 'street',
+        'house_number' => '',
+        'street_name' => '',
+        'block_number' => '',
+        'lot_number' => '',
+        'subdivision' => '',
+        'barangay' => '',
+        'municipality_city' => '',
+        'province' => '',
+        'area_number' => '',
+    ];
+}
+
 function ap_get_document_type_id(mysqli $conn, string $name, string $category = 'OfficialProfiling'): int
 {
     $q = $conn->prepare("
@@ -218,8 +248,16 @@ if (!$account) {
 }
 
 if (!$profile) {
-    header('Location: ' . appUrl('/official-onboarding'));
-    exit;
+    $profile = ap_profile_defaults();
+    $profile['role_access'] = (string)($account['role_access'] ?? '');
+    if ($flash['message'] === '') {
+        $flash = [
+            'type' => 'warning',
+            'message' => 'Your admin profile record is incomplete, so some personal details are unavailable right now.',
+        ];
+    }
+} else {
+    $profile = array_replace(ap_profile_defaults(), $profile);
 }
 
 $emailVerified = (int)($account['email_verify'] ?? 0) === 1;
@@ -321,6 +359,7 @@ $positionDisplayLabel = ap_format_position_label(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
     <title>Admin Profile</title>
     <script>
       window.RESIDENT_PROFILE_EMAIL_VERIFIED = <?= $emailVerified ? 'true' : 'false' ?>;

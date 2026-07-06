@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>Default page</title>
-        <link rel="icon" type="image/x-icon" href="https://hpanel.hostinger.com/favicons/hostinger.png">
+        <title>Barangay San Jose, Rodriguez, Rizal Official Website</title>
+        <link rel="icon" type="image/png" href="Images/favicon_sanjose.png?v=20260211">
         <meta charset="utf-8">
         <meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
-        <meta content="Default page" name="description">
+        <meta content="Barangay San Jose, Rodriguez, Rizal Official Website" name="description">
         <meta content="width=device-width, initial-scale=1" name="viewport">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans&display=swap" rel="stylesheet">
