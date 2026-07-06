@@ -1,6 +1,5 @@
 <?php
 define('ADMIN_GUARD_LIGHT', true);
-define('ADMIN_SIDEBAR_DEFER_DB', true);
 require_once __DIR__ . "/../includes/admin_guard.php";
 ?>
 <!DOCTYPE html>
