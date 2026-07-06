@@ -372,6 +372,12 @@ if (!function_exists('amp_get_permission_catalog')) {
                         'path' => 'Admin-End/AuditLogs.php',
                         'admin_only' => true,
                     ],
+                    [
+                        'key' => 'website_settings',
+                        'label' => 'Website Settings',
+                        'path' => 'Admin-End/WebsiteSettings.php',
+                        'admin_only' => true,
+                    ],
                 ],
             ],
             [
@@ -500,6 +506,7 @@ if (!function_exists('amp_get_it_superadmin_locked_permission_keys')) {
             'personnel_invite',
             'official_transition',
             'audit_logs',
+            'website_settings',
         ];
     }
 }
@@ -1706,6 +1713,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'OfficialInvites.php' => 'personnel_invite',
             'OfficialTransitions.php' => 'official_transition',
             'AuditLogs.php' => 'audit_logs',
+            'WebsiteSettings.php' => 'website_settings',
             'FinancePayments.php' => match (strtolower(trim((string)($_GET['section'] ?? 'tracker')))) {
                 'create' => 'finance_create_transaction',
                 'fees' => 'finance_fee_management',

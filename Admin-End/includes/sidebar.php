@@ -15,7 +15,7 @@ $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php', 'UserArchive.php'];
 $personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php'];
 $adminRecordsPages = ['AdminManagement.php'];
-$adminMgmtPages = ['UserMasterlist.php', 'UserArchive.php', 'AdminManagement.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php'];
+$adminMgmtPages = ['UserMasterlist.php', 'UserArchive.php', 'AdminManagement.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php', 'WebsiteSettings.php'];
 $barangayOfficialMgmtPages = ['OfficialsManagement.php', 'OfficialTransitions.php'];
 $officialTransitionPages = ['OfficialTransitions.php'];
 
@@ -93,6 +93,7 @@ $isAreaManagementActive = in_array($current, $areaManagementPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminRecordsActive = in_array($current, $adminRecordsPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
+$isWebsiteSettingsActive = ($current === 'WebsiteSettings.php');
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
 $isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);
 $isOfficialTransitionActive = in_array($current, $officialTransitionPages);
@@ -434,6 +435,7 @@ $sbAdminKeys = [
     'personnel_invite',
     'official_transition',
     'audit_logs',
+    'website_settings',
 ];
 
 $sbModuleAttentionCounts = [
@@ -1850,6 +1852,18 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
             <i class="fas fa-clipboard-list"></i>
           </span>
           <span class="sidebar-button-label">Audit Logs</span>
+        </a>
+      </li>
+      <?php endif; ?>
+      <?php if ($sbCan('website_settings')): ?>
+      <li class="mb-1">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/WebsiteSettings.php')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isWebsiteSettingsActive ? 'active' : '' ?>"
+           style="<?= $isWebsiteSettingsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-screwdriver-wrench"></i>
+          </span>
+          <span class="sidebar-button-label">Website Settings</span>
         </a>
       </li>
       <?php endif; ?>

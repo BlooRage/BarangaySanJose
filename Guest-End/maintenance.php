@@ -1,8 +1,13 @@
 <?php
 require_once __DIR__ . '/../PhpFiles/General/security.php';
+require_once __DIR__ . '/../PhpFiles/General/websiteMaintenance.php';
 
 http_response_code(503);
 header('Retry-After: 3600');
+
+$maintenanceSettings = wms_load_settings();
+$maintenanceMessage = (string)($maintenanceSettings['message'] ?? '');
+$maintenanceSubcopy = (string)($maintenanceSettings['subcopy'] ?? '');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -127,8 +132,8 @@ header('Retry-After: 3600');
     </div>
     <p class="maintenance-kicker">Please Stand By</p>
     <h1 class="maintenance-title" id="maintenance-title">Maintenance Mode</h1>
-    <p class="maintenance-copy">Our developers are currently upgrading the system to deliver a smoother, faster, and better experience for everyone.</p>
-    <p class="maintenance-subcopy">The public pages will be available again once the improvements are complete.</p>
+    <p class="maintenance-copy"><?= htmlspecialchars($maintenanceMessage, ENT_QUOTES, 'UTF-8') ?></p>
+    <p class="maintenance-subcopy"><?= htmlspecialchars($maintenanceSubcopy, ENT_QUOTES, 'UTF-8') ?></p>
   </main>
 </body>
 </html>

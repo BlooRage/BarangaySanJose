@@ -39,6 +39,11 @@ RewriteRule "(^|/).*\.(sql|bak|old|orig|ini|log|env)$" - [F,L,NC]
 RewriteRule ^Guest-End/maintenance/?$ Guest-End/maintenance.php [L,NC]
 RewriteRule ^maintenance/?$ Guest-End/maintenance.php [L,NC]
 
+# Public maintenance gate. Keep admin access and required support routes available.
+RewriteCond %{DOCUMENT_ROOT}/.maintenance-mode.flag -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/BarangaySanJose/.maintenance-mode.flag -f
+RewriteRule !^(?:Admin-End/|PhpFiles/Admin-End/|PhpFiles/Login/|CSS-Styles/|JS-Script-Files/|Images/|UnifiedFileAttachment/|Guest-End/maintenance(?:\.php)?/?$|maintenance/?$|Guest-End/login(?:\.php)?/?$|login/?$|Guest-End/official_onboarding(?:\.php)?/?$|official-onboarding/?$|Guest-End/verifyEmail(?:\.php)?/?$|verify-email/?$|logout/?$|account-redirect/?$) Guest-End/maintenance.php [L,NC]
+
 RewriteRule ^index/?$ index.html [L,NC]
 RewriteRule ^Guest-End/login/?$ Guest-End/login.php [L,NC]
 RewriteRule ^Guest-End/government/?$ Guest-End/government.html [L,NC]

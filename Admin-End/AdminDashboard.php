@@ -123,6 +123,7 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
     $addModuleCard($sbCan('admin_management'), 'admin-management', 'Admin Management', appUrl('Admin-End/AdminManagement.php'), 'fa-user-gear', 'Manage administrator records and admin-only account controls.', 0);
     $addModuleCard($sbCan('user_masterlist') || $sbCan('user_archive'), 'user-management', 'User Management', appUrl($sbCan('user_masterlist') ? 'Admin-End/UserMasterlist.php' : 'Admin-End/UserArchive.php'), 'fa-users-cog', 'Review user access, archive records, and account maintenance.', $userAttention);
     $addModuleCard($isSuperAdminSidebar, 'personnel-management', 'Personnel Management', appUrl('Admin-End/PersonnelTracker.php'), 'fa-user-tie', 'Open the personnel tracker, invites, and access control workspace.', 0);
+    $addModuleCard($sbCan('website_settings'), 'website-settings', 'Website Settings', appUrl('Admin-End/WebsiteSettings.php'), 'fa-screwdriver-wrench', 'Toggle maintenance mode and control public website availability.', 0);
     $addModuleCard($sbCan('official_records_management') || $sbCan('official_transition'), 'official-management', 'Official Management', appUrl($sbCan('official_records_management') ? 'Admin-End/OfficialsManagement.php' : 'Admin-End/OfficialTransitions.php'), 'fa-user-tie', 'Manage officials, transitions, and assigned office records.', 0);
     $addModuleCard($sbCan('audit_logs'), 'audit-logs', 'Audit Logs', appUrl('Admin-End/AuditLogs.php'), 'fa-clipboard-list', 'Review recent system actions and accountability trails.', 0);
 
