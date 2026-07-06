@@ -760,15 +760,14 @@ if (!function_exists('sbatt_count_pending_complaints')) {
                 SELECT
                     c.case_id,
                     CASE
-                        WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'escalated'
-                        WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'escalated'
+                        WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'referred'
+                        WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'referred'
+                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%refer%' THEN 'referred'
                         WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%under investigation%' THEN 'under_investigation'
                         WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%action in progress%' THEN 'action_in_progress'
-                        WHEN LOWER(COALESCE(s.status_name, 'pending')) LIKE '%resolved%' THEN 'resolved'
-                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%closed%' THEN 'closed'
+                        WHEN LOWER(COALESCE(s.status_name, 'received')) LIKE '%resolved%' THEN 'resolved'
                         WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%drop%' THEN 'dropped'
-                        WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%endorse%' THEN 'escalated'
-                        ELSE 'pending'
+                        ELSE 'received'
                     END AS status_key
                 FROM casereportstbl c
                 INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
@@ -787,7 +786,7 @@ if (!function_exists('sbatt_count_pending_complaints')) {
                 ) br ON br.complaint_case_id = c.case_id
                 WHERE c.report_type = 'Complaint'
             ) complaint_rows
-            WHERE complaint_rows.status_key = 'pending'
+            WHERE complaint_rows.status_key = 'received'
         ");
     }
 }

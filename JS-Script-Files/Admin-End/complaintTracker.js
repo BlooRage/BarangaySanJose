@@ -73,8 +73,8 @@
         under_investigation: investigateBtn,
         action_in_progress: actionInProgressBtn,
         resolved: resolveBtn,
-        closed: closeBtn,
-        endorsement: endorseBtn,
+        dropped: closeBtn,
+        referred: endorseBtn,
     };
     const complaintActionItemsByType = Object.fromEntries(
         Object.entries(complaintActionButtonsByType).map(([actionType, button]) => [actionType, button?.closest("li") || null])
@@ -211,13 +211,12 @@
 
     function normalizeComplaintStatus(value) {
         const status = String(value || "").trim().toLowerCase();
-        if (status === "" || status === "active" || status === "pending") return "pending";
+        if (status === "" || status === "active" || status === "pending" || status.includes("receive")) return "received";
         if (status.includes("under investigation")) return "under_investigation";
         if (status.includes("action in progress")) return "action_in_progress";
         if (status.includes("resolved") || status.includes("completed")) return "resolved";
-        if (status.includes("closed")) return "closed";
         if (status.includes("drop")) return "dropped";
-        if (status.includes("endorse")) return "endorsed";
+        if (status.includes("refer") || status.includes("endorse")) return "referred";
         return status.replace(/[^a-z0-9]+/g, "_");
     }
 
@@ -226,22 +225,27 @@
             under_investigation: {
                 title: "Start Investigation",
                 actionText: "start investigation for this complaint",
+                placeholder: "Add investigation notes...",
             },
             action_in_progress: {
                 title: "Start Action",
                 actionText: "move this complaint to Action in Progress",
+                placeholder: "Add action in progress notes...",
             },
             resolved: {
                 title: "Mark Complaint Resolved",
                 actionText: "mark this complaint as resolved",
+                placeholder: "Add resolution notes...",
             },
-            closed: {
-                title: "Close Complaint",
-                actionText: "close this complaint",
+            dropped: {
+                title: "Drop Complaint",
+                actionText: "drop this complaint",
+                placeholder: "Enter the admin reason for dropping this complaint...",
             },
-            endorsement: {
-                title: "Send Complaint for Blotter Review",
-                actionText: "send this complaint for blotter review",
+            referred: {
+                title: "Refer Complaint",
+                actionText: "refer this complaint to another department",
+                placeholder: "Add referral notes for the receiving department...",
             },
         };
         return map[actionType] || {
@@ -278,14 +282,14 @@
         const hasLinkedBlotter = String(detail?.blotter_id || "").trim() !== "";
         const requestStatus = String(detail?.blotter_request_status || "").trim().toLowerCase();
         const hasOpenRequest = ["pending", "approved"].includes(requestStatus);
-        const isFinal = ["resolved", "closed", "dropped"].includes(statusKey) || (statusKey === "endorsed" && hasLinkedBlotter) || hasOpenRequest;
+        const isFinal = ["resolved", "dropped", "referred"].includes(statusKey) || hasOpenRequest || hasLinkedBlotter;
         complaintActionButtons.classList.toggle("d-none", isFinal);
         if (isFinal) {
             return;
         }
 
-        const visibleActions = new Set(["endorsement", "closed"]);
-        if (statusKey === "pending") {
+        const visibleActions = new Set(["referred", "dropped"]);
+        if (statusKey === "received") {
             visibleActions.add("under_investigation");
         } else if (statusKey === "under_investigation") {
             visibleActions.add("action_in_progress");
@@ -305,14 +309,16 @@
     }
 
     function toneForStatus(row) {
+        const statusKey = normalizeComplaintStatus(row?.status_name || "");
+        if (statusKey === "referred") return "archived";
+
         const requestStatus = String(row?.blotter_request_status || "").trim().toLowerCase();
         if (Number(row?.escalated_to_blotter || 0) === 1 || ["pending", "approved"].includes(requestStatus)) return "info";
 
-        const statusKey = normalizeComplaintStatus(row?.status_name || "");
-        if (statusKey === "pending") return "pending";
-        if (statusKey === "under_investigation" || statusKey === "action_in_progress" || statusKey === "endorsed") return "info";
+        if (statusKey === "received") return "pending";
+        if (statusKey === "under_investigation" || statusKey === "action_in_progress" || statusKey === "referred") return "info";
         if (statusKey === "resolved") return "approved";
-        if (statusKey === "closed" || statusKey === "dropped") return "archived";
+        if (statusKey === "dropped") return "denied";
         return "archived";
     }
 
@@ -340,7 +346,7 @@
                 <td>${esc(row.complainant_name || "-")}</td>
                 <td>${esc(row.subject_display_name || "-")}</td>
                 <td>${esc(row.complaint_type || "-")}</td>
-                <td>${badge(row.status_name || "Pending", toneForStatus(row))}</td>
+                <td>${badge(row.status_name || "Received", toneForStatus(row))}</td>
                 <td>${badge(row.level_name || "Complaint Only", toneForLevel(row.level_name || "Complaint Only"))}</td>
                 <td>${actionBtn}</td>
             </tr>
@@ -851,7 +857,7 @@
                         result.progressedAction = noteValue;
                         return;
                     }
-                    if (["resolved", "closed", "dropped"].includes(stageLabel)) {
+                    if (["resolved", "dropped", "referred"].includes(stageLabel)) {
                         result.resolution = noteValue;
                         return;
                     }
@@ -868,7 +874,7 @@
         if (result.progressedAction === "" && statusKey === "action_in_progress" && screeningNotes !== "") {
             result.progressedAction = screeningNotes;
         }
-        if (result.resolution === "" && ["resolved", "closed", "dropped"].includes(statusKey) && screeningNotes !== "") {
+        if (result.resolution === "" && ["resolved", "dropped", "referred"].includes(statusKey) && screeningNotes !== "") {
             result.resolution = screeningNotes;
         }
         if (result.initialInvestigation === "" && screeningNotes !== "" && result.progressedAction === "" && result.resolution === "") {
@@ -974,7 +980,7 @@
         const notes = String(detail?.blotter_request_notes || "").trim();
 
         if (status === "pending" || status === "approved") {
-            return "Blotter request is still under review.";
+            return "This complaint has already been referred and is still under review.";
         }
 
         if (status === "rejected") {
@@ -1023,10 +1029,12 @@
             window.alert("Set the admin complaint classification first before updating the complaint status.");
             return;
         }
-        pendingComplaintAction = actionType;
-        if (complaintActionRemarks) complaintActionRemarks.value = "";
-
         const config = complaintActionConfig(actionType);
+        pendingComplaintAction = actionType;
+        if (complaintActionRemarks) {
+            complaintActionRemarks.value = "";
+            complaintActionRemarks.placeholder = config.placeholder || "Add status update notes or reason...";
+        }
         if (complaintActionModalTitle) complaintActionModalTitle.textContent = config.title;
 
         transitionModal(viewModalEl, viewModal, complaintActionModal);
@@ -1070,8 +1078,8 @@
         investigateBtn?.addEventListener("click", () => openComplaintActionModal("under_investigation"));
         actionInProgressBtn?.addEventListener("click", () => openComplaintActionModal("action_in_progress"));
         resolveBtn?.addEventListener("click", () => openComplaintActionModal("resolved"));
-        closeBtn?.addEventListener("click", () => openComplaintActionModal("closed"));
-        endorseBtn?.addEventListener("click", () => openComplaintActionModal("endorsement"));
+        closeBtn?.addEventListener("click", () => openComplaintActionModal("dropped"));
+        endorseBtn?.addEventListener("click", () => openComplaintActionModal("referred"));
 
         btnComplaintActionReturn?.addEventListener("click", () => {
             transitionModal(complaintActionModalEl, complaintActionModal, viewModal);
@@ -1141,7 +1149,7 @@
                 { label: "Complaint ID", value: d.complaint_id || "-" },
                 { label: "Submitted At", value: d.submitted_at || "-" },
                 { label: "Origin", value: d.complaint_origin || "ResidentPortal" },
-                { label: "Status", value: d.status_name || "Pending" },
+                { label: "Status", value: d.status_name || "Received" },
             ], 4);
             const summaryMetaGrid = renderFieldGrid([
                 { label: "Complaint Level", value: d.level_name || "Complaint Only" },

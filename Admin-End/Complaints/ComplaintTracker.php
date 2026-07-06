@@ -706,7 +706,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="resolved">Resolved</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="closed">Closed</button>
+                <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="finalized">Dropped/Referred</button>
             </li>
         </ul>
 
@@ -884,17 +884,17 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                             <button type="button" class="dropdown-item action-endorse" id="btnComplaintEndorse">
                                 <span class="complaint-action-icon"><i class="fa-solid fa-share-from-square" aria-hidden="true"></i></span>
                                 <span class="complaint-action-copy">
-                                    <span class="complaint-action-label">Send for Blotter Review</span>
-                                    <span class="complaint-action-hint">Escalate this complaint for blotter evaluation.</span>
+                                    <span class="complaint-action-label">Refer Complaint</span>
+                                    <span class="complaint-action-hint">Refer this complaint to another department and close it in this tracker.</span>
                                 </span>
                             </button>
                         </li>
                         <li>
                             <button type="button" class="dropdown-item action-close" id="btnComplaintClose">
-                                <span class="complaint-action-icon"><i class="fa-solid fa-folder-closed" aria-hidden="true"></i></span>
+                                <span class="complaint-action-icon"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i></span>
                                 <span class="complaint-action-copy">
-                                    <span class="complaint-action-label">Close Complaint</span>
-                                    <span class="complaint-action-hint">End the complaint without marking it resolved.</span>
+                                    <span class="complaint-action-label">Drop Complaint</span>
+                                    <span class="complaint-action-hint">End the complaint and record the admin reason for dropping it.</span>
                                 </span>
                             </button>
                         </li>
@@ -915,7 +915,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             <div class="modal-body">
                 <div class="mb-0">
                     <label for="complaintActionRemarks" class="form-label">Case Update Notes</label>
-                    <textarea id="complaintActionRemarks" class="form-control" rows="4" placeholder="Add status update notes..."></textarea>
+                    <textarea id="complaintActionRemarks" class="form-control" rows="4" placeholder="Add status update notes or reason..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
