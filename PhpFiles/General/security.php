@@ -460,7 +460,12 @@ function sendJsonErrorAndExit(int $statusCode, string $message): void {
     exit;
 }
 
-function destroySessionAndExit(bool $json = true, int $statusCode = 401, string $message = 'Session expired. Please login again.'): void
+function destroySessionAndExit(
+    bool $json = true,
+    int $statusCode = 401,
+    string $message = 'Session expired. Please login again.',
+    string $loginQuery = '?session=expired'
+): void
 {
     $_SESSION = [];
 
@@ -475,7 +480,7 @@ function destroySessionAndExit(bool $json = true, int $statusCode = 401, string 
         sendJsonErrorAndExit($statusCode, $message);
     }
 
-    redirectToLogin('?session=expired');
+    redirectToLogin($loginQuery);
 }
 
 // Enforce inactivity-based auto logout. Default: 30 minutes idle.
@@ -496,6 +501,69 @@ function enforceSessionInactivityTimeout(int $timeoutSeconds = 1800, bool $json 
     $_SESSION['last_activity'] = $now;
 }
 
+function enforceCurrentSessionAccountStatus(bool $json = true): void
+{
+    $userId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($userId === '') {
+        return;
+    }
+
+    $conn = $GLOBALS['conn'] ?? null;
+    if (!($conn instanceof mysqli)) {
+        return;
+    }
+
+    static $cache = [];
+    if (array_key_exists($userId, $cache)) {
+        $sessionStatus = $cache[$userId];
+    } else {
+        $stmt = $conn->prepare("
+            SELECT status_id_account
+            FROM useraccountstbl
+            WHERE user_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return;
+        }
+
+        $stmt->bind_param('s', $userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$row) {
+            destroySessionAndExit($json, 401, 'Account cannot be found.', '?account=missing');
+        }
+
+        require_once __DIR__ . '/userAccountLocks.php';
+        $statuses = ual_load_status_ids($conn);
+        $sessionStatus = [
+            'status_id' => (int)($row['status_id_account'] ?? 0),
+            'locked' => isset($statuses['locked']) ? (int)$statuses['locked'] : null,
+            'archived' => isset($statuses['archived']) ? (int)$statuses['archived'] : null,
+            'deactivated' => isset($statuses['deactivated']) ? (int)$statuses['deactivated'] : null,
+            'deleted' => isset($statuses['deleted']) ? (int)$statuses['deleted'] : null,
+        ];
+        $cache[$userId] = $sessionStatus;
+    }
+
+    $statusId = (int)($sessionStatus['status_id'] ?? 0);
+
+    if (($sessionStatus['archived'] ?? null) !== null && $statusId === (int)$sessionStatus['archived']) {
+        destroySessionAndExit($json, 403, 'Account Archived.', '?account=archived');
+    }
+    if (($sessionStatus['deactivated'] ?? null) !== null && $statusId === (int)$sessionStatus['deactivated']) {
+        destroySessionAndExit($json, 403, 'Account Deactivated.', '?account=deactivated');
+    }
+    if (($sessionStatus['deleted'] ?? null) !== null && $statusId === (int)$sessionStatus['deleted']) {
+        destroySessionAndExit($json, 403, 'Account cannot be found.', '?account=deleted');
+    }
+    if (($sessionStatus['locked'] ?? null) !== null && $statusId === (int)$sessionStatus['locked']) {
+        destroySessionAndExit($json, 403, 'Account is locked. Please contact the barangay office.', '?account=locked');
+    }
+}
+
 function requireAuthenticatedSession(bool $json = true): void {
     if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] === '') {
         if ($json) {
@@ -504,6 +572,7 @@ function requireAuthenticatedSession(bool $json = true): void {
         redirectToLogin();
     }
 
+    enforceCurrentSessionAccountStatus($json);
     enforceSessionInactivityTimeout(1800, $json);
 }
 

@@ -5,6 +5,8 @@ require_once "../General/security.php";
 require_once "../General/audit.php";
 require_once "../General/adminModulePermissions.php";
 require_once "../General/userAccountLocks.php";
+require_once "../General/sendSMS.php";
+require_once "../EmailHandlers/emailSender.php";
 
 requireRoleSession(['SuperAdmin']);
 
@@ -69,6 +71,138 @@ function userMasterlistMatchesSearch(array $row, string $needle): bool
         'account_role_access',
         'info_role_access',
     ], $needle);
+}
+
+function userMasterlistAccountHolderName(array $row): string
+{
+    $name = trim((string)($row['display_name'] ?? ''));
+    if ($name !== '' && $name !== '—') {
+        return $name;
+    }
+
+    $firstName = trim((string)($row['firstname'] ?? $row['r_firstname'] ?? $row['o_firstname'] ?? ''));
+    $middleName = trim((string)($row['middlename'] ?? $row['r_middlename'] ?? $row['o_middlename'] ?? ''));
+    $lastName = trim((string)($row['lastname'] ?? $row['r_lastname'] ?? $row['o_lastname'] ?? ''));
+    $suffix = trim((string)($row['suffix'] ?? $row['r_suffix'] ?? $row['o_suffix'] ?? ''));
+    $middleInitial = $middleName !== '' ? substr($middleName, 0, 1) . '. ' : '';
+    $fullName = trim($firstName . ' ' . $middleInitial . $lastName . ($suffix !== '' ? ' ' . $suffix : ''));
+
+    return $fullName !== '' ? $fullName : 'Resident';
+}
+
+function userMasterlistLoadArchiveNoticeRecipient(mysqli $conn, string $userId): ?array
+{
+    $stmt = $conn->prepare("
+        SELECT
+            ua.user_id,
+            ua.email,
+            ua.phone_number,
+            ri.firstname AS r_firstname,
+            ri.middlename AS r_middlename,
+            ri.lastname AS r_lastname,
+            ri.suffix AS r_suffix,
+            oi.firstname AS o_firstname,
+            oi.middlename AS o_middlename,
+            oi.lastname AS o_lastname,
+            oi.suffix AS o_suffix
+        FROM useraccountstbl ua
+        LEFT JOIN residentinformationtbl ri ON ri.user_id COLLATE utf8mb4_general_ci = ua.user_id COLLATE utf8mb4_general_ci
+        LEFT JOIN officialinformationtbl oi ON oi.user_id COLLATE utf8mb4_general_ci = ua.user_id COLLATE utf8mb4_general_ci
+        WHERE ua.user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        return null;
+    }
+
+    $row = userMasterlistDecryptRow($row);
+    $row['display_name'] = userMasterlistDisplayName($row);
+    return $row;
+}
+
+function userMasterlistSendArchiveNotice(array $recipient): array
+{
+    $result = [
+        'sms' => 'skipped',
+        'email' => 'skipped',
+    ];
+
+    $displayName = userMasterlistAccountHolderName($recipient);
+    $phone = normalizeSmsRecipient((string)($recipient['phone_number'] ?? ''));
+    $email = trim((string)($recipient['email'] ?? ''));
+
+    $smsMessage = 'Your account has been archived and can no longer be used to log in. If this is a mistake, please contact the barangay office.';
+    if ($phone !== '') {
+        $result['sms'] = sendSMS($phone, $smsMessage) ? 'sent' : 'failed';
+    }
+
+    if ($email !== '') {
+        $smtpConfig = require __DIR__ . '/../General/mailConfigurations.php';
+        $emailSender = new EmailSender($smtpConfig);
+        $archivedAt = date('F j, Y g:i A');
+        $bodyHtml = '
+            <p>Hello ' . htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') . ',</p>
+            <p>Your Barangay San Jose account was archived on ' . htmlspecialchars($archivedAt, ENT_QUOTES, 'UTF-8') . ' and can no longer be used to log in.</p>
+            <p>If you believe this was done by mistake, please contact the barangay office for assistance.</p>
+        ';
+        $bodyText = implode("\n", [
+            'Hello ' . $displayName . ',',
+            '',
+            'Your Barangay San Jose account was archived on ' . $archivedAt . ' and can no longer be used to log in.',
+            'If you believe this was done by mistake, please contact the barangay office for assistance.',
+        ]);
+
+        $result['email'] = $emailSender->send([
+            'type' => 'transaction',
+            'to' => $email,
+            'subject' => 'Your Barangay San Jose account was archived',
+            'bodyHtml' => $bodyHtml,
+            'bodyText' => $bodyText,
+        ]) ? 'sent' : 'failed';
+    }
+
+    return $result;
+}
+
+function userMasterlistArchiveNoticeSummary(array $delivery): string
+{
+    $labels = ['sms' => 'SMS', 'email' => 'email'];
+    $sent = [];
+    $failed = [];
+    $skipped = [];
+
+    foreach ($labels as $key => $label) {
+        $status = trim((string)($delivery[$key] ?? 'skipped'));
+        if ($status === 'sent') {
+            $sent[] = $label;
+        } elseif ($status === 'failed') {
+            $failed[] = $label;
+        } else {
+            $skipped[] = $label;
+        }
+    }
+
+    $parts = [];
+    if ($sent !== []) {
+        $parts[] = 'Notice sent by ' . implode(' and ', $sent) . '.';
+    }
+    if ($failed !== []) {
+        $parts[] = 'Could not deliver ' . implode(' and ', $failed) . '.';
+    }
+    if ($sent === [] && $skipped !== []) {
+        $parts[] = 'No notice was sent because no contact details are on file.';
+    }
+
+    return implode(' ', $parts);
 }
 
 function parseLockUntilInput(string $rawValue): ?DateTimeImmutable
@@ -484,6 +618,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $update->execute();
             $update->close();
 
+            $noticeRecipient = userMasterlistLoadArchiveNoticeRecipient($conn, $userId);
+            $noticeSummary = '';
+            if ($noticeRecipient) {
+                $noticeSummary = userMasterlistArchiveNoticeSummary(userMasterlistSendArchiveNotice($noticeRecipient));
+            }
+
             insertUnifiedAuditLog(
                 $conn,
                 $actorUserId,
@@ -501,7 +641,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Account archived successfully.',
+                'message' => trim('Account archived successfully. ' . $noticeSummary),
             ]);
             exit;
         }

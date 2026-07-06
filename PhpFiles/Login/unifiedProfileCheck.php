@@ -11,5 +11,7 @@ if (!$userID || !$role) {
     $loginQuery = $requestedService !== '' ? 'service=' . rawurlencode($requestedService) : '';
     redirectToLogin($loginQuery);
 }
+
+enforceCurrentSessionAccountStatus(false);
 header('Location: ' . resolveRequestedPostLoginRedirect($conn, (string)$userID, (string)$role, $requestedService));
 exit;
