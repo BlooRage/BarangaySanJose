@@ -421,6 +421,26 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       }
     }
     @media (max-width: 767.98px) {
+      #div-mainDisplay {
+        padding: 1rem !important;
+      }
+      .tracker-shell {
+        padding: 0.95rem !important;
+        border-radius: 1rem !important;
+      }
+      .tracker-actions {
+        flex-wrap: wrap;
+        overflow: visible;
+      }
+      .tracker-actions > .pending-summary-badge {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .tracker-actions .btn-icon {
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+      }
       .table-responsive {
         display: none;
       }
@@ -445,6 +465,31 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       #viewModal .tracker-form-grid.cols-3,
       #viewModal .tracker-form-grid.cols-4 {
         grid-template-columns: 1fr;
+      }
+      .request-actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .request-actions .btn {
+        flex: 1 1 100%;
+      }
+    }
+    @media (max-width: 480px) {
+      .tracker-title {
+        font-size: clamp(1.7rem, 8vw, 2.2rem);
+      }
+      .tracker-tabs {
+        gap: 0.5rem;
+      }
+      .tracker-tab.btn {
+        font-size: 0.9rem;
+        padding: 0.45rem 0.8rem;
+      }
+      #viewModal .modal-header,
+      #viewModal .modal-body,
+      #viewModal .modal-footer {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
       }
     }
   </style>

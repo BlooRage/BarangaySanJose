@@ -92,8 +92,8 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
     <?php if ($guestAppointmentUsesRecaptcha): ?>
         <script src="https://www.google.com/recaptcha/api.js?render=<?= htmlspecialchars($guestAppointmentRecaptchaSiteKey, ENT_QUOTES, 'UTF-8') ?>"></script>
     <?php endif; ?>
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
-    <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css?v=20260706-navbar-fix">
+    <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix">
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
     <style>
         :root {

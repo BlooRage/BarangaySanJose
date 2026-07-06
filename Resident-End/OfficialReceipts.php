@@ -542,6 +542,10 @@ if (isset($conn) && $conn instanceof mysqli) {
             #div-mainDisplay { padding: 1rem !important; }
             .receipts-subtitle { font-size: 0.95rem; }
             .receipts-card { padding: 0.9rem !important; }
+            .admin-list-actions {
+                width: 100%;
+                gap: 0.6rem;
+            }
             .table-responsive { display: none; }
             #receiptCards { display: block; margin-top: 0.25rem; }
             .txn-page-title { font-size: clamp(1.7rem, 7.5vw, 2.15rem); margin-bottom: 0.4rem; }
@@ -566,9 +570,26 @@ if (isset($conn) && $conn instanceof mysqli) {
             }
         }
         @media (max-width: 480px) {
-            .receipts-table { min-width: 720px; }
-            .receipts-table td, .receipts-table th { font-size: 0.875rem; }
             .receipts-summary { width: 100%; justify-content: space-between; }
+            .admin-list-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .receipt-card {
+                padding: 0.8rem;
+            }
+            .receipt-card-header {
+                gap: 0.55rem;
+            }
+            #receiptViewerModal .modal-header,
+            #receiptViewerModal .modal-body,
+            #receiptViewerModal .modal-footer {
+                padding-left: 0.9rem;
+                padding-right: 0.9rem;
+            }
+            .receipt-preview-frame {
+                height: 56vh;
+            }
         }
         @media (max-width: 1160px) {
             #mobile-header {

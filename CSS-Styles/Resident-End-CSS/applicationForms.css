@@ -1032,13 +1032,32 @@ body {
 
 /* Responsiveness */
 @media (max-width: 768px) {
+    .application-main {
+        min-height: 0;
+        align-items: flex-start;
+        padding: 18px 12px 28px;
+    }
+
     .application-card {
         width: 100%;
-        padding: 24px;
+        padding: 24px 18px;
+    }
+
+    .main-head.application-card {
+        margin-top: 1rem !important;
+        margin-bottom: 1.5rem !important;
     }
     .form-row {
         grid-template-columns: repeat(2, 1fr);
     }
+
+    .form-row input,
+    .form-row select,
+    .form-row textarea,
+    .form-control {
+        font-size: 16px;
+    }
+
     .full-width,
     .phone,
     .span-3,
@@ -1048,11 +1067,17 @@ body {
     .agreement-text {
         max-width: 100%;
     }
+
+    .submit-btn {
+        width: 100%;
+        min-height: 46px;
+        justify-content: center;
+    }
 }
 
 @media (max-width: 480px) {
     .application-card {
-        padding: 20px;
+        padding: 18px 14px;
         border-radius: 10px;
     }
     .form-title {

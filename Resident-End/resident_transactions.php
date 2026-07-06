@@ -361,6 +361,15 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       #div-tableContainer {
         padding: 0.9rem !important;
       }
+      .admin-list-actions {
+        flex-wrap: wrap;
+        overflow: visible;
+      }
+      .admin-list-actions .btn-icon {
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+      }
       .table-responsive {
         display: none;
       }
@@ -404,14 +413,23 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         font-size: clamp(1.7rem, 7.5vw, 2.15rem);
         margin-bottom: 0.4rem;
       }
+      .txn-action-btns {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .txn-action-btns .btn {
+        flex: 1 1 100%;
+      }
     }
     @media (max-width: 480px) {
-      .audit-table {
-        min-width: 620px;
+      .admin-list-tabs {
+        gap: 0.5rem;
       }
-      .audit-table td,
-      .audit-table th {
-        font-size: 0.875rem;
+      .txn-tab.btn {
+        padding: 0.45rem 0.8rem;
+      }
+      .txn-card {
+        padding: 0.8rem 0.85rem;
       }
     }
     @media (max-width: 1160px) {

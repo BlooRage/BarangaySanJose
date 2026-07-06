@@ -914,7 +914,26 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     display: none;
   }
 
-  @media screen and (orientation: portrait) and (max-width: 1024px) {
+  @media screen and (max-width: 768px), screen and (orientation: portrait) and (max-width: 1024px) {
+    html,
+    body {
+      overflow-x: hidden;
+    }
+
+    body.admin-sidebar-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    body.admin-sidebar-open::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 1090;
+      background: rgba(15, 23, 42, 0.38);
+      backdrop-filter: blur(2px);
+    }
+
     #admin-mobile-header {
       display: block;
       position: fixed;
@@ -924,17 +943,36 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       z-index: 1200;
     }
 
+    #admin-mobile-header .d-flex {
+      min-height: 58px;
+      gap: 0.6rem;
+      padding-left: 0.9rem !important;
+      padding-right: 0.9rem !important;
+    }
+
+    #btn-admin-burger {
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 12px;
+    }
+
     #dashboard-sidebar {
       position: fixed !important;
       top: 0;
       left: 0;
-      width: 100% !important;
+      width: min(88vw, 360px) !important;
       min-width: 0;
       height: 100vh;
       transform: translateX(-100%);
       transition: transform 0.3s ease;
       z-index: 1100;
       overflow-y: auto;
+      border-right: 1px solid rgba(215, 221, 229, 0.9);
+      box-shadow: 0 22px 44px rgba(15, 23, 42, 0.18);
     }
 
     #dashboard-sidebar.show {
@@ -947,6 +985,18 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     body {
       padding-top: 60px;
+    }
+
+    #main-display {
+      width: 100%;
+      min-width: 0;
+      padding: 1rem !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #main-display {
+      padding: 0.85rem !important;
     }
   }
 
@@ -1894,7 +1944,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     if (!sidebar) return;
     const collapseButtons = Array.from(sidebar.querySelectorAll('[data-sidebar-toggle="collapse"]'));
     const topLevelItems = Array.from(sidebar.querySelectorAll(".btn-toggle, .sidebar-direct-link, .sidebar-profile-trigger"));
-    const portraitMq = window.matchMedia("(orientation: portrait) and (max-width: 1024px)");
+    const drawerMq = window.matchMedia("(max-width: 768px), (orientation: portrait) and (max-width: 1024px)");
     const desktopQuery = window.matchMedia("(min-width: 769px)");
     const collapsedClass = "admin-sidebar-collapsed";
     const storageKey = "adminSidebarCollapsed";
@@ -1918,6 +1968,11 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       } catch (error) {
         // Ignore storage access issues.
       }
+    };
+
+    const syncMobileOpenState = () => {
+      const isOpen = drawerMq.matches && sidebar.classList.contains("show");
+      document.body.classList.toggle("admin-sidebar-open", isOpen);
     };
 
     const getFirstLink = (button) => {
@@ -2026,7 +2081,7 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     };
 
     const syncMode = () => {
-      if (!portraitMq.matches) {
+      if (!drawerMq.matches) {
         sidebar.classList.remove("show");
         setDesktopCollapsed(readStoredCollapsed(), false);
       } else {
@@ -2034,14 +2089,16 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
         sidebar.classList.remove("is-collapsed");
       }
 
+      syncMobileOpenState();
       updateDesktopToggle();
       updateCollapsedTitles();
     };
 
     if (burgerBtn) {
       burgerBtn.addEventListener("click", () => {
-        if (!portraitMq.matches) return;
+        if (!drawerMq.matches) return;
         sidebar.classList.toggle("show");
+        syncMobileOpenState();
       });
     }
 
@@ -2058,18 +2115,46 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     sidebar.querySelectorAll("a").forEach((link) => {
       link.addEventListener("click", () => {
-        if (!portraitMq.matches) return;
+        if (!drawerMq.matches) return;
         if (String(link.getAttribute("data-bs-toggle") || "").toLowerCase() === "dropdown") {
           return;
         }
         sidebar.classList.remove("show");
+        syncMobileOpenState();
       });
     });
 
-    if (typeof portraitMq.addEventListener === "function") {
-      portraitMq.addEventListener("change", syncMode);
-    } else if (typeof portraitMq.addListener === "function") {
-      portraitMq.addListener(syncMode);
+    document.addEventListener("click", (event) => {
+      if (!drawerMq.matches || !sidebar.classList.contains("show")) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (sidebar.contains(target) || burgerBtn?.contains(target)) {
+        return;
+      }
+
+      sidebar.classList.remove("show");
+      syncMobileOpenState();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !drawerMq.matches || !sidebar.classList.contains("show")) {
+        return;
+      }
+
+      sidebar.classList.remove("show");
+      syncMobileOpenState();
+    });
+
+    if (typeof drawerMq.addEventListener === "function") {
+      drawerMq.addEventListener("change", syncMode);
+    } else if (typeof drawerMq.addListener === "function") {
+      drawerMq.addListener(syncMode);
     }
 
     if (typeof desktopQuery.addEventListener === "function") {
