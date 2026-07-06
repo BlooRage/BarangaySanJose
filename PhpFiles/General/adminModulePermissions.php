@@ -1529,6 +1529,10 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
             }
         }
 
+        if ($displayRole === 'SuperAdmin') {
+            $permissions['website_settings'] = true;
+        }
+
         return $permissions;
     }
 }
@@ -1598,7 +1602,7 @@ if (!function_exists('amp_get_allowed_permission_keys')) {
             return $cache[$cacheKey];
         }
 
-        $sessionCacheKey = 'allowed_permissions:' . md5($cacheKey);
+        $sessionCacheKey = 'allowed_permissions:v2:' . md5($cacheKey);
         $sessionCached = amp_session_cache_get($sessionCacheKey, 1800);
         if (is_array($sessionCached)) {
             $cache[$cacheKey] = $sessionCached;
