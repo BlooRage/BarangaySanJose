@@ -3,6 +3,7 @@ require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
 require_once __DIR__ . "/../General/complaintTypeDetails.php";
+require_once __DIR__ . "/../General/sendSMS.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
@@ -366,7 +367,7 @@ function ensureStatusId(mysqli $conn, string $name, string $type): int
 function ensureComplaintLookups(mysqli $conn): array
 {
     $statusIds = [];
-    foreach (['Pending', 'Resolved', 'Dropped', 'Endorsed'] as $statusName) {
+    foreach (['Received', 'Under Investigation', 'Action In Progress', 'Resolved', 'Dropped', 'Referred'] as $statusName) {
         $statusIds[$statusName] = ensureStatusId($conn, $statusName, 'Complaint');
     }
 
@@ -541,7 +542,7 @@ $residentUserId = null;
 $conn->begin_transaction();
 try {
     $lookupIds = ensureComplaintLookups($conn);
-    $statusId = (int)$lookupIds['status']['Pending'];
+    $statusId = (int)$lookupIds['status']['Received'];
     $levelId = (int)$lookupIds['level']['Complaint Only'];
     $caseId = GenerateCaseID($conn);
     if (!$caseId) {
@@ -594,6 +595,7 @@ try {
     }
 
     $conn->commit();
+    sendSMS($complainantContact, 'Your complaint has been received. Check complaint tracker for updates.');
     redirectWithMessage('success', 'Complaint submitted successfully.', ['case_id' => $caseId]);
 } catch (Throwable $e) {
     $conn->rollback();

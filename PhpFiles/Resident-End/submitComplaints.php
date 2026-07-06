@@ -4,6 +4,7 @@ require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
 require_once __DIR__ . "/../General/complaintTypeDetails.php";
 require_once __DIR__ . "/../General/recaptcha.php";
+require_once __DIR__ . "/../General/sendSMS.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 cuafk_ensure_case_useraccount_foreign_keys($conn);
@@ -91,7 +92,7 @@ function ensureStatusId(mysqli $conn, string $name, string $type): int
 function ensureComplaintLookups(mysqli $conn): array
 {
     $statusIds = [];
-    foreach (['Pending', 'Resolved', 'Dropped', 'Endorsed'] as $statusName) {
+    foreach (['Received', 'Under Investigation', 'Action In Progress', 'Resolved', 'Dropped', 'Referred'] as $statusName) {
         $statusIds[$statusName] = ensureStatusId($conn, $statusName, 'Complaint');
     }
 
@@ -570,7 +571,7 @@ $residentUserId = $actorUserId !== '' ? $actorUserId : null;
 $conn->begin_transaction();
 try {
     $lookupIds = ensureComplaintLookups($conn);
-    $statusId = (int)$lookupIds['status']['Pending'];
+    $statusId = (int)$lookupIds['status']['Received'];
     $levelId = (int)$lookupIds['level']['Complaint Only'];
     $caseId = GenerateCaseID($conn);
     if (!$caseId) {
@@ -673,6 +674,7 @@ try {
 
     logCaseUpdate($conn, $caseId, 'Complaint submitted through resident portal.', $actorUserId ?: null);
     $conn->commit();
+    sendSMS($complainantContact, 'Your complaint has been received. Check complaint tracker for updates.');
 
     redirectWithMessage($complainantPath, 'success', 'Complaint submitted successfully.', [
         'case_id' => $caseId,

@@ -55,19 +55,28 @@ function rct_display_name(array $row): string
 function rct_status_payload(string $statusName, array $row = []): array
 {
     $normalized = strtolower(trim($statusName));
-    $label = trim($statusName) !== '' ? trim($statusName) : 'Pending';
+    $label = trim($statusName) !== '' ? trim($statusName) : 'Received';
 
-    if ((int)($row['escalated_to_blotter'] ?? 0) === 1 || str_contains($normalized, 'endorse')) {
-        return ['label' => 'Endorsed to Blotter', 'bucket' => 'archived'];
+    if ((int)($row['escalated_to_blotter'] ?? 0) === 1 || str_contains($normalized, 'refer') || str_contains($normalized, 'endorse')) {
+        return ['label' => 'Referred', 'bucket' => 'archived'];
     }
     if (str_contains($normalized, 'resolve')) {
-        return ['label' => 'Resolved', 'bucket' => 'approved'];
+        return ['label' => 'Resolved', 'bucket' => 'resolved'];
     }
     if (str_contains($normalized, 'drop')) {
         return ['label' => 'Dropped', 'bucket' => 'archived'];
     }
+    if (str_contains($normalized, 'under investigation')) {
+        return ['label' => 'Under Investigation', 'bucket' => 'active'];
+    }
+    if (str_contains($normalized, 'action in progress')) {
+        return ['label' => 'Action In Progress', 'bucket' => 'active'];
+    }
+    if (str_contains($normalized, 'receive') || str_contains($normalized, 'pending')) {
+        return ['label' => 'Received', 'bucket' => 'active'];
+    }
 
-    return ['label' => $label, 'bucket' => 'pending'];
+    return ['label' => $label, 'bucket' => 'active'];
 }
 
 if (
@@ -88,11 +97,11 @@ $statusJoin = rct_table_exists($conn, 'statuslookuptbl')
     : '';
 $statusSelect = rct_table_exists($conn, 'statuslookuptbl')
     ? "
-        COALESCE(s.status_name, 'Pending') AS status_name,
+        COALESCE(s.status_name, 'Received') AS status_name,
         COALESCE(l.status_name, 'Complaint Only') AS level_name
     "
     : "
-        'Pending' AS status_name,
+        'Received' AS status_name,
         'Complaint Only' AS level_name
     ";
 
@@ -149,7 +158,7 @@ $result = $stmt->get_result();
 
 $items = [];
 while ($row = $result->fetch_assoc()) {
-    $status = rct_status_payload((string)($row['status_name'] ?? 'Pending'), $row);
+    $status = rct_status_payload((string)($row['status_name'] ?? 'Received'), $row);
     $parsedCaseDetails = complaintTypeParseCaseDetails($row['case_details'] ?? '');
     $items[] = [
         'complaint_id' => (string)($row['complaint_id'] ?? ''),

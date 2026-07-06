@@ -4,6 +4,7 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/caseUserAccountForeignKeys.php';
 require_once __DIR__ . '/../General/complaintTypeDetails.php';
 require_once __DIR__ . '/../General/recaptcha.php';
+require_once __DIR__ . '/../General/sendSMS.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 
 cuafk_ensure_case_useraccount_foreign_keys($conn);
@@ -187,7 +188,7 @@ function guestComplaintEnsureStatusId(mysqli $conn, string $name, string $type):
 function guestComplaintEnsureLookups(mysqli $conn): array
 {
     $statusIds = [];
-    foreach (['Pending', 'Under Investigation', 'Action in Progress', 'Resolved', 'Closed', 'Endorsed'] as $statusName) {
+    foreach (['Received', 'Under Investigation', 'Action In Progress', 'Resolved', 'Dropped', 'Referred'] as $statusName) {
         $statusIds[$statusName] = guestComplaintEnsureStatusId($conn, $statusName, 'Complaint');
     }
 
@@ -514,7 +515,7 @@ function guestComplaintFindActiveByPhone(mysqli $conn, string $phone): ?array
         SELECT
             ct.complaint_id,
             c.case_id,
-            COALESCE(s.status_name, 'Pending') AS status_name
+            COALESCE(s.status_name, 'Received') AS status_name
         FROM caseparticipantstbl cp
         INNER JOIN casereportstbl c ON c.case_id = cp.case_id
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
@@ -522,7 +523,7 @@ function guestComplaintFindActiveByPhone(mysqli $conn, string $phone): ?array
         WHERE c.report_type = 'Complaint'
           AND cp.participant_role = 'Complainant'
           AND cp.contact_number = ?
-          AND LOWER(COALESCE(s.status_name, 'pending')) NOT IN ('resolved', 'closed', 'dropped')
+          AND LOWER(COALESCE(s.status_name, 'received')) NOT IN ('resolved', 'dropped', 'referred')
         ORDER BY c.case_id DESC
         LIMIT 1
     ");
@@ -620,7 +621,7 @@ $witnessSummary = guestComplaintBuildWitnessSummary($witnesses);
 $conn->begin_transaction();
 try {
     $lookupIds = guestComplaintEnsureLookups($conn);
-    $statusId = (int)$lookupIds['status']['Pending'];
+    $statusId = (int)$lookupIds['status']['Received'];
     $levelId = (int)$lookupIds['level']['Complaint Only'];
     $caseId = GenerateCaseID($conn);
     if (!$caseId) {
@@ -742,6 +743,7 @@ try {
 
     guestComplaintLogCaseUpdate($conn, $caseId, 'Complaint submitted through guest portal.', null);
     $conn->commit();
+    sendSMS($complainantContact, 'Your complaint has been received. Check complaint tracker for updates.');
     unset($_SESSION['guest_complaint_otp_verified']);
     guestComplaintClearTrackerCache();
 

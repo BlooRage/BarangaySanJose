@@ -365,9 +365,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn tracker-tab active" data-tab="all" data-filter="ALL">All</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="pending" data-filter="Pending">Pending</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="approved" data-filter="Resolved">Resolved</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="archived" data-filter="Closed">Closed</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="active" data-filter="Received">Active</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="resolved" data-filter="Resolved">Resolved</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="archived" data-filter="Dropped">Dropped/Referred</button>
           </div>
           <div class="admin-list-actions">
             <div class="input-group admin-search">
@@ -433,10 +433,12 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
               <label class="form-label small text-muted mb-1">Status</label>
               <select class="form-select" id="complaintStatusFilter">
                 <option value="">All Status</option>
-                <option value="Pending">Pending</option>
+                <option value="Received">Received</option>
+                <option value="Under Investigation">Under Investigation</option>
+                <option value="Action In Progress">Action In Progress</option>
                 <option value="Resolved">Resolved</option>
                 <option value="Dropped">Dropped</option>
-                <option value="Endorsed to Blotter">Endorsed to Blotter</option>
+                <option value="Referred">Referred</option>
               </select>
             </div>
             <div class="col-12">
@@ -537,9 +539,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
     function statusBadgeClass(value) {
       const normalized = String(value || "").toLowerCase();
+      if (normalized.includes("receive")) return "pending";
+      if (normalized.includes("under investigation") || normalized.includes("action in progress")) return "info";
       if (normalized.includes("resolve")) return "approved";
       if (normalized.includes("drop")) return "denied";
-      if (normalized.includes("endorse") || normalized.includes("close")) return "archived";
+      if (normalized.includes("refer") || normalized.includes("endorse")) return "archived";
       return "pending";
     }
 
@@ -644,7 +648,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         value: clean.map((attachment, index) => {
           const name = String(attachment.name || `Attachment ${index + 1}`).trim() || `Attachment ${index + 1}`;
           const href = encodeURI(String(attachment.path || "").trim());
-          return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
+          const meta = [
+            String(attachment.uploaded_at || "").trim() ? `Uploaded: ${String(attachment.uploaded_at || "").trim()}` : "",
+            String(attachment.source || "").trim() ? `Source: ${String(attachment.source || "").trim()}` : "",
+          ].filter(Boolean).join(" | ");
+          return meta
+            ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a><br><span class="text-muted small">${escapeHtml(meta)}</span>`
+            : `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
         }).join("<br>"),
         raw: true,
       }], 1);
@@ -697,7 +707,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             { label: "Complaint ID", value: item.complaint_id || "-" },
             { label: "Submitted At", value: formatDateTime(item.report_timestamp) },
             { label: "Origin", value: "ResidentPortal" },
-            { label: "Status", value: item.status_name || "Pending" },
+            { label: "Status", value: item.status_name || "Received" },
           ], 4),
           renderFieldGrid([
             { label: "Complaint Level", value: item.level_name || "-" },
@@ -794,7 +804,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <td>${escapeHtml(item.complaint_type || "-")}</td>
           <td>${escapeHtml(item.subject_display_name || "-")}<div class="small text-muted mt-1">${escapeHtml(item.incident_place || "No location noted")}</div></td>
           <td>${escapeHtml(formatDate(item.incident_date))}</td>
-          <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span><div class="small text-muted mt-1">${escapeHtml(item.level_name || "Complaint Only")}</div></td>
+          <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Received")}</span><div class="small text-muted mt-1">${escapeHtml(item.level_name || "Complaint Only")}</div></td>
           <td><button type="button" class="btn btn-sm btn-outline-secondary complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}">View</button></td>
         </tr>
       `).join("");
@@ -808,7 +818,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-label mt-2">Subject</div>
           <div class="tracker-value">${escapeHtml(item.subject_display_name || "-")}</div>
           <div class="tracker-label mt-2">Status</div>
-          <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span></div>
+          <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Received")}</span></div>
           <button type="button" class="btn btn-sm btn-outline-secondary mt-3 complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}">View</button>
         </article>
       `).join("");

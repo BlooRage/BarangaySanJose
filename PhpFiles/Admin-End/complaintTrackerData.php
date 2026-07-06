@@ -117,6 +117,7 @@ require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/complaintTypeDetails.php";
 require_once "../General/uniqueIDGenerate.php";
+require_once "../General/sendSMS.php";
 
 if (!$authChecked) {
     requireRoleSession($allowedRoles);
@@ -324,7 +325,7 @@ function ensureStatusId(mysqli $conn, string $statusName, string $statusType): i
 function ensureComplaintWorkflowLookups(mysqli $conn): array
 {
     $statusIds = [];
-    foreach (['Pending', 'Under Investigation', 'Action in Progress', 'Resolved', 'Closed', 'Endorsed'] as $statusName) {
+    foreach (['Received', 'Under Investigation', 'Action In Progress', 'Resolved', 'Dropped', 'Referred'] as $statusName) {
         $statusIds[$statusName] = ensureStatusId($conn, $statusName, 'Complaint');
     }
 
@@ -350,6 +351,61 @@ function appendMultilineNote(?string $existing, string $newNote): string
         return $existing;
     }
     return $existing . "\n" . $newNote;
+}
+
+function complaintStatusKey(string $statusName, array $row = []): string
+{
+    $normalized = strtolower(trim($statusName));
+    if ((int)($row['escalated_to_blotter'] ?? 0) === 1) {
+        return 'referred';
+    }
+    if (in_array(strtolower(trim((string)($row['request_status_name'] ?? ''))), ['pending', 'approved'], true)) {
+        return 'referred';
+    }
+    if (str_contains($normalized, 'refer')) {
+        return 'referred';
+    }
+    if (str_contains($normalized, 'under investigation')) {
+        return 'under_investigation';
+    }
+    if (str_contains($normalized, 'action in progress')) {
+        return 'action_in_progress';
+    }
+    if (str_contains($normalized, 'resolve') || str_contains($normalized, 'complete')) {
+        return 'resolved';
+    }
+    if (str_contains($normalized, 'drop')) {
+        return 'dropped';
+    }
+
+    return 'received';
+}
+
+function complaintSmsClip(string $value, int $maxLength): string
+{
+    $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    if ($value === '' || $maxLength <= 0) {
+        return '';
+    }
+
+    if (function_exists('mb_strimwidth')) {
+        return mb_strimwidth($value, 0, $maxLength, '...');
+    }
+
+    return strlen($value) > $maxLength ? substr($value, 0, max(0, $maxLength - 3)) . '...' : $value;
+}
+
+function complaintResidentSmsMessage(string $actionType, string $remarks = ''): string
+{
+    return match ($actionType) {
+        'received' => 'Your complaint has been received. Check complaint tracker for updates.',
+        'under_investigation' => 'Your complaint is now under investigation. Check complaint tracker for updates.',
+        'action_in_progress' => 'Action is now in progress for your complaint. Check complaint tracker for updates.',
+        'resolved' => 'Your complaint has been resolved. Check complaint tracker for details.',
+        'dropped' => 'Your complaint has been dropped. Reason: ' . complaintSmsClip($remarks, 72) . '. Check complaint tracker for details.',
+        'referred' => 'Your complaint has been referred to another department and is now closed in our tracker.',
+        default => '',
+    };
 }
 
 function participantDisplayName(array $row, string $prefix = ''): string
@@ -453,6 +509,139 @@ function syncComplaintCaseDetailsClassification(?string $caseDetails, string $cl
             'attachments' => is_array($parsed['attachments'] ?? null) ? $parsed['attachments'] : [],
         ]
     );
+}
+
+function complaintTrackerFilterAttachments(array $attachments): array
+{
+    return array_values(array_filter($attachments, static function ($attachment): bool {
+        return is_array($attachment)
+            && trim((string)($attachment['path'] ?? '')) !== ''
+            && trim((string)($attachment['name'] ?? '')) !== '';
+    }));
+}
+
+function syncComplaintCaseDetailsAttachments(?string $caseDetails, array $attachments, string $fallbackClassification = ''): string
+{
+    $rawCaseDetails = (string)$caseDetails;
+    if (!function_exists('complaintTypeParseCaseDetails') || !function_exists('complaintTypeBuildCaseDetails')) {
+        return $rawCaseDetails;
+    }
+
+    $parsed = complaintTypeParseCaseDetails($rawCaseDetails);
+    $cleanAttachments = complaintTrackerFilterAttachments($attachments);
+    $meta = is_array($parsed['meta'] ?? null) ? $parsed['meta'] : [];
+
+    $classification = trim($fallbackClassification);
+    if ($classification === '') {
+        $classification = trim((string)($meta['complaint_type'] ?? ''));
+    }
+
+    $selectedType = trim((string)($meta['selected_type'] ?? ''));
+    if ($selectedType === '') {
+        $selectedType = isValidComplaintClassification($classification) ? $classification : 'Other';
+    }
+
+    if ($classification === '') {
+        $classification = $selectedType;
+    }
+
+    return complaintTypeBuildCaseDetails(
+        (string)($parsed['narration'] ?? $rawCaseDetails),
+        [
+            'selected_type' => $selectedType,
+            'complaint_type' => $classification,
+            'fields' => $parsed['fields'] ?? [],
+        ],
+        [
+            'incident_area_number' => (string)($parsed['incident_area_number'] ?? ''),
+            'attachments' => $cleanAttachments,
+        ]
+    );
+}
+
+function complaintTrackerStoreImageUploads(array $files, string $caseId, string $actorUserId, array &$savedAbsolutePaths = []): array
+{
+    if (!isset($files['name']) || !is_array($files['name'])) {
+        return [];
+    }
+
+    $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    $maxBytes = 5 * 1024 * 1024;
+    $projectRoot = dirname(__DIR__, 2);
+    $relativeFolder = '/UnifiedFileAttachment/ComplaintEvidence/' . date('Y/m');
+    $absoluteFolder = $projectRoot . $relativeFolder;
+    $selectedCount = count(array_filter($files['name'], static function ($name): bool {
+        return trim((string)$name) !== '';
+    }));
+
+    if ($selectedCount > 3) {
+        throw new RuntimeException('You can only upload up to 3 complaint images at a time.');
+    }
+
+    if (!is_dir($absoluteFolder) && !mkdir($absoluteFolder, 0775, true) && !is_dir($absoluteFolder)) {
+        throw new RuntimeException('Failed to prepare the complaint upload folder.');
+    }
+
+    $saved = [];
+    $fileCount = min(3, count($files['name']));
+    for ($index = 0; $index < $fileCount; $index++) {
+        $errorCode = (int)($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('One of the complaint image uploads failed. Please try again.');
+        }
+
+        $originalName = trim((string)($files['name'][$index] ?? ''));
+        $tmpPath = (string)($files['tmp_name'][$index] ?? '');
+        $size = (int)($files['size'][$index] ?? 0);
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if ($extension === '' || !in_array($extension, $allowedExtensions, true)) {
+            throw new RuntimeException('Complaint images must be JPG, JPEG, PNG, or WEBP.');
+        }
+        if ($size <= 0 || $size > $maxBytes) {
+            throw new RuntimeException('Each complaint image must be 5 MB or smaller.');
+        }
+        if (!is_uploaded_file($tmpPath)) {
+            throw new RuntimeException('Invalid complaint image upload detected.');
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $detectedMimeType = $finfo ? strtolower((string)finfo_file($finfo, $tmpPath)) : '';
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        if (!in_array($detectedMimeType, $allowedMimeTypes, true)) {
+            throw new RuntimeException('Complaint images must be JPG, JPEG, PNG, or WEBP.');
+        }
+
+        $safeStem = preg_replace('/[^a-zA-Z0-9_-]+/', '-', pathinfo($originalName, PATHINFO_FILENAME)) ?: 'complaint-image';
+        $targetName = sprintf(
+            '%s_%s_admin_%d_%s.%s',
+            preg_replace('/[^A-Za-z0-9]/', '', $caseId),
+            preg_replace('/[^A-Za-z0-9]/', '', $actorUserId ?: 'user'),
+            $index + 1,
+            bin2hex(random_bytes(4)),
+            $extension
+        );
+        $targetPath = $absoluteFolder . '/' . $targetName;
+        if (!move_uploaded_file($tmpPath, $targetPath)) {
+            throw new RuntimeException('Failed to save one of the complaint images.');
+        }
+        @chmod($targetPath, 0664);
+        $savedAbsolutePaths[] = $targetPath;
+
+        $saved[] = [
+            'name' => $originalName !== '' ? $originalName : ($safeStem . '.' . $extension),
+            'path' => $relativeFolder . '/' . $targetName,
+            'type' => $detectedMimeType,
+        ];
+    }
+
+    return $saved;
 }
 
 function bindDynamicParams(mysqli_stmt $stmt, string $types, array $params): void
@@ -590,7 +779,7 @@ function createBlotterFromComplaint(mysqli $conn, array $complaintRow, string $a
     }
 
     $caseRemarks = trim((string)($complaintRow['case_remarks'] ?? ''));
-    $endorsementNote = 'Endorsed from complaint ' . trim((string)($complaintRow['complaint_id'] ?? $complaintRow['case_id'] ?? ''));
+    $endorsementNote = 'Referred from complaint ' . trim((string)($complaintRow['complaint_id'] ?? $complaintRow['case_id'] ?? ''));
     if ($remarks !== '') {
         $endorsementNote .= '. Screening notes: ' . $remarks;
     }
@@ -729,7 +918,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
     $searchTerm = trim((string)($_GET['search'] ?? ''));
     $statusFilter = strtolower(trim((string)($_GET['status'] ?? '')));
-    if (!in_array($statusFilter, ['', 'active', 'resolved', 'closed'], true)) {
+    if (!in_array($statusFilter, ['', 'active', 'resolved', 'finalized'], true)) {
         $statusFilter = '';
     }
     $dateFrom = trim((string)($_GET['date_from'] ?? ''));
@@ -770,7 +959,7 @@ if ($action === 'list') {
             ct.complaint_id,
             c.report_timestamp AS submitted_at_raw,
             c.complaint_type,
-            COALESCE(s.status_name, 'Pending') AS status_name,
+            COALESCE(s.status_name, 'Received') AS status_name,
             COALESCE(l.status_name, 'Complaint Only') AS level_name,
             ct.subject_display_name,
             ct.subject_kind,
@@ -785,15 +974,14 @@ if ($action === 'list') {
             cp.suffix
             {$residentSelect},
             CASE
-                WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'escalated'
-                WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'escalated'
+                WHEN COALESCE(ct.escalated_to_blotter, 0) = 1 THEN 'referred'
+                WHEN LOWER(COALESCE(br.request_status_name, '')) IN ('pending', 'approved') THEN 'referred'
+                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%refer%' THEN 'referred'
                 WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%under investigation%' THEN 'under_investigation'
                 WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%action in progress%' THEN 'action_in_progress'
-                WHEN LOWER(COALESCE(s.status_name, 'pending')) LIKE '%resolved%' THEN 'resolved'
-                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%closed%' THEN 'closed'
+                WHEN LOWER(COALESCE(s.status_name, 'received')) LIKE '%resolved%' THEN 'resolved'
                 WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%drop%' THEN 'dropped'
-                WHEN LOWER(COALESCE(s.status_name, '')) LIKE '%endorse%' THEN 'escalated'
-                ELSE 'pending'
+                ELSE 'received'
             END AS status_key
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
@@ -835,9 +1023,9 @@ if ($action === 'list') {
     $filterParams = [];
 
     if ($statusFilter === 'active') {
-        $filterSql .= " AND complaint_rows.status_key IN ('pending', 'under_investigation', 'action_in_progress', 'escalated')";
-    } elseif ($statusFilter === 'closed') {
-        $filterSql .= " AND complaint_rows.status_key IN ('closed', 'dropped')";
+        $filterSql .= " AND complaint_rows.status_key IN ('received', 'under_investigation', 'action_in_progress')";
+    } elseif ($statusFilter === 'finalized') {
+        $filterSql .= " AND complaint_rows.status_key IN ('dropped', 'referred')";
     } elseif ($statusFilter === 'resolved') {
         $filterSql .= " AND complaint_rows.status_key = ?";
         $filterTypes .= 's';
@@ -924,7 +1112,7 @@ if ($action === 'list') {
     $pendingCountStmt = $conn->prepare("
         SELECT COUNT(*) AS total
         FROM ({$baseSql}) complaint_rows
-        WHERE complaint_rows.status_key = 'pending'
+        WHERE complaint_rows.status_key = 'received'
     ");
     if ($pendingCountStmt) {
         $pendingCountStmt->execute();
@@ -953,7 +1141,7 @@ if ($action === 'list') {
     $res = $stmt->get_result();
     $items = [];
     while ($row = $res->fetch_assoc()) {
-        $statusName = trim((string)($row['status_name'] ?? 'Pending'));
+        $statusName = trim((string)($row['status_name'] ?? 'Received'));
         $requestStatusName = trim((string)($row['request_status_name'] ?? ''));
 
         $items[] = [
@@ -964,8 +1152,8 @@ if ($action === 'list') {
             'complaint_type' => $row['complaint_type'] ?? '',
             'area_number' => $row['area_number'] ?? '',
             'sector_membership' => $row['sector_membership'] ?? '',
-            'status_name' => $statusName !== '' ? $statusName : 'Pending',
-            'status_key' => $row['status_key'] ?? 'pending',
+            'status_name' => $statusName !== '' ? $statusName : 'Received',
+            'status_key' => $row['status_key'] ?? 'received',
             'level_name' => $row['level_name'] ?? 'Complaint Only',
             'subject_display_name' => $row['subject_display_name'] ?? '',
             'subject_kind' => $row['subject_kind'] ?? '',
@@ -1136,7 +1324,7 @@ if ($action === 'detail') {
             'complaint_detail_fields' => $parsedCaseDetails['fields'] ?? [],
             'attachments' => $parsedCaseDetails['attachments'] ?? [],
             'case_remarks' => $detail['case_remarks'] ?? '',
-            'status_name' => $detail['status_name'] ?? 'Pending',
+            'status_name' => $detail['status_name'] ?? 'Received',
             'level_name' => $detail['level_name'] ?? 'Complaint Only',
             'subject_kind' => $detail['subject_kind'] ?? '',
             'subject_display_name' => $detail['subject_display_name'] ?? '',
@@ -1239,6 +1427,135 @@ if ($action === 'update_case_classification') {
     }
 }
 
+if ($action === 'add_attachments') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = trim((string)($_POST['case_id'] ?? $jsonInput['case_id'] ?? ''));
+    if ($caseId === '') {
+        respond(false, [], 'Invalid case ID.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $existsStmt = $conn->prepare("
+        SELECT c.complaint_type, c.case_details
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        respond(false, [], 'Failed to validate complaint case.');
+    }
+    $existsStmt->bind_param("s", $caseId);
+    $existsStmt->execute();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
+    $existsStmt->close();
+    if (!$existingComplaint) {
+        respond(false, [], 'Complaint case not found.');
+    }
+    $currentClassification = trim((string)($existingComplaint['complaint_type'] ?? ''));
+    if (!isValidComplaintClassification($currentClassification)) {
+        respond(false, [], 'Complaint classification must be set by admin before uploading attachments.');
+    }
+
+    $parsedCaseDetails = complaintTypeParseCaseDetails((string)($existingComplaint['case_details'] ?? ''));
+    $existingAttachments = complaintTrackerFilterAttachments(is_array($parsedCaseDetails['attachments'] ?? null) ? $parsedCaseDetails['attachments'] : []);
+    $maxTotalAttachments = 6;
+    if (count($existingAttachments) >= $maxTotalAttachments) {
+        respond(false, [], 'This complaint already has the maximum number of attachments.');
+    }
+
+    $savedAbsolutePaths = [];
+    try {
+        $uploadedAttachments = complaintTrackerStoreImageUploads($_FILES['complaint_images'] ?? [], $caseId, $actorUserId, $savedAbsolutePaths);
+    } catch (Throwable $e) {
+        respond(false, [], $e->getMessage() ?: 'Failed to upload complaint attachments.');
+    }
+
+    if ($uploadedAttachments === []) {
+        respond(false, [], 'Select at least one complaint image to upload.');
+    }
+    if ((count($existingAttachments) + count($uploadedAttachments)) > $maxTotalAttachments) {
+        foreach ($savedAbsolutePaths as $path) {
+            if (is_string($path) && is_file($path)) {
+                @unlink($path);
+            }
+        }
+        respond(false, [], 'A complaint can only keep up to 6 attachments in total.');
+    }
+
+    $uploadedAt = date('Y-m-d H:i:s');
+    $uploadedBy = trim((string)($_SESSION['fullname'] ?? $_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+    if ($uploadedBy === '') {
+        $uploadedBy = $actorUserId;
+    }
+
+    $newAttachments = array_map(static function (array $attachment) use ($uploadedAt, $uploadedBy): array {
+        $attachment['source'] = 'Admin';
+        $attachment['uploaded_at'] = $uploadedAt;
+        $attachment['uploaded_by'] = $uploadedBy;
+        return $attachment;
+    }, $uploadedAttachments);
+
+    $updatedAttachments = array_values(array_merge($existingAttachments, $newAttachments));
+    $updatedCaseDetails = syncComplaintCaseDetailsAttachments(
+        (string)($existingComplaint['case_details'] ?? ''),
+        $updatedAttachments,
+        $currentClassification
+    );
+
+    $conn->begin_transaction();
+    try {
+        $updateCaseStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET case_details = ?,
+                user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateCaseStmt) {
+            throw new Exception('Failed to prepare complaint attachment update.');
+        }
+        $updateCaseStmt->bind_param("sss", $updatedCaseDetails, $actorUserId, $caseId);
+        $updateCaseStmt->execute();
+        $updateCaseStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare complaint attachment log.');
+            }
+            $logEntry = count($newAttachments) === 1
+                ? 'Admin attachment added to complaint: ' . trim((string)($newAttachments[0]['name'] ?? 'Attachment'))
+                : count($newAttachments) . ' admin attachments added to complaint.';
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        complaintTrackerCacheClear();
+        respond(true, [], count($newAttachments) === 1 ? 'Attachment added to complaint.' : 'Attachments added to complaint.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        foreach ($savedAbsolutePaths as $path) {
+            if (is_string($path) && is_file($path)) {
+                @unlink($path);
+            }
+        }
+        respond(false, [], 'Failed to add complaint attachments.');
+    }
+}
+
 if ($action === 'add_witness') {
     if ($requestMethod !== 'POST') {
         respond(false, [], 'Method not allowed.');
@@ -1266,7 +1583,7 @@ if ($action === 'add_witness') {
     }
 
     $existsStmt = $conn->prepare("
-        SELECT 1
+        SELECT c.complaint_type
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
@@ -1277,10 +1594,13 @@ if ($action === 'add_witness') {
     }
     $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
-    $exists = $existsStmt->get_result()->fetch_row();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
     $existsStmt->close();
-    if (!$exists) {
+    if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
+    }
+    if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before adding witness details.');
     }
     if (complaintTrackerWitnessCount($conn, $caseId) >= 10) {
         respond(false, [], 'A maximum of 10 witnesses is allowed for each complaint.');
@@ -1412,7 +1732,7 @@ if ($action === 'add_witnesses') {
     }
 
     $existsStmt = $conn->prepare("
-        SELECT 1
+        SELECT c.complaint_type
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
@@ -1423,10 +1743,13 @@ if ($action === 'add_witnesses') {
     }
     $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
-    $exists = $existsStmt->get_result()->fetch_row();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
     $existsStmt->close();
-    if (!$exists) {
+    if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
+    }
+    if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before adding witness details.');
     }
 
     $existingWitnessCount = complaintTrackerWitnessCount($conn, $caseId);
@@ -1534,7 +1857,7 @@ if ($action === 'update_intake_notes') {
     }
 
     $existsStmt = $conn->prepare("
-        SELECT 1
+        SELECT c.complaint_type
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
@@ -1545,10 +1868,13 @@ if ($action === 'update_intake_notes') {
     }
     $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
-    $exists = $existsStmt->get_result()->fetch_row();
+    $existingComplaint = $existsStmt->get_result()->fetch_assoc();
     $existsStmt->close();
-    if (!$exists) {
+    if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
+    }
+    if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
+        respond(false, [], 'Complaint classification must be set by admin before updating intake notes.');
     }
 
     $conn->begin_transaction();
@@ -1617,7 +1943,7 @@ if ($action === 'update_case_outcome') {
     if ($remarks === '') {
         respond(false, [], 'Remarks are required.');
     }
-    if (!in_array($actionType, ['under_investigation', 'action_in_progress', 'resolved', 'endorsement', 'closed'], true)) {
+    if (!in_array($actionType, ['under_investigation', 'action_in_progress', 'resolved', 'referred', 'dropped'], true)) {
         respond(false, [], 'Invalid action type.');
     }
 
@@ -1641,11 +1967,15 @@ if ($action === 'update_case_outcome') {
             ct.complaint_id,
             ct.screening_notes,
             ct.escalated_to_blotter,
-            ct.blotter_id
+            ct.blotter_id,
+            complainant.contact_number AS complainant_contact_number
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
         LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        LEFT JOIN caseparticipantstbl complainant
+            ON complainant.case_id = c.case_id
+           AND complainant.participant_role = 'Complainant'
         WHERE c.case_id = ? AND c.report_type = 'Complaint'
         LIMIT 1
     ");
@@ -1664,21 +1994,27 @@ if ($action === 'update_case_outcome') {
         respond(false, [], 'Complaint classification must be set by admin before updating the complaint status.');
     }
 
-    $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Pending'));
+    $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Received'));
     $oldLevelName = trim((string)($oldRow['old_level_name'] ?? 'Complaint Only'));
     $existingBlotterId = trim((string)($oldRow['blotter_id'] ?? ''));
     $existingRequest = getLatestBlotterRequest($conn, $caseId);
     $existingRequestStatus = strtolower(trim((string)($existingRequest['request_status_name'] ?? '')));
-    if (in_array(strtolower($oldStatusName), ['resolved', 'closed', 'dropped'], true)) {
+    if (in_array(complaintStatusKey($oldStatusName, [
+        'escalated_to_blotter' => $oldRow['escalated_to_blotter'] ?? 0,
+        'request_status_name' => $existingRequest['request_status_name'] ?? '',
+    ]), ['resolved', 'dropped', 'referred'], true)) {
         respond(false, [], 'Complaint status is already finalized and cannot be changed again.');
     }
-    if ($actionType === 'endorsement' && $existingBlotterId !== '') {
+    if ($actionType === 'referred' && $existingBlotterId !== '') {
         respond(false, [], 'Complaint is already linked to a blotter.');
     }
-    if ($actionType === 'endorsement' && in_array($existingRequestStatus, ['pending', 'approved'], true)) {
+    if ($actionType === 'referred' && in_array($existingRequestStatus, ['pending', 'approved'], true)) {
         respond(false, [], 'A blotter review request already exists for this complaint.');
     }
-    if (strtolower($oldStatusName) === 'endorsed' && $existingBlotterId !== '') {
+    if (complaintStatusKey($oldStatusName, [
+        'escalated_to_blotter' => $oldRow['escalated_to_blotter'] ?? 0,
+        'request_status_name' => $existingRequest['request_status_name'] ?? '',
+    ]) === 'referred' && $existingBlotterId !== '') {
         respond(false, [], 'Complaint status is already finalized and cannot be changed again.');
     }
 
@@ -1690,14 +2026,14 @@ if ($action === 'update_case_outcome') {
     if ($actionType === 'under_investigation') {
         $newStatusName = 'Under Investigation';
     } elseif ($actionType === 'action_in_progress') {
-        $newStatusName = 'Action in Progress';
+        $newStatusName = 'Action In Progress';
     } elseif ($actionType === 'resolved') {
         $newStatusName = 'Resolved';
-    } elseif ($actionType === 'closed') {
-        $newStatusName = 'Closed';
+    } elseif ($actionType === 'dropped') {
+        $newStatusName = 'Dropped';
     } else {
         $newLevelName = 'Endorsed to Blotter';
-        $newStatusName = $oldStatusName !== '' ? $oldStatusName : 'Pending';
+        $newStatusName = 'Referred';
     }
 
     $newStatusId = getStatusId($conn, $newStatusName, 'Complaint');
@@ -1714,7 +2050,7 @@ if ($action === 'update_case_outcome') {
 
     $conn->begin_transaction();
     try {
-        if ($actionType === 'endorsement') {
+        if ($actionType === 'referred') {
             $createdRequest = createBlotterRequest($conn, $oldRow, $actorUserId, $remarks);
             $logEntry .= '; Blotter review request created: ' . ($createdRequest['request_id'] ?? '');
         }
@@ -1765,10 +2101,15 @@ if ($action === 'update_case_outcome') {
 
         $conn->commit();
         complaintTrackerCacheClear();
+        $residentSms = complaintResidentSmsMessage($actionType, $remarks);
+        $residentPhone = trim((string)($oldRow['complainant_contact_number'] ?? ''));
+        if ($residentSms !== '' && $residentPhone !== '') {
+            sendSMS($residentPhone, $residentSms);
+        }
         respond(true, [], 'Complaint updated.');
     } catch (Throwable $e) {
         $conn->rollback();
-        error_log('Failed to update complaint endorsement: ' . $e->getMessage());
+        error_log('Failed to update complaint status: ' . $e->getMessage());
         respond(false, [], 'Failed to update complaint: ' . $e->getMessage());
     }
 }
