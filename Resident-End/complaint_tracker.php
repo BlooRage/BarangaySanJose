@@ -14,7 +14,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260707-transactions-ui3">
   <style>
     #div-sidebarWrapper {
       width: 280px;
@@ -168,6 +168,55 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       color: #8f2932;
       background: #e8cfd3;
       border: 2px solid #e0bcc2;
+    }
+    .complaint-status-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      text-align: center;
+      width: 100%;
+      max-width: 210px;
+      margin: 0 auto;
+    }
+    .complaint-status-primary {
+      color: #1f2937;
+      font-size: 0.98rem;
+      line-height: 1.05;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      max-width: 100%;
+      word-break: break-word;
+    }
+    .complaint-status-secondary {
+      color: #6b7280;
+      font-size: 0.82rem;
+      line-height: 1.15;
+      max-width: 100%;
+      word-break: break-word;
+    }
+    .complaint-status-primary.is-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 150px;
+      min-height: 44px;
+      padding: 0.55rem 1.2rem;
+      border-radius: 999px;
+      border: 2px solid #c0dac9;
+      background: #d4e8db;
+      color: #18613f;
+      line-height: 1;
+    }
+    .complaint-status-primary.is-pending {
+      color: #6c5a06;
+    }
+    .complaint-status-primary.is-denied {
+      color: #8f2932;
+    }
+    .complaint-status-primary.is-archived {
+      color: #495057;
     }
     .tracker-table-responsive {
       display: block;
@@ -547,6 +596,27 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       return "pending";
     }
 
+    function renderComplaintStatusTile(item) {
+      const statusText = escapeHtml(item?.status_name || "Received");
+      const levelText = escapeHtml(item?.level_name || "Complaint Only");
+      const statusClass = statusBadgeClass(item?.status_name || "");
+      const isChip = statusClass === "approved";
+      const primaryClass = [
+        "complaint-status-primary",
+        isChip ? "is-chip" : "",
+        statusClass === "pending" ? "is-pending" : "",
+        statusClass === "denied" ? "is-denied" : "",
+        statusClass === "archived" ? "is-archived" : "",
+      ].filter(Boolean).join(" ");
+
+      return `
+        <div class="complaint-status-tile">
+          <div class="${primaryClass}">${statusText}</div>
+          <div class="complaint-status-secondary">${levelText}</div>
+        </div>
+      `;
+    }
+
     function paginateRows(rows, currentPage, perPage) {
       const safePerPage = Math.max(1, Number.parseInt(perPage, 10) || 20);
       const totalPages = Math.max(1, Math.ceil(rows.length / safePerPage));
@@ -804,8 +874,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <td>${escapeHtml(item.complaint_type || "-")}</td>
           <td>${escapeHtml(item.subject_display_name || "-")}<div class="small text-muted mt-1">${escapeHtml(item.incident_place || "No location noted")}</div></td>
           <td>${escapeHtml(formatDate(item.incident_date))}</td>
-          <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Received")}</span><div class="small text-muted mt-1">${escapeHtml(item.level_name || "Complaint Only")}</div></td>
-          <td><button type="button" class="btn btn-sm btn-outline-secondary complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}">View</button></td>
+          <td>${renderComplaintStatusTile(item)}</td>
+          <td><button type="button" class="btn btn-sm compact-table-btn btn-view-download complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}"><i class="fa-regular fa-eye me-1"></i>View</button></td>
         </tr>
       `).join("");
 
@@ -818,8 +888,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-label mt-2">Subject</div>
           <div class="tracker-value">${escapeHtml(item.subject_display_name || "-")}</div>
           <div class="tracker-label mt-2">Status</div>
-          <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Received")}</span></div>
-          <button type="button" class="btn btn-sm btn-outline-secondary mt-3 complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}">View</button>
+          <div class="tracker-value">${renderComplaintStatusTile(item)}</div>
+          <button type="button" class="btn btn-sm compact-table-btn btn-view-download mt-3 complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}"><i class="fa-regular fa-eye me-1"></i>View</button>
         </article>
       `).join("");
 

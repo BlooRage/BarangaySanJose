@@ -28,6 +28,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260707-transactions-ui3">
   <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
   <style>
     .tracker-shell {
@@ -162,59 +163,20 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     .table-responsive .table th:last-child,
     .table-responsive .table td:last-child {
       width: 1%;
-      min-width: 290px;
+      min-width: 150px;
       white-space: nowrap;
     }
     .request-actions {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
+      justify-content: flex-start;
+      gap: 0.35rem;
       flex-wrap: nowrap;
       white-space: nowrap;
     }
-    .request-actions .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 36px;
-      padding: 0.42rem 0.78rem;
-      border-radius: 0.75rem;
-      font-size: 0.82rem;
-      line-height: 1.15;
-      font-weight: 600;
-      white-space: nowrap;
-      box-shadow: none !important;
-    }
-    .request-actions .btn-outline-secondary,
-    .request-actions .btn-outline-dark {
-      color: #475467;
-      border-color: #cfd6de;
-      background: #fff;
-    }
-    .request-actions .btn-outline-secondary:hover,
-    .request-actions .btn-outline-dark:hover,
-    .request-actions .btn-outline-secondary:focus-visible,
-    .request-actions .btn-outline-dark:focus-visible {
-      color: #1f2937;
-      border-color: #b8c2cc;
-      background: #f8fafc;
-    }
-    .request-actions .btn-outline-primary,
-    .request-actions .btn-primary,
-    .request-actions .btn-success {
-      color: #fff;
-      border-color: #de710c;
-      background: #de710c;
-    }
-    .request-actions .btn-outline-primary:hover,
-    .request-actions .btn-primary:hover,
-    .request-actions .btn-success:hover,
-    .request-actions .btn-outline-primary:focus-visible,
-    .request-actions .btn-primary:focus-visible,
-    .request-actions .btn-success:focus-visible {
-      color: #fff;
-      border-color: #b95606;
-      background: #b95606;
+    .request-actions .compact-table-btn {
+      min-width: 0;
+      text-decoration: none;
     }
     #viewModal .modal-dialog {
       max-width: 1100px;
@@ -503,7 +465,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     <h2 class="tracker-title">Document Requests</h2>
     <hr class="mt-0 mb-3">
 
-    <div class="bg-white rounded-4 shadow-sm border p-4 tracker-shell">
+    <div class="bg-white rounded-4 shadow-sm border p-4 tracker-shell resident-masterlist-shell">
       <div class="tracker-toolbar">
         <div class="tracker-tabs">
           <button type="button" class="btn tracker-tab active" data-tab="all">All</button>
@@ -1088,13 +1050,12 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
   function paymentActions(row) {
     const requestId = String(row.request_id || '');
-    const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view="${escapeHtml(requestId)}">View</button>`;
+    const viewBtn = `<button class="btn btn-sm compact-table-btn btn-view-download" data-view="${escapeHtml(requestId)}"><i class="fa-regular fa-eye me-1"></i>View</button>`;
     const method = String(row.payment_method || '').toLowerCase();
     const hasMode = method === 'gcash' || method === 'barangay';
     const modeLabel = hasMode ? 'Change Mode of Payment' : 'Select Mode of Payment';
-    const modeButtonClass = hasMode ? 'btn-outline-secondary' : 'btn-outline-primary';
-    const modeBtn = `<button type="button" class="btn btn-sm ${modeButtonClass}" data-open-mode="${escapeHtml(requestId)}">${modeLabel}</button>`;
-    const payNowBtn = `<button class="btn btn-sm btn-primary" data-pay-now="${escapeHtml(requestId)}">Pay Now</button>`;
+    const modeBtn = `<button type="button" class="btn btn-sm compact-table-btn btn-invoice" data-open-mode="${escapeHtml(requestId)}"><i class="fa-solid fa-credit-card me-1"></i>${escapeHtml(modeLabel)}</button>`;
+    const payNowBtn = `<button class="btn btn-sm compact-table-btn btn-invoice" data-pay-now="${escapeHtml(requestId)}"><i class="fa-solid fa-money-bill-wave me-1"></i>Pay Now</button>`;
 
     if (method === 'gcash') {
       return `<span class="request-actions">${viewBtn}${payNowBtn}${modeBtn}</span>`;
@@ -1103,6 +1064,40 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       return `<span class="request-actions">${viewBtn}${modeBtn}</span>`;
     }
     return `<span class="request-actions">${viewBtn}${modeBtn}</span>`;
+  }
+
+  function requestCompletedActions(row) {
+    const requestId = String(row.request_id || '');
+    const viewBtn = `<button class="btn btn-sm compact-table-btn btn-view-download" data-view="${escapeHtml(requestId)}"><i class="fa-regular fa-eye me-1"></i>View</button>`;
+    const proofBtn = row.payment_proof_path
+      ? `<button class="btn btn-sm compact-table-btn btn-download" data-proof="${escapeHtml(requestId)}"><i class="fa-solid fa-receipt me-1"></i>View Payment</button>`
+      : '';
+    const issuedBtn = `<button class="btn btn-sm compact-table-btn btn-invoice" data-issued="${escapeHtml(requestId)}"><i class="fa-solid ${isBarangayIdRequest(row) ? 'fa-id-card' : 'fa-file-lines'} me-1"></i>${isBarangayIdRequest(row) ? 'View Digital ID' : 'View Document'}</button>`;
+
+    return `<span class="request-actions">${viewBtn}${proofBtn}${issuedBtn}</span>`;
+  }
+
+  function requestDefaultActions(row) {
+    const requestId = String(row.request_id || '');
+    const viewBtn = `<button class="btn btn-sm compact-table-btn btn-view-download" data-view="${escapeHtml(requestId)}"><i class="fa-regular fa-eye me-1"></i>View</button>`;
+    const proofBtn = row.payment_proof_path
+      ? `<button class="btn btn-sm compact-table-btn btn-download" data-proof="${escapeHtml(requestId)}"><i class="fa-solid fa-receipt me-1"></i>View Payment</button>`
+      : '';
+
+    return `<span class="request-actions">${viewBtn}${proofBtn}</span>`;
+  }
+
+  function buildRequestActionHtml(row) {
+    if (!row) {
+      return '<span class="text-muted small">-</span>';
+    }
+    if (row.stage === 'for_payment' || row.stage === 'payment_rejected') {
+      return paymentActions(row);
+    }
+    if (row.stage === 'completed') {
+      return requestCompletedActions(row);
+    }
+    return requestDefaultActions(row);
   }
 
   function filterBucket(row) {
@@ -1160,7 +1155,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   }
 
   function bindRowActions() {
-    tbody.querySelectorAll('button[data-open-mode]').forEach((btn) => {
+    document.querySelectorAll('#requestRows button[data-open-mode], #requestCards button[data-open-mode]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-open-mode') || '');
         if (!id) return;
@@ -1168,14 +1163,14 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       });
     });
 
-    tbody.querySelectorAll('button[data-pay-now]').forEach((btn) => {
+    document.querySelectorAll('#requestRows button[data-pay-now], #requestCards button[data-pay-now]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-pay-now') || '');
         openGcashModal(id);
       });
     });
 
-    tbody.querySelectorAll('button[data-view]').forEach((btn) => {
+    document.querySelectorAll('#requestRows button[data-view], #requestCards button[data-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-view') || '');
         const row = itemById.get(id);
@@ -1184,7 +1179,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       });
     });
 
-    tbody.querySelectorAll('button[data-proof]').forEach((btn) => {
+    document.querySelectorAll('#requestRows button[data-proof], #requestCards button[data-proof]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-proof') || '');
         const row = itemById.get(id);
@@ -1200,7 +1195,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       });
     });
 
-    tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
+    document.querySelectorAll('#requestRows button[data-issued], #requestCards button[data-issued]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-issued') || '');
         const row = itemById.get(id);
@@ -1229,19 +1224,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
 
     tbody.innerHTML = items.map((r) => {
-      let action = '<span class="text-muted small">-</span>';
-      const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view="${escapeHtml(r.request_id)}">View</button>`;
-      const proofBtn = r.payment_proof_path
-        ? `<button class="btn btn-sm btn-outline-dark" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
-        : '';
-      const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">${isBarangayIdRequest(r) ? 'View Digital ID' : 'View Document'}</button>`;
-      if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
-        action = paymentActions(r);
-      } else if (r.stage === 'completed') {
-        action = `<span class="request-actions">${viewBtn}${proofBtn}${issuedBtn}</span>`;
-      } else {
-        action = `<span class="request-actions">${viewBtn}${proofBtn}</span>`;
-      }
+      const action = buildRequestActionHtml(r);
 
       const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
       const paymentDeadline = (r.stage === 'for_payment' || r.stage === 'payment_rejected') && r.payment_deadline
@@ -1273,6 +1256,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-value">${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}</div>
           <div class="tracker-label mt-2">Submitted</div>
           <div class="tracker-value">${escapeHtml(r.submitted_at || '-')}</div>
+          <div class="mt-3">${buildRequestActionHtml(r)}</div>
         </article>
       `).join('');
     }
@@ -1364,117 +1348,6 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       throw new Error(data?.message || `Request failed (${res.status}).`);
     }
     return data;
-  }
-
-  async function load() {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>';
-    try {
-      const data = await fetchJson(endpoint + '?action=list&limit=80');
-      if (!data.success) throw new Error(data.message || 'Unable to load requests');
-
-      const items = Array.isArray(data.items) ? data.items : [];
-      itemById = new Map(items.map((it) => [String(it.request_id), it]));
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No requests yet.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = items.map((r) => {
-        let action = '<span class="text-muted small">-</span>';
-        const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view="${escapeHtml(r.request_id)}">View</button>`;
-        const proofBtn = r.payment_proof_path
-          ? `<button class="btn btn-sm btn-outline-dark" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
-          : '';
-        const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">${isBarangayIdRequest(r) ? 'View Digital ID' : 'View Document'}</button>`;
-        if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
-          action = paymentActions(r);
-        } else if (r.stage === 'completed') {
-          action = `<span class="request-actions">${viewBtn}${proofBtn}${issuedBtn}</span>`;
-        } else {
-          action = `<span class="request-actions">${viewBtn}${proofBtn}</span>`;
-        }
-
-        const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
-        const paymentDeadline = (r.stage === 'for_payment' || r.stage === 'payment_rejected') && r.payment_deadline
-          ? `<div class="text-muted small mt-1">Payment deadline: ${escapeHtml(formatDateTime(r.payment_deadline))}</div>`
-          : '';
-        const feeText = (r.fee_amount !== null && r.fee_amount !== undefined && String(r.fee_amount) !== '')
-          ? `₱${Number(r.fee_amount).toFixed(2)}`
-          : '-';
-        return `
-          <tr>
-            <td class="fw-semibold">${escapeHtml(r.request_id)}</td>
-            <td>${escapeHtml(r.document_type)}</td>
-            <td>${escapeHtml(r.purpose || '-')}</td>
-            <td>${escapeHtml(feeText)}</td>
-            <td>${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${reason}${paymentDeadline}</td>
-            <td>${escapeHtml(r.submitted_at || '-')}</td>
-            <td>${action}</td>
-          </tr>
-        `;
-      }).join('');
-
-      tbody.querySelectorAll('button[data-open-mode]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const id = String(btn.getAttribute('data-open-mode') || '');
-          if (!id) return;
-          openModeModal(id);
-        });
-      });
-
-      tbody.querySelectorAll('button[data-pay-now]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const id = String(btn.getAttribute('data-pay-now') || '');
-          openGcashModal(id);
-        });
-      });
-
-      tbody.querySelectorAll('button[data-view]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const id = String(btn.getAttribute('data-view') || '');
-          const row = itemById.get(id);
-          if (!row) return;
-          openRequestView(row);
-        });
-      });
-
-      tbody.querySelectorAll('button[data-proof]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const id = String(btn.getAttribute('data-proof') || '');
-          const row = itemById.get(id);
-          if (!row || !row.payment_proof_path) return;
-          const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
-          openFileViewerModal({
-            title: 'Payment Proof',
-            viewUrl: proofUrl,
-            linkText: 'Open in New Tab',
-            linkUrl: proofUrl,
-            isPdf: String(row.payment_proof_path || '').toLowerCase().endsWith('.pdf')
-          });
-        });
-      });
-
-      tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const id = String(btn.getAttribute('data-issued') || '');
-          const row = itemById.get(id);
-          const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
-          const fullDigitalIdUrl = `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
-          const viewUrl = row && isBarangayIdRequest(row)
-            ? `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&embed=1&_ts=${Date.now()}`
-            : `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
-          openFileViewerModal({
-            title: row && isBarangayIdRequest(row) ? 'Digital Barangay ID' : 'Issued Document (PDF)',
-            viewUrl,
-            linkText: row && isBarangayIdRequest(row) ? 'Open Full Page' : 'Download PDF',
-            linkUrl: row && isBarangayIdRequest(row) ? fullDigitalIdUrl : downloadUrl,
-            isPdf: true
-          });
-        });
-      });
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(err.message || err)}</td></tr>`;
-    }
   }
 
   async function load() {

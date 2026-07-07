@@ -1030,10 +1030,63 @@ body.admin-sidebar-collapsed .appointment-shell {
 }
 
 .compact-admin-table tbody .btn.btn-sm,
-.compact-admin-table .compact-table-btn {
+.compact-admin-table .compact-table-btn,
+.compact-table-btn {
     padding: 0.22rem 0.5rem;
     font-size: 0.76rem;
     line-height: 1.15;
+}
+
+.compact-admin-table .compact-table-btn.btn-view-download,
+.compact-admin-table .compact-table-btn.btn-outline-secondary,
+.compact-table-btn.btn-view-download,
+.compact-table-btn.btn-outline-secondary {
+    color: #fff;
+    border-color: #0d6efd;
+    background: #0d6efd;
+    font-weight: 400 !important;
+    letter-spacing: 0.15px;
+}
+
+.compact-admin-table .compact-table-btn.btn-view-download:hover,
+.compact-admin-table .compact-table-btn.btn-outline-secondary:hover,
+.compact-table-btn.btn-view-download:hover,
+.compact-table-btn.btn-outline-secondary:hover {
+    color: #fff;
+    border-color: #0b5ed7;
+    background: #0b5ed7;
+}
+
+.compact-admin-table .compact-table-btn.btn-download,
+.compact-table-btn.btn-download {
+    color: #212529;
+    border-color: #ffc107;
+    background: #ffc107;
+    font-weight: 400 !important;
+    letter-spacing: 0.15px;
+}
+
+.compact-admin-table .compact-table-btn.btn-download:hover,
+.compact-table-btn.btn-download:hover {
+    color: #212529;
+    border-color: #e0a800;
+    background: #e0a800;
+}
+
+.compact-admin-table .compact-table-btn.btn-invoice,
+.compact-table-btn.btn-invoice {
+    color: #fff;
+    border-color: #198754;
+    background: #198754;
+    font-weight: 400 !important;
+    letter-spacing: 0.15px;
+}
+
+.compact-admin-table .compact-table-btn.btn-invoice:hover,
+.compact-table-btn.btn-invoice:hover {
+    color: #fff;
+    border-color: #157347;
+    background: #157347;
 }
 
 .compact-admin-table .compact-table-btn.btn-outline-secondary,

@@ -248,13 +248,16 @@ if (isset($conn) && $conn instanceof mysqli) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260707-transactions-ui3">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
         :root {
-            --receipts-hci-red: #d92d20;
-            --receipts-hci-red-dark: #b42318;
-            --receipts-hci-red-ring: rgba(217, 45, 32, 0.2);
+            --receipt-action-view: #0d6efd;
+            --receipt-action-view-dark: #0b5ed7;
+            --receipt-action-view-ring: rgba(13, 110, 253, 0.2);
+            --receipt-action-download: #ffc107;
+            --receipt-action-download-dark: #e0a800;
+            --receipt-action-download-ring: rgba(255, 193, 7, 0.24);
         }
         body { background: #f8f9fb; }
         #mobile-header { display: none; }
@@ -358,48 +361,6 @@ if (isset($conn) && $conn instanceof mysqli) {
         }
         .amount-value { font-weight: 700; color: #c66a10; }
         .timestamp-value { color: #334155; }
-        .compact-table-btn {
-            padding: 0.42rem 0.78rem;
-            font-size: 0.82rem;
-            line-height: 1.15;
-        }
-        .btn-receipt-view,
-        .btn-receipt-download {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.38rem;
-            min-height: 34px;
-            border-radius: 0.75rem;
-            white-space: nowrap;
-            font-weight: 700 !important;
-            letter-spacing: 0.01em;
-        }
-        .btn-receipt-view {
-            color: var(--receipts-hci-red) !important;
-            border: 1px solid rgba(217, 45, 32, 0.28) !important;
-            background: #fff5f4 !important;
-        }
-        .btn-receipt-view:hover {
-            color: var(--receipts-hci-red-dark) !important;
-            border-color: rgba(180, 35, 24, 0.32) !important;
-            background: #ffe7e5 !important;
-        }
-        .btn-receipt-download {
-            color: #fff !important;
-            border: 1px solid var(--receipts-hci-red) !important;
-            background: var(--receipts-hci-red) !important;
-        }
-        .btn-receipt-download:hover {
-            color: #fff !important;
-            border-color: var(--receipts-hci-red-dark) !important;
-            background: var(--receipts-hci-red-dark) !important;
-        }
-        .btn-receipt-view:focus-visible,
-        .btn-receipt-download:focus-visible,
-        .btn-receipt-open:focus-visible {
-            box-shadow: 0 0 0 0.2rem var(--receipts-hci-red-ring);
-        }
         .receipts-table { table-layout: auto; min-width: 100%; }
         .receipts-table th, .receipts-table td { white-space: normal; }
         .receipts-table th:last-child, .receipts-table td:last-child {
@@ -485,28 +446,28 @@ if (isset($conn) && $conn instanceof mysqli) {
             box-shadow: none;
         }
         .btn-receipt-open {
-            color: var(--receipts-hci-red);
-            background: #fff5f4;
-            border: 1px solid rgba(217, 45, 32, 0.28);
+            color: #fff;
+            background: var(--receipt-action-view);
+            border: 1px solid var(--receipt-action-view);
         }
         .btn-receipt-open:hover,
         .btn-receipt-open:focus {
-            color: var(--receipts-hci-red-dark);
-            background: #ffe7e5;
-            border-color: rgba(180, 35, 24, 0.32);
-            box-shadow: 0 0 0 0.2rem var(--receipts-hci-red-ring);
+            color: #fff;
+            background: var(--receipt-action-view-dark);
+            border-color: var(--receipt-action-view-dark);
+            box-shadow: 0 0 0 0.2rem var(--receipt-action-view-ring);
         }
         .btn-receipt-modal-download {
-            color: #fff;
-            background: var(--receipts-hci-red);
-            border: 1px solid var(--receipts-hci-red);
+            color: #1f2937;
+            background: var(--receipt-action-download);
+            border: 1px solid var(--receipt-action-download);
         }
         .btn-receipt-modal-download:hover,
         .btn-receipt-modal-download:focus {
-            color: #fff;
-            background: var(--receipts-hci-red-dark);
-            border-color: var(--receipts-hci-red-dark);
-            box-shadow: 0 0 0 0.2rem var(--receipts-hci-red-ring);
+            color: #1f2937;
+            background: var(--receipt-action-download-dark);
+            border-color: var(--receipt-action-download-dark);
+            box-shadow: 0 0 0 0.2rem var(--receipt-action-download-ring);
         }
         .btn-receipt-close {
             background: #ffffff;
@@ -558,10 +519,10 @@ if (isset($conn) && $conn instanceof mysqli) {
             #receiptViewerModal .modal-footer {
                 padding-top: 0.85rem;
             }
-            .btn-receipt-view {
+            .btn-view-download {
                 width: 100%;
             }
-            .btn-receipt-download {
+            .btn-download {
                 width: 100%;
             }
             .receipt-modal-actions {
@@ -1023,15 +984,15 @@ if (isset($conn) && $conn instanceof mysqli) {
                     ? `
                         <span class="compact-table-actions">
                             <button type="button"
-                                    class="btn btn-sm compact-table-btn btn-receipt-view js-view-receipt"
+                                    class="btn btn-sm compact-table-btn btn-view-download js-view-receipt"
                                     data-receipt-url="${escapeHtml(item.receipt_url || '')}"
                                     data-receipt-download-url="${escapeHtml(item.download_url || '')}"
                                     data-receipt-title="${escapeHtml(item.details || '')}"
                                     data-receipt-id="${escapeHtml(item.payment_id || '')}">
-                                <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
+                                <i class="fa-regular fa-eye me-1"></i>View
                             </button>
-                            <a href="${escapeHtml(item.download_url || '#')}" class="btn btn-sm compact-table-btn btn-receipt-download">
-                                <i class="fa-solid fa-download"></i><span>Download</span>
+                            <a href="${escapeHtml(item.download_url || '#')}" class="btn btn-sm compact-table-btn btn-download">
+                                <i class="fa-solid fa-download me-1"></i>Download
                             </a>
                         </span>
                     `
@@ -1052,15 +1013,15 @@ if (isset($conn) && $conn instanceof mysqli) {
                 const actionHtml = item.receipt_url
                     ? `
                         <button type="button"
-                                class="btn btn-sm compact-table-btn btn-receipt-view w-100 js-view-receipt"
+                                class="btn btn-sm compact-table-btn btn-view-download w-100 js-view-receipt"
                                 data-receipt-url="${escapeHtml(item.receipt_url || '')}"
                                 data-receipt-download-url="${escapeHtml(item.download_url || '')}"
                                 data-receipt-title="${escapeHtml(item.details || '')}"
                                 data-receipt-id="${escapeHtml(item.payment_id || '')}">
-                            <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
+                            <i class="fa-regular fa-eye me-1"></i>View
                         </button>
-                        <a href="${escapeHtml(item.download_url || '#')}" class="btn btn-sm compact-table-btn btn-receipt-download w-100">
-                            <i class="fa-solid fa-download"></i><span>Download</span>
+                        <a href="${escapeHtml(item.download_url || '#')}" class="btn btn-sm compact-table-btn btn-download w-100">
+                            <i class="fa-solid fa-download me-1"></i>Download
                         </a>
                     `
                     : '<span class="text-muted small">Receipt unavailable.</span>';

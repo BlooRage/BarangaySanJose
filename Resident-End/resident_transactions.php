@@ -13,7 +13,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260707-transactions-ui3">
   <style>
     :root {
       --txn-hover-bg: #e6e8ec;
@@ -597,7 +597,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           </div>
         </div>
         <div class="modal-footer">
-          <a href="#" class="btn btn-outline-primary d-none" id="txnViewResubmitBtn">Resubmit Document</a>
+          <a href="#" class="btn btn-sm compact-table-btn btn-invoice d-none" id="txnViewResubmitBtn"><i class="fa-solid fa-rotate-right me-1"></i>Resubmit Document</a>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
@@ -1094,8 +1094,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         const hasDocuments = Boolean(row?.has_documents);
         const actionHtml = `
           <div class="txn-action-btns">
-            <button type="button" class="btn btn-sm btn-outline-secondary txn-view-btn" data-txn-id="${escapeHtml(row.transaction_id)}">View</button>
-            ${resubmitUrl ? `<a class="btn btn-sm btn-outline-primary" href="${escapeHtml(resubmitUrl)}">Resubmit</a>` : ""}
+            <button type="button" class="btn btn-sm compact-table-btn btn-view-download txn-view-btn" data-txn-id="${escapeHtml(row.transaction_id)}"><i class="fa-regular fa-eye me-1"></i>View</button>
+            ${resubmitUrl ? `<a class="btn btn-sm compact-table-btn btn-invoice" href="${escapeHtml(resubmitUrl)}"><i class="fa-solid fa-rotate-right me-1"></i>Resubmit</a>` : ""}
           </div>
         `;
         const expandId = `txn-expand-${escapeHtml(row.transaction_id)}`;
@@ -1166,8 +1166,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 <div>
                   <div class="txn-label">Status</div>
                   <div class="txn-value"><span class="badge rounded-pill ${statusClass}">${escapeHtml(displayStatusName(row.status_name))}</span>${decisionDateHtml}</div>
-                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2 txn-view-btn" data-txn-id="${escapeHtml(row.transaction_id)}">View</button>
-                  ${resubmitUrl ? `<a class="btn btn-sm btn-outline-primary mt-2" href="${escapeHtml(resubmitUrl)}">Resubmit</a>` : ""}
+                  <button type="button" class="btn btn-sm compact-table-btn btn-view-download mt-2 txn-view-btn" data-txn-id="${escapeHtml(row.transaction_id)}"><i class="fa-regular fa-eye me-1"></i>View</button>
+                  ${resubmitUrl ? `<a class="btn btn-sm compact-table-btn btn-invoice mt-2" href="${escapeHtml(resubmitUrl)}"><i class="fa-solid fa-rotate-right me-1"></i>Resubmit</a>` : ""}
                 </div>
               </div>
             </article>
@@ -1257,7 +1257,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           } else {
             docsBody.innerHTML = docs.map((doc, idx) => {
               const fileLink = doc.file_url
-                ? `<button type="button" class="btn btn-sm btn-outline-primary txn-doc-view-btn" data-doc-idx="${escapeHtml(String(idx))}">View</button>`
+                ? `<button type="button" class="btn btn-sm compact-table-btn btn-view-download txn-doc-view-btn" data-doc-idx="${escapeHtml(String(idx))}"><i class="fa-regular fa-eye me-1"></i>View</button>`
                 : `<span class="text-muted">-</span>`;
               return `
                 <tr>

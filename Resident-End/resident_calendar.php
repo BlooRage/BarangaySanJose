@@ -90,7 +90,7 @@ $calendarPayload = array_map(static function (array $item): array {
     }
 
     .calendar-page-header {
-      margin-bottom: 0;
+      margin-bottom: 1.35rem;
     }
 
     .calendar-page-title {
@@ -147,13 +147,13 @@ $calendarPayload = array_map(static function (array $item): array {
 
     .calendar-card-head,
     .agenda-card-head {
-      padding: 1.15rem 1.25rem 1rem;
+      padding: 0.95rem 1.25rem 0.85rem;
       border-bottom: 1px solid var(--calendar-line);
       background: #ffffff;
-      min-height: 108px;
+      min-height: 92px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
     }
 
     .calendar-card-title,
@@ -603,7 +603,7 @@ $calendarPayload = array_map(static function (array $item): array {
 
     @media (max-width: 767.98px) {
       .calendar-page-header {
-        margin-bottom: 0;
+        margin-bottom: 1rem;
       }
 
       .calendar-page-title {

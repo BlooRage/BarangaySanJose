@@ -180,7 +180,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260707-transactions-ui3">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
         :root {
@@ -314,59 +314,6 @@ if (isset($conn) && $conn instanceof mysqli) {
             align-items: center;
             gap: 0.35rem;
             flex-wrap: nowrap;
-        }
-        .compact-admin-table tbody .btn.btn-sm,
-        .compact-admin-table .compact-table-btn,
-        .compact-table-btn {
-            padding: 0.22rem 0.5rem;
-            font-size: 0.76rem;
-            line-height: 1.15;
-        }
-        .compact-admin-table .compact-table-btn.btn-view-download,
-        .compact-admin-table .compact-table-btn.btn-outline-secondary,
-        .compact-table-btn.btn-view-download,
-        .compact-table-btn.btn-outline-secondary {
-            color: #fff;
-            border-color: #0d6efd;
-            background: #0d6efd;
-            font-weight: 400 !important;
-            letter-spacing: 0.15px;
-        }
-        .compact-admin-table .compact-table-btn.btn-view-download:hover,
-        .compact-admin-table .compact-table-btn.btn-outline-secondary:hover,
-        .compact-table-btn.btn-view-download:hover,
-        .compact-table-btn.btn-outline-secondary:hover {
-            color: #fff;
-            border-color: #0b5ed7;
-            background: #0b5ed7;
-        }
-        .compact-admin-table .compact-table-btn.btn-download,
-        .compact-table-btn.btn-download {
-            color: #212529;
-            border-color: #ffc107;
-            background: #ffc107;
-            font-weight: 400 !important;
-            letter-spacing: 0.15px;
-        }
-        .compact-admin-table .compact-table-btn.btn-download:hover,
-        .compact-table-btn.btn-download:hover {
-            color: #212529;
-            border-color: #e0a800;
-            background: #e0a800;
-        }
-        .compact-admin-table .compact-table-btn.btn-invoice,
-        .compact-table-btn.btn-invoice {
-            color: #fff;
-            border-color: #198754;
-            background: #198754;
-            font-weight: 400 !important;
-            letter-spacing: 0.15px;
-        }
-        .compact-admin-table .compact-table-btn.btn-invoice:hover,
-        .compact-table-btn.btn-invoice:hover {
-            color: #fff;
-            border-color: #157347;
-            background: #157347;
         }
         .downloads-status-pill {
             display: inline-flex;

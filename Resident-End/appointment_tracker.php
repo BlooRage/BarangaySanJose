@@ -14,7 +14,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260707-transactions-ui3">
   <style>
     #div-sidebarWrapper {
       width: 280px;
@@ -638,7 +638,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <td>${escapeHtml(formatDateTime(item.preferred_schedule_timestamp, "To be scheduled"))}</td>
           <td>${escapeHtml(confirmedScheduleDisplay(item))}</td>
           <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(appointmentStatusLabel(item.status_name))}</span></td>
-          <td><button type="button" class="btn btn-sm btn-outline-secondary appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}">View</button></td>
+          <td><button type="button" class="btn btn-sm compact-table-btn btn-view-download appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}"><i class="fa-regular fa-eye me-1"></i>View</button></td>
         </tr>
       `).join("");
 
@@ -654,7 +654,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-value">${escapeHtml(formatDateTime(item.preferred_schedule_timestamp, "To be scheduled"))}</div>
           <div class="tracker-label mt-2">Status</div>
           <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(appointmentStatusLabel(item.status_name))}</span></div>
-          <button type="button" class="btn btn-sm btn-outline-secondary mt-3 appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}">View</button>
+          <button type="button" class="btn btn-sm compact-table-btn btn-view-download mt-3 appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}"><i class="fa-regular fa-eye me-1"></i>View</button>
         </article>
       `).join("");
 
