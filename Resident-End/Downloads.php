@@ -118,15 +118,45 @@ if (isset($conn) && $conn instanceof mysqli) {
                         $validUntilValue = $barangayIdValidUntil->format('Y-m-d H:i:s');
                     }
                 }
+                $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower($documentType));
+                $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
+                $viewUrl = $isBarangayId
+                    ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode((string)($row['request_id'] ?? '')) . '&embed=1')
+                    : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode((string)($row['request_id'] ?? '')));
+                $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode((string)($row['request_id'] ?? ''));
+                $invoiceUrl = $invoicePath !== ''
+                    ? ($workflowEndpoint . '?action=download_invoice&request_id=' . rawurlencode((string)($row['request_id'] ?? '')))
+                    : '';
+                $category = 'other';
+                $documentTypeLower = strtolower($documentType);
+                if ($isBarangayId) {
+                    $category = 'barangay-id';
+                } elseif (strpos($documentTypeLower, 'clearance') !== false || strpos($documentTypeLower, 'permit') !== false) {
+                    $category = 'clearance';
+                } elseif (
+                    strpos($documentTypeLower, 'certificate') !== false
+                    || strpos($documentTypeLower, 'residency') !== false
+                    || strpos($documentTypeLower, 'indigency') !== false
+                    || strpos($documentTypeLower, 'cohabitation') !== false
+                ) {
+                    $category = 'certificate';
+                }
 
                 $downloadItems[] = [
                     'request_id' => (string)($row['request_id'] ?? ''),
                     'document_type' => $documentType,
                     'purpose' => $purpose !== '' ? $purpose : '-',
                     'submitted_at' => downloads_format_datetime((string)($row['request_timestamp'] ?? '')),
+                    'submitted_at_raw' => (string)($row['request_timestamp'] ?? ''),
                     'released_at' => downloads_format_datetime((string)($row['release_timestamp'] ?? '')),
+                    'released_at_raw' => (string)($row['release_timestamp'] ?? ''),
                     'valid_until' => downloads_format_datetime($validUntilValue),
+                    'valid_until_raw' => $validUntilValue,
+                    'category' => $category,
+                    'view_url' => $viewUrl,
+                    'download_url' => $downloadUrl,
                     'invoice_path' => $invoicePath,
+                    'invoice_url' => $invoiceUrl,
                 ];
             }
             $stmt->close();
@@ -150,6 +180,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
         :root {
@@ -525,7 +556,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                 width: 100%;
                 gap: 0.6rem;
             }
-            .table-responsive {
+            .tracker-table-responsive {
                 display: none;
             }
             #downloadCards {
@@ -671,21 +702,32 @@ if (isset($conn) && $conn instanceof mysqli) {
                         <p class="mb-0">Once your document requests are approved, issued, and ready for release, they will appear here for download.</p>
                     </div>
                 <?php else: ?>
-                    <div class="admin-list-toolbar mb-3">
-                        <div>
-                            <h2 class="h5 mb-1 fw-bold">Released Documents</h2>
-                            <p class="text-muted small mb-0">This table now follows the same compact layout used in the resident masterlist.</p>
+                    <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+                        <div class="admin-list-tabs">
+                            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn download-tab active" data-tab="all" data-filter="ALL">All</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab" data-tab="certificate" data-filter="Certificates">Certificates</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab" data-tab="clearance" data-filter="Clearances">Clearances</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab" data-tab="barangay-id" data-filter="Barangay ID">Barangay ID</button>
                         </div>
                         <div class="admin-list-actions">
-                            <div class="downloads-summary">
-                                <span>Available Files</span>
-                                <span class="count"><?= count($downloadItems) ?></span>
+                            <div class="input-group admin-search">
+                                <input id="downloadSearch" class="form-control" placeholder="Search downloads..." />
+                                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                             </div>
+                            <button id="downloadFilterBtn" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#downloadFilterModal">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                            <button id="downloadColumnsBtn" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#downloadColumnsModal">
+                                <i class="fa-solid fa-sliders"></i>
+                            </button>
+                            <button id="downloadRefreshBtn" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh downloads" aria-label="Refresh downloads">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="table-responsive compact-admin-table-shell">
-                        <table class="table align-middle mb-0 compact-admin-table downloads-table">
+                    <div class="table-responsive compact-admin-table-shell tracker-table-responsive">
+                        <table id="downloadsTable" class="table align-middle mb-0 compact-admin-table downloads-table">
                             <thead>
                                 <tr class="table-light">
                                     <th>Request ID</th>
@@ -698,112 +740,84 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php foreach ($downloadItems as $item): ?>
-                                    <?php
-                                    $requestId = (string)$item['request_id'];
-                                    $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower((string)($item['document_type'] ?? '')));
-                                    $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
-                                    $viewUrl = $isBarangayId
-                                        ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId) . '&embed=1')
-                                        : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId));
-                                    $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode($requestId);
-                                    ?>
-                                    <tr>
-                                        <td class="request-id"><?= htmlspecialchars($requestId) ?></td>
-                                        <td><div class="doc-title"><?= htmlspecialchars((string)$item['document_type']) ?></div></td>
-                                        <td class="doc-purpose"><?= htmlspecialchars((string)$item['purpose']) ?></td>
-                                        <td><?= htmlspecialchars((string)$item['submitted_at']) ?></td>
-                                        <td><?= htmlspecialchars((string)$item['released_at']) ?></td>
-                                        <td><?= htmlspecialchars((string)$item['valid_until']) ?></td>
-                                        <td><span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span></td>
-                                        <td>
-                                            <div class="compact-table-actions">
-                                                <button type="button"
-                                                        class="btn btn-sm compact-table-btn btn-view-download js-view-download"
-                                                        data-view-url="<?= htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                                        data-view-title="<?= htmlspecialchars((string)$item['document_type'], ENT_QUOTES, 'UTF-8') ?>"
-                                                        data-view-request-id="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
-                                                    <i class="fa-regular fa-eye me-1"></i>View
-                                                </button>
-                                                <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
-                                                    <i class="fa-solid fa-download me-1"></i>Download
-                                                </a>
-                                                <?php if ((string)$item['invoice_path'] !== ''): ?>
-                                                <a class="btn btn-sm compact-table-btn btn-invoice" href="<?= htmlspecialchars($workflowEndpoint . '?action=download_invoice&request_id=' . rawurlencode($requestId)) ?>">
-                                                    <i class="fa-solid fa-receipt me-1"></i>Invoice
-                                                </a>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+                            <tbody id="downloadsTbody">
+                                <tr><td colspan="8" class="text-center text-muted py-4">Loading downloads...</td></tr>
                             </tbody>
                         </table>
                     </div>
+                    <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-table-responsive">
+                        <div class="d-flex align-items-center gap-2">
+                            <label for="downloadEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+                            <input id="downloadEntriesPerPageInput" type="number" min="1" step="1" value="20" class="form-control form-control-sm resident-entries-input" />
+                        </div>
+                        <nav aria-label="Downloads pagination">
+                            <ul class="pagination pagination-sm mb-0" id="downloadPagination"></ul>
+                        </nav>
+                    </div>
 
                     <div id="downloadCards" class="mt-2">
-                        <?php foreach ($downloadItems as $item): ?>
-                            <?php
-                            $requestId = (string)$item['request_id'];
-                            $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower((string)($item['document_type'] ?? '')));
-                            $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
-                            $viewUrl = $isBarangayId
-                                ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId) . '&embed=1')
-                                : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId));
-                            $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode($requestId);
-                            ?>
-                            <article class="download-card">
-                                <div class="download-card-header">
-                                    <div>
-                                        <div class="doc-title"><?= htmlspecialchars((string)$item['document_type']) ?></div>
-                                        <div class="request-id mt-1"><?= htmlspecialchars($requestId) ?></div>
-                                    </div>
-                                    <span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span>
-                                </div>
-                                <div class="download-card-meta">
-                                    <div>
-                                        <div class="txn-label">Purpose</div>
-                                        <div class="txn-value"><?= htmlspecialchars((string)$item['purpose']) ?></div>
-                                    </div>
-                                    <div>
-                                        <div class="txn-label">Submitted</div>
-                                        <div class="txn-value"><?= htmlspecialchars((string)$item['submitted_at']) ?></div>
-                                    </div>
-                                    <div>
-                                        <div class="txn-label">Released</div>
-                                        <div class="txn-value"><?= htmlspecialchars((string)$item['released_at']) ?></div>
-                                    </div>
-                                    <div>
-                                        <div class="txn-label">Valid Until</div>
-                                        <div class="txn-value"><?= htmlspecialchars((string)$item['valid_until']) ?></div>
-                                    </div>
-                                </div>
-                                <div class="download-actions mt-3">
-                                    <button type="button"
-                                            class="btn btn-sm compact-table-btn btn-view-download js-view-download"
-                                            data-view-url="<?= htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                            data-view-title="<?= htmlspecialchars((string)$item['document_type'], ENT_QUOTES, 'UTF-8') ?>"
-                                            data-view-request-id="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
-                                        <i class="fa-regular fa-eye me-1"></i>View
-                                    </button>
-                                    <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
-                                        <i class="fa-solid fa-download me-1"></i>Download
-                                    </a>
-                                    <?php if ((string)$item['invoice_path'] !== ''): ?>
-                                    <a class="btn btn-sm compact-table-btn btn-invoice" href="<?= htmlspecialchars($workflowEndpoint . '?action=download_invoice&request_id=' . rawurlencode($requestId)) ?>">
-                                        <i class="fa-solid fa-receipt me-1"></i>Invoice
-                                    </a>
-                                    <?php endif; ?>
-                                </div>
-                            </article>
-                        <?php endforeach; ?>
+                        <div class="text-center text-muted py-4">Loading downloads...</div>
                     </div>
                 <?php endif; ?>
             </section>
         </div>
     </main>
 </div>
+
+<?php if (!$queryError && $downloadItems): ?>
+<div class="modal fade" id="downloadFilterModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Filter Downloads</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small text-muted mb-1">Document Type</label>
+                        <select class="form-select" id="downloadTypeFilter">
+                            <option value="">All Documents</option>
+                            <option value="certificate">Certificates</option>
+                            <option value="clearance">Clearances</option>
+                            <option value="barangay-id">Barangay ID</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-muted mb-1">Released Date From</label>
+                        <input type="date" class="form-control" id="downloadDateFrom" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-muted mb-1">Released Date To</label>
+                        <input type="date" class="form-control" id="downloadDateTo" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="downloadFilterReset">Reset</button>
+                <button type="button" class="btn btn-primary" id="downloadFilterApply" data-bs-dismiss="modal">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="downloadColumnsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Columns</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2" id="downloadColumnsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="downloadColumnsReset">Reset</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="modal fade" id="downloadViewerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -837,6 +851,11 @@ if (isset($conn) && $conn instanceof mysqli) {
 <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const downloadItems = <?= json_encode($downloadItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        let downloadActiveTab = 'all';
+        let downloadCurrentPage = 1;
+        let downloadEntriesPerPage = 20;
+
         const modalEl = document.getElementById('downloadViewerModal');
         const frameEl = document.getElementById('downloadViewerFrame');
         const emptyEl = document.getElementById('downloadViewerEmpty');
@@ -849,6 +868,108 @@ if (isset($conn) && $conn instanceof mysqli) {
         }
 
         const viewerModal = new bootstrap.Modal(modalEl);
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const dateOnly = (value) => String(value || '').trim().slice(0, 10);
+
+        const paginateRows = (rows, currentPage, perPage) => {
+            const safePerPage = Math.max(1, Number.parseInt(perPage, 10) || 20);
+            const totalPages = Math.max(1, Math.ceil(rows.length / safePerPage));
+            const page = Math.min(Math.max(1, currentPage), totalPages);
+            const start = (page - 1) * safePerPage;
+            return {
+                page,
+                totalPages,
+                items: rows.slice(start, start + safePerPage),
+            };
+        };
+
+        const renderDownloadPagination = (totalPages) => {
+            const pagination = document.getElementById('downloadPagination');
+            if (!pagination) {
+                return;
+            }
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            const items = [];
+            items.push(`
+                <li class="page-item ${downloadCurrentPage <= 1 ? 'disabled' : ''}">
+                    <button type="button" class="page-link" data-page="${downloadCurrentPage - 1}">Prev</button>
+                </li>
+            `);
+            for (let page = 1; page <= totalPages; page += 1) {
+                items.push(`
+                    <li class="page-item ${page === downloadCurrentPage ? 'active' : ''}">
+                        <button type="button" class="page-link" data-page="${page}">${page}</button>
+                    </li>
+                `);
+            }
+            items.push(`
+                <li class="page-item ${downloadCurrentPage >= totalPages ? 'disabled' : ''}">
+                    <button type="button" class="page-link" data-page="${downloadCurrentPage + 1}">Next</button>
+                </li>
+            `);
+            pagination.innerHTML = items.join('');
+            pagination.querySelectorAll('button[data-page]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (button.closest('.page-item')?.classList.contains('disabled')) {
+                        return;
+                    }
+                    downloadCurrentPage = Number.parseInt(button.getAttribute('data-page') || '1', 10) || 1;
+                    renderDownloads();
+                });
+            });
+        };
+
+        const getFilteredDownloads = () => {
+            const search = String(document.getElementById('downloadSearch')?.value || '').toLowerCase().trim();
+            const type = String(document.getElementById('downloadTypeFilter')?.value || '').trim();
+            const dateFrom = String(document.getElementById('downloadDateFrom')?.value || '').trim();
+            const dateTo = String(document.getElementById('downloadDateTo')?.value || '').trim();
+
+            return downloadItems.filter((item) => {
+                const category = String(item.category || 'other').trim();
+                if (downloadActiveTab !== 'all' && category !== downloadActiveTab) {
+                    return false;
+                }
+                if (type && category !== type) {
+                    return false;
+                }
+
+                const releasedDate = dateOnly(item.released_at_raw || item.submitted_at_raw || '');
+                if (dateFrom && releasedDate && releasedDate < dateFrom) {
+                    return false;
+                }
+                if (dateTo && releasedDate && releasedDate > dateTo) {
+                    return false;
+                }
+
+                if (search) {
+                    const haystack = [
+                        item.request_id,
+                        item.document_type,
+                        item.purpose,
+                        item.submitted_at,
+                        item.released_at,
+                        item.valid_until,
+                    ].join(' ').toLowerCase();
+                    if (!haystack.includes(search)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        };
 
         const resetViewer = () => {
             if (frameEl) {
@@ -895,18 +1016,195 @@ if (isset($conn) && $conn instanceof mysqli) {
             viewerModal.show();
         };
 
-        document.querySelectorAll('.js-view-download').forEach((trigger) => {
-            trigger.addEventListener('click', () => {
-                openViewer({
-                    url: String(trigger.dataset.viewUrl || '').trim(),
-                    title: String(trigger.dataset.viewTitle || '').trim(),
-                    requestId: String(trigger.dataset.viewRequestId || '').trim(),
+        const bindDownloadViewButtons = () => {
+            document.querySelectorAll('.js-view-download').forEach((trigger) => {
+                trigger.addEventListener('click', () => {
+                    openViewer({
+                        url: String(trigger.dataset.viewUrl || '').trim(),
+                        title: String(trigger.dataset.viewTitle || '').trim(),
+                        requestId: String(trigger.dataset.viewRequestId || '').trim(),
+                    });
                 });
+            });
+        };
+
+        const renderDownloads = () => {
+            const tbody = document.getElementById('downloadsTbody');
+            const cards = document.getElementById('downloadCards');
+            if (!tbody || !cards) {
+                return;
+            }
+
+            const rows = getFilteredDownloads();
+            const paged = paginateRows(rows, downloadCurrentPage, downloadEntriesPerPage);
+            downloadCurrentPage = paged.page;
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No downloads found.</td></tr>';
+                cards.innerHTML = '<div class="text-center text-muted py-4">No downloads found.</div>';
+                renderDownloadPagination(1);
+                return;
+            }
+
+            tbody.innerHTML = paged.items.map((item) => {
+                const invoiceAction = item.invoice_url
+                    ? `
+                        <a class="btn btn-sm compact-table-btn btn-invoice" href="${escapeHtml(item.invoice_url)}">
+                            <i class="fa-solid fa-receipt me-1"></i>Invoice
+                        </a>
+                    `
+                    : '';
+                return `
+                    <tr>
+                        <td class="request-id">${escapeHtml(item.request_id || '-')}</td>
+                        <td><div class="doc-title">${escapeHtml(item.document_type || '-')}</div></td>
+                        <td class="doc-purpose">${escapeHtml(item.purpose || '-')}</td>
+                        <td>${escapeHtml(item.submitted_at || '-')}</td>
+                        <td>${escapeHtml(item.released_at || '-')}</td>
+                        <td>${escapeHtml(item.valid_until || '-')}</td>
+                        <td><span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span></td>
+                        <td>
+                            <div class="compact-table-actions">
+                                <button type="button"
+                                        class="btn btn-sm compact-table-btn btn-view-download js-view-download"
+                                        data-view-url="${escapeHtml(item.view_url || '')}"
+                                        data-view-title="${escapeHtml(item.document_type || '')}"
+                                        data-view-request-id="${escapeHtml(item.request_id || '')}">
+                                    <i class="fa-regular fa-eye me-1"></i>View
+                                </button>
+                                <a class="btn btn-sm compact-table-btn btn-download" href="${escapeHtml(item.download_url || '#')}">
+                                    <i class="fa-solid fa-download me-1"></i>Download
+                                </a>
+                                ${invoiceAction}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            cards.innerHTML = paged.items.map((item) => {
+                const invoiceAction = item.invoice_url
+                    ? `
+                        <a class="btn btn-sm compact-table-btn btn-invoice" href="${escapeHtml(item.invoice_url)}">
+                            <i class="fa-solid fa-receipt me-1"></i>Invoice
+                        </a>
+                    `
+                    : '';
+                return `
+                    <article class="download-card">
+                        <div class="download-card-header">
+                            <div>
+                                <div class="doc-title">${escapeHtml(item.document_type || '-')}</div>
+                                <div class="request-id mt-1">${escapeHtml(item.request_id || '-')}</div>
+                            </div>
+                            <span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span>
+                        </div>
+                        <div class="download-card-meta">
+                            <div>
+                                <div class="txn-label">Purpose</div>
+                                <div class="txn-value">${escapeHtml(item.purpose || '-')}</div>
+                            </div>
+                            <div>
+                                <div class="txn-label">Submitted</div>
+                                <div class="txn-value">${escapeHtml(item.submitted_at || '-')}</div>
+                            </div>
+                            <div>
+                                <div class="txn-label">Released</div>
+                                <div class="txn-value">${escapeHtml(item.released_at || '-')}</div>
+                            </div>
+                            <div>
+                                <div class="txn-label">Valid Until</div>
+                                <div class="txn-value">${escapeHtml(item.valid_until || '-')}</div>
+                            </div>
+                        </div>
+                        <div class="download-actions mt-3">
+                            <button type="button"
+                                    class="btn btn-sm compact-table-btn btn-view-download js-view-download"
+                                    data-view-url="${escapeHtml(item.view_url || '')}"
+                                    data-view-title="${escapeHtml(item.document_type || '')}"
+                                    data-view-request-id="${escapeHtml(item.request_id || '')}">
+                                <i class="fa-regular fa-eye me-1"></i>View
+                            </button>
+                            <a class="btn btn-sm compact-table-btn btn-download" href="${escapeHtml(item.download_url || '#')}">
+                                <i class="fa-solid fa-download me-1"></i>Download
+                            </a>
+                            ${invoiceAction}
+                        </div>
+                    </article>
+                `;
+            }).join('');
+
+            renderDownloadPagination(paged.totalPages);
+            bindDownloadViewButtons();
+        };
+
+        document.querySelectorAll('.download-tab').forEach((button) => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.download-tab').forEach((node) => node.classList.remove('active'));
+                button.classList.add('active');
+                downloadActiveTab = String(button.getAttribute('data-tab') || 'all');
+                downloadCurrentPage = 1;
+                renderDownloads();
             });
         });
 
+        document.getElementById('downloadSearch')?.addEventListener('input', () => {
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadTypeFilter')?.addEventListener('change', () => {
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadDateFrom')?.addEventListener('change', () => {
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadDateTo')?.addEventListener('change', () => {
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadFilterApply')?.addEventListener('click', () => {
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadFilterReset')?.addEventListener('click', () => {
+            const typeFilter = document.getElementById('downloadTypeFilter');
+            const dateFrom = document.getElementById('downloadDateFrom');
+            const dateTo = document.getElementById('downloadDateTo');
+            if (typeFilter) typeFilter.value = '';
+            if (dateFrom) dateFrom.value = '';
+            if (dateTo) dateTo.value = '';
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadEntriesPerPageInput')?.addEventListener('change', (event) => {
+            downloadEntriesPerPage = Math.max(1, Number.parseInt(event.target.value || '20', 10) || 20);
+            event.target.value = String(downloadEntriesPerPage);
+            downloadCurrentPage = 1;
+            renderDownloads();
+        });
+        document.getElementById('downloadRefreshBtn')?.addEventListener('click', (event) => {
+            event.currentTarget?.classList.add('is-loading');
+            window.location.reload();
+        });
+
         modalEl.addEventListener('hidden.bs.modal', resetViewer);
+        renderDownloads();
     });
 </script>
+<?php if (!$queryError && $downloadItems): ?>
+<script>
+    window.ADMIN_TABLE_COLUMNS_CONFIG = {
+        tableSelector: '#downloadsTable',
+        modalId: 'downloadColumnsModal',
+        listId: 'downloadColumnsList',
+        resetBtnId: 'downloadColumnsReset',
+        storageKey: 'resident_cols_downloads_v1',
+        defaultHiddenIdxs: []
+    };
+</script>
+<script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Admin-End/tableColumnsGeneric.js"></script>
+<?php endif; ?>
 </body>
 </html>

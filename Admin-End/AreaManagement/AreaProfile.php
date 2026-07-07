@@ -224,6 +224,7 @@ if (!in_array($requestedArea, $allowedAreas, true)) {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/areaStatistics.js"></script>
 </body>
 </html>

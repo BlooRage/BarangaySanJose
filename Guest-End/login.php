@@ -49,7 +49,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix" />
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260622-1" />
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260707-auth-layout-fix" />
     <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>

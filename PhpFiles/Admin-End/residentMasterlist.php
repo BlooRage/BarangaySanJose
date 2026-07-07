@@ -836,6 +836,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
     $voterStatus = $_POST['voterStatus'] ?? '';
     $religion    = $_POST['religion'] ?? '';
 
+    $birthdateObj = DateTimeImmutable::createFromFormat('!Y-m-d', trim((string)$birthdate));
+    if (!$birthdateObj instanceof DateTimeImmutable || $birthdateObj->format('Y-m-d') !== trim((string)$birthdate)) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Date of birth must be a valid date.']);
+        exit;
+    }
+    if ($birthdateObj > new DateTimeImmutable('today')) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Date of birth cannot be in the future.']);
+        exit;
+    }
+
     // -----------------------
     // Occupation (tinyint + detail)
     // -----------------------

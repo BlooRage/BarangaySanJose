@@ -220,7 +220,9 @@ if (isset($conn) && $conn instanceof mysqli) {
                     ),
                     'price' => receipts_format_amount($row['amount'] ?? null),
                     'timestamp' => receipts_format_datetime((string)($row['transaction_timestamp'] ?? '')),
+                    'timestamp_raw' => (string)($row['transaction_timestamp'] ?? ''),
                     'payment_method' => receipts_format_payment_method((string)($row['payment_method'] ?? '')),
+                    'payment_method_group' => strtolower(str_replace(' ', '-', receipts_format_payment_method((string)($row['payment_method'] ?? '')))),
                     'receipt_url' => $canViewReceipt ? receipts_build_view_url($workflowEndpoint, $requestId) : '',
                     'download_url' => $canViewReceipt ? receipts_build_download_url($workflowEndpoint, $requestId) : '',
                 ];
@@ -242,10 +244,11 @@ if (isset($conn) && $conn instanceof mysqli) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/favicon_sanjose.png?v=20260211">
-    <title>Finance Transactions</title>
+    <title>Official Receipts</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
         :root {
@@ -547,7 +550,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                 width: 100%;
                 gap: 0.6rem;
             }
-            .table-responsive { display: none; }
+            .tracker-table-responsive { display: none; }
             #receiptCards { display: block; margin-top: 0.25rem; }
             .txn-page-title { font-size: clamp(1.7rem, 7.5vw, 2.15rem); margin-bottom: 0.4rem; }
             .receipt-card-header { flex-direction: column; align-items: stretch; }
@@ -645,7 +648,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5">
         <div class="receipts-shell">
-            <h1 class="txn-page-title">Finance Transaction Tracker</h1>
+            <h1 class="txn-page-title">Official Receipts</h1>
             <hr class="mt-0 mb-3">
             <p class="receipts-subtitle mb-4">
                 Review your verified payments here and open the same official receipt PDF that was sent to your email after finance verification.
@@ -661,21 +664,33 @@ if (isset($conn) && $conn instanceof mysqli) {
                         <p class="mb-0">Once your payment is verified by the finance office, it will appear here together with its official receipt PDF.</p>
                     </div>
                 <?php else: ?>
-                    <div class="admin-list-toolbar mb-3">
-                        <div>
-                            <h2 class="h5 mb-1 fw-bold">Finance Transactions</h2>
-                            <p class="text-muted small mb-0">Verified payments for your certificates, clearances, and permit-related requests.</p>
+                    <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+                        <div class="admin-list-tabs">
+                            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn receipt-tab active" data-tab="all" data-filter="ALL">All</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn receipt-tab" data-tab="walk-in" data-filter="Walk-in">Walk-in</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn receipt-tab" data-tab="gcash" data-filter="GCash">GCash</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn receipt-tab" data-tab="cash" data-filter="Cash">Cash</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn receipt-tab" data-tab="online" data-filter="Online">Online</button>
                         </div>
                         <div class="admin-list-actions">
-                            <div class="receipts-summary">
-                                <span>Transactions</span>
-                                <span class="count"><?= count($receiptItems) ?></span>
+                            <div class="input-group admin-search">
+                                <input id="receiptSearch" class="form-control" placeholder="Search receipts..." />
+                                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                             </div>
+                            <button id="receiptFilterBtn" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#receiptFilterModal">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                            <button id="receiptColumnsBtn" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#receiptColumnsModal">
+                                <i class="fa-solid fa-sliders"></i>
+                            </button>
+                            <button id="receiptRefreshBtn" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh receipts" aria-label="Refresh receipts">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="table-responsive compact-admin-table-shell">
-                        <table class="table align-middle mb-0 compact-admin-table receipts-table">
+                    <div class="table-responsive compact-admin-table-shell tracker-table-responsive">
+                        <table id="receiptTable" class="table align-middle mb-0 compact-admin-table receipts-table">
                             <thead>
                                 <tr class="table-light">
                                     <th>ID</th>
@@ -686,98 +701,84 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php foreach ($receiptItems as $item): ?>
-                                    <?php
-                                    $requestId = (string)$item['request_id'];
-                                    $receiptUrl = (string)($item['receipt_url'] ?? '');
-                                    $downloadUrl = (string)($item['download_url'] ?? '');
-                                    ?>
-                                    <tr>
-                                        <td class="payment-id"><?= htmlspecialchars((string)$item['payment_id']) ?></td>
-                                        <td><div class="details-value"><?= htmlspecialchars((string)$item['details']) ?></div></td>
-                                        <td class="amount-value"><?= htmlspecialchars((string)$item['price']) ?></td>
-                                        <td class="timestamp-value"><?= htmlspecialchars((string)$item['timestamp']) ?></td>
-                                        <td><?= htmlspecialchars((string)$item['payment_method']) ?></td>
-                                        <td>
-                                            <?php if ($receiptUrl !== ''): ?>
-                                                <span class="compact-table-actions">
-                                                    <button type="button"
-                                                       class="btn btn-sm compact-table-btn btn-receipt-view js-view-receipt"
-                                                       data-receipt-url="<?= htmlspecialchars($receiptUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                                       data-receipt-download-url="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                                       data-receipt-title="<?= htmlspecialchars((string)$item['details'], ENT_QUOTES, 'UTF-8') ?>"
-                                                       data-receipt-id="<?= htmlspecialchars((string)$item['payment_id'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
-                                                    </button>
-                                                    <a href="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                                       class="btn btn-sm compact-table-btn btn-receipt-download">
-                                                        <i class="fa-solid fa-download"></i><span>Download</span>
-                                                    </a>
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-muted small">Unavailable</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+                            <tbody id="receiptTbody">
+                                <tr><td colspan="6" class="text-center text-muted py-4">Loading receipts...</td></tr>
                             </tbody>
                         </table>
                     </div>
+                    <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-table-responsive">
+                        <div class="d-flex align-items-center gap-2">
+                            <label for="receiptEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+                            <input id="receiptEntriesPerPageInput" type="number" min="1" step="1" value="20" class="form-control form-control-sm resident-entries-input" />
+                        </div>
+                        <nav aria-label="Official receipt pagination">
+                            <ul class="pagination pagination-sm mb-0" id="receiptPagination"></ul>
+                        </nav>
+                    </div>
 
                     <div id="receiptCards" class="mt-2">
-                        <?php foreach ($receiptItems as $item): ?>
-                            <?php
-                            $receiptUrl = (string)($item['receipt_url'] ?? '');
-                            $downloadUrl = (string)($item['download_url'] ?? '');
-                            ?>
-                            <article class="receipt-card">
-                                <div class="receipt-card-header">
-                                    <div>
-                                        <div class="details-value"><?= htmlspecialchars((string)$item['details']) ?></div>
-                                        <div class="payment-id mt-1"><?= htmlspecialchars((string)$item['payment_id']) ?></div>
-                                    </div>
-                                </div>
-                                <div class="receipt-card-meta">
-                                    <div>
-                                        <div class="txn-label">Price</div>
-                                        <div class="txn-value amount-value"><?= htmlspecialchars((string)$item['price']) ?></div>
-                                    </div>
-                                    <div>
-                                        <div class="txn-label">Time Stamp</div>
-                                        <div class="txn-value timestamp-value"><?= htmlspecialchars((string)$item['timestamp']) ?></div>
-                                    </div>
-                                    <div>
-                                        <div class="txn-label">Payment Method</div>
-                                        <div class="txn-value"><?= htmlspecialchars((string)$item['payment_method']) ?></div>
-                                    </div>
-                                </div>
-                                <div class="mt-3 d-grid gap-2">
-                                    <?php if ($receiptUrl !== ''): ?>
-                                        <button type="button"
-                                           class="btn btn-sm compact-table-btn btn-receipt-view w-100 js-view-receipt"
-                                           data-receipt-url="<?= htmlspecialchars($receiptUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                           data-receipt-download-url="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                           data-receipt-title="<?= htmlspecialchars((string)$item['details'], ENT_QUOTES, 'UTF-8') ?>"
-                                           data-receipt-id="<?= htmlspecialchars((string)$item['payment_id'], ENT_QUOTES, 'UTF-8') ?>">
-                                            <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
-                                        </button>
-                                        <a href="<?= htmlspecialchars($downloadUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                           class="btn btn-sm compact-table-btn btn-receipt-download w-100">
-                                            <i class="fa-solid fa-download"></i><span>Download</span>
-                                        </a>
-                                    <?php else: ?>
-                                        <span class="text-muted small">Receipt unavailable.</span>
-                                    <?php endif; ?>
-                                </div>
-                            </article>
-                        <?php endforeach; ?>
+                        <div class="text-center text-muted py-4">Loading receipts...</div>
                     </div>
                 <?php endif; ?>
             </section>
         </div>
     </main>
 </div>
+
+<?php if (!$queryError && $receiptItems): ?>
+<div class="modal fade" id="receiptFilterModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Filter Receipts</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small text-muted mb-1">Payment Method</label>
+                        <select class="form-select" id="receiptMethodFilter">
+                            <option value="">All Methods</option>
+                            <option value="walk-in">Walk-in</option>
+                            <option value="gcash">GCash</option>
+                            <option value="cash">Cash</option>
+                            <option value="online">Online</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-muted mb-1">Transaction Date From</label>
+                        <input type="date" class="form-control" id="receiptDateFrom" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-muted mb-1">Transaction Date To</label>
+                        <input type="date" class="form-control" id="receiptDateTo" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="receiptFilterReset">Reset</button>
+                <button type="button" class="btn btn-primary" id="receiptFilterApply" data-bs-dismiss="modal">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="receiptColumnsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Columns</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2" id="receiptColumnsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="receiptColumnsReset">Reset</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="modal fade" id="receiptViewerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -814,6 +815,11 @@ if (isset($conn) && $conn instanceof mysqli) {
 <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const receiptItems = <?= json_encode($receiptItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        let receiptActiveTab = 'all';
+        let receiptCurrentPage = 1;
+        let receiptEntriesPerPage = 20;
+
         const modalEl = document.getElementById('receiptViewerModal');
         const frameEl = document.getElementById('receiptViewerFrame');
         const emptyEl = document.getElementById('receiptViewerEmpty');
@@ -827,6 +833,107 @@ if (isset($conn) && $conn instanceof mysqli) {
         }
 
         const receiptModal = new bootstrap.Modal(modalEl);
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const dateOnly = (value) => String(value || '').trim().slice(0, 10);
+
+        const paginateRows = (rows, currentPage, perPage) => {
+            const safePerPage = Math.max(1, Number.parseInt(perPage, 10) || 20);
+            const totalPages = Math.max(1, Math.ceil(rows.length / safePerPage));
+            const page = Math.min(Math.max(1, currentPage), totalPages);
+            const start = (page - 1) * safePerPage;
+            return {
+                page,
+                totalPages,
+                items: rows.slice(start, start + safePerPage),
+            };
+        };
+
+        const renderReceiptPagination = (totalPages) => {
+            const pagination = document.getElementById('receiptPagination');
+            if (!pagination) {
+                return;
+            }
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            const items = [];
+            items.push(`
+                <li class="page-item ${receiptCurrentPage <= 1 ? 'disabled' : ''}">
+                    <button type="button" class="page-link" data-page="${receiptCurrentPage - 1}">Prev</button>
+                </li>
+            `);
+            for (let page = 1; page <= totalPages; page += 1) {
+                items.push(`
+                    <li class="page-item ${page === receiptCurrentPage ? 'active' : ''}">
+                        <button type="button" class="page-link" data-page="${page}">${page}</button>
+                    </li>
+                `);
+            }
+            items.push(`
+                <li class="page-item ${receiptCurrentPage >= totalPages ? 'disabled' : ''}">
+                    <button type="button" class="page-link" data-page="${receiptCurrentPage + 1}">Next</button>
+                </li>
+            `);
+            pagination.innerHTML = items.join('');
+            pagination.querySelectorAll('button[data-page]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (button.closest('.page-item')?.classList.contains('disabled')) {
+                        return;
+                    }
+                    receiptCurrentPage = Number.parseInt(button.getAttribute('data-page') || '1', 10) || 1;
+                    renderReceipts();
+                });
+            });
+        };
+
+        const getFilteredReceipts = () => {
+            const search = String(document.getElementById('receiptSearch')?.value || '').toLowerCase().trim();
+            const method = String(document.getElementById('receiptMethodFilter')?.value || '').trim();
+            const dateFrom = String(document.getElementById('receiptDateFrom')?.value || '').trim();
+            const dateTo = String(document.getElementById('receiptDateTo')?.value || '').trim();
+
+            return receiptItems.filter((item) => {
+                const methodGroup = String(item.payment_method_group || '').trim();
+                if (receiptActiveTab !== 'all' && methodGroup !== receiptActiveTab) {
+                    return false;
+                }
+                if (method && methodGroup !== method) {
+                    return false;
+                }
+
+                const sourceDate = dateOnly(item.timestamp_raw || '');
+                if (dateFrom && sourceDate && sourceDate < dateFrom) {
+                    return false;
+                }
+                if (dateTo && sourceDate && sourceDate > dateTo) {
+                    return false;
+                }
+
+                if (search) {
+                    const haystack = [
+                        item.payment_id,
+                        item.details,
+                        item.price,
+                        item.timestamp,
+                        item.payment_method,
+                    ].join(' ').toLowerCase();
+                    if (!haystack.includes(search)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        };
 
         const resetReceiptViewer = () => {
             if (frameEl) {
@@ -880,19 +987,181 @@ if (isset($conn) && $conn instanceof mysqli) {
             receiptModal.show();
         };
 
-        document.querySelectorAll('.js-view-receipt').forEach((trigger) => {
-            trigger.addEventListener('click', () => {
-                openReceiptViewer({
-                    url: String(trigger.dataset.receiptUrl || '').trim(),
-                    downloadUrl: String(trigger.dataset.receiptDownloadUrl || '').trim(),
-                    title: String(trigger.dataset.receiptTitle || '').trim(),
-                    paymentId: String(trigger.dataset.receiptId || '').trim(),
+        const bindReceiptViewButtons = () => {
+            document.querySelectorAll('.js-view-receipt').forEach((trigger) => {
+                trigger.addEventListener('click', () => {
+                    openReceiptViewer({
+                        url: String(trigger.dataset.receiptUrl || '').trim(),
+                        downloadUrl: String(trigger.dataset.receiptDownloadUrl || '').trim(),
+                        title: String(trigger.dataset.receiptTitle || '').trim(),
+                        paymentId: String(trigger.dataset.receiptId || '').trim(),
+                    });
                 });
+            });
+        };
+
+        const renderReceipts = () => {
+            const tbody = document.getElementById('receiptTbody');
+            const cards = document.getElementById('receiptCards');
+            if (!tbody || !cards) {
+                return;
+            }
+
+            const rows = getFilteredReceipts();
+            const paged = paginateRows(rows, receiptCurrentPage, receiptEntriesPerPage);
+            receiptCurrentPage = paged.page;
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No receipts found.</td></tr>';
+                cards.innerHTML = '<div class="text-center text-muted py-4">No receipts found.</div>';
+                renderReceiptPagination(1);
+                return;
+            }
+
+            tbody.innerHTML = paged.items.map((item) => {
+                const actionHtml = item.receipt_url
+                    ? `
+                        <span class="compact-table-actions">
+                            <button type="button"
+                                    class="btn btn-sm compact-table-btn btn-receipt-view js-view-receipt"
+                                    data-receipt-url="${escapeHtml(item.receipt_url || '')}"
+                                    data-receipt-download-url="${escapeHtml(item.download_url || '')}"
+                                    data-receipt-title="${escapeHtml(item.details || '')}"
+                                    data-receipt-id="${escapeHtml(item.payment_id || '')}">
+                                <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
+                            </button>
+                            <a href="${escapeHtml(item.download_url || '#')}" class="btn btn-sm compact-table-btn btn-receipt-download">
+                                <i class="fa-solid fa-download"></i><span>Download</span>
+                            </a>
+                        </span>
+                    `
+                    : '<span class="text-muted small">Unavailable</span>';
+                return `
+                    <tr>
+                        <td class="payment-id">${escapeHtml(item.payment_id || '-')}</td>
+                        <td><div class="details-value">${escapeHtml(item.details || '-')}</div></td>
+                        <td class="amount-value">${escapeHtml(item.price || '-')}</td>
+                        <td class="timestamp-value">${escapeHtml(item.timestamp || '-')}</td>
+                        <td>${escapeHtml(item.payment_method || '-')}</td>
+                        <td>${actionHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            cards.innerHTML = paged.items.map((item) => {
+                const actionHtml = item.receipt_url
+                    ? `
+                        <button type="button"
+                                class="btn btn-sm compact-table-btn btn-receipt-view w-100 js-view-receipt"
+                                data-receipt-url="${escapeHtml(item.receipt_url || '')}"
+                                data-receipt-download-url="${escapeHtml(item.download_url || '')}"
+                                data-receipt-title="${escapeHtml(item.details || '')}"
+                                data-receipt-id="${escapeHtml(item.payment_id || '')}">
+                            <i class="fa-solid fa-file-pdf"></i><span>View Receipt</span>
+                        </button>
+                        <a href="${escapeHtml(item.download_url || '#')}" class="btn btn-sm compact-table-btn btn-receipt-download w-100">
+                            <i class="fa-solid fa-download"></i><span>Download</span>
+                        </a>
+                    `
+                    : '<span class="text-muted small">Receipt unavailable.</span>';
+                return `
+                    <article class="receipt-card">
+                        <div class="receipt-card-header">
+                            <div>
+                                <div class="details-value">${escapeHtml(item.details || '-')}</div>
+                                <div class="payment-id mt-1">${escapeHtml(item.payment_id || '-')}</div>
+                            </div>
+                        </div>
+                        <div class="receipt-card-meta">
+                            <div>
+                                <div class="txn-label">Price</div>
+                                <div class="txn-value amount-value">${escapeHtml(item.price || '-')}</div>
+                            </div>
+                            <div>
+                                <div class="txn-label">Time Stamp</div>
+                                <div class="txn-value timestamp-value">${escapeHtml(item.timestamp || '-')}</div>
+                            </div>
+                            <div>
+                                <div class="txn-label">Payment Method</div>
+                                <div class="txn-value">${escapeHtml(item.payment_method || '-')}</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 d-grid gap-2">${actionHtml}</div>
+                    </article>
+                `;
+            }).join('');
+
+            renderReceiptPagination(paged.totalPages);
+            bindReceiptViewButtons();
+        };
+
+        document.querySelectorAll('.receipt-tab').forEach((button) => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.receipt-tab').forEach((node) => node.classList.remove('active'));
+                button.classList.add('active');
+                receiptActiveTab = String(button.getAttribute('data-tab') || 'all');
+                receiptCurrentPage = 1;
+                renderReceipts();
             });
         });
 
+        document.getElementById('receiptSearch')?.addEventListener('input', () => {
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptMethodFilter')?.addEventListener('change', () => {
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptDateFrom')?.addEventListener('change', () => {
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptDateTo')?.addEventListener('change', () => {
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptFilterApply')?.addEventListener('click', () => {
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptFilterReset')?.addEventListener('click', () => {
+            const methodFilter = document.getElementById('receiptMethodFilter');
+            const dateFrom = document.getElementById('receiptDateFrom');
+            const dateTo = document.getElementById('receiptDateTo');
+            if (methodFilter) methodFilter.value = '';
+            if (dateFrom) dateFrom.value = '';
+            if (dateTo) dateTo.value = '';
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptEntriesPerPageInput')?.addEventListener('change', (event) => {
+            receiptEntriesPerPage = Math.max(1, Number.parseInt(event.target.value || '20', 10) || 20);
+            event.target.value = String(receiptEntriesPerPage);
+            receiptCurrentPage = 1;
+            renderReceipts();
+        });
+        document.getElementById('receiptRefreshBtn')?.addEventListener('click', (event) => {
+            event.currentTarget?.classList.add('is-loading');
+            window.location.reload();
+        });
+
         modalEl.addEventListener('hidden.bs.modal', resetReceiptViewer);
+        renderReceipts();
     });
 </script>
+<?php if (!$queryError && $receiptItems): ?>
+<script>
+    window.ADMIN_TABLE_COLUMNS_CONFIG = {
+        tableSelector: '#receiptTable',
+        modalId: 'receiptColumnsModal',
+        listId: 'receiptColumnsList',
+        resetBtnId: 'receiptColumnsReset',
+        storageKey: 'resident_cols_official_receipts_v1',
+        defaultHiddenIdxs: []
+    };
+</script>
+<script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Admin-End/tableColumnsGeneric.js"></script>
+<?php endif; ?>
 </body>
 </html>

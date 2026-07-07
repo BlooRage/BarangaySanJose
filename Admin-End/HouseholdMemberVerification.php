@@ -380,6 +380,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
     storageKey: "admin_cols_household_member_verification_v1"
   };
 </script>
+<script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-04"></script>
 </body>

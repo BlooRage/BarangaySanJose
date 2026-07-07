@@ -524,7 +524,7 @@ $areaOptions = [
     }
 </script>
 <script src="../../JS-Script-Files/modalHandler.js"></script>
-<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260704-complaint-all-modals"></script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>
 </html>

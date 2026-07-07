@@ -98,6 +98,17 @@ if ($section === 'personal') {
         echo json_encode(['success' => false, 'message' => 'Birthdate is invalid.']);
         exit;
     }
+    $birthdateObj = DateTimeImmutable::createFromFormat('!Y-m-d', $birthdate);
+    if (!$birthdateObj instanceof DateTimeImmutable || $birthdateObj->format('Y-m-d') !== $birthdate) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Birthdate is invalid.']);
+        exit;
+    }
+    if ($birthdateObj > new DateTimeImmutable('today')) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Birthdate cannot be in the future.']);
+        exit;
+    }
     $personalEncrypted = pii_encrypt_field_map([
         'lastname' => $lastName,
         'firstname' => $firstName,

@@ -889,7 +889,7 @@ $residentUploadLimitLabel = app_upload_limit_label('resident');
     <script id="businessRenewalHistoryData" type="application/json"><?= htmlspecialchars((string)json_encode($businessRenewalHistory, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_NOQUOTES, 'UTF-8') ?></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../../JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
-    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
     <script src="../../JS-Script-Files/Resident-End/Clearances/businessClearanceScript.js"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <style>
     :root {
       --txn-hover-bg: #e6e8ec;
@@ -20,82 +21,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     .audit-shell {
       border-color: #f1e1cf !important;
     }
-    .btn-icon {
-      width: 38px;
-      height: 38px;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 38px;
-      border-radius: 10px;
-      line-height: 1;
-    }
-    .btn-icon i {
-      margin: 0 !important;
-    }
-    .admin-list-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 2px;
-      margin-top: 8px;
-    }
-    .admin-list-tabs,
-    .admin-list-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 0 0 auto;
-      white-space: nowrap;
-    }
-    .admin-list-actions {
-      margin-left: auto;
-      flex-wrap: nowrap;
-    }
     .admin-search {
-      min-width: 260px;
-      max-width: 420px;
       flex: 1 1 auto;
-    }
-    .admin-list-actions .btn-icon {
-      flex: 0 0 38px;
     }
     .audit-search .form-control:focus {
       box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.18);
       border-color: rgba(254, 153, 60, 0.55);
-    }
-    .admin-refresh {
-      border-color: rgba(254, 153, 60, 0.45);
-      color: #b85b00;
-      background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
-      font-weight: 700;
-      letter-spacing: 0.2px;
-      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
-    }
-    .admin-refresh:hover {
-      border-color: rgba(254, 153, 60, 0.7);
-      color: #a04f00;
-      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
-      box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
-      transform: translateY(-1px);
-    }
-    .admin-refresh:active {
-      transform: translateY(0);
-      box-shadow: 0 6px 12px rgba(222, 113, 12, 0.12);
-    }
-    .admin-refresh:focus-visible {
-      box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.25);
-    }
-    .admin-refresh.is-loading i {
-      animation: txnSpin 900ms linear infinite;
-    }
-    @keyframes txnSpin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
     }
     .audit-table th {
       white-space: nowrap;
@@ -306,17 +237,9 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       display: none;
     }
     .txn-tab.btn {
-      border-radius: 999px;
+      border-radius: 10px;
       padding: 0.35rem 0.85rem;
       font-weight: 600;
-      border-color: #e3e6ea;
-      color: #495057;
-      background: #fff;
-    }
-    .txn-tab.btn.active {
-      border-color: rgba(254, 153, 60, 0.7);
-      color: #a04f00;
-      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
     }
     .txn-page-title {
       font-family: 'Charis SIL Bold', serif;
@@ -336,17 +259,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         width: 100%;
       }
       .admin-list-tabs {
-        overflow-x: auto;
-        white-space: nowrap;
-        padding-bottom: 4px;
+        row-gap: 8px;
       }
       .admin-list-actions {
         margin-left: 0;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         justify-content: flex-start;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 2px;
       }
       .admin-search {
         min-width: 0;
@@ -365,12 +283,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         flex-wrap: wrap;
         overflow: visible;
       }
-      .admin-list-actions .btn-icon {
-        width: 44px;
-        height: 44px;
-        flex: 0 0 44px;
-      }
-      .table-responsive {
+      .tracker-table-responsive {
         display: none;
       }
       #txnCards {
@@ -502,25 +415,29 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     </header>
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
-      <h2 class="txn-page-title">Transactions</h2>
+      <h2 class="txn-page-title">All Transactions</h2>
       <hr class="mt-0 mb-3">
 
-      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border audit-shell">
-        <div class="admin-list-toolbar mb-3">
+      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border audit-shell resident-masterlist-shell">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
-            <button type="button" class="btn txn-tab active" data-tab="all">All</button>
-            <button type="button" class="btn txn-tab" data-tab="verified">Verified</button>
-            <button type="button" class="btn txn-tab" data-tab="denied">Denied</button>
-            <button type="button" class="btn txn-tab" data-tab="pending">Pending</button>
+            <button type="button" class="btn btn-outline-primary btn-sm txn-tab status-filter-btn active" data-tab="all" data-filter="ALL">All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm txn-tab status-filter-btn" data-tab="verified" data-filter="Verified">Verified</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm txn-tab status-filter-btn" data-tab="denied" data-filter="Denied">Denied</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm txn-tab status-filter-btn" data-tab="pending" data-filter="Pending">Pending</button>
           </div>
           <div class="admin-list-actions">
             <div class="input-group admin-search audit-search">
-              <input id="txnSearch" class="form-control" placeholder="Search..." />
+              <input id="txnSearch" class="form-control" placeholder="Search transactions..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="txnFilterBtn" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#txnFilterModal">
+            <button id="txnFilterBtn" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#txnFilterModal">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
+            </button>
+            <button id="txnColumnsBtn" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#txnColumnsModal">
+              <i class="fa-solid fa-sliders"></i>
+              <span class="visually-hidden">Columns</span>
             </button>
             <button id="txnRefreshBtn" class="btn admin-refresh btn-icon" type="button" title="Refresh table" aria-label="Refresh table">
               <i class="fa-solid fa-arrows-rotate"></i>
@@ -529,8 +446,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0 audit-table">
+        <div class="table-responsive compact-admin-table-shell tracker-table-responsive">
+          <table id="transactionTable" class="table align-middle mb-0 compact-admin-table compact-admin-table--wide audit-table">
             <thead class="table-light">
               <tr>
                 <th>Transaction</th>
@@ -546,6 +463,15 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-table-responsive">
+          <div class="d-flex align-items-center gap-2">
+            <label for="txnEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+            <input id="txnEntriesPerPageInput" type="number" min="1" step="1" value="20" class="form-control form-control-sm resident-entries-input" />
+          </div>
+          <nav aria-label="Transactions pagination">
+            <ul class="pagination pagination-sm mb-0" id="txnPagination"></ul>
+          </nav>
         </div>
         <div id="txnCards" class="mt-2">
           <div class="text-center text-muted py-4">Loading transactions...</div>
@@ -599,6 +525,23 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="txnFilterReset">Reset</button>
           <button type="button" class="btn btn-primary" id="txnFilterApply" data-bs-dismiss="modal">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="txnColumnsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Columns</h5>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2" id="txnColumnsList"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="txnColumnsReset">Reset</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
         </div>
       </div>
     </div>
@@ -686,6 +629,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     let txnViewModalInstance = null;
     let txnDocViewerModalInstance = null;
     let txnViewDocsCurrent = [];
+    let txnCurrentPage = 1;
+    let txnEntriesPerPage = 20;
     const expandedRows = new Set();
     const docStatusCache = new Map();
 
@@ -847,6 +792,54 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     function getResubmitUrl(row) {
       const url = String(row?.metadata?.resubmit_url || "").trim();
       return url || "";
+    }
+
+    function paginateRows(rows, currentPage, perPage) {
+      const safePerPage = Math.max(1, Number.parseInt(perPage, 10) || 20);
+      const totalPages = Math.max(1, Math.ceil(rows.length / safePerPage));
+      const page = Math.min(Math.max(1, currentPage), totalPages);
+      const start = (page - 1) * safePerPage;
+      return {
+        page,
+        totalPages,
+        items: rows.slice(start, start + safePerPage)
+      };
+    }
+
+    function renderTransactionPagination(totalPages) {
+      const pagination = document.getElementById("txnPagination");
+      if (!pagination) return;
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const items = [];
+      items.push(`
+        <li class="page-item ${txnCurrentPage <= 1 ? "disabled" : ""}">
+          <button type="button" class="page-link" data-page="${txnCurrentPage - 1}">Prev</button>
+        </li>
+      `);
+      for (let page = 1; page <= totalPages; page += 1) {
+        items.push(`
+          <li class="page-item ${page === txnCurrentPage ? "active" : ""}">
+            <button type="button" class="page-link" data-page="${page}">${page}</button>
+          </li>
+        `);
+      }
+      items.push(`
+        <li class="page-item ${txnCurrentPage >= totalPages ? "disabled" : ""}">
+          <button type="button" class="page-link" data-page="${txnCurrentPage + 1}">Next</button>
+        </li>
+      `);
+      pagination.innerHTML = items.join("");
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (button.closest(".page-item")?.classList.contains("disabled")) return;
+          txnCurrentPage = Number.parseInt(button.getAttribute("data-page") || "1", 10) || 1;
+          renderTransactions();
+        });
+      });
     }
 
     function getFilteredItems() {
@@ -1080,14 +1073,17 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       const tbody = document.getElementById("txnTbody");
       const cards = document.getElementById("txnCards");
       const rows = getFilteredItems();
+      const paged = paginateRows(rows, txnCurrentPage, txnEntriesPerPage);
+      txnCurrentPage = paged.page;
 
       if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No transactions found.</td></tr>`;
         if (cards) cards.innerHTML = `<div class="text-center text-muted py-4">No transactions found.</div>`;
+        renderTransactionPagination(1);
         return;
       }
 
-      tbody.innerHTML = rows.map((row) => {
+      tbody.innerHTML = paged.items.map((row) => {
         const statusClass = statusBadgeClass(row.status_name);
         const descriptionText = buildTransactionDescription(row);
         const deniedReason = getDeniedReason(row);
@@ -1144,7 +1140,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       }).join("");
 
       if (cards) {
-        cards.innerHTML = rows.map((row) => {
+        cards.innerHTML = paged.items.map((row) => {
           const statusClass = statusBadgeClass(row.status_name);
           const descriptionText = buildTransactionDescription(row);
           const deniedReason = getDeniedReason(row);
@@ -1180,6 +1176,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       }
 
       bindViewButtons();
+      renderTransactionPagination(paged.totalPages);
       document.querySelectorAll(".txn-expand-row").forEach((rowEl) => {
         if (rowEl.getAttribute("data-open") === "1") {
           requestAnimationFrame(() => rowEl.classList.add("is-open"));
@@ -1302,10 +1299,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           throw new Error(data?.message || "Failed to load transactions.");
         }
         allTransactions = Array.isArray(data.items) ? data.items : [];
+        txnCurrentPage = 1;
         renderTransactions();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${escapeHtml(err?.message || "Unable to load transactions.")}</td></tr>`;
         if (cards) cards.innerHTML = `<div class="text-center text-danger py-4">${escapeHtml(err?.message || "Unable to load transactions.")}</div>`;
+        renderTransactionPagination(1);
       } finally {
         if (refreshBtn) refreshBtn.classList.remove("is-loading");
       }
@@ -1325,25 +1324,51 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           document.querySelectorAll(".txn-tab").forEach((b) => b.classList.remove("active"));
           btn.classList.add("active");
           activeTab = btn.getAttribute("data-tab") || "all";
+          txnCurrentPage = 1;
           renderTransactions();
         });
       });
 
-      document.getElementById("txnSearch").addEventListener("input", renderTransactions);
-      document.getElementById("txnTypeFilter").addEventListener("change", renderTransactions);
-      document.getElementById("txnStatusFilter").addEventListener("change", renderTransactions);
-      document.getElementById("txnDateFrom").addEventListener("change", renderTransactions);
-      document.getElementById("txnDateTo").addEventListener("change", renderTransactions);
+      document.getElementById("txnSearch").addEventListener("input", () => {
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
+      document.getElementById("txnTypeFilter").addEventListener("change", () => {
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
+      document.getElementById("txnStatusFilter").addEventListener("change", () => {
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
+      document.getElementById("txnDateFrom").addEventListener("change", () => {
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
+      document.getElementById("txnDateTo").addEventListener("change", () => {
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
 
-      document.getElementById("txnFilterApply").addEventListener("click", renderTransactions);
+      document.getElementById("txnFilterApply").addEventListener("click", () => {
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
       document.getElementById("txnFilterReset").addEventListener("click", () => {
         document.getElementById("txnTypeFilter").value = "";
         document.getElementById("txnStatusFilter").value = "";
         document.getElementById("txnDateFrom").value = "";
         document.getElementById("txnDateTo").value = "";
+        txnCurrentPage = 1;
         renderTransactions();
       });
 
+      document.getElementById("txnEntriesPerPageInput").addEventListener("change", (event) => {
+        txnEntriesPerPage = Math.max(1, Number.parseInt(event.target.value || "20", 10) || 20);
+        event.target.value = String(txnEntriesPerPage);
+        txnCurrentPage = 1;
+        renderTransactions();
+      });
       document.getElementById("txnRefreshBtn").addEventListener("click", loadTransactions);
 
       const txnTbody = document.getElementById("txnTbody");
@@ -1465,6 +1490,17 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+  <script>
+    window.ADMIN_TABLE_COLUMNS_CONFIG = {
+      tableSelector: "#transactionTable",
+      modalId: "txnColumnsModal",
+      listId: "txnColumnsList",
+      resetBtnId: "txnColumnsReset",
+      storageKey: "resident_cols_all_transactions_v1",
+      defaultHiddenIdxs: []
+    };
+  </script>
+  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
+  <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js"></script>
 </body>
 </html>

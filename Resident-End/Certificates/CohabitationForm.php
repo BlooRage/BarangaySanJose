@@ -297,11 +297,10 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                             <div>
                                 <label class="top-label text-dark"><?= $isRelationshipJailVisitVariant ? 'Birthday / Date of Birth' : 'Date of Birth' ?> <span class="required-asterisk">*</span></label>
                                 <input
-                                    type="text"
+                                    type="date"
                                     name="cohabitant_dob"
-                                    placeholder="Select date"
-                                    onfocus="this.type='date'"
-                                    onblur="if(!this.value){this.type='text'}"
+                                    max="<?= date('Y-m-d') ?>"
+                                    data-date-modal-style="calendar"
                                     required
                                 >
                             </div>
@@ -966,7 +965,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260311-05"></script>
 </body>
 

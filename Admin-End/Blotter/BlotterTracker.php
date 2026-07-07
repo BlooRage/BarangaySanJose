@@ -429,11 +429,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         defaultHiddenIdxs: [1, 5]
     };
 </script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260703-1"></script>
 </body>
 </html>
-
 
 
 

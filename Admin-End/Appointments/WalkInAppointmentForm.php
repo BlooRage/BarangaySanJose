@@ -410,7 +410,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const form = document.getElementById("walkInAppointmentForm");

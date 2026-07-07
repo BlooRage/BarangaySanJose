@@ -26,6 +26,51 @@ function dr_now(): string {
     return date('Y-m-d H:i:s');
 }
 
+function dr_parse_iso_date(string $value): ?DateTimeImmutable {
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $value) {
+        return null;
+    }
+
+    return $date;
+}
+
+function dr_validate_birthdate_payload_fields(array $payload, array $labels = []): ?string {
+    $fieldLabels = array_merge([
+        'birthdate' => 'Birthdate',
+        'date_of_birth' => 'Date of birth',
+        'birthDate' => 'Birthdate',
+        'child_dob' => 'Child birthdate',
+        'cohabitant_birthdate' => 'Partner birthdate',
+        'cohabitant_dob' => 'Partner birthdate',
+        'partner_birthdate' => 'Partner birthdate',
+        'partner_dob' => 'Partner birthdate',
+    ], $labels);
+
+    $today = new DateTimeImmutable('today');
+    foreach ($fieldLabels as $field => $label) {
+        $value = trim((string)($payload[$field] ?? ''));
+        if ($value === '') {
+            continue;
+        }
+
+        $date = dr_parse_iso_date($value);
+        if (!$date instanceof DateTimeImmutable) {
+            return $label . ' must be a valid date.';
+        }
+        if ($date > $today) {
+            return $label . ' cannot be in the future.';
+        }
+    }
+
+    return null;
+}
+
 function dr_add_working_days(string $fromDateTime, int $workingDays): string {
     try {
         $date = new DateTime($fromDateTime);

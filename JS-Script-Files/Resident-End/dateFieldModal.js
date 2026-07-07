@@ -61,7 +61,9 @@
         .resident-date-proxy {
           padding-right: 44px;
           cursor: pointer;
-          background: #fff;
+          background: #fff !important;
+          background-color: #fff !important;
+          background-image: none !important;
           border-color: #cbd5e1;
           color: #0f172a;
           box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -69,16 +71,31 @@
         }
         .resident-date-proxy[readonly] {
           background: #fff !important;
+          background-color: #fff !important;
           color: #0f172a !important;
           opacity: 1;
           -webkit-text-fill-color: #0f172a;
+        }
+        .application-card input.resident-date-proxy[readonly],
+        .form-row input.resident-date-proxy[readonly],
+        .status-row input.resident-date-proxy[readonly],
+        .application-card input.resident-date-proxy[readonly]:focus,
+        .form-row input.resident-date-proxy[readonly]:focus,
+        .status-row input.resident-date-proxy[readonly]:focus {
+          background: #fff !important;
+          background-color: #fff !important;
+          color: #0f172a !important;
+          border-color: #cbd5e1 !important;
+          -webkit-text-fill-color: #0f172a !important;
+          opacity: 1 !important;
+          cursor: pointer !important;
         }
         .resident-date-proxy::placeholder {
           color: #64748b;
           opacity: 1;
         }
         .resident-date-proxy:hover {
-          background: #f8fafc;
+          background: #fff;
           border-color: #94a3b8;
         }
         .resident-date-proxy:focus {
@@ -479,10 +496,36 @@
       modalError.classList.toggle("d-none", !message);
     }
 
+    const inputValueDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    const inputDisabledDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "disabled");
+
     function getInputMode(input) {
-      return String(input?.dataset?.dateModalStyle || "").trim().toLowerCase() === "calendar"
-        ? "calendar"
-        : "select";
+      return String(input?.dataset?.dateModalStyle || "").trim().toLowerCase() === "select"
+        ? "select"
+        : "calendar";
+    }
+
+    function patchInputInstanceProperty(input, propertyName, descriptor, onSet) {
+      if (!(input instanceof HTMLInputElement) || !descriptor || typeof descriptor.get !== "function" || typeof descriptor.set !== "function") {
+        return;
+      }
+
+      const ownDescriptor = Object.getOwnPropertyDescriptor(input, propertyName);
+      if (ownDescriptor && ownDescriptor.configurable === false) {
+        return;
+      }
+
+      Object.defineProperty(input, propertyName, {
+        configurable: true,
+        enumerable: descriptor.enumerable ?? true,
+        get() {
+          return descriptor.get.call(this);
+        },
+        set(value) {
+          descriptor.set.call(this, value);
+          onSet();
+        }
+      });
     }
 
     function isComplaintDateInput(input) {
@@ -500,6 +543,52 @@
     function getTodayIso() {
       const today = new Date();
       return toIsoDate(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    }
+
+    function normalizeFieldToken(value) {
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+    }
+
+    function isBirthdateLikeInput(input) {
+      if (!(input instanceof HTMLInputElement)) {
+        return false;
+      }
+
+      return [
+        input.id,
+        input.name,
+        input.getAttribute("data-date-field"),
+        input.getAttribute("aria-label")
+      ].some((value) => {
+        const token = normalizeFieldToken(value);
+        return token === "birthdate"
+          || token === "dateofbirth"
+          || token === "dob"
+          || token.endsWith("birthdate")
+          || token.endsWith("dateofbirth")
+          || token.endsWith("dob")
+          || token.includes("childdob")
+          || token.includes("cohabitantdob")
+          || token.includes("cohabitantbirthdate")
+          || token.includes("partnerdob")
+          || token.includes("partnerbirthdate")
+          || token.includes("manualbirthdate");
+      });
+    }
+
+    function applyPastOnlyDateConstraints(input) {
+      if (!isBirthdateLikeInput(input)) {
+        return;
+      }
+
+      const todayIso = getTodayIso();
+      const currentMax = String(input.getAttribute("max") || "").trim();
+      if (!currentMax || currentMax > todayIso) {
+        input.setAttribute("max", todayIso);
+      }
     }
 
     function getDisabledWeekdays(input) {
@@ -860,6 +949,8 @@
         return;
       }
 
+      applyPastOnlyDateConstraints(input);
+
       activeInput = input;
       activeProxy = proxy;
       modalEl.classList.toggle("resident-date-modal--complaint", isComplaintDateInput(input));
@@ -1008,7 +1099,12 @@
       setModalError("");
     });
 
-    document.querySelectorAll('input[type="date"]:not([readonly]):not([disabled]):not([data-date-modal-ignore])').forEach((input) => {
+    function enhanceDateInput(input) {
+      if (!(input instanceof HTMLInputElement) || input.type !== "date" || input.readOnly || input.hasAttribute("data-date-modal-ignore")) {
+        return;
+      }
+
+      applyPastOnlyDateConstraints(input);
       if (input.dataset.dateModalApplied === "1") return;
       input.dataset.dateModalApplied = "1";
 
@@ -1017,7 +1113,20 @@
 
       const proxy = document.createElement("input");
       proxy.type = "text";
-      proxy.className = `${input.className || "form-control"} resident-date-proxy`;
+      const proxyClassList = String(input.className || "form-control")
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((className) => ![
+          "text-bg-light",
+          "bg-light",
+          "bg-light-subtle",
+          "text-muted",
+          "text-secondary"
+        ].includes(className));
+      if (!proxyClassList.includes("form-control")) {
+        proxyClassList.unshift("form-control");
+      }
+      proxy.className = `${proxyClassList.join(" ")} resident-date-proxy`;
       proxy.placeholder = input.getAttribute("placeholder") || "Select date";
       proxy.readOnly = true;
       proxy.autocomplete = "off";
@@ -1041,6 +1150,8 @@
         updateProxyValue(input, proxy);
       };
 
+      patchInputInstanceProperty(input, "value", inputValueDescriptor, syncProxyState);
+      patchInputInstanceProperty(input, "disabled", inputDisabledDescriptor, syncProxyState);
       syncProxyState();
       input.focus = () => {
         proxy.focus();
@@ -1057,6 +1168,37 @@
           openForInput(input, proxy);
         }
       });
-    });
+    }
+
+    function enhanceDateInputs(root = document) {
+      if (root instanceof HTMLInputElement) {
+        enhanceDateInput(root);
+        return;
+      }
+      if (!(root instanceof Element || root instanceof Document)) {
+        return;
+      }
+
+      root.querySelectorAll('input[type="date"]:not([readonly]):not([data-date-modal-ignore])').forEach(enhanceDateInput);
+    }
+
+    enhanceDateInputs(document);
+
+    if (document.body) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof HTMLInputElement) {
+              enhanceDateInput(node);
+              return;
+            }
+            if (node instanceof Element) {
+              enhanceDateInputs(node);
+            }
+          });
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   });
 })();

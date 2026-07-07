@@ -102,7 +102,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
                                         <div class="row mb-3">
                                             <div class="col-md-2">
                                                 <label class="form-label" for="dateOfBirth">Date of Birth <span class="text-danger">*</span></label>
-                                                <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="2026-12-31" data-date-modal-style="calendar" required>
+                                                <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar" required>
                                             </div>
 
                                             <div class="col-md-2">
@@ -441,7 +441,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
 
     <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
+    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
     <script src="../JS-Scripts/Admin-End-JS/AdminDashboardScript.js"></script>
 
     <script>

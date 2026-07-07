@@ -8926,6 +8926,8 @@
       manualMiddleName.value = resident.middle_name || '';
       manualSuffix.value = resident.suffix || '';
       manualBirthdate.value = resident.birthdate || '';
+      manualBirthdate.dispatchEvent(new Event('input', { bubbles: true }));
+      manualBirthdate.dispatchEvent(new Event('change', { bubbles: true }));
       manualBirthplace.value = resident.birthplace || '';
       manualSex.value = resident.sex || '';
       manualCivilStatus.value = resident.civil_status || '';

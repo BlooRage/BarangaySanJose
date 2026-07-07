@@ -390,6 +390,24 @@ try {
     $isHead = (($_POST['isHead'] ?? '') === 'yes') ? 1 : 0;
     $voter  = (($_POST['registeredVoter'] ?? '') === 'yes') ? 1 : 0;
 
+    $dobDate = DateTimeImmutable::createFromFormat('!Y-m-d', $dob);
+    if (!$dobDate instanceof DateTimeImmutable || $dobDate->format('Y-m-d') !== $dob) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "Date of birth must be a valid date."
+        ]);
+        exit;
+    }
+    if ($dobDate > new DateTimeImmutable('today')) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "Date of birth cannot be in the future."
+        ]);
+        exit;
+    }
+
     /**
      * ✅ FIX: Your form sends:
      * - occupationStatus = employed/unemployed

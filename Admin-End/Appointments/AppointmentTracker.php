@@ -2132,7 +2132,7 @@ foreach ($appointmentCouncilMembers as $member) {
                     <div class="tracker-form-grid cols-2">
                         <div class="tracker-form-field">
                             <label class="tracker-form-label" for="reviewConfirmedDate">Reschedule Date</label>
-                            <input class="form-control" type="date" name="confirmed_date" id="reviewConfirmedDate" form="appointmentReviewForm" min="<?= htmlspecialchars($minConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" data-disabled-weekdays="<?= htmlspecialchars(implode(',', $appointmentDisabledWeekdays), ENT_QUOTES, 'UTF-8') ?>" data-disabled-dates="<?= htmlspecialchars($appointmentUnavailableDatesCsv, ENT_QUOTES, 'UTF-8') ?>" data-available-weekdays="<?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>" data-date-modal-ignore>
+                            <input class="form-control" type="date" name="confirmed_date" id="reviewConfirmedDate" form="appointmentReviewForm" min="<?= htmlspecialchars($minConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" data-disabled-weekdays="<?= htmlspecialchars(implode(',', $appointmentDisabledWeekdays), ENT_QUOTES, 'UTF-8') ?>" data-disabled-dates="<?= htmlspecialchars($appointmentUnavailableDatesCsv, ENT_QUOTES, 'UTF-8') ?>" data-available-weekdays="<?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>" data-date-modal-style="calendar">
                         </div>
                         <div class="tracker-form-field">
                             <label class="tracker-form-label" for="reviewConfirmedTime">Reschedule Time</label>
@@ -2193,7 +2193,7 @@ foreach ($appointmentCouncilMembers as $member) {
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260326-1"></script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script>
     (() => {
         const feedbackSuccessMessage = <?= json_encode($appointmentSuccessMessage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;

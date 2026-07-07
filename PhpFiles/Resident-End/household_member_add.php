@@ -47,6 +47,10 @@ if (!$dob || $dob->format('Y-m-d') !== $birthdate) {
     echo json_encode(['success' => false, 'message' => 'Invalid birthdate format.']);
     exit;
 }
+if ($dob > new DateTime('today')) {
+    echo json_encode(['success' => false, 'message' => 'Birthdate cannot be in the future.']);
+    exit;
+}
 
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);

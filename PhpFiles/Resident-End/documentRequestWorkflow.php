@@ -1243,6 +1243,10 @@ if ($action === 'submit_request') {
                 dr_respond_json(422, ['success' => false, 'message' => $message]);
             }
         }
+        $birthdateValidationMessage = dr_validate_birthdate_payload_fields($_POST);
+        if ($birthdateValidationMessage !== null) {
+            dr_respond_json(422, ['success' => false, 'message' => $birthdateValidationMessage]);
+        }
 
         $purposeText = dr_barangay_id_purpose_for_mode($expectedMode);
         $_POST['request_purpose'] = $purposeText;

@@ -388,6 +388,7 @@ require_once __DIR__ . '/includes/admin_guard.php';
         storageKey: "admin_cols_business_monitoring_v2"
     };
 </script>
+<script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/businessMonitoring.js?v=20260322-3"></script>
 </body>

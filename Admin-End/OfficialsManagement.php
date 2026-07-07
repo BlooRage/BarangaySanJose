@@ -956,7 +956,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
 
                     <div class="col-md-4">
                       <label for="officialsMgmtProfileBirthdate" class="form-label small fw-bold mb-1">Birthdate</label>
-                      <input type="date" class="form-control" id="officialsMgmtProfileBirthdate" data-date-modal-style="calendar" required>
+                      <input type="date" class="form-control" id="officialsMgmtProfileBirthdate" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar" required>
                     </div>
                     <div class="col-md-4">
                       <label for="officialsMgmtProfileSex" class="form-label small fw-bold mb-1">Sex</label>
@@ -1195,7 +1195,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       }
     });
   </script>
-  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
+  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
   <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260328-3"></script>
 </body>

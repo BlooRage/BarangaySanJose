@@ -246,6 +246,21 @@ body {
     cursor: not-allowed;
 }
 
+/* Date modal proxy fields stay interactive and should not inherit muted readonly styling */
+.application-card input.resident-date-proxy[readonly],
+.form-row input.resident-date-proxy[readonly],
+.status-row input.resident-date-proxy[readonly],
+.application-card input.resident-date-proxy[readonly]:focus,
+.form-row input.resident-date-proxy[readonly]:focus,
+.status-row input.resident-date-proxy[readonly]:focus {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #cbd5e1 !important;
+    -webkit-text-fill-color: #111827 !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
 /* Column Spans */
 .full-width {
     grid-column: span 4;

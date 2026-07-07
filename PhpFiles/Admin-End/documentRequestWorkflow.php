@@ -6801,6 +6801,10 @@ if ($action === 'create_manual_request') {
             }
         }
     }
+    $birthdateValidationMessage = dr_validate_birthdate_payload_fields($payload);
+    if ($birthdateValidationMessage !== null) {
+        dr_respond_json(422, ['success' => false, 'message' => $birthdateValidationMessage]);
+    }
 
     $payload['_submission_channel'] = 'manual_admin_walkin';
     $payload['_encoded_by_user_id'] = $currentUserId;

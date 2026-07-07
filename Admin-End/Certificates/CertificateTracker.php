@@ -2638,7 +2638,7 @@ if ($certificateLaunchStage === 'release') {
                 </div>
                 <div class="col-md-6 col-lg-3">
                   <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate</label>
-                  <input type="date" id="manualBirthdate" class="form-control">
+                  <input type="date" id="manualBirthdate" class="form-control" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar">
                 </div>
                 <div class="col-md-6 col-lg-3">
                   <label for="manualSex" class="form-label fw-semibold small">Sex</label>
@@ -3446,6 +3446,7 @@ if ($certificateLaunchStage === 'release') {
     defaultHiddenIdxs: [1, 4]
   };
 </script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-03"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260328-07"></script>

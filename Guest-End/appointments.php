@@ -1810,7 +1810,7 @@ $guestAppointmentRecaptchaSiteKey = $guestAppointmentUsesRecaptcha ? recaptcha_v
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
     <script>
         let topBtn = document.getElementById("goToTop");
 
