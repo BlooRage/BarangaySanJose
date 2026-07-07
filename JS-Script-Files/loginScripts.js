@@ -778,8 +778,8 @@ function showOTPForm(purpose, userData = {}) {
   otpFrom = purpose;
   if (otpForm) otpForm.dataset.purpose = purpose;
 
-  hideAllAuthScreens();
   setAuthStepMode(true);
+  hideAllAuthScreens();
 
   if (otpForm) otpForm.classList.add("active");
 

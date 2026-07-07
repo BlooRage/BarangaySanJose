@@ -55,7 +55,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <?php endif; ?>
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix" />
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260707-auth-otp-manual3" />
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260707-auth-button-unify2" />
     <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
@@ -68,7 +68,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260707-auth-otp-staged1" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260707-auth-otp-transition1" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260328-01" defer></script>
   </head>
 

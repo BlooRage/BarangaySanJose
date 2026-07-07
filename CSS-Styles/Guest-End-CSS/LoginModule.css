@@ -65,7 +65,7 @@ body {
     margin: 24px auto 40px;
     border-radius: 10px;
     overflow: hidden;
-    background: rgba(255, 249, 242, 0.88);
+    background: #ffffff;
     position: relative;
     z-index: 10;
     box-shadow: 0 18px 40px rgba(77, 40, 6, 0.16);
@@ -98,7 +98,7 @@ body {
     overflow: hidden;
     transition: transform 1s ease;
     z-index: 1;
-    background: linear-gradient(180deg, #fffdf9 0%, #fff4e4 100%);
+    background: #ffffff;
 }
 
 .login-signup-container.step-mode .form-box {
@@ -108,8 +108,29 @@ body {
     transform: none !important;
 }
 
+.login-signup-container.step-mode .auth-image,
+.login-signup-container.step-mode .form-wrapper {
+    transform: none !important;
+    transition: none !important;
+}
+
+.login-signup-container.step-mode #loginForm,
+.login-signup-container.step-mode #signupForm,
+.login-signup-container.step-mode #inactive-verify-step,
+.login-signup-container.step-mode #forgotpassword-verify,
+.login-signup-container.step-mode #reset-password-step {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    transform: none !important;
+    transition: none !important;
+}
+
 .login-signup-container.step-mode #otp-form.active {
     z-index: 6;
+    transition: none !important;
 }
 
 .form-box {
@@ -190,6 +211,62 @@ body {
 /* Match login button padding with other pages */
 #loginForm button[type="submit"] {
     padding: 10px 20px;
+}
+
+#loginSubmitBtn,
+#createAccountBtn,
+#inactiveContinueBtn,
+#forgotContinueBtn,
+#sendOTPBtn,
+#verifyOTPBtn,
+#submitNewPasswordBtn,
+#verifiedContinueBtn {
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 16px;
+    border: 1px solid #0d6efd;
+    border-radius: var(--border-radius);
+    background: #0d6efd;
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: none;
+    transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+#loginSubmitBtn:hover,
+#loginSubmitBtn:focus,
+#createAccountBtn:hover,
+#createAccountBtn:focus,
+#inactiveContinueBtn:hover,
+#inactiveContinueBtn:focus,
+#forgotContinueBtn:hover,
+#forgotContinueBtn:focus,
+#sendOTPBtn:hover,
+#sendOTPBtn:focus,
+#verifyOTPBtn:hover,
+#verifyOTPBtn:focus,
+#submitNewPasswordBtn:hover,
+#submitNewPasswordBtn:focus,
+#verifiedContinueBtn:hover,
+#verifiedContinueBtn:focus {
+    background: #0b5ed7;
+    border-color: #0b5ed7;
+    color: #ffffff;
+}
+
+#createAccountBtn,
+#sendOTPBtn {
+    border-color: #198754;
+    background: #198754;
+}
+
+#createAccountBtn:hover,
+#createAccountBtn:focus,
+#sendOTPBtn:hover,
+#sendOTPBtn:focus {
+    background: #157347;
+    border-color: #157347;
+    color: #ffffff;
 }
 
 /* ===== Other Forms (Forgot / OTP) ===== */
@@ -298,41 +375,19 @@ body {
 }
 
 /* OTP Button */
-#otp-form button {
-    width: 100%;
-    padding: 13px 16px;
-    border: none;
-    border-radius: var(--border-radius);
-    background-color: var(--primary-color);
-    color: #fff;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-#otp-form button:hover {
-    background-color: var(--accent-color);
-}
-
-#sendOTPBtn {
-    border: 1px solid rgba(255, 153, 51, 0.3);
-    background: rgba(255, 244, 228, 0.92);
-    color: #9b4f00;
-}
-
-#sendOTPBtn:hover,
-#sendOTPBtn:focus {
-    background: rgba(255, 234, 205, 0.96);
-    color: #8a4300;
-}
-
 #sendOTPBtn.is-sending {
     opacity: 0.8;
     cursor: wait;
 }
 
 #verifyOTPBtn:disabled,
-#sendOTPBtn:disabled {
+#sendOTPBtn:disabled,
+#loginSubmitBtn:disabled,
+#createAccountBtn:disabled,
+#inactiveContinueBtn:disabled,
+#forgotContinueBtn:disabled,
+#submitNewPasswordBtn:disabled,
+#verifiedContinueBtn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
 }
@@ -511,7 +566,7 @@ body {
     align-items: stretch;
 
     padding: 40px;
-    background: transparent;
+    background: #ffffff;
     z-index: 4;
     overflow: hidden;
 }
@@ -554,12 +609,8 @@ body {
 
 /* Button match */
 #submitNewPasswordBtn {
-    height: 50px;                 /* âœ” matches Login button */
-    font-weight: 600;
-}
-
-#submitNewPasswordBtn:hover {
-    background-color: var(--accent-color);
+    height: 48px;
+    font-weight: 700;
 }
 
 /* Error box consistency */
