@@ -355,7 +355,11 @@
     if (profileFirstNameInput) profileFirstNameInput.value = String(detail.firstname || "");
     if (profileMiddleNameInput) profileMiddleNameInput.value = String(detail.middlename || "");
     if (profileSuffixInput) profileSuffixInput.value = String(detail.suffix || "");
-    if (profileBirthdateInput) profileBirthdateInput.value = String(detail.birthdate || "");
+    if (profileBirthdateInput) {
+      profileBirthdateInput.value = String(detail.birthdate || "");
+      profileBirthdateInput.dispatchEvent(new Event("input", { bubbles: true }));
+      profileBirthdateInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
     if (profileSexSelect) profileSexSelect.value = String(detail.sex || "");
     if (profileCivilStatusSelect) profileCivilStatusSelect.value = String(detail.civil_status || "");
     if (profilePhoneInput) profilePhoneInput.value = String(detail.contact_number || "");
@@ -1269,6 +1273,7 @@
     if (accessExpiryInput) {
       accessExpiryInput.value = String(row.access_expires_on || "").trim();
       accessExpiryInput.disabled = !row.can_edit_access;
+      accessExpiryInput.dispatchEvent(new Event("change", { bubbles: true }));
     }
     if (accessModulesSummaryEl) accessModulesSummaryEl.textContent = `${row.module_count || 0} enabled — ${row.module_summary || "No modules"}`;
     if (accessPermissionSearch) accessPermissionSearch.value = "";

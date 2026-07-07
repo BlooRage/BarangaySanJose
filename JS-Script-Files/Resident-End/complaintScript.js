@@ -393,6 +393,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!incidentDateInput) return;
         if (String(incidentDateInput.value || "").trim() === "") {
             incidentDateInput.value = toIsoDate(getNow());
+            incidentDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+            incidentDateInput.dispatchEvent(new Event("change", { bubbles: true }));
         }
     };
 

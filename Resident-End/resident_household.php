@@ -708,7 +708,7 @@ if ($residentAddressPreview === '') {
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label small text-muted">Birthdate <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" id="hmBirthdate">
+                                <input type="date" class="form-control" id="hmBirthdate" data-date-modal-style="calendar">
                             </div>
                             <div class="col-12">
                                 <label class="form-label small text-muted">Birth Certificate <span class="text-danger">*</span></label>
@@ -747,5 +747,6 @@ if ($residentAddressPreview === '') {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 </body>
 </html>

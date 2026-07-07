@@ -881,7 +881,7 @@ $areaOptions = [
                 <div class="form-row two-col-row">
                     <div>
                         <label class="top-label">Date of the Incident <span class="required-asterisk">*</span></label>
-                        <input type="date" id="incidentDate" name="incident_date" class="complaint-picker-proxy" required>
+                        <input type="date" id="incidentDate" name="incident_date" class="complaint-picker-proxy" data-date-modal-style="calendar" required>
                         <div id="incidentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                     </div>
                     <div>

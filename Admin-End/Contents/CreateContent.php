@@ -255,7 +255,7 @@ $sharedMeta = [
                   <div class="row g-3 announcement-publish-grid">
                     <div class="col-12 col-xl-6">
                       <label class="form-label mb-1">Schedule Date (optional)</label>
-                      <input type="date" class="form-control" name="schedule_date">
+                      <input type="date" class="form-control" name="schedule_date" data-date-modal-style="calendar">
                     </div>
                     <div class="col-12 col-xl-6">
                       <label class="form-label mb-1">Schedule Time (optional)</label>
@@ -1140,9 +1140,9 @@ $sharedMeta = [
       applyContentTypeMode();
     })();
   </script>
+  <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 </body>
 </html>
-
 
 
 

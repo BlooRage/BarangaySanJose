@@ -1767,7 +1767,7 @@ if ($hasCouncilTbl) {
             <!-- Effective Date -->
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Effective Date</label>
-              <input type="date" class="form-control" name="effective_date" id="ntEffectiveDate">
+              <input type="date" class="form-control" name="effective_date" id="ntEffectiveDate" data-date-modal-style="calendar">
             </div>
 
             <!-- Governance Cycle Label (turnover types only) -->
@@ -1819,7 +1819,7 @@ if ($hasCouncilTbl) {
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Effective Date</label>
-              <input type="date" class="form-control" name="effective_date" id="nbEffectiveDate">
+              <input type="date" class="form-control" name="effective_date" id="nbEffectiveDate" data-date-modal-style="calendar">
             </div>
           </div>
 
@@ -2658,5 +2658,6 @@ if ($hasCouncilTbl) {
       });
     })();
   </script>
+  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 </body>
 </html>

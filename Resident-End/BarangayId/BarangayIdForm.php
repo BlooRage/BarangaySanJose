@@ -250,7 +250,7 @@ $activeFormContext = $formContext[$resolvedMode] ?? $formContext['new'];
                         <div class="form-row">
                             <div>
                                 <label class="top-label">Date of Birth <span class="required-asterisk">*</span></label>
-                                <input type="date" name="birthdate" required <?php echo $birthdateValue !== '' ? 'readonly' : ''; ?> value="<?php echo htmlspecialchars($birthdateValue, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="date" name="birthdate" required data-date-modal-style="calendar" <?php echo $birthdateValue !== '' ? 'readonly' : ''; ?> value="<?php echo htmlspecialchars($birthdateValue, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
 
                             <div>
@@ -336,6 +336,7 @@ $activeFormContext = $formContext[$resolvedMode] ?? $formContext['new'];
 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
@@ -359,6 +360,5 @@ $activeFormContext = $formContext[$resolvedMode] ?? $formContext['new'];
 </body>
 
 </html>
-
 
 

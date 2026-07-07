@@ -1008,7 +1008,7 @@
       setModalError("");
     });
 
-    document.querySelectorAll('input[type="date"]:not([readonly]):not([data-date-modal-ignore])').forEach((input) => {
+    document.querySelectorAll('input[type="date"]:not([readonly]):not([disabled]):not([data-date-modal-ignore])').forEach((input) => {
       if (input.dataset.dateModalApplied === "1") return;
       input.dataset.dateModalApplied = "1";
 
@@ -1034,12 +1034,21 @@
       input.insertAdjacentElement("afterend", proxyWrap);
 
       input.type = "hidden";
-      updateProxyValue(input, proxy);
+      const syncProxyState = () => {
+        proxy.disabled = input.disabled;
+        proxy.setAttribute("aria-disabled", input.disabled ? "true" : "false");
+        proxy.classList.toggle("is-disabled", !!input.disabled);
+        updateProxyValue(input, proxy);
+      };
+
+      syncProxyState();
       input.focus = () => {
         proxy.focus();
         openForInput(input, proxy);
       };
 
+      input.addEventListener("input", syncProxyState);
+      input.addEventListener("change", syncProxyState);
       proxy.addEventListener("click", () => openForInput(input, proxy));
       proxy.addEventListener("focus", () => openForInput(input, proxy));
       proxy.addEventListener("keydown", (event) => {

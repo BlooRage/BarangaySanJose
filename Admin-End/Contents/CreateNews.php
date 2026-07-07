@@ -1091,7 +1091,7 @@ if ($editingAnnouncementId !== '') {
                 <p class="news-schedule-panel-copy">Choose when this news article should become available.</p>
                 <div class="mb-3">
                   <label for="modalNewsScheduleDateInput" class="form-label fw-semibold">Date</label>
-                  <input type="date" class="form-control" id="modalNewsScheduleDateInput">
+                  <input type="date" class="form-control" id="modalNewsScheduleDateInput" data-date-modal-style="calendar">
                 </div>
                 <div class="mb-0">
                   <label for="modalNewsScheduleTimeInput" class="form-label fw-semibold">Time</label>
@@ -1398,6 +1398,8 @@ if ($editingAnnouncementId !== '') {
         setScheduleFields("", "");
         if (modalScheduleDateInput) {
           modalScheduleDateInput.value = "";
+          modalScheduleDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+          modalScheduleDateInput.dispatchEvent(new Event("change", { bubbles: true }));
         }
         if (modalScheduleTimeInput) {
           modalScheduleTimeInput.value = "";
@@ -1407,6 +1409,8 @@ if ($editingAnnouncementId !== '') {
       function syncScheduleModalInputsFromHidden() {
         if (modalScheduleDateInput) {
           modalScheduleDateInput.value = String(scheduleDateInput?.value || "").trim();
+          modalScheduleDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+          modalScheduleDateInput.dispatchEvent(new Event("change", { bubbles: true }));
         }
         if (modalScheduleTimeInput) {
           modalScheduleTimeInput.value = String(scheduleTimeInput?.value || "").trim();
@@ -2068,5 +2072,6 @@ if ($editingAnnouncementId !== '') {
       }
     })();
   </script>
+  <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 </body>
 </html>

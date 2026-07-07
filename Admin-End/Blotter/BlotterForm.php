@@ -410,7 +410,7 @@ $defaultFiledTime = date('H:i');
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-4">
                         <label class="form-label">Date of Incident <span class="required-asterisk">*</span></label>
-                        <input type="date" class="form-control" id="incidentDate" name="incident_date" required>
+                        <input type="date" class="form-control" id="incidentDate" name="incident_date" data-date-modal-style="calendar" required>
                         <div id="incidentDateError" class="invalid-feedback d-block d-none"></div>
                     </div>
                     <div class="col-12 col-md-4">
@@ -606,6 +606,7 @@ $defaultFiledTime = date('H:i');
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 <script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260318-2" defer></script>
 </body>
 </html>

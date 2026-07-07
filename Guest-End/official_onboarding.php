@@ -1664,7 +1664,7 @@ if ($mode === 'password') {
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Birthdate</label>
-                        <input type="date" class="form-control" name="birthdate" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string)($officialInfo['birthdate'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input type="date" class="form-control" name="birthdate" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar" value="<?= htmlspecialchars((string)($officialInfo['birthdate'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Sex</label>
@@ -2159,5 +2159,7 @@ document.addEventListener("DOMContentLoaded", () => {
     refresh();
 })();
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 </body>
 </html>

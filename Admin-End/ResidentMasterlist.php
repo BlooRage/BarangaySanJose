@@ -668,7 +668,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
           <div class="col-md-3">
             <label class="small fw-bold">Date of Birth</label>
-            <input type="date" id="edit-birthdate" name="dateOfBirth" class="form-control" min="1916-01-01" max="2026-12-31" required>
+            <input type="date" id="edit-birthdate" name="dateOfBirth" class="form-control" min="1916-01-01" max="2026-12-31" data-date-modal-style="calendar" required>
           </div>
           <div class="col-md-3">
             <label class="small fw-bold">Sex</label>
@@ -933,6 +933,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     storageKey: "admin_cols_resident_masterlist_readonly_v1"
   };
 </script>
+<script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-form-calendar"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260321-2"></script>
 </body>
