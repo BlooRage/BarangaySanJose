@@ -42,12 +42,15 @@ $userAccount = pii_select_first_useraccount_by_contact_hashes(
 );
 
 if (!$userAccount) {
+    unset($_SESSION['forgot_password_otp_phone']);
     echo json_encode([
         'success' => false,
         'error' => 'No account found matching the provided email and phone number.'
     ]);
     exit;
 }
+
+$_SESSION['forgot_password_otp_phone'] = $phone;
 
 echo json_encode([
     'success' => true

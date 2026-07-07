@@ -3,6 +3,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
+require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json');
 require '../General/connection.php';
@@ -34,6 +35,12 @@ if ($phone) {
         pii_lookup_hash_candidates($phone, 'useraccount.phone'),
         ['user_id']
     ) !== null;
+
+    if (!$response['phoneExists']) {
+        $_SESSION['signup_otp_phone'] = $phone;
+    } else {
+        unset($_SESSION['signup_otp_phone']);
+    }
 }
 
 if ($email) {

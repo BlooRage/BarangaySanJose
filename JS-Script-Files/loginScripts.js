@@ -14,6 +14,7 @@ const inactiveContinueBtn = document.getElementById("inactiveContinueBtn");
 
 const otpForm = document.getElementById("otp-form");
 const otpInputFields = otpForm ? otpForm.querySelectorAll(".otp-inputs input") : [];
+const sendOTPBtn = document.getElementById("sendOTPBtn");
 const verifyOTPBtn = document.getElementById("verifyOTPBtn");
 
 const phoneInput = document.getElementById("RPhoneNumber");
@@ -58,6 +59,7 @@ const otpBackLink = document.getElementById("otpBackLink") || document.getElemen
 
 // OTP message (new preferred) + fallback
 const otpMessage = document.getElementById("otpMessage");
+const otpHelperText = document.getElementById("otpHelperText");
 
 // ===== State =====
 const currentOTPByPurpose = {};        // stores last OTP per purpose
@@ -67,6 +69,8 @@ const resendIntervalByPurpose = {};    // interval per purpose
 let tempSignupData = null;
 let otpFrom = ""; // 'signup' | 'forgot' | 'inactive'
 let otpRecipient = ""; // 11-digit recipient used for SMS sending: 0XXXXXXXXXX
+let otpSent = false;
+let otpSending = false;
 let otpVerifying = false;
 const signupEscalatedFields = new Set();
 let authSuccessModalInstance = null;
@@ -74,6 +78,7 @@ const AUTH_SUCCESS_FALLBACK_DELAY_MS = 700;
 
 const tryAutoVerifyOtp = () => {
   if (otpVerifying) return;
+  if (!otpSent) return;
   if (otpInputFields.length !== 6) return;
 
   const otp = Array.from(otpInputFields).map((el) => (el.value || "").trim()).join("");
@@ -90,6 +95,8 @@ let verifiedResetPhone = "";
 const defaultLoginResolveRedirect = window.APP_LOGIN_RESOLVE_REDIRECT || "../account-redirect";
 const requestedLoginAuthMode = typeof window.APP_LOGIN_AUTH_MODE === "string" ? window.APP_LOGIN_AUTH_MODE : "";
 const requestedLoginService = typeof window.APP_LOGIN_REQUESTED_SERVICE === "string" ? window.APP_LOGIN_REQUESTED_SERVICE : "";
+const loginRecaptchaEnabled = !!window.APP_LOGIN_RECAPTCHA_ENABLED;
+const loginRecaptchaSiteKey = typeof window.APP_LOGIN_RECAPTCHA_SITE_KEY === "string" ? window.APP_LOGIN_RECAPTCHA_SITE_KEY : "";
 
 // Inactive flow state
 let inactiveSession = {
@@ -343,9 +350,15 @@ function hideAllAuthScreens() {
   if (otpForm) otpForm.classList.remove("active");
 }
 
+function setAuthStepMode(enabled) {
+  if (!container) return;
+  container.classList.toggle("step-mode", !!enabled);
+}
+
 // ===== Step Navigation =====
 const showStep = (stepId) => {
   hideAllAuthScreens();
+  setAuthStepMode(false);
 
   const el = document.getElementById(stepId);
   if (el) el.classList.add("active");
@@ -376,6 +389,7 @@ const showInactiveWarningStep = () => {
 // ===== Form Switching (keeps transitions) =====
 const switchToSignup = () => {
   if (container) container.classList.add("signup-mode");
+  setAuthStepMode(false);
   hideAllAuthScreens();
   toggleActiveForm(signupForm, loginForm);
   if (authImage) authImage.classList.replace("login-image", "signup-image");
@@ -383,6 +397,7 @@ const switchToSignup = () => {
 
 const switchToLogin = () => {
   if (container) container.classList.remove("signup-mode");
+  setAuthStepMode(false);
   hideAllAuthScreens();
   toggleActiveForm(loginForm, signupForm);
   if (authImage) authImage.classList.replace("signup-image", "login-image");
@@ -390,6 +405,8 @@ const switchToLogin = () => {
   // reset otp state
   otpFrom = "";
   otpRecipient = "";
+  otpSent = false;
+  otpSending = false;
   tempSignupData = null;
 
   // reset inactive state
@@ -629,6 +646,11 @@ function setOtpStatusMessage(state, displayText = "") {
   if (otpMessage) {
     otpMessage.dataset.displayText = safeDisplayText;
 
+    if (state === "ready") {
+      otpMessage.innerHTML = `Ready to send an OTP to <strong>${safeDisplayText}</strong>.`;
+      return;
+    }
+
     if (state === "pending") {
       otpMessage.innerHTML = `We are sending an OTP to <strong>${safeDisplayText}</strong>`;
       return;
@@ -647,6 +669,70 @@ function setOtpStatusMessage(state, displayText = "") {
   if (strong) {
     strong.textContent = safeDisplayText;
   }
+}
+
+function setOtpHelperMessage(message = "") {
+  if (!otpHelperText) return;
+  otpHelperText.textContent = message;
+}
+
+function syncOtpActionState() {
+  if (sendOTPBtn) {
+    sendOTPBtn.hidden = otpSent;
+    sendOTPBtn.disabled = otpSending;
+    sendOTPBtn.classList.toggle("is-sending", otpSending);
+    sendOTPBtn.textContent = otpSending ? "Sending..." : "Send OTP";
+  }
+
+  if (verifyOTPBtn) {
+    verifyOTPBtn.disabled = !otpSent || otpSending || otpVerifying;
+  }
+
+  if (resendOTPBtn) {
+    resendOTPBtn.hidden = !otpSent;
+    if (!otpSent) {
+      resendOTPBtn.style.pointerEvents = "none";
+      resendOTPBtn.style.opacity = 0.5;
+    }
+  }
+
+  if (resendTimer && !otpSent) {
+    resendTimer.textContent = "";
+  }
+}
+
+function recaptchaActionForPurpose(purpose) {
+  switch (purpose) {
+    case "signup":
+      return "login_signup_otp";
+    case "forgot":
+      return "login_forgot_otp";
+    case "inactive":
+      return "login_inactive_otp";
+    default:
+      return "";
+  }
+}
+
+async function executeLoginRecaptcha(action) {
+  if (!loginRecaptchaEnabled) {
+    return "";
+  }
+
+  if (!(window.grecaptcha && typeof window.grecaptcha.execute === "function")) {
+    throw new Error("Security check is still loading. Please try again.");
+  }
+
+  await new Promise((resolve) => {
+    window.grecaptcha.ready(resolve);
+  });
+
+  const token = await window.grecaptcha.execute(loginRecaptchaSiteKey, { action });
+  if (String(token || "").trim() === "") {
+    throw new Error("Security verification failed. Please try again.");
+  }
+
+  return token;
 }
 
 // ===== Back to Login (used by multiple flows) =====
@@ -687,11 +773,13 @@ function showOTPForm(purpose, userData = {}) {
   if (otpForm) otpForm.dataset.purpose = purpose;
 
   hideAllAuthScreens();
+  setAuthStepMode(true);
 
   if (otpForm) otpForm.classList.add("active");
 
   clearOtpUI();
-  if (otpInputFields[0]) otpInputFields[0].focus();
+  otpSent = false;
+  otpSending = false;
 
   // Update message
   let displayText = "";
@@ -701,36 +789,24 @@ function showOTPForm(purpose, userData = {}) {
   } else if (userData?.phone) {
     const phone10 = phoneForDB(userData.phone);
     displayText = `+63 ******${phone10.slice(-4)}`;
+  } else if (userData?.phone10) {
+    displayText = `+63 ******${String(userData.phone10).slice(-4)}`;
   }
 
-  setOtpStatusMessage("pending", displayText || "+63 •••••• XXXX");
+  setOtpStatusMessage("ready", displayText || "+63 •••••• XXXX");
+  setOtpHelperMessage("Tap Send OTP to receive the 6-digit verification code by SMS.");
 
   updateOtpBackUI();
+  syncOtpActionState();
+  if (sendOTPBtn) {
+    sendOTPBtn.focus();
+  }
 
-  // Auto-send OTP only if we already know recipient (inactive may not yet)
   if (userData?.phone) {
     const phone10 = phoneForDB(userData.phone);
-    otpRecipient = phoneForOTP(phone10); // 0XXXXXXXXXX
-    sendOTP(otpRecipient, purpose)
-      .then(() => {
-        setOtpStatusMessage("sent", displayText || "+63 •••••• XXXX");
-        startResendCountdown(purpose, 120);
-      })
-      .catch((err) => {
-        setOtpStatusMessage("failed", displayText || "+63 •••••• XXXX");
-        showOtpError(err?.message || "Unable to send OTP. Please try again later.");
-      });
+    otpRecipient = phoneForOTP(phone10);
   } else if (userData?.phone10) {
     otpRecipient = phoneForOTP(userData.phone10);
-    sendOTP(otpRecipient, purpose)
-      .then(() => {
-        setOtpStatusMessage("sent", displayText || "+63 •••••• XXXX");
-        startResendCountdown(purpose, 120);
-      })
-      .catch((err) => {
-        setOtpStatusMessage("failed", displayText || "+63 •••••• XXXX");
-        showOtpError(err?.message || "Unable to send OTP. Please try again later.");
-      });
   }
 }
 
@@ -774,6 +850,13 @@ async function sendOTP(recipient, purpose, reuse = false) {
   const genForm = new FormData();
   genForm.append("recipient", recipient); // 0XXXXXXXXXX
   genForm.append("purpose", purpose);
+  const recaptchaAction = recaptchaActionForPurpose(purpose);
+  if (recaptchaAction !== "") {
+    const recaptchaToken = await executeLoginRecaptcha(recaptchaAction);
+    if (recaptchaToken !== "") {
+      genForm.append("recaptcha_token", recaptchaToken);
+    }
+  }
 
   const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
     method: "POST",
@@ -796,6 +879,36 @@ async function sendOTP(recipient, purpose, reuse = false) {
   return genData;
 }
 
+if (sendOTPBtn) {
+  sendOTPBtn.addEventListener("click", async () => {
+    if (!otpFrom || !otpRecipient || otpSending) {
+      return;
+    }
+
+    clearOtpUI();
+    otpSending = true;
+    setOtpStatusMessage("pending");
+    setOtpHelperMessage("Sending a one-time password to your mobile number now.");
+    syncOtpActionState();
+
+    try {
+      await sendOTP(otpRecipient, otpFrom, otpSent);
+      otpSent = true;
+      setOtpStatusMessage("sent");
+      setOtpHelperMessage("Enter the 6-digit OTP we sent to your phone.");
+      startResendCountdown(otpFrom, 120);
+      if (otpInputFields[0]) otpInputFields[0].focus();
+    } catch (err) {
+      setOtpStatusMessage("failed");
+      setOtpHelperMessage("OTP was not sent. Review the message below and try again.");
+      showOtpError(err?.message || "Unable to send OTP. Please try again later.");
+    } finally {
+      otpSending = false;
+      syncOtpActionState();
+    }
+  });
+}
+
 // ===== Resend OTP (single listener) =====
 if (resendOTPBtn) {
   resendOTPBtn.addEventListener("click", async () => {
@@ -808,11 +921,14 @@ if (resendOTPBtn) {
 
     try {
       await sendOTP(otpRecipient, otpFrom, true);
+      otpSent = true;
       setOtpStatusMessage("sent");
+      setOtpHelperMessage("Enter the latest 6-digit OTP we sent to your phone.");
       resendOTPBtn.textContent = "OTP Resent!";
       startResendCountdown(otpFrom, 120);
     } catch (err) {
       setOtpStatusMessage("failed");
+      setOtpHelperMessage("OTP was not resent. Review the message below and try again.");
       showOtpError(err?.message || "Unable to resend OTP. Please try again later.");
     }
   });
@@ -832,6 +948,8 @@ function showForgotError(message, highlightFields = []) {
     input.focus();
   });
 }
+
+syncOtpActionState();
 
 if (forgotLink) {
   forgotLink.addEventListener("click", (e) => {
@@ -987,14 +1105,14 @@ if (createAccountBtn) {
         password: passwordInput?.value || "",
       };
 
-      showOTPForm("signup", { phone }); // auto send OTP
+      showOTPForm("signup", { phone });
     } catch (err) {
       showError("Unable to verify account. Please try again later.", "signup");
     }
   });
 }
 
-// ===== INACTIVE: Continue → server-side lookup → show OTP form (auto send) =====
+// ===== INACTIVE: Continue → server-side lookup → show OTP form =====
 if (inactiveContinueBtn) {
   inactiveContinueBtn.addEventListener("click", async () => {
     try {
@@ -1003,7 +1121,7 @@ if (inactiveContinueBtn) {
 
       if (!data.success) {
         const div = document.getElementById("inactiveVerifyErrors");
-        setErrorBox(div, data.error || "Unable to send OTP. Please try again.");
+        setErrorBox(div, data.error || "Unable to load your verification details. Please try again.");
         return;
       }
 
@@ -1028,6 +1146,12 @@ if (verifyOTPBtn) {
     otpVerifying = true;
     let otp = "";
     otpInputFields.forEach((input) => (otp += (input.value || "").trim()));
+
+    if (!otpSent) {
+      showOtpError("Send OTP first before entering the verification code.");
+      otpVerifying = false;
+      return;
+    }
 
     if (otp.length !== 6) {
       showOtpError("Please enter a 6-digit OTP");

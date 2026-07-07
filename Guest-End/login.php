@@ -7,6 +7,7 @@
 require_once __DIR__ . "/../PhpFiles/General/security.php";
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../PhpFiles/Login/redirectDestination.php";
+require_once __DIR__ . "/../PhpFiles/General/recaptcha.php";
 
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
@@ -18,6 +19,8 @@ $requestedService = normalizeRequestedResidentService($_GET['service'] ?? '');
 $requestedAuthMode = strtolower(trim((string)($_GET['auth'] ?? '')));
 $serviceLabel = residentServiceDisplayName($requestedService);
 $serviceAwareRedirect = appUrl('/account-redirect' . ($requestedService !== '' ? '?service=' . rawurlencode($requestedService) : ''));
+$loginRecaptchaEnabled = recaptcha_v3_frontend_enabled();
+$loginRecaptchaSiteKey = $loginRecaptchaEnabled ? recaptcha_v3_site_key() : '';
 
 $inviteToken = trim((string)($_GET['invite'] ?? ''));
 if ($inviteToken !== '') {
@@ -47,9 +50,12 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <?php if ($loginRecaptchaEnabled): ?>
+    <script src="https://www.google.com/recaptcha/api.js?render=<?= htmlspecialchars($loginRecaptchaSiteKey, ENT_QUOTES, 'UTF-8') ?>"></script>
+    <?php endif; ?>
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix" />
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260707-auth-layout-fix" />
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260707-auth-otp-manual3" />
     <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
@@ -57,10 +63,12 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
       window.APP_LOGIN_RESOLVE_REDIRECT = <?= json_encode($serviceAwareRedirect) ?>;
       window.APP_LOGIN_AUTH_MODE = <?= json_encode($requestedAuthMode) ?>;
       window.APP_LOGIN_REQUESTED_SERVICE = <?= json_encode($requestedService) ?>;
+      window.APP_LOGIN_RECAPTCHA_ENABLED = <?= json_encode($loginRecaptchaEnabled) ?>;
+      window.APP_LOGIN_RECAPTCHA_SITE_KEY = <?= json_encode($loginRecaptchaSiteKey) ?>;
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260327-auth-success-modal2" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260707-auth-otp-manual3" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260328-01" defer></script>
   </head>
 
@@ -251,13 +259,16 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
                ✅ Keeps old structure so loginScripts.js continues to work
                ========================= -->
           <div id="otp-form" class="fp-step">
-            <div class="otp-icon-wrapper text-center mb-3">
+            <div class="otp-icon-wrapper text-center">
               <img src="../Images/SMS-OTP.png" alt="OTP Icon" class="otp-icon" />
             </div>
 
-            <p class="otp-text text-center" id="otpMessage">
-              Check your phone. An OTP has been sent to <strong>+63 •••••• XXXX</strong>
-            </p>
+            <h1 class="mb-1 fs-2 text-center"><strong>Verify Your Number</strong></h1>
+            <p class="text-center fs-6 text-muted mb-2">We only send an OTP after you confirm the request.</p>
+            <p class="otp-text text-center" id="otpMessage">Ready to send an OTP to <strong>+63 •••••• XXXX</strong>.</p>
+
+            <button type="button" id="sendOTPBtn" class="btn btn-outline-primary w-100">Send OTP</button>
+            <p class="otp-helper-text text-center mb-0" id="otpHelperText">Tap Send OTP to receive the 6-digit verification code by SMS.</p>
 
             <div class="otp-inputs" id="otpInputs">
               <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />

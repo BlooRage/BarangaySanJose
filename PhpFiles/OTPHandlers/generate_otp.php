@@ -106,6 +106,28 @@ function otpHandlerRecentOtpRequest(mysqli $conn, string $recipient, string $pur
     ];
 }
 
+function otpHandlerUserPhone10ByUserId(mysqli $conn, string $userId): string
+{
+    if ($userId === '') {
+        return '';
+    }
+
+    $stmt = $conn->prepare("SELECT phone_number FROM useraccountstbl WHERE user_id = ? LIMIT 1");
+    if (!$stmt) {
+        return '';
+    }
+
+    $stmt->bind_param("s", $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $row = $row ? (pii_decrypt_useraccount_row($row) ?? $row) : null;
+    $digits = preg_replace('/\D+/', '', (string)($row['phone_number'] ?? ''));
+
+    return strlen($digits) >= 10 ? substr($digits, -10) : '';
+}
+
 // ===== Validate input =====
 if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
     echo json_encode(['success' => false, 'error' => 'Missing parameters']);
@@ -129,17 +151,59 @@ if (preg_match('/^09\d{9}$/', $rawRecipient)) {
     exit;
 }
 
-if ($purpose === 'guest_appointment' || $purpose === 'guest_complaint') {
-    if (recaptcha_v3_should_enforce()) {
-        $recaptchaAction = $purpose === 'guest_complaint' ? 'guest_complaint_otp' : 'guest_appointment_otp';
-        $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, $recaptchaAction);
-        if (empty($recaptchaCheck['success'])) {
-            echo json_encode([
-                'success' => false,
-                'error' => (string)($recaptchaCheck['message'] ?? 'Security verification failed. Please try again.'),
-            ]);
-            exit;
-        }
+if (!in_array($purpose, ['signup', 'forgot', 'inactive', 'guest_appointment', 'guest_complaint'], true)) {
+    echo json_encode(['success' => false, 'error' => 'Invalid OTP purpose.']);
+    exit;
+}
+
+if ($purpose === 'signup') {
+    $expectedPhone = pii_normalize_phone10((string)($_SESSION['signup_otp_phone'] ?? ''));
+    if ($expectedPhone === '' || $expectedPhone !== $recipient_db) {
+        echo json_encode(['success' => false, 'error' => 'Signup verification session expired. Please review your details again.']);
+        exit;
+    }
+}
+
+if ($purpose === 'forgot') {
+    $expectedPhone = pii_normalize_phone10((string)($_SESSION['forgot_password_otp_phone'] ?? ''));
+    if ($expectedPhone === '' || $expectedPhone !== $recipient_db) {
+        echo json_encode(['success' => false, 'error' => 'Password reset verification expired. Please start again.']);
+        exit;
+    }
+}
+
+if ($purpose === 'inactive') {
+    $pendingUserId = trim((string)($_SESSION['pending_user_id'] ?? ''));
+    $pendingVerify = trim((string)($_SESSION['pending_verify'] ?? ''));
+    if ($pendingUserId === '' || $pendingVerify !== 'inactive') {
+        echo json_encode(['success' => false, 'error' => 'Session expired. Please login again.']);
+        exit;
+    }
+
+    $user_id = $pendingUserId;
+    $expectedPhone = otpHandlerUserPhone10ByUserId($conn, $pendingUserId);
+    if ($expectedPhone === '' || $expectedPhone !== $recipient_db) {
+        echo json_encode(['success' => false, 'error' => 'The verification number does not match your account.']);
+        exit;
+    }
+}
+
+if (recaptcha_v3_should_enforce()) {
+    $recaptchaActionMap = [
+        'signup' => 'login_signup_otp',
+        'forgot' => 'login_forgot_otp',
+        'inactive' => 'login_inactive_otp',
+        'guest_appointment' => 'guest_appointment_otp',
+        'guest_complaint' => 'guest_complaint_otp',
+    ];
+    $recaptchaAction = $recaptchaActionMap[$purpose] ?? '';
+    $recaptchaCheck = recaptcha_v3_verify($recaptchaToken, $recaptchaAction);
+    if (empty($recaptchaCheck['success'])) {
+        echo json_encode([
+            'success' => false,
+            'error' => (string)($recaptchaCheck['message'] ?? 'Security verification failed. Please try again.'),
+        ]);
+        exit;
     }
 }
 
@@ -176,6 +240,20 @@ if ($purpose === 'guest_appointment') {
     }
 
     $recentOtpRequest = apsh_guest_appointment_recent_otp_request($conn, $recipient_db, 60);
+    if (is_array($recentOtpRequest)) {
+        $remainingSeconds = (int)($recentOtpRequest['remaining_seconds'] ?? 0);
+        echo json_encode([
+            'success' => false,
+            'error' => $remainingSeconds > 0
+                ? "Please wait {$remainingSeconds} seconds before requesting another OTP."
+                : 'Please wait before requesting another OTP.',
+        ]);
+        exit;
+    }
+}
+
+if ($purpose === 'signup' || $purpose === 'forgot' || $purpose === 'inactive') {
+    $recentOtpRequest = otpHandlerRecentOtpRequest($conn, $recipient_db, $purpose, 60);
     if (is_array($recentOtpRequest)) {
         $remainingSeconds = (int)($recentOtpRequest['remaining_seconds'] ?? 0);
         echo json_encode([

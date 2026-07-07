@@ -59,16 +59,16 @@ body {
     display: flex;
     gap: 0;
     min-width: 300px;
-    min-height: 300px;
+    min-height: 620px;
     width: min(900px, 90vw);
-    height: max(70vh, 820px);
+    height: clamp(620px, 72vh, 720px);
     margin: 24px auto 40px;
     border-radius: 10px;
     overflow: hidden;
-    background-color: #fff;
+    background: rgba(255, 249, 242, 0.88);
     position: relative;
     z-index: 10;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 18px 40px rgba(77, 40, 6, 0.16);
 }
 
 /* ===== Images ===== */
@@ -98,6 +98,18 @@ body {
     overflow: hidden;
     transition: transform 1s ease;
     z-index: 1;
+    background: linear-gradient(180deg, #fffdf9 0%, #fff4e4 100%);
+}
+
+.login-signup-container.step-mode .form-box {
+    opacity: 0 !important;
+    z-index: 0 !important;
+    pointer-events: none;
+    transform: none !important;
+}
+
+.login-signup-container.step-mode #otp-form.active {
+    z-index: 6;
 }
 
 .form-box {
@@ -106,10 +118,10 @@ body {
     width: 100%; height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: stretch;
     padding: 40px;
-    background: #fff;
+    background: transparent;
     transition: opacity 0.8s ease, z-index 0.8s ease, transform 1s ease;
     opacity: 0;
     z-index: 1;
@@ -211,17 +223,18 @@ body {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    padding: 40px;
-    background: #fff;
+    padding: 34px 40px 30px;
+    background: transparent;
     display: none;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: stretch;
+    gap: 14px;
     z-index: 5;
     opacity: 0;
     transition: opacity 0.5s ease, transform 0.5s ease;
     border-radius: var(--border-radius);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    box-shadow: none;
     overflow: hidden;
 }
 
@@ -243,8 +256,14 @@ body {
 #otp-form p.otp-text {
     font-size: 0.95rem;
     color: #6c757d;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     text-align: center;
+}
+
+.otp-helper-text {
+    font-size: 0.9rem;
+    color: #7a5e3f;
+    line-height: 1.5;
 }
 
 /* ===== OTP Inputs ===== */
@@ -252,22 +271,24 @@ body {
     display: flex;
     justify-content: center;
     gap: 10px; /* keeps spacing between each digit */
-    margin: 0 0 15px 0; /* bottom margin consistent with other inputs */
+    margin: 4px 0 0;
     width: 100%; /* take full width to allow side padding */
-    max-width: 300px; /* optional: limit OTP width like form inputs */
+    max-width: 100%;
 }
 
 .otp-inputs input {
     flex: 1; /* distribute inputs evenly */
-    min-width: 40px;
-    height: 50px;
+    min-width: 0;
+    max-width: 58px;
+    height: 56px;
     text-align: center;
     font-size: 20px;
     font-weight: bold;
     border: 1px solid #ced4da;
-    border-radius: 8px;
-    margin: 0 5px; /* add consistent left/right margin */
+    border-radius: 14px;
+    margin: 0;
     padding: 0; /* no extra padding inside single digit */
+    background: rgba(255, 255, 255, 0.96);
 }
 
 .otp-inputs input:focus {
@@ -279,12 +300,12 @@ body {
 /* OTP Button */
 #otp-form button {
     width: 100%;
-    padding: 12px;
+    padding: 13px 16px;
     border: none;
     border-radius: var(--border-radius);
     background-color: var(--primary-color);
     color: #fff;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: background 0.3s ease;
 }
@@ -293,10 +314,37 @@ body {
     background-color: var(--accent-color);
 }
 
+#sendOTPBtn {
+    border: 1px solid rgba(255, 153, 51, 0.3);
+    background: rgba(255, 244, 228, 0.92);
+    color: #9b4f00;
+}
+
+#sendOTPBtn:hover,
+#sendOTPBtn:focus {
+    background: rgba(255, 234, 205, 0.96);
+    color: #8a4300;
+}
+
+#sendOTPBtn.is-sending {
+    opacity: 0.8;
+    cursor: wait;
+}
+
+#verifyOTPBtn:disabled,
+#sendOTPBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.otp-actions {
+    margin-top: 2px !important;
+}
+
 /* Responsive OTP Inputs */
 @media (max-width: 500px) {
     .otp-inputs input {
-        width: 40px;
+        max-width: 46px;
         height: 45px;
         font-size: 16px;
     }
@@ -459,11 +507,11 @@ body {
 
     display: none;                 /* hidden by default */
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: stretch;
 
     padding: 40px;
-    background: #fff;
+    background: transparent;
     z-index: 4;
     overflow: hidden;
 }
