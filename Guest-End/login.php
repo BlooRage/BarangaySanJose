@@ -68,7 +68,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260707-auth-otp-manual3" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260707-auth-otp-staged1" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260328-01" defer></script>
   </head>
 

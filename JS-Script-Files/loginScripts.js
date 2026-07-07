@@ -13,6 +13,7 @@ const inactiveVerifyStep = document.getElementById("inactive-verify-step");
 const inactiveContinueBtn = document.getElementById("inactiveContinueBtn");
 
 const otpForm = document.getElementById("otp-form");
+const otpInputsRow = document.getElementById("otpInputs");
 const otpInputFields = otpForm ? otpForm.querySelectorAll(".otp-inputs input") : [];
 const sendOTPBtn = document.getElementById("sendOTPBtn");
 const verifyOTPBtn = document.getElementById("verifyOTPBtn");
@@ -684,7 +685,12 @@ function syncOtpActionState() {
     sendOTPBtn.textContent = otpSending ? "Sending..." : "Send OTP";
   }
 
+  if (otpInputsRow) {
+    otpInputsRow.hidden = !otpSent;
+  }
+
   if (verifyOTPBtn) {
+    verifyOTPBtn.hidden = !otpSent;
     verifyOTPBtn.disabled = !otpSent || otpSending || otpVerifying;
   }
 
