@@ -911,11 +911,6 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     box-shadow: 0 0 0 2px #fff;
   }
 
-  body.admin-sidebar-collapsed #dashboard-sidebar .sidebar-direct-link[data-sidebar-has-badge="true"] > .sidebar-attention-badge {
-    right: 0.25rem;
-    top: 0.25rem;
-  }
-
   #admin-mobile-header {
     display: none;
   }
@@ -1322,9 +1317,9 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-file-circle-check"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('certificate_issuance')) ?>
+            <?= $sbRenderAttentionBadge($sbCount('certificate_issuance')) ?>
           </span>
           <span class="sidebar-button-label sidebar-button-label--certificate">Certificate Issuance</span>
-          <?= $sbRenderAttentionBadge($sbCount('certificate_issuance')) ?>
         </a>
       </li>
       <?php endif; ?>
@@ -1380,9 +1375,9 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-icon-wrap">
             <i class="fas fa-stamp"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('clearance_issuance')) ?>
+            <?= $sbRenderAttentionBadge($sbCount('clearance_issuance')) ?>
           </span>
           <span class="sidebar-button-label">Clearance Issuance</span>
-          <?= $sbRenderAttentionBadge($sbCount('clearance_issuance')) ?>
         </a>
       </li>
       <?php endif; ?>
