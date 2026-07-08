@@ -358,6 +358,8 @@ h5 {
         gap: 0.75rem;
     }
     .navbar-collapse {
+        flex: 1 0 100%;
+        width: 100%;
         text-align: center;
         padding-top: 0.65rem;
     }

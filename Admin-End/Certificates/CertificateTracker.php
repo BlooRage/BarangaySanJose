@@ -1072,6 +1072,7 @@ if ($certificateLaunchStage === 'release') {
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signature div:last-child {
       font-style: italic;
+      text-transform: none;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta {
       width: 280px;
@@ -1285,6 +1286,7 @@ if ($certificateLaunchStage === 'release') {
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signature div:last-child {
       font-style: italic;
+      text-transform: none;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-footer {
       width: 64%;
@@ -1496,6 +1498,7 @@ if ($certificateLaunchStage === 'release') {
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signature div:last-child {
       font-style: italic;
+      text-transform: none;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-footer {
       width: 58%;
@@ -1585,6 +1588,14 @@ if ($certificateLaunchStage === 'release') {
       line-height: 1.15;
       font-style: italic;
       text-align: center;
+      text-transform: none;
+    }
+    #viewModal .doc-preview-issuedby em,
+    #viewModal .doc-preview-business-issuedby em,
+    #viewModal .doc-preview-generalclearance-issuedby em,
+    #viewModal .doc-preview-tricycle-issuedby em,
+    #viewModal .doc-preview-signature div:last-child {
+      text-transform: none;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date-line {
       width: 100%;
@@ -2519,16 +2530,21 @@ if ($certificateLaunchStage === 'release') {
         </div>
         <div class="manual-step">
           <div class="manual-step-index">3</div>
+          <div class="manual-step-title">Set Validity</div>
+          <p class="manual-step-copy">For certificates, set the document validity before previewing. If you leave it blank, the system uses the 45-day default.</p>
+        </div>
+        <div class="manual-step">
+          <div class="manual-step-index">4</div>
           <div class="manual-step-title">Preview</div>
           <p class="manual-step-copy">Open the rendered document preview first so the encoded details match the physical form before submission.</p>
         </div>
         <div class="manual-step">
-          <div class="manual-step-index">4</div>
+          <div class="manual-step-index">5</div>
           <div class="manual-step-title">Payment Routing</div>
           <p class="manual-step-copy">Only paid requests continue to finance for walk-in payment recording. Free requests such as Barangay ID skip finance and proceed directly to release.</p>
         </div>
         <div class="manual-step">
-          <div class="manual-step-index">5</div>
+          <div class="manual-step-index">6</div>
           <div class="manual-step-title">Release by Print</div>
           <p class="manual-step-copy">After payment or interview handling, admin releases the final document through print while keeping QR verification active.</p>
         </div>
@@ -2610,6 +2626,11 @@ if ($certificateLaunchStage === 'release') {
                 <div class="col-lg-5">
                   <label for="manualPurpose" class="form-label fw-semibold small">Purpose / Request For</label>
                   <input type="text" id="manualPurpose" class="form-control" placeholder="Purpose from the handwritten form">
+                </div>
+                <div class="col-lg-5 d-none" id="manualValidityWrap">
+                  <label for="manualValidityDate" class="form-label fw-semibold small">Certificate Valid Until</label>
+                  <input type="date" id="manualValidityDate" class="form-control">
+                  <div class="form-text">Optional. Leave blank to use the default 45-day validity.</div>
                 </div>
               </div>
             </div>
@@ -2754,6 +2775,10 @@ if ($certificateLaunchStage === 'release') {
               <div class="manual-summary-item">
                 <p class="manual-summary-item-label">Next Step After Submit</p>
                 <p class="manual-summary-item-value" id="manualNextStageSummary">Preview the document first to unlock submission.</p>
+              </div>
+              <div class="manual-summary-item d-none" id="manualValiditySummaryWrap">
+                <p class="manual-summary-item-label">Certificate Valid Until</p>
+                <p class="manual-summary-item-value" id="manualValiditySummary">Default: 45 days after approval</p>
               </div>
             </div>
             <p class="manual-summary-note">
@@ -3029,6 +3054,12 @@ if ($certificateLaunchStage === 'release') {
         <div id="actionOrWrap" class="d-none mb-3">
           <label class="form-label">OR Number</label>
           <input id="actionOr" name="or_number" type="text" class="form-control">
+        </div>
+
+        <div id="actionValidityWrap" class="d-none mb-3">
+          <label class="form-label">Certificate Valid Until</label>
+          <input id="actionValidity" name="document_validity" type="date" class="form-control">
+          <div class="form-text">Optional. Leave blank to use the default 45-day validity.</div>
         </div>
 
         <div id="actionIssuedWrap" class="d-none mb-3">

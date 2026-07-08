@@ -494,6 +494,8 @@
   const actionAmount = document.getElementById('actionAmount');
   const actionOrWrap = document.getElementById('actionOrWrap');
   const actionOr = document.getElementById('actionOr');
+  const actionValidityWrap = document.getElementById('actionValidityWrap');
+  const actionValidity = document.getElementById('actionValidity');
   const actionIssuedWrap = document.getElementById('actionIssuedWrap');
   const actionIssued = document.getElementById('actionIssued');
   const actionBusinessApprovalWrap = document.getElementById('actionBusinessApprovalWrap');
@@ -595,6 +597,119 @@
     'ready_for_claim',
     'completed'
   ]);
+
+  function formatDateInputValue(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function parseDateInputValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const dateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      const parsed = new Date(
+        Number.parseInt(dateMatch[1], 10),
+        Number.parseInt(dateMatch[2], 10) - 1,
+        Number.parseInt(dateMatch[3], 10),
+        12,
+        0,
+        0,
+        0
+      );
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function addDaysDateInputValue(days) {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + Number(days || 0));
+    return formatDateInputValue(date);
+  }
+
+  function certificateDefaultValidityDate() {
+    return addDaysDateInputValue(45);
+  }
+
+  function normalizeDateInputValue(value, fallback = '') {
+    const parsed = parseDateInputValue(value);
+    if (parsed) return formatDateInputValue(parsed);
+    return String(fallback || '').trim();
+  }
+
+  function resolveCertificateValidityDate(value, fallback = '') {
+    return normalizeDateInputValue(value, '') || normalizeDateInputValue(fallback, '') || certificateDefaultValidityDate();
+  }
+
+  function diffCalendarDays(startValue, endValue) {
+    const start = parseDateInputValue(startValue);
+    const end = parseDateInputValue(endValue);
+    if (!(start instanceof Date) || Number.isNaN(start.getTime()) || !(end instanceof Date) || Number.isNaN(end.getTime())) {
+      return null;
+    }
+    const startMidday = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12, 0, 0, 0);
+    const endMidday = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 12, 0, 0, 0);
+    return Math.max(0, Math.round((endMidday.getTime() - startMidday.getTime()) / 86400000));
+  }
+
+  function numberToWords(value) {
+    const number = Math.max(0, Number.parseInt(String(value || '0'), 10) || 0);
+    const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+    if (number < 10) return ones[number];
+    if (number < 20) return teens[number - 10];
+    if (number < 100) {
+      const remainder = number % 10;
+      return remainder ? `${tens[Math.floor(number / 10)]}-${ones[remainder]}` : tens[Math.floor(number / 10)];
+    }
+    if (number < 1000) {
+      const remainder = number % 100;
+      const prefix = `${ones[Math.floor(number / 100)]} hundred`;
+      return remainder ? `${prefix} ${numberToWords(remainder)}` : prefix;
+    }
+    const thousands = Math.floor(number / 1000);
+    const remainder = number % 1000;
+    const prefix = `${numberToWords(thousands)} thousand`;
+    return remainder ? `${prefix} ${numberToWords(remainder)}` : prefix;
+  }
+
+  function sentenceCaseWords(value) {
+    const text = String(value || '').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+
+  function formatValiditySummary(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return 'Default: 45 days after approval';
+    const parsed = parseDateInputValue(raw);
+    if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) return raw;
+    return parsed.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  function isCertificateRequestRow(row) {
+    return normalizePreviewDocKey(row?.document_type || '') !== 'barangayid' && !requestNeedsFeeTagging(row);
+  }
+
+  function isCertificateManualConfig(config) {
+    return !!config && !config.clearance && config.kind !== 'barangay_id';
+  }
+
+  function isCertificatePreviewDocKey(docKey) {
+    const key = normalizePreviewDocKey(docKey || '');
+    return !!key && !['barangayid', 'generalpermitclearance', 'businessclearance', 'tricycleclearance'].includes(key);
+  }
   const isFinancePaymentsPage = /\/admin-end\/certificates\/financepayments(?:\.php)?\/?$/i.test(window.location.pathname);
   const requestFilterModalEl = isFinancePaymentsPage ? document.getElementById('modalFinanceFilter') : filterModalEl;
   const requestFilterDateFromEl = isFinancePaymentsPage ? financeFilterDateFrom : filterDateFrom;
@@ -1018,7 +1133,7 @@
     if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
     if (k === 'completed') return `<span class="badge bg-success">${label}</span>`;
     if (k === 'fee_tagging') return `<span class="badge bg-success">${label}</span>`;
-    if (k === 'ready_for_claim') return `<span class="badge bg-primary">${label}</span>`;
+    if (k === 'ready_for_claim' || k === 'payment_verified') return `<span class="badge bg-primary">${label}</span>`;
     if (k === 'for_payment' || k === 'payment_submitted') return `<span class="badge bg-warning text-dark">${label}</span>`;
     return `<span class="badge bg-secondary">${label}</span>`;
   }
@@ -2872,6 +2987,15 @@
     const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
     const requestedDocKey = normalizePreviewDocKey(requestedDocType);
     const isBarangayIdDocument = requestedDocKey === 'barangayid';
+    const certificateValidityDate = isCertificatePreviewDocKey(requestedDocKey)
+      ? resolveCertificateValidityDate(
+          firstNonEmpty([
+            payload.document_validity,
+            row.document_validity
+          ]),
+          certificateDefaultValidityDate()
+        )
+      : '';
     const generalPermitPurpose = generalClearancePurposeFromDocType(requestedDocType);
     const generalPermitLocation = buildGeneralPermitLocation(
       payload,
@@ -3074,12 +3198,32 @@
         row.submitted_at,
         dr_now_text()
       ]),
+      documentValidity: certificateValidityDate,
       approvedByName: upperText(firstNonEmptyName([
+        row.punong_signatory_name,
         row.reviewed_by,
         row.personnel_name,
         row.released_by,
         row.finance_user_name
       ]), 'HON. GLENN S. EVANGELISTA'),
+      punongSignatoryName: upperText(firstNonEmptyName([
+        row.punong_signatory_name,
+        row.reviewed_by,
+        row.personnel_name,
+        row.released_by,
+        row.finance_user_name
+      ]), 'HON. GLENN S. EVANGELISTA'),
+      punongSignatoryTitle: firstNonEmpty([
+        row.punong_signatory_title,
+        'Punong Barangay'
+      ]) || 'Punong Barangay',
+      secretarySignatoryName: upperText(firstNonEmptyName([
+        row.secretary_signatory_name
+      ]), 'MINERVA D. QUITA'),
+      secretarySignatoryTitle: firstNonEmpty([
+        row.secretary_signatory_title,
+        'Barangay Secretary'
+      ]) || 'Barangay Secretary',
       requestOfficer: requestOfficerText,
       requestOfficerLine1: requestOfficerLine1Text,
       requestOfficerLine2: requestOfficerLine2Text,
@@ -3185,6 +3329,16 @@
     const signedDateText = String(state.signedDate || 'DATE').trim() || 'DATE';
     const ftjsSignedDateText = signedDateText && signedDateText !== 'DATE' ? signedDateText : 'MM/DD/YYYY';
     const approvedByNameText = String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA';
+    const punongSignatoryNameText = String(state.punongSignatoryName || approvedByNameText).trim() || approvedByNameText;
+    const punongSignatoryTitleText = String(state.punongSignatoryTitle || 'Punong Barangay').trim() || 'Punong Barangay';
+    const secretarySignatoryNameText = String(state.secretarySignatoryName || 'MINERVA D. QUITA').trim() || 'MINERVA D. QUITA';
+    const secretarySignatoryTitleText = String(state.secretarySignatoryTitle || 'Barangay Secretary').trim() || 'Barangay Secretary';
+    const documentValidityText = resolveCertificateValidityDate(state.documentValidity || '', certificateDefaultValidityDate());
+    const certificateValidityDays = (() => {
+      const issuedBase = firstNonEmpty([state.issuedOn, state.issuedDate, formatDateInputValue(new Date())]);
+      const resolvedDays = diffCalendarDays(issuedBase, documentValidityText);
+      return resolvedDays === null ? 45 : Math.max(0, resolvedDays);
+    })();
     const leftLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
     const rightLogoUrl = `${appBase}/Images/Montalban_Logo.png`;
     const fallbackRightLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
@@ -3254,6 +3408,11 @@
       { label: 'Issued On:', value: generalClearanceIssuedOn || '_____' },
       { label: 'OR No.:', value: safe(state.orNumber, '_____') },
     ]);
+    const buildCertificateFooterNote = () => {
+      const dayWord = sentenceCaseWords(numberToWords(certificateValidityDays || 0)) || 'Forty-five';
+      const dayLabel = Number(certificateValidityDays || 0) === 1 ? 'day' : 'days';
+      return `This certificate is valid for ${esc(dayWord)} (${esc(String(certificateValidityDays || 0))}) ${dayLabel} from the date of issue,<br>check the QR code to verify the authenticity of this document.`;
+    };
 
     let contentHtml = '';
     let titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
@@ -3652,11 +3811,11 @@
       footerAreaHtml = `
         <div class="doc-preview-business-footer-area${qrBlockHtml ? '' : ' doc-preview-business-footer-area--noqr'}">
           <div class="doc-preview-business-footer-main">
-            <div class="doc-preview-business-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+            <div class="doc-preview-business-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
             <div class="doc-preview-business-signing">
               <div class="doc-preview-signature doc-preview-business-signature">
-                <div class="name">HON. GLENN S. EVANGELISTA</div>
-                <div>Punong Barangay</div>
+                <div class="name">${esc(punongSignatoryNameText)}</div>
+                <div>${esc(punongSignatoryTitleText)}</div>
               </div>
               <div class="doc-preview-signature doc-preview-business-signature">
                 <div class="name">MR. JOSEPH C. PATRICIO</div>
@@ -3698,11 +3857,11 @@
     } else if (isGeneralPermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-generalclearance-footer-area${qrBlockHtml ? '' : ' doc-preview-generalclearance-footer-area--noqr'}">
-          <div class="doc-preview-generalclearance-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+          <div class="doc-preview-generalclearance-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
           <div class="doc-preview-generalclearance-signing">
             <div class="doc-preview-signature doc-preview-generalclearance-signature">
-              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
-              <div>Punong Barangay</div>
+              <div class="name">${esc(punongSignatoryNameText)}</div>
+              <div>${esc(punongSignatoryTitleText)}</div>
             </div>
             <div class="doc-preview-signature doc-preview-generalclearance-signature">
               <div class="name">MR. JOSEPH C. PATRICIO</div>
@@ -3716,11 +3875,11 @@
     } else if (isTricyclePermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-tricycle-footer-area${qrBlockHtml ? '' : ' doc-preview-tricycle-footer-area--noqr'}">
-          <div class="doc-preview-tricycle-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+          <div class="doc-preview-tricycle-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
           <div class="doc-preview-tricycle-signing">
             <div class="doc-preview-signature doc-preview-tricycle-signature">
-              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
-              <div>Punong Barangay</div>
+              <div class="name">${esc(punongSignatoryNameText)}</div>
+              <div>${esc(punongSignatoryTitleText)}</div>
             </div>
             <div class="doc-preview-signature doc-preview-tricycle-signature">
               <div class="name">MR. JOSEPH C. PATRICIO</div>
@@ -3739,15 +3898,15 @@
               <div></div>
               <div class="doc-preview-ftjs-signing">
                 <div class="doc-preview-ftjs-block">
-                  <div class="doc-preview-ftjs-name">${esc(approvedByNameText)}</div>
-                  <div class="doc-preview-ftjs-role">Punong Barangay</div>
+                  <div class="doc-preview-ftjs-name">${esc(punongSignatoryNameText)}</div>
+                  <div class="doc-preview-ftjs-role">${esc(punongSignatoryTitleText)}</div>
                 </div>
                 <div class="doc-preview-ftjs-date-line"><span>${esc(ftjsSignedDateText)}</span></div>
                 <div class="doc-preview-ftjs-date-label">Date</div>
                 <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
                 <div class="doc-preview-ftjs-block doc-preview-ftjs-witness">
-                  <div class="doc-preview-ftjs-name">MINERVA D. QUITA</div>
-                  <div class="doc-preview-ftjs-role">Barangay Secretary</div>
+                  <div class="doc-preview-ftjs-name">${esc(secretarySignatoryNameText)}</div>
+                  <div class="doc-preview-ftjs-role">${esc(secretarySignatoryTitleText)}</div>
                 </div>
                 <div class="doc-preview-ftjs-date-line"><span>${esc(ftjsSignedDateText)}</span></div>
                 <div class="doc-preview-ftjs-date-label">Date</div>
@@ -3757,17 +3916,15 @@
           `
         : `
             <div class="${footerAreaClass}">
-              <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+              <div class="doc-preview-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
               <div class="doc-preview-signature">
-                <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
-                <div>Punong Barangay</div>
+                <div class="name">${esc(punongSignatoryNameText)}</div>
+                <div>${esc(punongSignatoryTitleText)}</div>
               </div>
               ${qrBlockHtml}
             </div>
           `;
-      footerNoteHtml = isFirstTimeJobSeeker
-        ? 'This certification is only valid for 1 year from the issuance.<br>Check the qr code to verify the authenticity of this document.'
-        : 'This certificate is valid for Forty-five (45) days from the date of issue,<br>check the QR code to verify the authenticity of this document.';
+      footerNoteHtml = buildCertificateFooterNote();
     }
 
     return `
@@ -4728,6 +4885,7 @@
     const fullName = fullNameFromRow(row);
     const purpose = normalizeDisplayCasing(firstNonEmpty([row.purpose, '-']));
     const statusKey = statusBucket(row);
+    const workflowStage = resolveWorkflowStage(row);
     const financeStatusLabel = {
       verified: 'Verified',
       rejected: 'Rejected',
@@ -4745,7 +4903,7 @@
         <td class="col-purpose-cell">
           <div class="cell-purpose">${esc(purpose)}</div>
         </td>
-        <td>${badge(isFinancePaymentsPage ? statusKey : row.stage, esc(isFinancePaymentsPage ? financeStatusLabel : stageLabel))}${reason}</td>
+        <td>${badge(isFinancePaymentsPage ? statusKey : workflowStage, esc(isFinancePaymentsPage ? financeStatusLabel : stageLabel))}${reason}</td>
         <td>${esc(row.submitted_at || '-')}</td>
         <td>${actionButtons(row)}</td>
       </tr>
@@ -4982,6 +5140,16 @@
     if (stage.includes('rejected') || stage === 'interview_failed' || stage === 'inspection_failed') return 'denied';
     if (stage === 'completed' || stage === 'ready_for_claim' || stage === 'payment_verified') return 'verified';
     return 'pending';
+  }
+
+  function isFinanceWalkInEligible(row) {
+    const stage = String(row?.stage || '').toLowerCase();
+    return stage === 'for_payment' || stage === 'payment_rejected';
+  }
+
+  function isFinanceOnlineVerificationEligible(row) {
+    const stage = String(row?.stage || '').toLowerCase();
+    return stage === 'payment_submitted';
   }
 
   function matchesStatusFilter(row) {
@@ -5583,12 +5751,18 @@
     actionReasonWrap.classList.add('d-none');
     actionAmountWrap.classList.add('d-none');
     actionOrWrap.classList.add('d-none');
+    actionValidityWrap?.classList.add('d-none');
     actionIssuedWrap.classList.add('d-none');
     actionBusinessApprovalWrap?.classList.add('d-none');
     actionPlateWrap?.classList.add('d-none');
     actionReason.required = false;
     actionAmount.required = false;
     actionOr.required = false;
+    if (actionValidity) {
+      actionValidity.required = false;
+      actionValidity.value = '';
+      actionValidity.min = formatDateInputValue(new Date());
+    }
     actionIssued.required = false;
     if (actionBusinessApproval) {
       actionBusinessApproval.required = false;
@@ -5746,6 +5920,7 @@
     const needsInspection = requestRequiresInspection(row);
     const needsManualIssuedUpload = requestNeedsManualIssuedUpload(row);
     const isBarangayIdRequest = docKey === 'barangayid';
+    const isCertificateRequest = isCertificateRequestRow(row);
     if (actionForm) {
       actionForm.dataset.docKey = docKey;
     }
@@ -5765,6 +5940,12 @@
       row?.payload?.business_plate_number,
       row?.payload?.vehicle_plate_number
     ]).toUpperCase();
+    const existingDocumentValidity = resolveCertificateValidityDate(firstNonEmpty([
+      options?.documentValidity,
+      viewPreviewState?.documentValidity,
+      row?.document_validity,
+      row?.payload?.document_validity
+    ]), certificateDefaultValidityDate());
 
     const rowStage = String(row?.stage || '').toLowerCase();
     const isWalkInFlow = rowStage === 'for_payment' || rowStage === 'payment_rejected';
@@ -5799,7 +5980,9 @@
             ? 'Click Review Application to inspect the submitted Barangay ID details. Once everything is correct, proceed to approve the request for release.'
         : (needsFeeTagging
             ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for ${needsInspection ? 'inspection' : 'payment'}.`
-            : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`));
+            : (isCertificateRequest
+                ? `Set the certificate validity first, then click View Document to check the document that will be issued. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`
+                : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`)));
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
@@ -5810,6 +5993,11 @@
             : `Please confirm that you thoroughly checked the resident's data to ${needsInspection ? `approve the ${docName} for inspection` : `issue a ${docName}`}.`);
       actionPrompt.classList.remove('d-none');
     }
+    if ((type === 'personnel_approve' || type === 'interview_pass') && isCertificateRequest && actionValidityWrap && actionValidity) {
+      actionValidityWrap.classList.remove('d-none');
+      actionValidity.min = formatDateInputValue(new Date());
+      actionValidity.value = existingDocumentValidity;
+    }
     if (type === 'mark_completed_confirm' && actionPrompt) {
       actionPrompt.textContent = 'Are you sure you want to release this document now? This will mark the request as completed.';
       actionPrompt.classList.remove('d-none');
@@ -5819,7 +6007,7 @@
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass' && actionPrompt) {
-      actionPrompt.textContent = 'Click View Document to review the First Time Job Seeker certificate first. After you save and process it, first-time requests will move to release while repeat requests will move to payment.';
+      actionPrompt.textContent = 'Set the certificate validity first, then click View Document to review the First Time Job Seeker certificate. After you save and process it, first-time requests will move to release while repeat requests will move to payment.';
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass_confirm' && actionPrompt) {
@@ -5912,13 +6100,12 @@
     if (type === 'finance_verify') {
       actionOrWrap.classList.remove('d-none');
       actionOr.required = true;
-      const financeKey = isFinancePaymentsPage ? statusBucket(row) : '';
       const stage = String(row?.stage || '').toLowerCase();
       const isPendingVerification = isFinancePaymentsPage
-        ? financeKey === 'pending_verification'
+        ? isFinanceOnlineVerificationEligible(row)
         : stage === 'payment_submitted';
       const isWalkInStage = isFinancePaymentsPage
-        ? financeKey === 'unpaid' || financeKey === 'rejected'
+        ? isFinanceWalkInEligible(row)
         : stage === 'for_payment' || stage === 'payment_rejected';
       const fixedAmount = resolveSystemAmount(row);
 
@@ -6046,7 +6233,8 @@
     if (state.kind === 'action') {
       openActionModal(String(state.actionType || 'personnel_approve'), String(state.requestId || ''), {
         businessApprovalType: String(state.businessApprovalType || '').trim(),
-        plateNumber: String(state.plateNumber || '').trim()
+        plateNumber: String(state.plateNumber || '').trim(),
+        documentValidity: String(state.documentValidity || '').trim()
       });
       return;
     }
@@ -6426,8 +6614,7 @@
             viewModalBackBtn.classList.add('d-none');
           }
           if (viewModalWalkInBtn) {
-            const isUnpaidStage = financeStatusKeyForActions === 'unpaid' || financeStatusKeyForActions === 'rejected';
-            if (isUnpaidStage) {
+            if (isFinanceWalkInEligible(row)) {
               viewModalWalkInBtn.classList.remove('d-none');
               viewModalWalkInBtn.setAttribute('data-id', String(row.request_id || ''));
             } else {
@@ -7086,6 +7273,19 @@
       const rid = currentRequestId;
       let selectedApprovalType = '';
       let selectedPlateNumber = '';
+      let selectedDocumentValidity = '';
+      if (isCertificatePreviewDocKey(currentDocKey)) {
+        selectedDocumentValidity = resolveCertificateValidityDate(
+          actionValidity?.value || '',
+          firstNonEmpty([
+            currentRow?.document_validity,
+            viewPreviewState?.documentValidity
+          ])
+        );
+        if (actionValidity) {
+          actionValidity.value = selectedDocumentValidity;
+        }
+      }
       if (String(actionForm?.dataset?.docKey || '') === 'businessclearance') {
         selectedApprovalType = encodeBusinessApprovalTypes(
           actionForm?.dataset?.businessApprovalType || actionBusinessApproval?.value || ''
@@ -7114,6 +7314,26 @@
           businessApprovalType: selectedApprovalType,
           plateNumber: selectedPlateNumber
         });
+      } else {
+        if (!viewPreviewState || typeof viewPreviewState !== 'object') {
+          const previewRow = itemById.get(rid) || {};
+          const previewPayload = previewRow?.payload && typeof previewRow.payload === 'object' ? previewRow.payload : {};
+          const previewProfile = previewRow?.resident_profile && typeof previewRow.resident_profile === 'object'
+            ? previewRow.resident_profile
+            : {};
+          viewPreviewState = buildPreviewState(previewRow, previewPayload, previewProfile, null);
+        }
+      }
+      if (selectedDocumentValidity) {
+        if (viewPreviewState && typeof viewPreviewState === 'object') {
+          viewPreviewState.documentValidity = selectedDocumentValidity;
+        }
+        rememberPreviewStateOverride(rid, {
+          ...(pendingPreviewStateOverride?.requestId === rid && pendingPreviewStateOverride?.patch
+            ? pendingPreviewStateOverride.patch
+            : {}),
+          documentValidity: selectedDocumentValidity
+        });
       }
       if (currentNeedsFeeTagging) {
         if (actionSubmitBtn) {
@@ -7131,7 +7351,8 @@
             actionType: 'personnel_approve',
             requestId: rid,
             businessApprovalType: selectedApprovalType,
-            plateNumber: selectedPlateNumber
+            plateNumber: selectedPlateNumber,
+            documentValidity: selectedDocumentValidity
           }
         }, actionModalEl, actionModal);
         return;
@@ -7155,6 +7376,35 @@
     }
 
     if ((actionType.value || '') === 'interview_pass') {
+      const rid = currentRequestId;
+      const selectedDocumentValidity = isCertificatePreviewDocKey(currentDocKey)
+        ? resolveCertificateValidityDate(
+            actionValidity?.value || '',
+            firstNonEmpty([
+              currentRow?.document_validity,
+              viewPreviewState?.documentValidity
+            ])
+          )
+        : '';
+      if (selectedDocumentValidity) {
+        if (actionValidity) {
+          actionValidity.value = selectedDocumentValidity;
+        }
+        if (!viewPreviewState || typeof viewPreviewState !== 'object') {
+          const previewRow = itemById.get(rid) || {};
+          const previewPayload = previewRow?.payload && typeof previewRow.payload === 'object' ? previewRow.payload : {};
+          const previewProfile = previewRow?.resident_profile && typeof previewRow.resident_profile === 'object'
+            ? previewRow.resident_profile
+            : {};
+          viewPreviewState = buildPreviewState(previewRow, previewPayload, previewProfile, null);
+        }
+        if (viewPreviewState && typeof viewPreviewState === 'object') {
+          viewPreviewState.documentValidity = selectedDocumentValidity;
+        }
+        rememberPreviewStateOverride(rid, {
+          documentValidity: selectedDocumentValidity
+        });
+      }
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = true;
         actionSubmitBtn.textContent = 'Opening Preview...';
@@ -7190,6 +7440,14 @@
     }
     if (actionOrWrap && !actionOrWrap.classList.contains('d-none')) {
       fd.append('or_number', actionOr.value || '');
+    }
+    const resolvedPreviewValidity = (currentAction === 'personnel_approve_confirm' || currentAction === 'interview_pass_confirm')
+      ? String(viewPreviewState?.documentValidity || '').trim()
+      : '';
+    if (actionValidityWrap && !actionValidityWrap.classList.contains('d-none')) {
+      fd.append('document_validity', actionValidity?.value || '');
+    } else if (resolvedPreviewValidity) {
+      fd.append('document_validity', resolvedPreviewValidity);
     }
     if (currentAction === 'finance_verify' && actionForm?.dataset?.verifyMode) {
       fd.append('verify_mode', String(actionForm.dataset.verifyMode));
@@ -7440,10 +7698,9 @@
     if (!id) return;
     const row = itemById.get(id);
     if (!row) return;
-    const financeKey = isFinancePaymentsPage ? statusBucket(row) : '';
     const stageKey = String(row?.stage || '').toLowerCase();
     const isEligible = isFinancePaymentsPage
-      ? (financeKey === 'unpaid' || financeKey === 'rejected')
+      ? isFinanceWalkInEligible(row)
       : (stageKey === 'for_payment' || stageKey === 'payment_rejected');
     if (!isEligible) {
       return;
@@ -7514,6 +7771,10 @@
     const manualResidentSummary = document.getElementById('manualResidentSummary');
     const manualDocumentSummary = document.getElementById('manualDocumentSummary');
     const manualNextStageSummary = document.getElementById('manualNextStageSummary');
+    const manualValidityWrap = document.getElementById('manualValidityWrap');
+    const manualValidityDate = document.getElementById('manualValidityDate');
+    const manualValiditySummaryWrap = document.getElementById('manualValiditySummaryWrap');
+    const manualValiditySummary = document.getElementById('manualValiditySummary');
     const manualLastName = document.getElementById('manualLastName');
     const manualFirstName = document.getElementById('manualFirstName');
     const manualMiddleName = document.getElementById('manualMiddleName');
@@ -8519,6 +8780,21 @@
 
       manualDocumentSummary.textContent = config ? config.label : 'Select a manual issuance form';
       manualNextStageSummary.textContent = manualExpectedStage(config).label;
+      if (manualValidityWrap && manualValidityDate && manualValiditySummaryWrap && manualValiditySummary) {
+        const showValidity = isCertificateManualConfig(config);
+        manualValidityWrap.classList.toggle('d-none', !showValidity);
+        manualValiditySummaryWrap.classList.toggle('d-none', !showValidity);
+        if (showValidity) {
+          manualValidityDate.min = formatDateInputValue(new Date());
+          if (!String(manualValidityDate.value || '').trim()) {
+            manualValidityDate.value = certificateDefaultValidityDate();
+          }
+          manualValiditySummary.textContent = formatValiditySummary(manualValidityDate.value);
+        } else {
+          manualValidityDate.value = '';
+          manualValiditySummary.textContent = 'Default: 45 days after approval';
+        }
+      }
     }
 
     function manualApplyCommonFieldRequirements(config) {
@@ -9065,6 +9341,12 @@
       } else if (config.kind === 'jail_visit') {
         payload.cohabitation_variant = 'relationship_jail_visit';
       }
+      if (isCertificateManualConfig(config)) {
+        const validityDate = String(manualValidityDate?.value || '').trim();
+        if (validityDate) {
+          payload.document_validity = validityDate;
+        }
+      }
 
       return payload;
     }
@@ -9295,6 +9577,13 @@
     manualSectorMembershipWrap?.addEventListener('change', () => {
       manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
+    });
+    manualValidityDate?.addEventListener('change', () => {
+      manualMarkPreviewStale(true);
+      manualUpdateSummary();
+      if (isCertificateManualConfig(manualCurrentConfig())) {
+        manualSetAlert('Certificate validity updated. Preview the document again before submitting.', 'info');
+      }
     });
     manualDocumentType?.addEventListener('change', () => {
       manualSetFieldInvalidState(manualDocumentType, !manualDocumentType.checkValidity());

@@ -22,7 +22,7 @@ function ti_stage_label(string $stage): string {
         'for_payment' => 'For Payment',
         'payment_submitted' => 'Pending Payment Verification',
         'payment_rejected' => 'Payment Rejected',
-        'payment_verified' => 'Payment Verified',
+        'payment_verified' => 'For Release',
         'ready_for_claim' => 'For Release',
         'completed' => 'Completed',
     ];
@@ -40,7 +40,7 @@ function ti_stage_from_status_name(string $statusName): ?string {
         'forpayment' => 'for_payment',
         'paymentsubmitted' => 'payment_submitted',
         'paymentrejected' => 'payment_rejected',
-        'paymentverified' => 'payment_verified',
+        'paymentverified' => 'ready_for_claim',
         'forrelease' => 'ready_for_claim',
         'readyforclaim' => 'ready_for_claim',
         'completed' => 'completed',

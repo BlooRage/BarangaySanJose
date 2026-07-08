@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../General/security.php';
@@ -6,6 +7,10 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/audit.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
+
+if (!($conn instanceof mysqli)) {
+    throw new RuntimeException('Database connection is unavailable.');
+}
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], true);
 
@@ -157,7 +162,8 @@ if ($action === 'bulk_regenerate_issued') {
 $currentUserId   = (string)($_SESSION['user_id'] ?? '');
 $currentUserRole = (string)($_SESSION['role'] ?? 'Personnel');
 
-function dra_is_finance_user(mysqli $conn, string $userId): bool {
+function dra_is_finance_user(mysqli $conn, string $userId): bool
+{
     $userId = trim($userId);
     if ($userId === '' || !dr_table_exists($conn, 'officialinformationtbl')) {
         return false;
@@ -189,7 +195,8 @@ function dra_is_finance_user(mysqli $conn, string $userId): bool {
     );
 }
 
-function dra_resolve_official_display_name(mysqli $conn, string $userId): string {
+function dra_resolve_official_display_name(mysqli $conn, string $userId): string
+{
     static $cache = [];
     $userId = trim($userId);
     if ($userId === '') {
@@ -215,17 +222,46 @@ function dra_resolve_official_display_name(mysqli $conn, string $userId): string
     $stmt->close();
     $row = $row ? (pii_decrypt_official_row($row) ?? $row) : null;
 
-    $fullName = trim(implode(' ', array_values(array_filter([
+    $fullName = dra_format_official_display_name(
         (string)($row['firstname'] ?? ''),
         (string)($row['middlename'] ?? ''),
         (string)($row['lastname'] ?? ''),
-        (string)($row['suffix'] ?? ''),
-    ], static fn($value) => trim((string)$value) !== ''))));
+        (string)($row['suffix'] ?? '')
+    );
     $cache[$userId] = $fullName !== '' ? $fullName : $userId;
     return $cache[$userId];
 }
 
-function dra_current_barangay_signatories(mysqli $conn): array {
+function dra_format_official_display_name(string $firstName, string $middleName, string $lastName, string $suffix = '', bool $prefixHonorific = false): string
+{
+    $firstName = trim($firstName);
+    $middleName = trim($middleName);
+    $lastName = trim($lastName);
+    $suffix = trim($suffix);
+
+    $middleInitial = '';
+    if ($middleName !== '') {
+        if (function_exists('mb_substr')) {
+            $middleInitial = mb_substr($middleName, 0, 1, 'UTF-8');
+        } else {
+            $middleInitial = substr($middleName, 0, 1);
+        }
+        $middleInitial = strtoupper((string)$middleInitial) . '.';
+    }
+
+    $parts = array_values(array_filter([
+        $prefixHonorific ? 'Hon.' : '',
+        $firstName,
+        $middleInitial,
+        $lastName,
+        $suffix,
+    ], static fn($value): bool => trim((string)$value) !== ''));
+
+    return trim(implode(' ', $parts));
+}
+
+function dra_current_barangay_signatories(mysqli $conn): array
+{
     static $cache = null;
     if ($cache !== null) {
         return $cache;
@@ -243,73 +279,148 @@ function dra_current_barangay_signatories(mysqli $conn): array {
     ];
 
     if (!dr_table_exists($conn, 'barangaycounciltbl') || !dr_table_exists($conn, 'officialinformationtbl')) {
-        $cache = $fallback;
-        return $cache;
-    }
-
-    $result = $conn->query("
-        SELECT bc.seat_name, oi.firstname, oi.middlename, oi.lastname, oi.suffix
-        FROM barangaycounciltbl bc
-        LEFT JOIN officialinformationtbl oi
-            ON oi.official_id = bc.current_official_id
-        WHERE bc.is_active = 1
-          AND bc.current_official_id IS NOT NULL
-        ORDER BY bc.sort_order, bc.council_id
-    ");
-    if (!($result instanceof mysqli_result)) {
-        $cache = $fallback;
-        return $cache;
+        if (!dr_table_exists($conn, 'officialinformationtbl')) {
+            $cache = $fallback;
+            return $cache;
+        }
     }
 
     $resolved = $fallback;
-    while ($row = $result->fetch_assoc()) {
-        $row = pii_decrypt_official_row($row) ?? $row;
-        $seatName = trim((string)($row['seat_name'] ?? ''));
-        if ($seatName === '') {
-            continue;
-        }
-
-        $fullName = trim(implode(' ', array_values(array_filter([
-            trim((string)($row['firstname'] ?? '')),
-            trim((string)($row['middlename'] ?? '')),
-            trim((string)($row['lastname'] ?? '')),
-            trim((string)($row['suffix'] ?? '')),
-        ], static fn($value): bool => $value !== ''))));
-        if ($fullName === '') {
-            continue;
-        }
-
-        $seatLower = strtolower($seatName);
-        if (
-            strpos($seatLower, 'punong barangay') !== false
-            || strpos($seatLower, 'barangay captain') !== false
-            || $seatLower === 'barangay chairman'
-        ) {
-            $displayName = strtoupper($fullName);
-            if (!preg_match('/^HON\\.?\\s/i', $displayName)) {
-                $displayName = 'HON. ' . $displayName;
+    $positionField = dr_column_exists($conn, 'officialinformationtbl', 'position_access')
+        ? 'COALESCE(oi.position_access, oi.role_access)'
+        : 'oi.role_access';
+    $officialsResult = $conn->query("
+        SELECT
+            oi.official_id,
+            {$positionField} AS position_access,
+            oi.firstname,
+            oi.middlename,
+            oi.lastname,
+            oi.suffix
+        FROM officialinformationtbl oi
+        WHERE {$positionField} IN ('Barangay Chairman', 'Barangay Secretary', 'Punong Barangay', 'Barangay Captain')
+        ORDER BY oi.official_id DESC
+    ");
+    if ($officialsResult instanceof mysqli_result) {
+        while ($row = $officialsResult->fetch_assoc()) {
+            $row = pii_decrypt_official_row($row) ?? $row;
+            $positionAccess = strtolower(trim((string)($row['position_access'] ?? '')));
+            if ($positionAccess === '') {
+                continue;
             }
-            $resolved['punong'] = [
-                'name' => $displayName,
-                'title' => 'Punong Barangay',
-            ];
-            continue;
-        }
+            $fullName = dra_format_official_display_name(
+                (string)($row['firstname'] ?? ''),
+                (string)($row['middlename'] ?? ''),
+                (string)($row['lastname'] ?? ''),
+                (string)($row['suffix'] ?? '')
+            );
+            if ($fullName === '') {
+                continue;
+            }
 
-        if ($seatLower === 'barangay secretary') {
-            $resolved['secretary'] = [
-                'name' => strtoupper($fullName),
-                'title' => 'Barangay Secretary',
-            ];
+            if (
+                !isset($resolved['_from_position_punong'])
+                && (
+                    $positionAccess === 'barangay chairman'
+                    || $positionAccess === 'punong barangay'
+                    || $positionAccess === 'barangay captain'
+                )
+            ) {
+                $resolved['punong'] = [
+                    'name' => dra_format_official_display_name(
+                        (string)($row['firstname'] ?? ''),
+                        (string)($row['middlename'] ?? ''),
+                        (string)($row['lastname'] ?? ''),
+                        (string)($row['suffix'] ?? ''),
+                        true
+                    ),
+                    'title' => 'Punong Barangay',
+                ];
+                $resolved['_from_position_punong'] = true;
+            }
+
+            if (!isset($resolved['_from_position_secretary']) && $positionAccess === 'barangay secretary') {
+                $resolved['secretary'] = [
+                    'name' => $fullName,
+                    'title' => 'Barangay Secretary',
+                ];
+                $resolved['_from_position_secretary'] = true;
+            }
+        }
+        $officialsResult->free();
+    }
+
+    if (
+        !isset($resolved['_from_position_punong']) || !isset($resolved['_from_position_secretary'])
+    ) {
+        $result = $conn->query("
+            SELECT bc.seat_name, oi.firstname, oi.middlename, oi.lastname, oi.suffix
+            FROM barangaycounciltbl bc
+            LEFT JOIN officialinformationtbl oi
+                ON oi.official_id = bc.current_official_id
+            WHERE bc.is_active = 1
+              AND bc.current_official_id IS NOT NULL
+            ORDER BY bc.sort_order, bc.council_id
+        ");
+        if ($result instanceof mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                $row = pii_decrypt_official_row($row) ?? $row;
+                $seatName = trim((string)($row['seat_name'] ?? ''));
+                if ($seatName === '') {
+                    continue;
+                }
+
+                $fullName = dra_format_official_display_name(
+                    (string)($row['firstname'] ?? ''),
+                    (string)($row['middlename'] ?? ''),
+                    (string)($row['lastname'] ?? ''),
+                    (string)($row['suffix'] ?? '')
+                );
+                if ($fullName === '') {
+                    continue;
+                }
+
+                $seatLower = strtolower($seatName);
+                if (
+                    !isset($resolved['_from_position_punong'])
+                    && (
+                        strpos($seatLower, 'punong barangay') !== false
+                        || strpos($seatLower, 'barangay captain') !== false
+                        || $seatLower === 'barangay chairman'
+                    )
+                ) {
+                    $resolved['punong'] = [
+                        'name' => dra_format_official_display_name(
+                            (string)($row['firstname'] ?? ''),
+                            (string)($row['middlename'] ?? ''),
+                            (string)($row['lastname'] ?? ''),
+                            (string)($row['suffix'] ?? ''),
+                            true
+                        ),
+                        'title' => 'Punong Barangay',
+                    ];
+                    continue;
+                }
+
+                if (!isset($resolved['_from_position_secretary']) && $seatLower === 'barangay secretary') {
+                    $resolved['secretary'] = [
+                        'name' => $fullName,
+                        'title' => 'Barangay Secretary',
+                    ];
+                }
+            }
+            $result->free();
         }
     }
-    $result->free();
+
+    unset($resolved['_from_position_punong'], $resolved['_from_position_secretary']);
 
     $cache = $resolved;
     return $cache;
 }
 
-function dra_resolve_resident_display_name(mysqli $conn, string $residentUserId, string $residentId): string {
+function dra_resolve_resident_display_name(mysqli $conn, string $residentUserId, string $residentId): string
+{
     static $cache = [];
 
     $residentUserId = trim($residentUserId);
@@ -360,11 +471,143 @@ function dra_resolve_resident_display_name(mysqli $conn, string $residentUserId,
     return $cache[$cacheKey];
 }
 
-function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string $inspectorUserId, string $remarks): void {
+function dra_is_certificate_only_document_type(string $documentType): bool
+{
+    return dr_is_issuance_document_type($documentType) && !dr_is_barangay_id_document_type($documentType);
+}
+
+function dra_normalize_validity_date_input(?string $rawValue): ?string
+{
+    $rawValue = trim((string)$rawValue);
+    if ($rawValue === '') {
+        return null;
+    }
+
+    $parsed = dr_parse_iso_date($rawValue);
+    if (!$parsed instanceof DateTimeImmutable) {
+        return null;
+    }
+
+    return $parsed->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+}
+
+function dra_default_certificate_validity_datetime(?string $baseDateTime = null): string
+{
+    try {
+        $base = $baseDateTime !== null && trim($baseDateTime) !== ''
+            ? new DateTimeImmutable($baseDateTime)
+            : new DateTimeImmutable(dr_now());
+    } catch (Throwable $e) {
+        $base = new DateTimeImmutable(dr_now());
+    }
+
+    return $base->modify('+45 days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+}
+
+function dra_resolve_certificate_validity_datetime(string $documentType, ?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): ?string
+{
+    if (!dra_is_certificate_only_document_type($documentType)) {
+        return null;
+    }
+
+    $normalizedRequested = dra_normalize_validity_date_input($requestedValidity);
+    if ($normalizedRequested !== null) {
+        return $normalizedRequested;
+    }
+
+    $existingParsed = dr_parse_datetime_value((string)$existingValidity, true);
+    if ($existingParsed instanceof DateTimeImmutable) {
+        return $existingParsed->format('Y-m-d H:i:s');
+    }
+
+    return dra_default_certificate_validity_datetime($baseDateTime);
+}
+
+function dra_build_certificate_validity_notice(?string $validityDateTime, ?string $baseDateTime = null): string
+{
+    $resolvedValidity = dra_resolve_certificate_validity_datetime(
+        'Certificate',
+        null,
+        $validityDateTime,
+        $baseDateTime
+    );
+
+    $parsed = dr_parse_datetime_value((string)$resolvedValidity, true);
+    if (!$parsed instanceof DateTimeImmutable) {
+        $parsed = dr_parse_datetime_value(dra_default_certificate_validity_datetime($baseDateTime), true);
+    }
+
+    try {
+        $base = $baseDateTime !== null && trim($baseDateTime) !== ''
+            ? new DateTimeImmutable($baseDateTime)
+            : new DateTimeImmutable(dr_now());
+    } catch (Throwable $e) {
+        $base = new DateTimeImmutable(dr_now());
+    }
+
+    if (!$parsed instanceof DateTimeImmutable) {
+        $parsed = $base->modify('+45 days')->setTime(23, 59, 59);
+    }
+
+    $baseMidday = $base->setTime(12, 0, 0);
+    $validityMidday = $parsed->setTime(12, 0, 0);
+    $dayCount = max(0, (int)$baseMidday->diff($validityMidday)->format('%r%a'));
+
+    $dayWord = dra_ucfirst_words(dra_number_to_words($dayCount));
+    $dayLabel = $dayCount === 1 ? 'day' : 'days';
+
+    return "This certificate is valid for {$dayWord} ({$dayCount}) {$dayLabel} from the date of issue, check the\nQR code to verify the authenticity of this document.";
+}
+
+function dra_number_to_words(int $number): string
+{
+    $number = max(0, $number);
+    $ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    $teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    $tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+    if ($number < 10) {
+        return $ones[$number];
+    }
+    if ($number < 20) {
+        return $teens[$number - 10];
+    }
+    if ($number < 100) {
+        $remainder = $number % 10;
+        return $remainder > 0
+            ? $tens[intdiv($number, 10)] . '-' . $ones[$remainder]
+            : $tens[intdiv($number, 10)];
+    }
+    if ($number < 1000) {
+        $remainder = $number % 100;
+        $prefix = $ones[intdiv($number, 100)] . ' hundred';
+        return $remainder > 0 ? $prefix . ' ' . dra_number_to_words($remainder) : $prefix;
+    }
+
+    $thousands = intdiv($number, 1000);
+    $remainder = $number % 1000;
+    $prefix = dra_number_to_words($thousands) . ' thousand';
+    return $remainder > 0 ? $prefix . ' ' . dra_number_to_words($remainder) : $prefix;
+}
+
+function dra_ucfirst_words(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    return strtoupper(substr($value, 0, 1)) . substr($value, 1);
+}
+
+function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string $inspectorUserId, string $remarks): void
+{
     $requestId = trim((string)($requestRow['request_id'] ?? ''));
-    if ($requestId === ''
+    if (
+        $requestId === ''
         || !dr_requires_clearance_inspection((string)($requestRow['document_type'] ?? ''))
-        || !dr_table_exists($conn, 'clearanceinspectiontbl')) {
+        || !dr_table_exists($conn, 'clearanceinspectiontbl')
+    ) {
         return;
     }
 
@@ -401,7 +644,8 @@ function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string
     $stmt->close();
 }
 
-function dra_send_notification_deferred(mysqli $conn, array $request, string $subject, string $message): void {
+function dra_send_notification_deferred(mysqli $conn, array $request, string $subject, string $message): void
+{
     register_shutdown_function(static function () use ($conn, $request, $subject, $message): void {
         // Flush response first when supported, then send notifications outside request hot path.
         if (function_exists('session_write_close')) {
@@ -467,7 +711,6 @@ function dra_send_invoice_deferred(mysqli $conn, array $request, float $amount, 
             // Send invoice email with PDF attachment.
             $absPath = $baseDir . $relPath;
             dra_send_invoice_email($conn, $requestWithPayment, $amount, $orNumber, $absPath);
-
         } catch (Throwable $e) {
             error_log('[invoiceGenerator] deferred invoice failed: ' . $e->getMessage());
         }
@@ -542,7 +785,8 @@ function dra_send_invoice_email(mysqli $conn, array $request, float $amount, str
     }
 }
 
-function dra_strip_unreplaced_docx_qr_placeholder(string $docxDiskPath): void {
+function dra_strip_unreplaced_docx_qr_placeholder(string $docxDiskPath): void
+{
     if (!is_file($docxDiskPath) || !class_exists('ZipArchive')) {
         return;
     }
@@ -618,7 +862,8 @@ function dra_strip_unreplaced_docx_qr_placeholder(string $docxDiskPath): void {
     $zip->close();
 }
 
-function dra_restore_template_headers(string $templatePath, string $docxDiskPath): void {
+function dra_restore_template_headers(string $templatePath, string $docxDiskPath): void
+{
     if (!is_file($templatePath) || !is_file($docxDiskPath) || !class_exists('ZipArchive')) {
         return;
     }
@@ -821,7 +1066,8 @@ function dra_restore_template_headers(string $templatePath, string $docxDiskPath
     }
 }
 
-function dra_force_docx_placeholder_replacements(string $docxDiskPath, array $replacements): void {
+function dra_force_docx_placeholder_replacements(string $docxDiskPath, array $replacements): void
+{
     if (!is_file($docxDiskPath) || !class_exists('ZipArchive') || empty($replacements)) {
         return;
     }
@@ -866,7 +1112,8 @@ function dra_force_docx_placeholder_replacements(string $docxDiskPath, array $re
     $zip->close();
 }
 
-function dra_extract_docx_media_asset(string $templatePath, string $mediaName): ?string {
+function dra_extract_docx_media_asset(string $templatePath, string $mediaName): ?string
+{
     $templateReal = realpath($templatePath);
     if ($templateReal === false || !is_file($templateReal) || !class_exists('ZipArchive')) {
         return null;
@@ -901,7 +1148,8 @@ function dra_extract_docx_media_asset(string $templatePath, string $mediaName): 
     return is_file($cachePath) ? $cachePath : null;
 }
 
-function dra_ensure_list_hotpath_indexes(mysqli $conn): void {
+function dra_ensure_list_hotpath_indexes(mysqli $conn): void
+{
     static $done = false;
     if ($done) {
         return;
@@ -919,17 +1167,21 @@ function dra_ensure_list_hotpath_indexes(mysqli $conn): void {
         if (dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') && !isset($idxNames['idx_docreq_submitted_at'])) {
             $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_submitted_at (submitted_at)");
         }
-        if (dr_column_exists($conn, 'documentrequesttbl', 'stage')
+        if (
+            dr_column_exists($conn, 'documentrequesttbl', 'stage')
             && dr_column_exists($conn, 'documentrequesttbl', 'submitted_at')
-            && !isset($idxNames['idx_docreq_stage_submitted_at'])) {
+            && !isset($idxNames['idx_docreq_stage_submitted_at'])
+        ) {
             $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage_submitted_at (stage, submitted_at)");
         }
         if (dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp') && !isset($idxNames['idx_docreq_request_timestamp'])) {
             $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_request_timestamp (request_timestamp)");
         }
-        if (dr_column_exists($conn, 'documentrequesttbl', 'stage')
+        if (
+            dr_column_exists($conn, 'documentrequesttbl', 'stage')
             && dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp')
-            && !isset($idxNames['idx_docreq_stage_request_timestamp'])) {
+            && !isset($idxNames['idx_docreq_stage_request_timestamp'])
+        ) {
             $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage_request_timestamp (stage, request_timestamp)");
         }
     }
@@ -951,7 +1203,8 @@ function dra_ensure_list_hotpath_indexes(mysqli $conn): void {
     }
 }
 
-function dra_get_fee_map_for_document_types(mysqli $conn, array $documentTypes): array {
+function dra_get_fee_map_for_document_types(mysqli $conn, array $documentTypes): array
+{
     $out = [];
     $names = [];
     foreach ($documentTypes as $docType) {
@@ -997,14 +1250,16 @@ function dra_get_fee_map_for_document_types(mysqli $conn, array $documentTypes):
     return $out;
 }
 
-function dra_select_or_null(mysqli $conn, string $table, string $column, string $alias): string {
+function dra_select_or_null(mysqli $conn, string $table, string $column, string $alias): string
+{
     if (dr_column_exists($conn, $table, $column)) {
         return "d.{$column} AS {$alias}";
     }
     return "NULL AS {$alias}";
 }
 
-function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?array {
+function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?array
+{
     $requestId = trim($requestId);
     if ($requestId === '') {
         return null;
@@ -1189,7 +1444,8 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
     return $row;
 }
 
-function dra_strip_legacy_base(string $publicPath): string {
+function dra_strip_legacy_base(string $publicPath): string
+{
     $publicPath = trim($publicPath);
     if ($publicPath === '') {
         return '';
@@ -1226,7 +1482,8 @@ function dra_strip_legacy_base(string $publicPath): string {
     return $publicPath;
 }
 
-function dra_public_asset_path(string $storedPath): string {
+function dra_public_asset_path(string $storedPath): string
+{
     $storedPath = trim($storedPath);
     if ($storedPath === '') {
         return '';
@@ -1253,7 +1510,8 @@ function dra_public_asset_path(string $storedPath): string {
     return $publicPath;
 }
 
-function dra_public_asset_base_url(): string {
+function dra_public_asset_base_url(): string
+{
     static $cached = null;
 
     if ($cached !== null) {
@@ -1268,7 +1526,8 @@ function dra_public_asset_base_url(): string {
     return $cached = $configured !== '' ? rtrim($configured, '/') : '';
 }
 
-function dra_public_asset_exists_locally(string $publicPath): bool {
+function dra_public_asset_exists_locally(string $publicPath): bool
+{
     $normalized = '/' . ltrim(str_replace('\\', '/', trim($publicPath)), '/');
     if ($normalized === '/') {
         return false;
@@ -1282,7 +1541,8 @@ function dra_public_asset_exists_locally(string $publicPath): bool {
     return is_file(rtrim(str_replace('\\', '/', $projectRoot), '/') . $normalized);
 }
 
-function dra_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId): string {
+function dra_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId): string
+{
     static $cache = [];
 
     $residentId = trim($residentId);
@@ -1353,11 +1613,13 @@ function dra_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId)
     return $path;
 }
 
-function dra_clean_text($value): string {
+function dra_clean_text($value): string
+{
     return trim((string)$value);
 }
 
-function dra_normalize_subdivision_label($value): string {
+function dra_normalize_subdivision_label($value): string
+{
     $value = dra_clean_text($value);
     if ($value === '') {
         return '';
@@ -1368,7 +1630,8 @@ function dra_normalize_subdivision_label($value): string {
     return $value === '' ? '' : $value . ' Subdivision';
 }
 
-function dra_normalize_phase_label($value): string {
+function dra_normalize_phase_label($value): string
+{
     $value = dra_clean_text($value);
     if ($value === '') {
         return '';
@@ -1378,7 +1641,8 @@ function dra_normalize_phase_label($value): string {
     return $value === '' ? '' : 'Phase ' . $value;
 }
 
-function dra_normalize_street_label($value): string {
+function dra_normalize_street_label($value): string
+{
     $value = dra_clean_text($value);
     if ($value === '') {
         return '';
@@ -1389,7 +1653,8 @@ function dra_normalize_street_label($value): string {
     return trim(preg_replace('/\s+/', ' ', $value));
 }
 
-function dra_normalize_lot_label($value): string {
+function dra_normalize_lot_label($value): string
+{
     $value = dra_clean_text($value);
     if ($value === '') {
         return '';
@@ -1399,7 +1664,8 @@ function dra_normalize_lot_label($value): string {
     return $value === '' ? '' : 'Lot ' . $value;
 }
 
-function dra_normalize_block_label($value): string {
+function dra_normalize_block_label($value): string
+{
     $value = dra_clean_text($value);
     if ($value === '') {
         return '';
@@ -1410,7 +1676,8 @@ function dra_normalize_block_label($value): string {
     return $value === '' ? '' : 'Block ' . $value;
 }
 
-function dra_is_lot_block_address(array $address): bool {
+function dra_is_lot_block_address(array $address): bool
+{
     $streetNumber = dra_clean_text($address['street_number'] ?? '');
     $phaseNumber = dra_clean_text($address['phase_number'] ?? '');
     $streetName = dra_clean_text($address['street_name'] ?? '');
@@ -1428,7 +1695,8 @@ function dra_is_lot_block_address(array $address): bool {
     return $streetNumber !== '' && $phaseNumber !== '' && $streetName === '';
 }
 
-function dra_compose_resident_full_address(array $address, array $suffixParts = []): string {
+function dra_compose_resident_full_address(array $address, array $suffixParts = []): string
+{
     $unitNumber = dra_clean_text($address['unit_number'] ?? '');
     $streetNumber = dra_clean_text($address['street_number'] ?? '');
     $streetName = dra_clean_text($address['street_name'] ?? '');
@@ -1485,11 +1753,13 @@ function dra_compose_resident_full_address(array $address, array $suffixParts = 
     return implode(', ', array_values(array_filter($parts, static fn($value) => trim((string)$value) !== '')));
 }
 
-function dra_h(string $v): string {
+function dra_h(string $v): string
+{
     return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
 }
 
-function dra_is_protected_request_value($value): bool {
+function dra_is_protected_request_value($value): bool
+{
     $text = trim((string)$value);
     if ($text === '') {
         return false;
@@ -1506,7 +1776,8 @@ function dra_is_protected_request_value($value): bool {
         && pii_is_encrypted_value($text);
 }
 
-function dra_format_full_name_from_payload(array $payload): string {
+function dra_format_full_name_from_payload(array $payload): string
+{
     $last = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
     $first = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
     $middle = trim((string)($payload['middle_name'] ?? $payload['middlename'] ?? ''));
@@ -1515,7 +1786,8 @@ function dra_format_full_name_from_payload(array $payload): string {
     return trim(implode(' ', $parts));
 }
 
-function dra_hydrate_request_resident_name(mysqli $conn, array &$row, array $payload = []): void {
+function dra_hydrate_request_resident_name(mysqli $conn, array &$row, array $payload = []): void
+{
     foreach (['resident_name', 'full_name', 'resident_full_name'] as $nameField) {
         if (dra_is_protected_request_value($row[$nameField] ?? '')) {
             $row[$nameField] = '';
@@ -1559,7 +1831,8 @@ function dra_hydrate_request_resident_name(mysqli $conn, array &$row, array $pay
     }
 }
 
-function dra_strip_area_from_address(string $address): string {
+function dra_strip_area_from_address(string $address): string
+{
     $value = trim($address);
     if ($value === '') {
         return '';
@@ -1577,7 +1850,8 @@ function dra_strip_area_from_address(string $address): string {
     return $value;
 }
 
-function dra_compose_barangay_address(string $address, string $locality = 'Barangay San Jose, Rodriguez, Rizal'): string {
+function dra_compose_barangay_address(string $address, string $locality = 'Barangay San Jose, Rodriguez, Rizal'): string
+{
     $suffix = trim($locality);
     $clean = dra_strip_area_from_address($address);
     $clean = trim((string)(preg_replace('/\s+/u', ' ', $clean) ?? $clean), " \t\n\r\0\x0B,");
@@ -1593,7 +1867,8 @@ function dra_compose_barangay_address(string $address, string $locality = 'Baran
     return $clean . ', ' . $suffix;
 }
 
-function dra_compose_locality_address(string $address, string $locality = 'San Jose, Rodriguez, Rizal'): string {
+function dra_compose_locality_address(string $address, string $locality = 'San Jose, Rodriguez, Rizal'): string
+{
     $suffix = trim($locality);
     $clean = dra_strip_area_from_address($address);
     $clean = trim((string)(preg_replace('/\s+/u', ' ', $clean) ?? $clean), " \t\n\r\0\x0B,");
@@ -1609,7 +1884,8 @@ function dra_compose_locality_address(string $address, string $locality = 'San J
     return $clean . ', ' . $suffix;
 }
 
-function dra_pick_most_specific_address(array $candidates): string {
+function dra_pick_most_specific_address(array $candidates): string
+{
     $fallback = '';
     $best = '';
     $bestScore = -1;
@@ -1644,7 +1920,8 @@ function dra_pick_most_specific_address(array $candidates): string {
     return $best !== '' ? $best : $fallback;
 }
 
-function dra_join_address_parts(array $parts): string {
+function dra_join_address_parts(array $parts): string
+{
     $clean = [];
     foreach ($parts as $part) {
         $value = trim((string)$part);
@@ -1655,7 +1932,8 @@ function dra_join_address_parts(array $parts): string {
     return trim((string)(preg_replace('/\s+/', ' ', implode(', ', $clean)) ?? implode(', ', $clean)));
 }
 
-function dra_build_cohabitant_address(array $payload, string $fallback = ''): string {
+function dra_build_cohabitant_address(array $payload, string $fallback = ''): string
+{
     $direct = trim((string)($payload['cohabitant_full_address'] ?? $payload['cohabitant_full_address_display'] ?? ''));
     if ($direct !== '') {
         return $direct;
@@ -1689,7 +1967,8 @@ function dra_build_cohabitant_address(array $payload, string $fallback = ''): st
     return $fallback;
 }
 
-function dra_build_cohabitation_address(array $payload, string $fallback = ''): string {
+function dra_build_cohabitation_address(array $payload, string $fallback = ''): string
+{
     $direct = trim((string)($payload['cohabitation_full_address'] ?? $payload['cohabitation_full_address_display'] ?? ''));
     if ($direct !== '') {
         return $direct;
@@ -1723,7 +2002,8 @@ function dra_build_cohabitation_address(array $payload, string $fallback = ''): 
     return $fallback;
 }
 
-function dra_general_clearance_purpose_from_document_type(string $documentType): string {
+function dra_general_clearance_purpose_from_document_type(string $documentType): string
+{
     $token = preg_replace('/[^a-z0-9]+/', '', strtolower(trim($documentType)));
     if (strpos($token, 'electricalpermit') !== false) {
         return 'ELECTRICAL PERMIT';
@@ -1746,7 +2026,8 @@ function dra_general_clearance_purpose_from_document_type(string $documentType):
     return '';
 }
 
-function dra_build_general_clearance_location(array $payload, string $fallback = ''): string {
+function dra_build_general_clearance_location(array $payload, string $fallback = ''): string
+{
     $direct = trim((string)($payload['location'] ?? $payload['lot_full_address'] ?? $payload['project_location'] ?? ''));
     if ($direct !== '') {
         return $direct;
@@ -1790,17 +2071,20 @@ function dra_build_general_clearance_location(array $payload, string $fallback =
     return $fallback;
 }
 
-function dra_public_base_url(): string {
+function dra_public_base_url(): string
+{
     return appBaseUrl();
 }
 
-function dra_qr_verify_url(string $requestId, string $verificationCode): string {
+function dra_qr_verify_url(string $requestId, string $verificationCode): string
+{
     $vc = $verificationCode !== '' ? $verificationCode : $requestId;
     return rtrim(dra_public_base_url(), '/')
         . appUrl('/transaction-information?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($vc));
 }
 
-function dra_humanize_document_type(string $docType): string {
+function dra_humanize_document_type(string $docType): string
+{
     $text = trim($docType);
     if ($text === '') {
         return 'Document';
@@ -1811,7 +2095,8 @@ function dra_humanize_document_type(string $docType): string {
     return trim($text);
 }
 
-function dra_parse_residency_duration_text(string $raw): ?array {
+function dra_parse_residency_duration_text(string $raw): ?array
+{
     $text = trim($raw);
     if ($text === '') {
         return null;
@@ -1830,7 +2115,8 @@ function dra_parse_residency_duration_text(string $raw): ?array {
     return ['years' => $years ?? 0, 'months' => $months ?? 0];
 }
 
-function dra_parse_residency_start_ym(string $raw): ?array {
+function dra_parse_residency_start_ym(string $raw): ?array
+{
     $value = trim($raw);
     if ($value === '') {
         return null;
@@ -1848,17 +2134,20 @@ function dra_parse_residency_start_ym(string $raw): ?array {
     return ['years' => max(0, (int)$diff->y), 'months' => max(0, (int)$diff->m)];
 }
 
-function dra_duration_total_months(array $duration): int {
+function dra_duration_total_months(array $duration): int
+{
     $years = max(0, (int)($duration['years'] ?? 0));
     $months = max(0, (int)($duration['months'] ?? 0));
     return ($years * 12) + $months;
 }
 
-function dra_pick_longer_residency_duration(array $a, array $b): array {
+function dra_pick_longer_residency_duration(array $a, array $b): array
+{
     return dra_duration_total_months($a) >= dra_duration_total_months($b) ? $a : $b;
 }
 
-function dra_request_notice(array $requestRow, string $requestId, string $suffix): string {
+function dra_request_notice(array $requestRow, string $requestId, string $suffix): string
+{
     $docType = dra_humanize_document_type((string)($requestRow['document_type'] ?? ''));
     $rid = trim($requestId) !== '' ? trim($requestId) : trim((string)($requestRow['request_id'] ?? ''));
     if ($rid === '') {
@@ -1867,7 +2156,8 @@ function dra_request_notice(array $requestRow, string $requestId, string $suffix
     return 'Your ' . $docType . ' Request #' . $rid . ' has been ' . $suffix;
 }
 
-function dra_is_first_time_job_seeker(array $requestRow): bool {
+function dra_is_first_time_job_seeker(array $requestRow): bool
+{
     $docType = strtolower(trim((string)($requestRow['document_type'] ?? '')));
     if ($docType === '') {
         return false;
@@ -1876,7 +2166,8 @@ function dra_is_first_time_job_seeker(array $requestRow): bool {
     return is_string($normalized) && strpos($normalized, 'firsttimejobseeker') !== false;
 }
 
-function dra_barangay_id_template_assets(): array {
+function dra_barangay_id_template_assets(): array
+{
     static $resolved = null;
     if (is_array($resolved)) {
         return $resolved;
@@ -1901,16 +2192,19 @@ function dra_barangay_id_template_assets(): array {
     return $resolved;
 }
 
-function dra_has_barangay_id_template_assets(): bool {
+function dra_has_barangay_id_template_assets(): bool
+{
     $assets = dra_barangay_id_template_assets();
     return trim((string)($assets['front'] ?? '')) !== '' && trim((string)($assets['back'] ?? '')) !== '';
 }
 
-function dra_barangay_id_render_revision(): string {
+function dra_barangay_id_render_revision(): string
+{
     return 'r20260320bid08';
 }
 
-function dra_requires_manual_issued_upload(array $requestRow): bool {
+function dra_requires_manual_issued_upload(array $requestRow): bool
+{
     $docType = trim((string)($requestRow['document_type'] ?? ''));
     if ($docType === '') {
         $payload = dra_decode_request_payload($requestRow);
@@ -1919,7 +2213,8 @@ function dra_requires_manual_issued_upload(array $requestRow): bool {
     return dr_is_barangay_id_document_type($docType) && !dra_has_barangay_id_template_assets();
 }
 
-function dra_normalize_business_approval_types($value): array {
+function dra_normalize_business_approval_types($value): array
+{
     $rawValues = is_array($value) ? $value : explode(',', (string)$value);
     $normalized = [];
     foreach ($rawValues as $entry) {
@@ -1944,12 +2239,14 @@ function dra_normalize_business_approval_types($value): array {
     return $normalized;
 }
 
-function dra_normalize_business_approval_type(string $value): string {
+function dra_normalize_business_approval_type(string $value): string
+{
     $types = dra_normalize_business_approval_types($value);
     return $types[0] ?? '';
 }
 
-function dra_decode_request_payload(array $requestRow): array {
+function dra_decode_request_payload(array $requestRow): array
+{
     $raw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
     $payload = json_decode($raw, true);
     return is_array($payload) ? $payload : [];
@@ -2018,7 +2315,8 @@ function dra_ensure_barangay_id_generated_fields(mysqli $conn, string $requestId
     dra_persist_request_payload($conn, $requestId, $requestRow, $payload);
 }
 
-function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$requestRow, array $edited): void {
+function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$requestRow, array $edited): void
+{
     if ($requestId === '' || empty($edited)) {
         return;
     }
@@ -2106,7 +2404,8 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     dra_persist_request_payload($conn, $requestId, $requestRow, $payload);
 }
 
-function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
+function dra_overlay_preview_edits(array &$requestRow, array $edited): void
+{
     if (empty($edited)) {
         return;
     }
@@ -2226,7 +2525,8 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     $requestRow['request_details'] = dr_safe_json($payload);
 }
 
-function dra_generate_issued_document(array $requestRow): ?string {
+function dra_generate_issued_document(array $requestRow): ?string
+{
     global $conn;
 
     $signatories = ($conn instanceof mysqli)
@@ -2272,15 +2572,17 @@ function dra_generate_issued_document(array $requestRow): ?string {
     };
     $purpose = $stripTemplateTokens($purpose);
     $issuedDateRaw = '';
-    foreach ([
-        (string)($requestRow['release_timestamp'] ?? ''),
-        (string)($requestRow['completed_at'] ?? ''),
-        (string)($requestRow['ready_at'] ?? ''),
-        (string)($requestRow['finance_decision_at'] ?? ''),
-        (string)($requestRow['payment_submitted_at'] ?? ''),
-        (string)($requestRow['submitted_at'] ?? ''),
-        (string)($requestRow['request_timestamp'] ?? ''),
-    ] as $candidateIssuedDate) {
+    foreach (
+        [
+            (string)($requestRow['release_timestamp'] ?? ''),
+            (string)($requestRow['completed_at'] ?? ''),
+            (string)($requestRow['ready_at'] ?? ''),
+            (string)($requestRow['finance_decision_at'] ?? ''),
+            (string)($requestRow['payment_submitted_at'] ?? ''),
+            (string)($requestRow['submitted_at'] ?? ''),
+            (string)($requestRow['request_timestamp'] ?? ''),
+        ] as $candidateIssuedDate
+    ) {
         $candidateIssuedDate = trim($candidateIssuedDate);
         if ($candidateIssuedDate !== '') {
             $issuedDateRaw = $candidateIssuedDate;
@@ -5225,7 +5527,6 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
-
         } elseif ($isResidency) {
             $metaY = 196.0;
             $labelX = 18.0;
@@ -5457,7 +5758,22 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetFont($indigencyFont, 'I', 8);
             $pdf->SetXY(46, $footerNoteY);
             $pdf->SetFont($indigencyFont, 'I', 8);
-            $pdf->MultiCell(118, 4, "This certificate is valid for Forty-five (45) days from the date of issue, check the\nQR code to verify the authenticity of this document.", 0, 'C');
+            $pdf->MultiCell(
+                118,
+                4,
+                dra_build_certificate_validity_notice(
+                    (string)($row['document_validity'] ?? ''),
+                    (string)dra_manual_first_non_empty([
+                        $row['release_timestamp'] ?? null,
+                        $row['completed_at'] ?? null,
+                        $row['ready_at'] ?? null,
+                        $row['submitted_at'] ?? null,
+                        dr_now(),
+                    ])
+                ),
+                0,
+                'C'
+            );
         }
 
         $pdf->Output('F', $diskPath);
@@ -5518,7 +5834,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
     return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
 }
 
-function dra_generate_issued_document_safe(array $requestRow): ?string {
+function dra_generate_issued_document_safe(array $requestRow): ?string
+{
     $bufferLevel = ob_get_level();
     ob_start();
     try {
@@ -5533,22 +5850,26 @@ function dra_generate_issued_document_safe(array $requestRow): ?string {
     }
 }
 
-function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string {
+function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string
+{
     error_log('[dra_convert_docx_to_pdf] Disabled: LibreOffice workflow removed (DOCX-only mode).');
     return null;
 }
 
-function dra_convert_docx_to_html(string $docxDiskPath, string $outDir): ?string {
+function dra_convert_docx_to_html(string $docxDiskPath, string $outDir): ?string
+{
     error_log('[dra_convert_docx_to_html] Disabled: LibreOffice workflow removed (DOCX-only mode).');
     return null;
 }
 
-function dra_convert_docx_to_preview_image(string $docxDiskPath, string $outDir): ?string {
+function dra_convert_docx_to_preview_image(string $docxDiskPath, string $outDir): ?string
+{
     error_log('[dra_convert_docx_to_preview_image] Disabled: LibreOffice workflow removed (DOCX-only mode).');
     return null;
 }
 
-function dra_cleanup_docx_preview_html(string $html): string {
+function dra_cleanup_docx_preview_html(string $html): string
+{
     $clean = $html;
     $clean = preg_replace(
         '#<p[^>]*>\s*<table[^>]*>\s*<col[^>]*/?>\s*<tr>\s*<td[^>]*border:\s*1\.00pt solid #000000[^>]*>\s*<p[^>]*>\s*<br/?>\s*</p>\s*</td>\s*</tr>\s*</table>\s*<br/?>\s*</p>#is',
@@ -5559,7 +5880,8 @@ function dra_cleanup_docx_preview_html(string $html): string {
     return $clean;
 }
 
-function dra_stamp_qr_on_pdf(string $pdfDiskPath, string $qrDiskPath): bool {
+function dra_stamp_qr_on_pdf(string $pdfDiskPath, string $qrDiskPath): bool
+{
     $pdfReal = realpath($pdfDiskPath);
     $qrReal = realpath($qrDiskPath);
     if ($pdfReal === false || $qrReal === false || !is_file($pdfReal) || !is_file($qrReal)) {
@@ -5631,7 +5953,8 @@ function dra_stamp_qr_on_pdf(string $pdfDiskPath, string $qrDiskPath): bool {
     }
 }
 
-function dra_docx_contains_text(string $docxDiskPath, string $needle): bool {
+function dra_docx_contains_text(string $docxDiskPath, string $needle): bool
+{
     $docxReal = realpath($docxDiskPath);
     if ($docxReal === false || !is_file($docxReal) || $needle === '') {
         return false;
@@ -5669,7 +5992,8 @@ function dra_docx_contains_text(string $docxDiskPath, string $needle): bool {
     return false;
 }
 
-function dra_stamp_cohabitation_letterhead($pdf, float $pageWidth, float $pageHeight): void {
+function dra_stamp_cohabitation_letterhead($pdf, float $pageWidth, float $pageHeight): void
+{
     $templatePath = __DIR__ . '/../../Resident-End/Certificates/DocumentIssuance/CertificateOfCohabitationWithChild.docx';
     $leftLogo = dra_extract_docx_media_asset($templatePath, 'image1.jpg');
     $rightLogo = dra_extract_docx_media_asset($templatePath, 'image2.png');
@@ -5699,7 +6023,8 @@ function dra_stamp_cohabitation_letterhead($pdf, float $pageWidth, float $pageHe
     $pdf->SetTextColor(0, 0, 0);
 }
 
-function dra_finalize_template_pdf(string $pdfDiskPath, ?string $qrDiskPath = null, array $options = []): bool {
+function dra_finalize_template_pdf(string $pdfDiskPath, ?string $qrDiskPath = null, array $options = []): bool
+{
     $pdfReal = realpath($pdfDiskPath);
     if ($pdfReal === false || !is_file($pdfReal)) {
         return false;
@@ -5846,7 +6171,8 @@ function dra_issued_document_diagnostics(string $baseDir, array $row): string
     return implode(' ', $issues);
 }
 
-function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
+function dra_backfill_payment_verified_to_ready(mysqli $conn): void
+{
     try {
         $legacyStage = DR_STAGE_PAYMENT_VERIFIED;
         $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE stage = ? ORDER BY request_id ASC");
@@ -5885,7 +6211,8 @@ function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
     }
 }
 
-function dra_save_upload(array $file, string $folder): array {
+function dra_save_upload(array $file, string $folder): array
+{
     $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($errorCode === UPLOAD_ERR_NO_FILE) {
         return ['path' => null, 'error' => null];
@@ -5925,7 +6252,8 @@ function dra_save_upload(array $file, string $folder): array {
     return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name, 'error' => null];
 }
 
-function dra_decode_manual_barangay_id_photo_data_url(?string $value): array {
+function dra_decode_manual_barangay_id_photo_data_url(?string $value): array
+{
     $value = trim((string)$value);
     if ($value === '') {
         return ['binary' => null, 'extension' => '', 'error' => null];
@@ -5960,7 +6288,8 @@ function dra_decode_manual_barangay_id_photo_data_url(?string $value): array {
     return ['binary' => $binary, 'extension' => $extension, 'error' => null];
 }
 
-function dra_save_manual_barangay_id_photo(string $requestId, ?string $dataUrl): array {
+function dra_save_manual_barangay_id_photo(string $requestId, ?string $dataUrl): array
+{
     $requestId = trim($requestId);
     if ($requestId === '') {
         return ['path' => null, 'url' => '', 'error' => 'Unable to save the Barangay ID photo because the request ID is missing.'];
@@ -6011,7 +6340,8 @@ function dra_save_manual_barangay_id_photo(string $requestId, ?string $dataUrl):
     ];
 }
 
-function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, string $residentId): array {
+function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, string $residentId): array
+{
     static $cache = [];
 
     $cacheKey = trim($residentUserId) . '|' . trim($residentId);
@@ -6248,15 +6578,15 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
     $resolvedIdPicturePath = dra_resolve_resident_2x2_picture_path($conn, (string)($row['resident_id'] ?? ''));
     $fullName = trim(
         (string)($row['firstname'] ?? '') . ' ' .
-        (!empty($row['middlename']) ? substr((string)$row['middlename'], 0, 1) . '. ' : '') .
-        (string)($row['lastname'] ?? '') .
-        (!empty($row['suffix']) ? ' ' . (string)$row['suffix'] : '')
+            (!empty($row['middlename']) ? substr((string)$row['middlename'], 0, 1) . '. ' : '') .
+            (string)($row['lastname'] ?? '') .
+            (!empty($row['suffix']) ? ' ' . (string)$row['suffix'] : '')
     );
     $emergencyFullName = trim(
         (string)($row['emergency_first_name'] ?? '') . ' ' .
-        (!empty($row['emergency_middle_name']) ? substr((string)$row['emergency_middle_name'], 0, 1) . '. ' : '') .
-        (string)($row['emergency_last_name'] ?? '') .
-        (!empty($row['emergency_suffix']) ? ' ' . (string)$row['emergency_suffix'] : '')
+            (!empty($row['emergency_middle_name']) ? substr((string)$row['emergency_middle_name'], 0, 1) . '. ' : '') .
+            (string)($row['emergency_last_name'] ?? '') .
+            (!empty($row['emergency_suffix']) ? ' ' . (string)$row['emergency_suffix'] : '')
     );
 
     $profile = [
@@ -6312,7 +6642,8 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
     return $profile;
 }
 
-function dra_manual_first_non_empty(array $values, string $fallback = ''): string {
+function dra_manual_first_non_empty(array $values, string $fallback = ''): string
+{
     foreach ($values as $value) {
         if ($value === null) {
             continue;
@@ -6325,7 +6656,8 @@ function dra_manual_first_non_empty(array $values, string $fallback = ''): strin
     return trim($fallback);
 }
 
-function dra_manual_compose_full_name(array $payload, array $residentProfile = []): string {
+function dra_manual_compose_full_name(array $payload, array $residentProfile = []): string
+{
     $first = dra_manual_first_non_empty([
         $payload['first_name'] ?? null,
         $payload['firstname'] ?? null,
@@ -6350,7 +6682,8 @@ function dra_manual_compose_full_name(array $payload, array $residentProfile = [
     return trim(implode(' ', array_values(array_filter([$first, $middle, $last, $suffix], static fn($v) => trim((string)$v) !== ''))));
 }
 
-function dra_manual_fill_payload_from_resident(array $payload, array $residentProfile): array {
+function dra_manual_fill_payload_from_resident(array $payload, array $residentProfile): array
+{
     if (!$residentProfile) {
         return $payload;
     }
@@ -6506,7 +6839,8 @@ function dra_manual_fill_payload_from_resident(array $payload, array $residentPr
     return $payload;
 }
 
-function dra_manual_normalize_fee_rows($fees): array {
+function dra_manual_normalize_fee_rows($fees): array
+{
     if (!is_array($fees)) {
         return [];
     }
@@ -6530,7 +6864,8 @@ function dra_manual_normalize_fee_rows($fees): array {
     return $cleanFees;
 }
 
-function dra_manual_payload_has_certificate_payment_exemption(array $payload): bool {
+function dra_manual_payload_has_certificate_payment_exemption(array $payload): bool
+{
     $sectorMembership = trim((string)($payload['sector_membership'] ?? ''));
     if ($sectorMembership === '') {
         return false;
@@ -6915,7 +7250,18 @@ if ($action === 'create_manual_request') {
     $setIfColumn('request_timestamp', 's', $now);
     $setIfColumn('review_timestamp', 's', null);
     $setIfColumn('release_timestamp', 's', null);
-    $setIfColumn('document_validity', 's', date('Y-m-d H:i:s', strtotime('+2 years')));
+    $setIfColumn(
+        'document_validity',
+        's',
+        dr_is_barangay_id_document_type($documentType)
+            ? date('Y-m-d H:i:s', strtotime('+2 years'))
+            : dra_resolve_certificate_validity_datetime(
+                $documentType,
+                (string)($payload['document_validity'] ?? ''),
+                null,
+                $now
+            )
+    );
     $setIfColumn('qr_code_path', 's', '');
     $setIfColumn('issued_file_path', 's', null);
     $setIfColumn('stage', 's', DR_STAGE_SUBMITTED);
@@ -7052,7 +7398,8 @@ if ($action === 'create_manual_request') {
             $initialStage,
             $auditNotes
         );
-    } catch (Throwable $__e) {}
+    } catch (Throwable $__e) {
+    }
 
     dr_respond_json(200, [
         'success' => true,
@@ -7221,6 +7568,7 @@ if ($action === 'list') {
     $stmt->execute();
     $items = [];
     $feeByDocType = [];
+    $signatories = dra_current_barangay_signatories($conn);
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
         $docType = trim((string)($row['document_type'] ?? ''));
@@ -7249,6 +7597,10 @@ if ($action === 'list') {
         $row['released_by'] = dra_resolve_official_display_name($conn, (string)($row['user_id_official_released_by'] ?? ''));
         $row['personnel_name'] = dra_resolve_official_display_name($conn, (string)($row['personnel_user_id'] ?? ''));
         $row['finance_user_name'] = dra_resolve_official_display_name($conn, (string)($row['finance_user_id'] ?? ''));
+        $row['punong_signatory_name'] = (string)($signatories['punong']['name'] ?? '');
+        $row['punong_signatory_title'] = (string)($signatories['punong']['title'] ?? 'Punong Barangay');
+        $row['secretary_signatory_name'] = (string)($signatories['secretary']['name'] ?? '');
+        $row['secretary_signatory_title'] = (string)($signatories['secretary']['title'] ?? 'Barangay Secretary');
         $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
         if ($isBarangayIdDocument) {
             $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
@@ -7417,6 +7769,11 @@ if ($action === 'get_request') {
             $row['payload']['age'] = $residentAge;
         }
     }
+    $signatories = dra_current_barangay_signatories($conn);
+    $row['punong_signatory_name'] = (string)($signatories['punong']['name'] ?? '');
+    $row['punong_signatory_title'] = (string)($signatories['punong']['title'] ?? 'Punong Barangay');
+    $row['secretary_signatory_name'] = (string)($signatories['secretary']['name'] ?? '');
+    $row['secretary_signatory_title'] = (string)($signatories['secretary']['title'] ?? 'Barangay Secretary');
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     $storedFeeAmount = $row['fee_amount'] ?? null;
     if ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {
@@ -7773,9 +8130,13 @@ if ($action === 'view_issued') {
 $actionsWithoutRequestId = [
     'list',
     'list_general_fee_catalog',
-    'list_fee_types', 'save_fee_type', 'delete_fee_type',
-    'submit_fee_change_request', 'list_fee_change_requests',
-    'cancel_fee_change_request', 'process_fee_change_request',
+    'list_fee_types',
+    'save_fee_type',
+    'delete_fee_type',
+    'submit_fee_change_request',
+    'list_fee_change_requests',
+    'cancel_fee_change_request',
+    'process_fee_change_request',
 ];
 if ($requestId === '' && !in_array($action, $actionsWithoutRequestId, true)) {
     dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
@@ -7789,6 +8150,7 @@ if ($requestId !== '' && !$row) {
 if ($action === 'personnel_approve') {
     $editedPreview = [];
     $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    $requestedValidity = trim((string)($_POST['document_validity'] ?? ''));
     if ($editedPreviewRaw !== '') {
         $decoded = json_decode($editedPreviewRaw, true);
         if (is_array($decoded)) {
@@ -7875,6 +8237,15 @@ if ($action === 'personnel_approve') {
         'personnel_decision_at' => dr_now(),
         'fee_amount' => $defaultFee,
     ];
+    $resolvedCertificateValidity = dra_resolve_certificate_validity_datetime(
+        (string)($row['document_type'] ?? ''),
+        $requestedValidity,
+        (string)($row['document_validity'] ?? ''),
+        (string)($patch['personnel_decision_at'] ?? dr_now())
+    );
+    if ($resolvedCertificateValidity !== null) {
+        $patch['document_validity'] = $resolvedCertificateValidity;
+    }
 
     if ($isFreeDocument && !$isFirstTimeJobSeeker && !$requiresInspection) {
         $verificationCode = trim((string)($row['verification_code'] ?? ''));
@@ -7940,7 +8311,10 @@ if ($action === 'personnel_approve') {
         );
     }
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Approve', 'stage', (string)($row['stage'] ?? ''), $nextStage, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Approve', 'stage', (string)($row['stage'] ?? ''), $nextStage, (string)($row['document_type'] ?? ''));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -7967,7 +8341,10 @@ if ($action === 'personnel_reject') {
         dra_request_notice($updated, $requestId, 'rejected. Reason: ' . $reason)
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Reject', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_REJECTED, $reason); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Reject', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_REJECTED, $reason);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8001,6 +8378,12 @@ if ($action === 'interview_pass') {
         'ready_at' => dr_now(),
         'verification_code' => $verificationCode,
         'qr_code_path' => $qrCodePath,
+        'document_validity' => dra_resolve_certificate_validity_datetime(
+            (string)($row['document_type'] ?? ''),
+            null,
+            (string)($row['document_validity'] ?? ''),
+            dr_now()
+        ),
         'issued_file_path' => (string)$issuedPath,
     ]);
 
@@ -8015,7 +8398,10 @@ if ($action === 'interview_pass') {
         dra_request_notice($updated, $requestId, 'approved after interview and is now ready for release.')
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Pass', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Pass', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? ''));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8051,7 +8437,10 @@ if ($action === 'interview_fail') {
         dra_request_notice($updated, $requestId, 'did not pass the interview. Reason: ' . $reason)
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Fail', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_INTERVIEW_FAILED, $reason); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Fail', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_INTERVIEW_FAILED, $reason);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8138,7 +8527,10 @@ if ($action === 'inspection_pass') {
         $notificationMessage
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Inspection Pass', 'stage', DR_STAGE_FOR_INSPECTION, $nextStage, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Inspection Pass', 'stage', DR_STAGE_FOR_INSPECTION, $nextStage, (string)($row['document_type'] ?? ''));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8180,7 +8572,10 @@ if ($action === 'inspection_fail') {
         dra_request_notice($updated, $requestId, 'did not pass inspection. Reason: ' . $reason)
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Inspection Fail', 'stage', DR_STAGE_FOR_INSPECTION, DR_STAGE_INSPECTION_FAILED, $reason); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Inspection Fail', 'stage', DR_STAGE_FOR_INSPECTION, DR_STAGE_INSPECTION_FAILED, $reason);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8246,6 +8641,12 @@ if ($action === 'finance_verify') {
             'status_reason' => null,
             'finance_user_id' => $currentUserId,
             'finance_decision_at' => dr_now(),
+            'document_validity' => dra_resolve_certificate_validity_datetime(
+                (string)($row['document_type'] ?? ''),
+                null,
+                (string)($row['document_validity'] ?? ''),
+                dr_now()
+            ),
         ];
         if ($verifyMode === 'walkin' || in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
             $patch['payment_method'] = 'barangay';
@@ -8256,7 +8657,7 @@ if ($action === 'finance_verify') {
             $patch['payment_method'] = 'gcash';
         }
 
-        $updated = dr_update_stage($conn, $requestId, DR_STAGE_PAYMENT_VERIFIED, $patch);
+        $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
         if (!$updated) {
             dr_respond_json(500, ['success' => false, 'message' => 'Unable to verify payment.']);
         }
@@ -8264,12 +8665,15 @@ if ($action === 'finance_verify') {
         dra_send_notification_deferred(
             $conn,
             $updated,
-            'Payment Verified - Release Preparation Pending',
-            dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. The request is now awaiting final ID preparation for release.')
+            'Payment Verified - For Release',
+            dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. The request is now for release.')
         );
         dra_send_invoice_deferred($conn, $updated, (float)$resolvedAmount, $orNumber);
 
-        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_PAYMENT_VERIFIED, 'OR: ' . $orNumber . ' | ₱' . number_format((float)$resolvedAmount, 2)); } catch (Throwable $__e) {}
+        try {
+            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_READY_FOR_CLAIM, 'OR: ' . $orNumber . ' | ₱' . number_format((float)$resolvedAmount, 2));
+        } catch (Throwable $__e) {
+        }
         dr_respond_json(200, ['success' => true, 'request' => $updated]);
     }
 
@@ -8285,6 +8689,12 @@ if ($action === 'finance_verify') {
         'status_reason' => null,
         'finance_user_id' => $currentUserId,
         'finance_decision_at' => dr_now(),
+        'document_validity' => dra_resolve_certificate_validity_datetime(
+            (string)($row['document_type'] ?? ''),
+            null,
+            (string)($row['document_validity'] ?? ''),
+            dr_now()
+        ),
     ];
     if ($verifyMode === 'walkin' || in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
         $patch['payment_method'] = 'barangay';
@@ -8339,7 +8749,10 @@ if ($action === 'finance_verify') {
     );
     dra_send_invoice_deferred($conn, $updated, (float)$resolvedAmount, $orNumber);
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_READY_FOR_CLAIM, 'OR: ' . $orNumber . ' | Cert: ' . $certificateNumber . ' | ₱' . number_format((float)$resolvedAmount, 2)); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_READY_FOR_CLAIM, 'OR: ' . $orNumber . ' | Cert: ' . $certificateNumber . ' | ₱' . number_format((float)$resolvedAmount, 2));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8373,7 +8786,10 @@ if ($action === 'finance_reject') {
         dra_request_notice($updated, $requestId, 'payment rejected. Reason: ' . $reason)
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Reject Payment', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_PAYMENT_REJECTED, $reason); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Reject Payment', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_PAYMENT_REJECTED, $reason);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8440,6 +8856,12 @@ if ($action === 'mark_ready') {
         'ready_at' => dr_now(),
         'verification_code' => $verificationCode,
         'qr_code_path' => '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png',
+        'document_validity' => dra_resolve_certificate_validity_datetime(
+            (string)($row['document_type'] ?? ''),
+            null,
+            (string)($row['document_validity'] ?? ''),
+            dr_now()
+        ),
     ];
     $patch['issued_file_path'] = (string)$issuedPath;
 
@@ -8455,13 +8877,22 @@ if ($action === 'mark_ready') {
         dra_request_notice($updated, $requestId, $requiresManualIssuedUpload ? 'prepared and is now ready for ID release.' : 'prepared and is now for release.')
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Mark Ready', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Mark Ready', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? ''));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
 if ($action === 'mark_completed') {
     $patch = [
         'completed_at' => dr_now(),
+        'document_validity' => dra_resolve_certificate_validity_datetime(
+            (string)($row['document_type'] ?? ''),
+            null,
+            (string)($row['document_validity'] ?? ''),
+            dr_now()
+        ),
     ];
     $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
     $isBarangayIdWithTemplate = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))
@@ -8510,7 +8941,10 @@ if ($action === 'mark_completed') {
         dra_request_notice($updated, $requestId, 'completed and released.')
     );
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Release', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_COMPLETED, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Release', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_COMPLETED, (string)($row['document_type'] ?? ''));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -8574,7 +9008,10 @@ if ($action === 'save_fee_type') {
     }
     $newId = $feeTypeId > 0 ? $feeTypeId : $generatedFeeTypeIdInt;
     $stmt->close();
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$newId, $feeTypeId > 0 ? 'Update Fee Type' : 'Add Fee Type', 'fee_name', null, $feeName, '₱' . number_format($defaultAmount, 2) . ' | ' . $status); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$newId, $feeTypeId > 0 ? 'Update Fee Type' : 'Add Fee Type', 'fee_name', null, $feeName, '₱' . number_format($defaultAmount, 2) . ' | ' . $status);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'fee_type_id' => $newId]);
 }
 
@@ -8583,13 +9020,22 @@ if ($action === 'delete_fee_type') {
     if ($feeTypeId <= 0) dr_respond_json(400, ['success' => false, 'message' => 'Invalid fee type ID.']);
     $auditFeeName = '';
     $__s = $conn->prepare("SELECT fee_name FROM clearancefeetypetbl WHERE fee_type_id=? LIMIT 1");
-    if ($__s) { $__s->bind_param('i', $feeTypeId); $__s->execute(); $__r = $__s->get_result()->fetch_assoc(); $auditFeeName = (string)($__r['fee_name'] ?? ''); $__s->close(); }
+    if ($__s) {
+        $__s->bind_param('i', $feeTypeId);
+        $__s->execute();
+        $__r = $__s->get_result()->fetch_assoc();
+        $auditFeeName = (string)($__r['fee_name'] ?? '');
+        $__s->close();
+    }
     $stmt = $conn->prepare("DELETE FROM clearancefeetypetbl WHERE fee_type_id=?");
     if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
     $stmt->bind_param('i', $feeTypeId);
     $stmt->execute();
     $stmt->close();
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Delete Fee Type', 'fee_name', $auditFeeName, null, null); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Delete Fee Type', 'fee_name', $auditFeeName, null, null);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true]);
 }
 
@@ -8631,7 +9077,10 @@ if ($action === 'submit_fee_change_request') {
         }
         $newFeeId = (string)$generatedFeeTypeIdInt;
         $stmt->close();
-        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', $newFeeId, 'Request New Fee Type', 'fee_name', null, $proposedFeeName, '₱' . number_format($proposedAmount, 2) . ($notes ? ' | ' . $notes : '')); } catch (Throwable $__e) {}
+        try {
+            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', $newFeeId, 'Request New Fee Type', 'fee_name', null, $proposedFeeName, '₱' . number_format($proposedAmount, 2) . ($notes ? ' | ' . $notes : ''));
+        } catch (Throwable $__e) {
+        }
         dr_respond_json(200, ['success' => true]);
     }
 
@@ -8656,7 +9105,10 @@ if ($action === 'submit_fee_change_request') {
         if ($affected === 0) {
             dr_respond_json(409, ['success' => false, 'message' => 'Fee type not found or already has a pending change.']);
         }
-        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, 'â‚±' . number_format($proposedAmount, 2), $notes); } catch (Throwable $__e) {}
+        try {
+            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, 'â‚±' . number_format($proposedAmount, 2), $notes);
+        } catch (Throwable $__e) {
+        }
         dr_respond_json(200, ['success' => true]);
     }
 
@@ -8736,7 +9188,10 @@ if ($action === 'submit_fee_change_request') {
         $stmt->close();
     }
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$requestRowId, 'Request Price Edit', 'proposed_amount', null, '₱' . number_format($proposedAmount, 2), $notes); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$requestRowId, 'Request Price Edit', 'proposed_amount', null, '₱' . number_format($proposedAmount, 2), $notes);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true]);
 }
 if ($action === 'list_fee_change_requests') {
@@ -8750,7 +9205,9 @@ if ($action === 'list_fee_change_requests') {
             "SELECT * FROM clearancefeetypetbl WHERE status='pending' ORDER BY updated_at ASC LIMIT 200"
         );
         if ($res) {
-            while ($r = $res->fetch_assoc()) { $rows[] = $r; }
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = $r;
+            }
         }
     } else {
         // Admin: see own pending requests
@@ -8761,7 +9218,9 @@ if ($action === 'list_fee_change_requests') {
             $stmt->bind_param('s', $userId);
             $stmt->execute();
             $res = $stmt->get_result();
-            while ($r = $res->fetch_assoc()) { $rows[] = $r; }
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = $r;
+            }
             $stmt->close();
         }
     }
@@ -8830,7 +9289,10 @@ if ($action === 'cancel_fee_change_request') {
     }
     $stmt->execute();
     $stmt->close();
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Cancel Fee Change Request', 'change_type', $fcr['change_type'], null, (string)($fcr['fee_name'] ?? '')); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Cancel Fee Change Request', 'change_type', $fcr['change_type'], null, (string)($fcr['fee_name'] ?? ''));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true]);
 }
 
@@ -8950,10 +9412,23 @@ if ($action === 'process_fee_change_request') {
     }
     $stmt->execute();
     $stmt->close();
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, ucfirst($decision) . ' Fee Change Request', 'change_type', $fcr['change_type'], $decision, ($reviewNotes ?: (string)($fcr['fee_name'] ?? ''))); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, ucfirst($decision) . ' Fee Change Request', 'change_type', $fcr['change_type'], $decision, ($reviewNotes ?: (string)($fcr['fee_name'] ?? '')));
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true]);
 }
 if ($action === 'tag_clearance_fees') {
+    $requestId = trim((string)($_POST['request_id'] ?? $_GET['request_id'] ?? ''));
+    if ($requestId === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
+    }
+
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
+    }
+
     $feesRaw = trim((string)($_POST['fees'] ?? ''));
     $fees = json_decode($feesRaw, true);
     if (!is_array($fees)) $fees = [];
@@ -8985,7 +9460,11 @@ if ($action === 'tag_clearance_fees') {
 
     // Replace all existing fees for this clearance
     $delStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
-    if ($delStmt) { $delStmt->bind_param('s', $clearanceId); $delStmt->execute(); $delStmt->close(); }
+    if ($delStmt) {
+        $delStmt->bind_param('s', $clearanceId);
+        $delStmt->execute();
+        $delStmt->close();
+    }
 
     $total = 0.0;
     if (!empty($cleanFees)) {
@@ -9012,7 +9491,10 @@ if ($action === 'tag_clearance_fees') {
         );
 
         $feesSummary = implode(', ', array_map(fn($f) => $f['fee_name'] . ' ₱' . number_format($f['amount'], 2), $cleanFees));
-        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Tag Clearance Fees', 'fee_amount', null, '₱' . number_format($total, 2), $feesSummary); } catch (Throwable $__e) {}
+        try {
+            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Tag Clearance Fees', 'fee_amount', null, '₱' . number_format($total, 2), $feesSummary);
+        } catch (Throwable $__e) {
+        }
         dr_respond_json(200, ['success' => true, 'request' => $updated, 'total' => $total]);
     }
 
@@ -9022,13 +9504,25 @@ if ($action === 'tag_clearance_fees') {
     }
 
     $feesSummary = implode(', ', array_map(fn($f) => $f['fee_name'] . ' ₱' . number_format($f['amount'], 2), $cleanFees));
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Tag Clearance Fees', 'fee_amount', null, '₱' . number_format($total, 2), $feesSummary); } catch (Throwable $__e) {}
+    try {
+        insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Tag Clearance Fees', 'fee_amount', null, '₱' . number_format($total, 2), $feesSummary);
+    } catch (Throwable $__e) {
+    }
     dr_respond_json(200, ['success' => true, 'request' => $updated, 'total' => $total]);
 }
 
 // ── Get Clearance Fees for a Request ────────────────────────────────────────
 
 if ($action === 'get_clearance_fees') {
+    $requestId = trim((string)($_POST['request_id'] ?? $_GET['request_id'] ?? ''));
+    if ($requestId === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
+    }
+
+    if (!dr_fetch_request($conn, $requestId)) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
+    }
+
     $fees = dr_get_clearance_fees_for_request($conn, $requestId);
     $total = array_sum(array_column($fees, 'amount'));
     dr_respond_json(200, ['success' => true, 'fees' => $fees, 'total' => $total]);
