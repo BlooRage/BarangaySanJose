@@ -24,7 +24,6 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
   <?php
     $moduleCards = [];
     $attentionCandidates = [];
-    $focusItems = [];
     $dashboardAnnouncements = [];
     $announcementDismissVersion = '';
 
@@ -126,20 +125,6 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
     $addModuleCard($sbCan('website_settings'), 'website-settings', 'Website Settings', appUrl('Admin-End/WebsiteSettings.php'), 'fa-screwdriver-wrench', 'Toggle maintenance mode and control public website availability.', 0);
     $addModuleCard($sbCan('official_records_management') || $sbCan('official_transition'), 'official-management', 'Official Management', appUrl($sbCan('official_records_management') ? 'Admin-End/OfficialsManagement.php' : 'Admin-End/OfficialTransitions.php'), 'fa-user-tie', 'Manage officials, transitions, and assigned office records.', 0);
     $addModuleCard($sbCan('audit_logs'), 'audit-logs', 'Audit Logs', appUrl('Admin-End/AuditLogs.php'), 'fa-clipboard-list', 'Review recent system actions and accountability trails.', 0);
-
-    foreach ($topAttention as $item) {
-      $focusItems[] = $item;
-    }
-    if ($focusItems === []) {
-      $focusItems = array_map(static function (array $card): array {
-        return [
-          'label' => $card['label'],
-          'count' => 0,
-          'href' => $card['href'],
-          'icon' => $card['icon'],
-        ];
-      }, array_slice($moduleCards, 0, min(3, count($moduleCards))));
-    }
 
     $staffViewerContext = ann_audience_fetch_staff_context(
       $conn,
@@ -313,31 +298,6 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
           </div>
         <?php endif; ?>
       </article>
-    </section>
-
-    <section class="mb-4">
-      <div class="dashboard-rail">
-        <article class="chart-panel">
-          <div class="chart-panel-head">
-            <div>
-              <h3 class="chart-title">Current Focus</h3>
-              <p class="chart-copy mb-0">The dashboard highlights the queues that should be checked first.</p>
-            </div>
-            <span class="chart-total">Work today</span>
-          </div>
-          <div class="dashboard-focus-list">
-            <?php foreach ($focusItems as $item): ?>
-              <a href="<?= htmlspecialchars($item['href']) ?>" class="dashboard-focus-item text-decoration-none text-reset">
-                <span class="dashboard-focus-item__icon"><i class="fa-solid <?= htmlspecialchars($item['icon']) ?>"></i></span>
-                <div class="dashboard-focus-item__body">
-                  <strong><?= htmlspecialchars($item['label']) ?></strong>
-                  <span><?= (int)$item['count'] > 0 ? number_format((int)$item['count']) . ' items waiting' : 'Open module workspace' ?></span>
-                </div>
-              </a>
-            <?php endforeach; ?>
-          </div>
-        </article>
-      </div>
     </section>
 
     <section class="mb-4">

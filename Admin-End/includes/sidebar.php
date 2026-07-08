@@ -786,6 +786,10 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     flex: 0 0 auto;
   }
 
+  #dashboard-sidebar .sidebar-direct-link > .sidebar-attention-badge {
+    display: none;
+  }
+
   #dashboard-sidebar .sidebar-icon-wrap > .sidebar-attention-badge {
     display: none;
   }
