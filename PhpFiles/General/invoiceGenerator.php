@@ -3,6 +3,58 @@ declare(strict_types=1);
 
 if (!function_exists('dr_generate_invoice_pdf')) {
 
+    function dr_invoice_is_protected_value($value): bool
+    {
+        $text = trim((string)$value);
+        if ($text === '') {
+            return false;
+        }
+        return preg_match('/^pii:v\d+:/i', $text) === 1;
+    }
+
+    function dr_invoice_decode_payload(array $requestData): array
+    {
+        $raw = (string)($requestData['request_details'] ?? $requestData['payload_json'] ?? '{}');
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    function dr_invoice_format_full_name_from_payload(array $payload): string
+    {
+        $previewName = trim((string)($payload['_preview_full_name'] ?? ''));
+        if ($previewName !== '' && !dr_invoice_is_protected_value($previewName)) {
+            return $previewName;
+        }
+
+        $first = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
+        $middle = trim((string)($payload['middle_name'] ?? $payload['middlename'] ?? ''));
+        $last = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
+        $suffix = trim((string)($payload['suffix'] ?? $payload['suffix_name'] ?? ''));
+        $middleInitial = $middle !== '' ? strtoupper(substr($middle, 0, 1)) . '.' : '';
+        $parts = array_filter([$first, $middleInitial, $last, $suffix], static fn($value) => trim((string)$value) !== '');
+        return trim(implode(' ', $parts));
+    }
+
+    function dr_invoice_resident_name(array $requestData): string
+    {
+        foreach (['resident_name', 'full_name', 'resident_full_name'] as $field) {
+            $candidate = trim((string)($requestData[$field] ?? ''));
+            if ($candidate !== '' && !dr_invoice_is_protected_value($candidate)) {
+                return $candidate;
+            }
+        }
+
+        $payload = dr_invoice_decode_payload($requestData);
+        foreach (['resident_name', 'full_name', '_preview_full_name'] as $field) {
+            $candidate = trim((string)($payload[$field] ?? ''));
+            if ($candidate !== '' && !dr_invoice_is_protected_value($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return dr_invoice_format_full_name_from_payload($payload);
+    }
+
     function dr_invoice_autoload(): bool
     {
         static $loaded = null;
@@ -37,7 +89,7 @@ if (!function_exists('dr_generate_invoice_pdf')) {
         }
 
         $requestId    = trim((string)($requestData['request_id'] ?? ''));
-        $residentName = trim((string)($requestData['resident_name'] ?? ''));
+        $residentName = dr_invoice_resident_name($requestData);
         $documentType = trim((string)($requestData['document_type'] ?? 'Document Request'));
         $purpose      = trim((string)($requestData['purpose'] ?? ''));
         $orNumber     = trim((string)($requestData['or_number'] ?? ''));
@@ -204,6 +256,11 @@ if (!function_exists('dr_generate_invoice_pdf')) {
             $pdf->SetFont('Arial', '', 9);
             $pdf->Cell($valueW, $rowH, $methodLabel, 0, 1, 'L');
 
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->Cell($labelW, $rowH, 'Tax Status:', 0, 0, 'L');
+            $pdf->SetFont('Arial', '', 9);
+            $pdf->Cell($valueW, $rowH, 'Non-Taxable Transaction', 0, 1, 'L');
+
             if ($certNumber !== '') {
                 $pdf->SetFont('Arial', 'B', 9);
                 $pdf->Cell($labelW, $rowH, 'Certificate No.:', 0, 0, 'L');
@@ -224,11 +281,6 @@ if (!function_exists('dr_generate_invoice_pdf')) {
             $pdf->SetTextColor(100, 100, 100);
             $pdf->MultiCell(0, 4,
                 'Thank you for your payment. Please keep this receipt for your records.',
-                0, 'C'
-            );
-            $pdf->Ln(2);
-            $pdf->MultiCell(0, 4,
-                'This is a system-generated official receipt. No signature required.',
                 0, 'C'
             );
             $pdf->SetTextColor(0, 0, 0);

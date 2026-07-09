@@ -797,6 +797,8 @@ function dra_send_invoice_deferred(mysqli $conn, array $request, float $amount, 
                 'or_number' => $orNumber,
                 'fee_breakdown' => $feeBreakdown,
             ]);
+            $invoicePayload = dra_decode_request_payload($requestWithPayment);
+            dra_hydrate_request_resident_name($conn, $requestWithPayment, $invoicePayload);
 
             $relPath = dr_generate_invoice_pdf($requestWithPayment, $baseDir);
             if ($relPath === null || $relPath === '') {
@@ -823,6 +825,8 @@ function dra_send_invoice_deferred(mysqli $conn, array $request, float $amount, 
 
 function dra_send_invoice_email(mysqli $conn, array $request, float $amount, string $orNumber, string $absInvoicePath): void
 {
+    $requestPayload = dra_decode_request_payload($request);
+    dra_hydrate_request_resident_name($conn, $request, $requestPayload);
     $residentUserId = trim((string)($request['resident_user_id'] ?? $request['user_id'] ?? ''));
     if ($residentUserId === '') {
         return;

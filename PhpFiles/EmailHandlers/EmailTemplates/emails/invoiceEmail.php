@@ -85,6 +85,13 @@ if ($paymentDateValue  === '') $paymentDateValue  = date('F j, Y');
     </tr>
 
     <tr style="background:#fafafa;">
+        <td style="padding:7px 10px; color:#555; border-bottom:1px solid #f0f0f0;">Tax Status</td>
+        <td style="padding:7px 10px; font-weight:bold; color:#111; border-bottom:1px solid #f0f0f0;">
+            Non-Taxable Transaction
+        </td>
+    </tr>
+
+    <tr style="background:#fafafa;">
         <td style="padding:7px 10px; color:#555; border-bottom:1px solid #f0f0f0;">Date</td>
         <td style="padding:7px 10px; font-weight:bold; color:#111; border-bottom:1px solid #f0f0f0;">
             <?= htmlspecialchars($paymentDateValue, ENT_QUOTES, 'UTF-8') ?>
