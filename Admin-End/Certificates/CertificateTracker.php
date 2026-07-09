@@ -2628,9 +2628,11 @@ if ($certificateLaunchStage === 'release') {
                   <input type="text" id="manualPurpose" class="form-control" placeholder="Purpose from the handwritten form">
                 </div>
                 <div class="col-lg-5 d-none" id="manualValidityWrap">
-                  <label for="manualValidityDate" class="form-label fw-semibold small">Certificate Valid Until</label>
-                  <input type="date" id="manualValidityDate" class="form-control">
-                  <div class="form-text">Optional. Leave blank to use the default 45-day validity.</div>
+                  <label for="manualValidityDate" class="form-label fw-semibold small" id="manualValidityLabel">Validity Period</label>
+                  <select id="manualValidityDate" class="form-select">
+                    <option value="">Select validity period</option>
+                  </select>
+                  <div class="form-text" id="manualValidityHelp">Choose the validity period that will be reflected in the issued document.</div>
                 </div>
               </div>
             </div>
@@ -2777,7 +2779,7 @@ if ($certificateLaunchStage === 'release') {
                 <p class="manual-summary-item-value" id="manualNextStageSummary">Preview the document first to unlock submission.</p>
               </div>
               <div class="manual-summary-item d-none" id="manualValiditySummaryWrap">
-                <p class="manual-summary-item-label">Certificate Valid Until</p>
+                <p class="manual-summary-item-label" id="manualValiditySummaryLabel">Selected Validity</p>
                 <p class="manual-summary-item-value" id="manualValiditySummary">Default: 45 days after approval</p>
               </div>
             </div>
@@ -3057,9 +3059,11 @@ if ($certificateLaunchStage === 'release') {
         </div>
 
         <div id="actionValidityWrap" class="d-none mb-3">
-          <label class="form-label">Certificate Valid Until</label>
-          <input id="actionValidity" name="document_validity" type="date" class="form-control">
-          <div class="form-text">Optional. Leave blank to use the default 45-day validity.</div>
+          <label class="form-label" id="actionValidityLabel">Validity Period</label>
+          <select id="actionValidity" name="document_validity" class="form-select">
+            <option value="">Select validity period</option>
+          </select>
+          <div class="form-text" id="actionValidityHelp">Choose the validity period that will be reflected in the issued document.</div>
         </div>
 
         <div id="actionIssuedWrap" class="d-none mb-3">

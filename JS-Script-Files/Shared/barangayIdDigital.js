@@ -144,8 +144,11 @@
   }
 
   function computeValidUntil(overrideValue, issuedDate) {
-    const override = upper(overrideValue);
-    if (override) return override;
+    const rawOverride = String(overrideValue || '').trim();
+    if (rawOverride) {
+      const formattedOverride = formatDisplayDate(rawOverride);
+      return upper(formattedOverride || rawOverride);
+    }
     const baseDate = new Date(issuedDate || Date.now());
     if (Number.isNaN(baseDate.getTime())) {
       return '';
@@ -502,7 +505,7 @@
       issuedDate
     );
     const validUntil = computeValidUntil(
-      firstNonEmpty([payload.barangay_id_valid_until, payload.valid_until]),
+      firstNonEmpty([payload.barangay_id_valid_until, payload.valid_until, row.document_validity, payload.document_validity]),
       issuedDate
     );
     const fullName = formatCardName(

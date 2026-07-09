@@ -744,6 +744,14 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     return 'pending';
   }
 
+  function requestDeliveryNote(row) {
+    return String(row?.hard_copy_notice || '').trim();
+  }
+
+  function requestHardCopyStatusLabel(row) {
+    return String(row?.hard_copy_status_label || '').trim();
+  }
+
   function escapeHtml(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));
   }
@@ -963,6 +971,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   }
 
   function buildRequestViewHtml(row, payload) {
+    const deliveryNote = requestDeliveryNote(row);
+    const hardCopyStatusLabel = requestHardCopyStatusLabel(row);
     const summarySection = formSection('Request Summary', [
       renderFieldGrid([
         { label: 'Request ID', value: row.request_id || '-' },
@@ -976,6 +986,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         { label: 'Status', value: row.stage_label || row.stage || '-' },
         { label: 'Submitted At', value: row.submitted_at || '-' },
       ], 2),
+      (deliveryNote || hardCopyStatusLabel)
+        ? renderFieldGrid([
+            { label: 'Soft Copy', value: row.soft_copy_available ? 'Available Online' : 'Not Yet Available' },
+            { label: 'Hard Copy Status', value: hardCopyStatusLabel || '-' },
+            { label: 'Claim Note', value: deliveryNote || '-', raw: false },
+          ], 3)
+        : '',
     ].join(''));
 
     const documentType = String(row.document_type || payload.document_type || '').toLowerCase();
@@ -1227,6 +1244,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       const action = buildRequestActionHtml(r);
 
       const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
+      const deliveryNote = requestDeliveryNote(r)
+        ? `<div class="text-muted small mt-1">${escapeHtml(requestDeliveryNote(r))}</div>`
+        : '';
       const paymentDeadline = (r.stage === 'for_payment' || r.stage === 'payment_rejected') && r.payment_deadline
         ? `<div class="text-muted small mt-1">Payment deadline: ${escapeHtml(formatDateTime(r.payment_deadline))}</div>`
         : '';
@@ -1236,7 +1256,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <td>${escapeHtml(r.document_type)}</td>
           <td>${escapeHtml(r.purpose || '-')}</td>
           <td>${escapeHtml(feeTextOf(r))}</td>
-          <td>${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${reason}${paymentDeadline}</td>
+          <td>${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${reason}${deliveryNote}${paymentDeadline}</td>
           <td>${escapeHtml(r.submitted_at || '-')}</td>
           <td>${action}</td>
         </tr>
@@ -1244,7 +1264,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }).join('');
 
     if (cards) {
-      cards.innerHTML = items.map((r) => `
+      cards.innerHTML = items.map((r) => {
+        const deliveryNote = requestDeliveryNote(r)
+          ? `<div class="text-muted small mt-1">${escapeHtml(requestDeliveryNote(r))}</div>`
+          : '';
+        return `
         <article class="request-card">
           <div class="tracker-label">Request</div>
           <div class="tracker-value fw-semibold">${escapeHtml(r.request_id || '-')}</div>
@@ -1253,12 +1277,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-label mt-2">Purpose</div>
           <div class="tracker-value">${escapeHtml(r.purpose || '-')}</div>
           <div class="tracker-label mt-2">Status</div>
-          <div class="tracker-value">${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}</div>
+          <div class="tracker-value">${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${deliveryNote}</div>
           <div class="tracker-label mt-2">Submitted</div>
           <div class="tracker-value">${escapeHtml(r.submitted_at || '-')}</div>
           <div class="mt-3">${buildRequestActionHtml(r)}</div>
         </article>
-      `).join('');
+      `;
+      }).join('');
     }
 
     bindRowActions();

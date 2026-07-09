@@ -495,7 +495,9 @@
   const actionOrWrap = document.getElementById('actionOrWrap');
   const actionOr = document.getElementById('actionOr');
   const actionValidityWrap = document.getElementById('actionValidityWrap');
+  const actionValidityLabel = document.getElementById('actionValidityLabel');
   const actionValidity = document.getElementById('actionValidity');
+  const actionValidityHelp = document.getElementById('actionValidityHelp');
   const actionIssuedWrap = document.getElementById('actionIssuedWrap');
   const actionIssued = document.getElementById('actionIssued');
   const actionBusinessApprovalWrap = document.getElementById('actionBusinessApprovalWrap');
@@ -626,15 +628,60 @@
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  function addDaysDateInputValue(days) {
-    const date = new Date();
+  function addDaysDateInputValue(days, baseDate = new Date()) {
+    const date = baseDate instanceof Date && !Number.isNaN(baseDate.getTime())
+      ? new Date(baseDate.getTime())
+      : new Date();
     date.setHours(12, 0, 0, 0);
     date.setDate(date.getDate() + Number(days || 0));
     return formatDateInputValue(date);
   }
 
+  function addYearsDateInputValue(years, baseDate = new Date()) {
+    const date = baseDate instanceof Date && !Number.isNaN(baseDate.getTime())
+      ? new Date(baseDate.getTime())
+      : new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setFullYear(date.getFullYear() + Number(years || 0));
+    return formatDateInputValue(date);
+  }
+
   function certificateDefaultValidityDate() {
     return addDaysDateInputValue(45);
+  }
+
+  function barangayIdDefaultValidityDate() {
+    return addYearsDateInputValue(2);
+  }
+
+  function certificateValidityPresets(baseDate = new Date()) {
+    return [3, 15, 30, 45, 60].map((days) => ({
+      value: addDaysDateInputValue(days, baseDate),
+      label: `${days} days`,
+      amount: days,
+      unit: 'days'
+    }));
+  }
+
+  function barangayIdValidityPresets(baseDate = new Date()) {
+    return [1, 2, 3].map((years) => ({
+      value: addYearsDateInputValue(years, baseDate),
+      label: `${years} ${years === 1 ? 'year' : 'years'}`,
+      amount: years,
+      unit: 'years'
+    }));
+  }
+
+  function validityPresetOptions(kind, baseDate = new Date()) {
+    return kind === 'barangay_id'
+      ? barangayIdValidityPresets(baseDate)
+      : certificateValidityPresets(baseDate);
+  }
+
+  function defaultValidityDateForKind(kind) {
+    return kind === 'barangay_id'
+      ? barangayIdDefaultValidityDate()
+      : certificateDefaultValidityDate();
   }
 
   function normalizeDateInputValue(value, fallback = '') {
@@ -645,6 +692,16 @@
 
   function resolveCertificateValidityDate(value, fallback = '') {
     return normalizeDateInputValue(value, '') || normalizeDateInputValue(fallback, '') || certificateDefaultValidityDate();
+  }
+
+  function resolveBarangayIdValidityDate(value, fallback = '') {
+    return normalizeDateInputValue(value, '') || normalizeDateInputValue(fallback, '') || barangayIdDefaultValidityDate();
+  }
+
+  function resolveValidityDateByKind(kind, value, fallback = '') {
+    return kind === 'barangay_id'
+      ? resolveBarangayIdValidityDate(value, fallback)
+      : resolveCertificateValidityDate(value, fallback);
   }
 
   function diffCalendarDays(startValue, endValue) {
@@ -686,9 +743,9 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
   }
 
-  function formatValiditySummary(value) {
+  function formatDateForValidityCard(value) {
     const raw = String(value || '').trim();
-    if (!raw) return 'Default: 45 days after approval';
+    if (!raw) return '';
     const parsed = parseDateInputValue(raw);
     if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) return raw;
     return parsed.toLocaleDateString('en-PH', {
@@ -696,6 +753,82 @@
       month: 'long',
       day: 'numeric'
     });
+  }
+
+  function formatDateForBarangayIdCard(value) {
+    const parsed = parseDateInputValue(value);
+    if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) return String(value || '').trim();
+    return [
+      String(parsed.getMonth() + 1).padStart(2, '0'),
+      String(parsed.getDate()).padStart(2, '0'),
+      parsed.getFullYear()
+    ].join('/');
+  }
+
+  function describeValiditySelection(kind, value) {
+    const normalized = normalizeDateInputValue(value, '');
+    if (!normalized) {
+      return {
+        label: kind === 'barangay_id' ? 'Default: 2 years after approval' : 'Default: 45 days after approval',
+        dateText: '',
+      };
+    }
+
+    const preset = validityPresetOptions(kind).find((option) => option.value === normalized);
+    return {
+      label: preset ? preset.label : '',
+      dateText: formatDateForValidityCard(normalized),
+    };
+  }
+
+  function validityPresetByValue(kind, value) {
+    const normalized = normalizeDateInputValue(value, '');
+    if (!normalized) return null;
+    return validityPresetOptions(kind).find((option) => option.value === normalized) || null;
+  }
+
+  function formatValiditySummary(value, kind = 'certificate') {
+    const summary = describeValiditySelection(kind, value);
+    if (!summary.dateText) {
+      return summary.label;
+    }
+    if (!summary.label) {
+      return summary.dateText;
+    }
+    return `${summary.label} (until ${summary.dateText})`;
+  }
+
+  function populateValiditySelect(select, kind, selectedValue = '') {
+    if (!select) return '';
+    const options = validityPresetOptions(kind);
+    const fallbackValue = defaultValidityDateForKind(kind);
+    const resolvedValue = resolveValidityDateByKind(kind, selectedValue, fallbackValue);
+    const matchedValue = options.some((option) => option.value === resolvedValue)
+      ? resolvedValue
+      : fallbackValue;
+
+    select.dataset.validityKind = kind;
+    select.innerHTML = options.map((option) => (
+      `<option value="${option.value}">${option.label}</option>`
+    )).join('');
+    select.value = matchedValue;
+    return matchedValue;
+  }
+
+  function configureValidityField(labelEl, helpEl, selectEl, kind, selectedValue = '') {
+    if (labelEl) {
+      labelEl.textContent = kind === 'barangay_id' ? 'Barangay ID Validity' : 'Certificate Validity';
+    }
+    if (helpEl) {
+      helpEl.textContent = kind === 'barangay_id'
+        ? 'Choose the Barangay ID validity period: 1, 2, or 3 years.'
+        : 'Choose the certificate validity period: 3, 15, 30, 45, or 60 days.';
+    }
+    return populateValiditySelect(selectEl, kind, selectedValue);
+  }
+
+  function isBarangayIdPreviewDocKey(docKey) {
+    return normalizePreviewDocKey(docKey || '') === 'barangayid';
   }
 
   function isCertificateRequestRow(row) {
@@ -706,9 +839,34 @@
     return !!config && !config.clearance && config.kind !== 'barangay_id';
   }
 
+  function manualValidityKind(config) {
+    if (config?.kind === 'barangay_id') return 'barangay_id';
+    return isCertificateManualConfig(config) ? 'certificate' : '';
+  }
+
   function isCertificatePreviewDocKey(docKey) {
     const key = normalizePreviewDocKey(docKey || '');
     return !!key && !['barangayid', 'generalpermitclearance', 'businessclearance', 'tricycleclearance'].includes(key);
+  }
+
+  function resolveActionValidityKind(docKey, isFirstTimeJobSeeker = false) {
+    if (isBarangayIdPreviewDocKey(docKey)) {
+      return 'barangay_id';
+    }
+    if (isFirstTimeJobSeeker || isCertificatePreviewDocKey(docKey)) {
+      return 'certificate';
+    }
+    return '';
+  }
+
+  function applyBarangayIdValidityPreviewState(state, validityDate) {
+    if (!state || typeof state !== 'object') return;
+    const normalized = resolveBarangayIdValidityDate(validityDate, '');
+    if (!normalized) return;
+    const validUntil = formatDateForBarangayIdCard(normalized);
+    state.documentValidity = normalized;
+    state.validUntil = validUntil;
+    state.validityNotice = `This ID is valid until ${validUntil || '____'} except when the holder requests for a new one.`;
   }
   const isFinancePaymentsPage = /\/admin-end\/certificates\/financepayments(?:\.php)?\/?$/i.test(window.location.pathname);
   const requestFilterModalEl = isFinancePaymentsPage ? document.getElementById('modalFinanceFilter') : filterModalEl;
@@ -1136,6 +1294,14 @@
     if (k === 'ready_for_claim' || k === 'payment_verified') return `<span class="badge bg-primary">${label}</span>`;
     if (k === 'for_payment' || k === 'payment_submitted') return `<span class="badge bg-warning text-dark">${label}</span>`;
     return `<span class="badge bg-secondary">${label}</span>`;
+  }
+
+  function requestDeliveryNote(row) {
+    return String(row?.hard_copy_notice || '').trim();
+  }
+
+  function requestHardCopyStatusLabel(row) {
+    return String(row?.hard_copy_status_label || '').trim();
   }
 
   function resolveWorkflowStage(row) {
@@ -2987,15 +3153,25 @@
     const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
     const requestedDocKey = normalizePreviewDocKey(requestedDocType);
     const isBarangayIdDocument = requestedDocKey === 'barangayid';
-    const certificateValidityDate = isCertificatePreviewDocKey(requestedDocKey)
-      ? resolveCertificateValidityDate(
+    const documentValidityDate = isBarangayIdDocument
+      ? resolveBarangayIdValidityDate(
           firstNonEmpty([
+            payload.barangay_id_valid_until,
+            payload.valid_until,
             payload.document_validity,
             row.document_validity
           ]),
-          certificateDefaultValidityDate()
+          barangayIdDefaultValidityDate()
         )
-      : '';
+      : (isCertificatePreviewDocKey(requestedDocKey)
+          ? resolveCertificateValidityDate(
+              firstNonEmpty([
+                payload.document_validity,
+                row.document_validity
+              ]),
+              certificateDefaultValidityDate()
+            )
+          : '');
     const generalPermitPurpose = generalClearancePurposeFromDocType(requestedDocType);
     const generalPermitLocation = buildGeneralPermitLocation(
       payload,
@@ -3014,6 +3190,7 @@
       'birthdate', 'date_of_birth', 'child_dob', 'age', 'sex', 'gender', 'child_sex',
       'civil_status', 'religion', 'occupation',
       'purpose', 'request_purpose', 'request_officer',
+      'document_validity', 'barangay_id_valid_until', 'valid_until', 'barangay_id_validity_years',
       'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
       '_preview_business_approval_type', 'business_approval_type', 'businessApprovalType',
       '_preview_plate_number', 'plate_number', 'business_plate_number', 'vehicle_plate_number',
@@ -3198,7 +3375,7 @@
         row.submitted_at,
         dr_now_text()
       ]),
-      documentValidity: certificateValidityDate,
+      documentValidity: documentValidityDate,
       approvedByName: upperText(firstNonEmptyName([
         row.punong_signatory_name,
         row.reviewed_by,
@@ -4882,6 +5059,9 @@
   function rowHtml(row) {
     const reasonValue = firstNonEmpty([row.status_remarks, row.status_reason]);
     const reason = reasonValue ? `<div class="text-danger small mt-1">Reason: ${esc(normalizeDisplayCasing(reasonValue))}</div>` : '';
+    const deliveryNote = requestDeliveryNote(row)
+      ? `<div class="text-muted small mt-1">${esc(requestDeliveryNote(row))}</div>`
+      : '';
     const fullName = fullNameFromRow(row);
     const purpose = normalizeDisplayCasing(firstNonEmpty([row.purpose, '-']));
     const statusKey = statusBucket(row);
@@ -4903,7 +5083,7 @@
         <td class="col-purpose-cell">
           <div class="cell-purpose">${esc(purpose)}</div>
         </td>
-        <td>${badge(isFinancePaymentsPage ? statusKey : workflowStage, esc(isFinancePaymentsPage ? financeStatusLabel : stageLabel))}${reason}</td>
+        <td>${badge(isFinancePaymentsPage ? statusKey : workflowStage, esc(isFinancePaymentsPage ? financeStatusLabel : stageLabel))}${reason}${deliveryNote}</td>
         <td>${esc(row.submitted_at || '-')}</td>
         <td>${actionButtons(row)}</td>
       </tr>
@@ -5761,7 +5941,7 @@
     if (actionValidity) {
       actionValidity.required = false;
       actionValidity.value = '';
-      actionValidity.min = formatDateInputValue(new Date());
+      delete actionValidity.dataset.validityKind;
     }
     actionIssued.required = false;
     if (actionBusinessApproval) {
@@ -5921,6 +6101,7 @@
     const needsManualIssuedUpload = requestNeedsManualIssuedUpload(row);
     const isBarangayIdRequest = docKey === 'barangayid';
     const isCertificateRequest = isCertificateRequestRow(row);
+    const actionValidityKind = resolveActionValidityKind(docKey, isFirstTimeJobSeeker);
     if (actionForm) {
       actionForm.dataset.docKey = docKey;
     }
@@ -5940,12 +6121,15 @@
       row?.payload?.business_plate_number,
       row?.payload?.vehicle_plate_number
     ]).toUpperCase();
-    const existingDocumentValidity = resolveCertificateValidityDate(firstNonEmpty([
-      options?.documentValidity,
-      viewPreviewState?.documentValidity,
-      row?.document_validity,
-      row?.payload?.document_validity
-    ]), certificateDefaultValidityDate());
+    const existingDocumentValidity = actionValidityKind
+      ? resolveValidityDateByKind(actionValidityKind, firstNonEmpty([
+          options?.documentValidity,
+          viewPreviewState?.documentValidity,
+          row?.document_validity,
+          row?.payload?.document_validity,
+          row?.payload?.barangay_id_valid_until
+        ]), defaultValidityDateForKind(actionValidityKind))
+      : '';
 
     const rowStage = String(row?.stage || '').toLowerCase();
     const isWalkInFlow = rowStage === 'for_payment' || rowStage === 'payment_rejected';
@@ -5977,7 +6161,7 @@
       actionPrompt.textContent = isFirstTimeJobSeeker
         ? 'This request will be moved to the interview stage. The resident will be notified to report to the barangay within 5 working days for the oath of undertaking and interview.'
         : (isBarangayIdRequest
-            ? 'Click Review Application to inspect the submitted Barangay ID details. Once everything is correct, proceed to approve the request for release.'
+            ? 'Choose the Barangay ID validity first, then click Review Application to inspect the submitted details. Once everything is correct, proceed to approve the request for release.'
         : (needsFeeTagging
             ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for ${needsInspection ? 'inspection' : 'payment'}.`
             : (isCertificateRequest
@@ -5993,10 +6177,15 @@
             : `Please confirm that you thoroughly checked the resident's data to ${needsInspection ? `approve the ${docName} for inspection` : `issue a ${docName}`}.`);
       actionPrompt.classList.remove('d-none');
     }
-    if ((type === 'personnel_approve' || type === 'interview_pass') && isCertificateRequest && actionValidityWrap && actionValidity) {
+    if ([
+      'personnel_approve',
+      'personnel_approve_confirm',
+      'interview_pass',
+      'interview_pass_confirm',
+    ].includes(type) && actionValidityKind && actionValidityWrap && actionValidity) {
       actionValidityWrap.classList.remove('d-none');
-      actionValidity.min = formatDateInputValue(new Date());
-      actionValidity.value = existingDocumentValidity;
+      actionValidity.required = true;
+      configureValidityField(actionValidityLabel, actionValidityHelp, actionValidity, actionValidityKind, existingDocumentValidity);
     }
     if (type === 'mark_completed_confirm' && actionPrompt) {
       actionPrompt.textContent = 'Are you sure you want to release this document now? This will mark the request as completed.';
@@ -6947,6 +7136,8 @@
           const completedIssuedLabel = normalizePreviewDocKey(row?.document_type || '') === 'barangayid'
             ? 'Digital Barangay ID'
             : 'Issued Document';
+          const deliveryNote = requestDeliveryNote(row);
+          const hardCopyStatusLabel = requestHardCopyStatusLabel(row);
           const issuedViewerHtml = `
             <div class="tracker-form-grid cols-1">
               <div class="tracker-form-field">
@@ -6957,6 +7148,26 @@
                 </div>
               </div>
             </div>
+            ${deliveryNote || hardCopyStatusLabel ? `
+              <div class="tracker-form-grid cols-2">
+                <div class="tracker-form-field">
+                  <p class="tracker-form-label">Soft Copy</p>
+                  <div class="tracker-form-value">${esc(row.soft_copy_available ? 'Available Online' : 'Not Yet Available')}</div>
+                </div>
+                <div class="tracker-form-field">
+                  <p class="tracker-form-label">Hard Copy Status</p>
+                  <div class="tracker-form-value">${esc(hardCopyStatusLabel || '-')}</div>
+                </div>
+              </div>
+              ${deliveryNote ? `
+                <div class="tracker-form-grid cols-1">
+                  <div class="tracker-form-field">
+                    <p class="tracker-form-label">Claim Note</p>
+                    <div class="tracker-form-value">${esc(deliveryNote)}</div>
+                  </div>
+                </div>
+              ` : ''}
+            ` : ''}
           `;
           const issuedActionHtml = `<a class="btn btn-sm btn-outline-primary" href="${completedIssuedFileUrl}" target="_blank" rel="noopener">Open in New Tab</a>`;
           html += formSection(completedIssuedLabel, issuedViewerHtml, issuedActionHtml);
@@ -6973,6 +7184,8 @@
               ? `<span style="color:#b91c1c;font-weight:700;">${esc(statusReasonText)}</span>`
               : esc(statusReasonText))
           : (isRejectedStatus ? '<span style="color:#b91c1c;">No reason provided.</span>' : '-');
+        const deliveryNoteText = requestDeliveryNote(row);
+        const hardCopyStatusLabel = requestHardCopyStatusLabel(row);
 
         const statusGrid = renderFieldGrid([
           { label: 'Status', value: statusBadgeHtml, raw: true },
@@ -6994,7 +7207,12 @@
               row.personnel_name,
               '-'
             ])
-          }
+          },
+          ...(deliveryNoteText || hardCopyStatusLabel ? [
+            { label: 'Soft Copy', value: row.soft_copy_available ? 'Available Online' : 'Not Yet Available' },
+            { label: 'Hard Copy Status', value: hardCopyStatusLabel || '-' },
+            { label: 'Claim Note', value: deliveryNoteText || '-' }
+          ] : [])
         ], 3);
         if (statusGrid) {
           const modalActionsHtml = viewModalActionButtons(row);
@@ -7274,11 +7492,14 @@
       let selectedApprovalType = '';
       let selectedPlateNumber = '';
       let selectedDocumentValidity = '';
-      if (isCertificatePreviewDocKey(currentDocKey)) {
-        selectedDocumentValidity = resolveCertificateValidityDate(
+      const previewValidityKind = resolveActionValidityKind(currentDocKey, false);
+      if (previewValidityKind) {
+        selectedDocumentValidity = resolveValidityDateByKind(
+          previewValidityKind,
           actionValidity?.value || '',
           firstNonEmpty([
             currentRow?.document_validity,
+            currentRow?.payload?.barangay_id_valid_until,
             viewPreviewState?.documentValidity
           ])
         );
@@ -7327,12 +7548,21 @@
       if (selectedDocumentValidity) {
         if (viewPreviewState && typeof viewPreviewState === 'object') {
           viewPreviewState.documentValidity = selectedDocumentValidity;
+          if (previewValidityKind === 'barangay_id') {
+            applyBarangayIdValidityPreviewState(viewPreviewState, selectedDocumentValidity);
+          }
         }
         rememberPreviewStateOverride(rid, {
           ...(pendingPreviewStateOverride?.requestId === rid && pendingPreviewStateOverride?.patch
             ? pendingPreviewStateOverride.patch
             : {}),
-          documentValidity: selectedDocumentValidity
+          documentValidity: selectedDocumentValidity,
+          ...(previewValidityKind === 'barangay_id'
+            ? {
+                validUntil: formatDateForBarangayIdCard(selectedDocumentValidity),
+                validityNotice: `This ID is valid until ${formatDateForBarangayIdCard(selectedDocumentValidity) || '____'} except when the holder requests for a new one.`,
+              }
+            : {})
         });
       }
       if (currentNeedsFeeTagging) {
@@ -7377,8 +7607,9 @@
 
     if ((actionType.value || '') === 'interview_pass') {
       const rid = currentRequestId;
-      const selectedDocumentValidity = isCertificatePreviewDocKey(currentDocKey)
-        ? resolveCertificateValidityDate(
+      const selectedDocumentValidity = resolveActionValidityKind(currentDocKey, true)
+        ? resolveValidityDateByKind(
+            'certificate',
             actionValidity?.value || '',
             firstNonEmpty([
               currentRow?.document_validity,
@@ -7440,6 +7671,20 @@
     }
     if (actionOrWrap && !actionOrWrap.classList.contains('d-none')) {
       fd.append('or_number', actionOr.value || '');
+    }
+    if ((currentAction === 'personnel_approve_confirm' || currentAction === 'interview_pass_confirm')
+      && viewPreviewState && typeof viewPreviewState === 'object'
+      && actionValidityWrap && !actionValidityWrap.classList.contains('d-none')) {
+      const confirmValidityKind = resolveActionValidityKind(currentDocKey, currentAction === 'interview_pass_confirm');
+      const selectedConfirmValidity = resolveValidityDateByKind(
+        confirmValidityKind || 'certificate',
+        actionValidity?.value || '',
+        String(viewPreviewState?.documentValidity || '').trim()
+      );
+      viewPreviewState.documentValidity = selectedConfirmValidity;
+      if (confirmValidityKind === 'barangay_id') {
+        applyBarangayIdValidityPreviewState(viewPreviewState, selectedConfirmValidity);
+      }
     }
     const resolvedPreviewValidity = (currentAction === 'personnel_approve_confirm' || currentAction === 'interview_pass_confirm')
       ? String(viewPreviewState?.documentValidity || '').trim()
@@ -7772,8 +8017,11 @@
     const manualDocumentSummary = document.getElementById('manualDocumentSummary');
     const manualNextStageSummary = document.getElementById('manualNextStageSummary');
     const manualValidityWrap = document.getElementById('manualValidityWrap');
+    const manualValidityLabel = document.getElementById('manualValidityLabel');
     const manualValidityDate = document.getElementById('manualValidityDate');
+    const manualValidityHelp = document.getElementById('manualValidityHelp');
     const manualValiditySummaryWrap = document.getElementById('manualValiditySummaryWrap');
+    const manualValiditySummaryLabel = document.getElementById('manualValiditySummaryLabel');
     const manualValiditySummary = document.getElementById('manualValiditySummary');
     const manualLastName = document.getElementById('manualLastName');
     const manualFirstName = document.getElementById('manualFirstName');
@@ -8781,17 +9029,36 @@
       manualDocumentSummary.textContent = config ? config.label : 'Select a manual issuance form';
       manualNextStageSummary.textContent = manualExpectedStage(config).label;
       if (manualValidityWrap && manualValidityDate && manualValiditySummaryWrap && manualValiditySummary) {
-        const showValidity = isCertificateManualConfig(config);
+        const validityKind = manualValidityKind(config);
+        const showValidity = !!validityKind;
         manualValidityWrap.classList.toggle('d-none', !showValidity);
         manualValiditySummaryWrap.classList.toggle('d-none', !showValidity);
         if (showValidity) {
-          manualValidityDate.min = formatDateInputValue(new Date());
           if (!String(manualValidityDate.value || '').trim()) {
-            manualValidityDate.value = certificateDefaultValidityDate();
+            manualValidityDate.value = configureValidityField(
+              manualValidityLabel,
+              manualValidityHelp,
+              manualValidityDate,
+              validityKind
+            );
+          } else {
+            configureValidityField(
+              manualValidityLabel,
+              manualValidityHelp,
+              manualValidityDate,
+              validityKind,
+              manualValidityDate.value
+            );
           }
-          manualValiditySummary.textContent = formatValiditySummary(manualValidityDate.value);
+          if (manualValiditySummaryLabel) {
+            manualValiditySummaryLabel.textContent = validityKind === 'barangay_id' ? 'Barangay ID Validity' : 'Certificate Validity';
+          }
+          manualValiditySummary.textContent = formatValiditySummary(manualValidityDate.value, validityKind);
         } else {
           manualValidityDate.value = '';
+          if (manualValiditySummaryLabel) {
+            manualValiditySummaryLabel.textContent = 'Selected Validity';
+          }
           manualValiditySummary.textContent = 'Default: 45 days after approval';
         }
       }
@@ -9341,10 +9608,18 @@
       } else if (config.kind === 'jail_visit') {
         payload.cohabitation_variant = 'relationship_jail_visit';
       }
-      if (isCertificateManualConfig(config)) {
+      const validityKind = manualValidityKind(config);
+      if (validityKind) {
         const validityDate = String(manualValidityDate?.value || '').trim();
         if (validityDate) {
           payload.document_validity = validityDate;
+          if (validityKind === 'barangay_id') {
+            payload.barangay_id_valid_until = validityDate;
+            const matchedPreset = validityPresetByValue(validityKind, validityDate);
+            if (matchedPreset?.amount) {
+              payload.barangay_id_validity_years = String(matchedPreset.amount);
+            }
+          }
         }
       }
 
@@ -9581,7 +9856,10 @@
     manualValidityDate?.addEventListener('change', () => {
       manualMarkPreviewStale(true);
       manualUpdateSummary();
-      if (isCertificateManualConfig(manualCurrentConfig())) {
+      const validityKind = manualValidityKind(manualCurrentConfig());
+      if (validityKind === 'barangay_id') {
+        manualSetAlert('Barangay ID validity updated. Preview the ID again before submitting.', 'info');
+      } else if (validityKind === 'certificate') {
         manualSetAlert('Certificate validity updated. Preview the document again before submitting.', 'info');
       }
     });

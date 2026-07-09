@@ -491,6 +491,52 @@ function dra_normalize_validity_date_input(?string $rawValue): ?string
     return $parsed->setTime(23, 59, 59)->format('Y-m-d H:i:s');
 }
 
+function dra_validity_datetime_from_offset(int $amount, string $unit, ?string $baseDateTime = null): ?string
+{
+    $amount = max(0, $amount);
+    $unit = strtolower(trim($unit));
+    if ($amount <= 0 || !in_array($unit, ['day', 'days', 'year', 'years'], true)) {
+        return null;
+    }
+
+    try {
+        $base = $baseDateTime !== null && trim($baseDateTime) !== ''
+            ? new DateTimeImmutable($baseDateTime)
+            : new DateTimeImmutable(dr_now());
+    } catch (Throwable $e) {
+        $base = new DateTimeImmutable(dr_now());
+    }
+
+    if ($unit === 'day' || $unit === 'days') {
+        return $base->modify('+' . $amount . ' days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+    }
+
+    return $base->modify('+' . $amount . ' years')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+}
+
+function dra_normalize_validity_selection_input(?string $rawValue, ?string $baseDateTime = null): ?string
+{
+    $rawValue = trim((string)$rawValue);
+    if ($rawValue === '') {
+        return null;
+    }
+
+    $directDate = dra_normalize_validity_date_input($rawValue);
+    if ($directDate !== null) {
+        return $directDate;
+    }
+
+    if (preg_match('/^(days|years):(\d{1,4})$/i', $rawValue, $matches)) {
+        return dra_validity_datetime_from_offset((int)$matches[2], strtolower($matches[1]), $baseDateTime);
+    }
+
+    if (preg_match('/^(\d{1,4})\s*(day|days|year|years)$/i', $rawValue, $matches)) {
+        return dra_validity_datetime_from_offset((int)$matches[1], strtolower($matches[2]), $baseDateTime);
+    }
+
+    return null;
+}
+
 function dra_default_certificate_validity_datetime(?string $baseDateTime = null): string
 {
     try {
@@ -504,13 +550,26 @@ function dra_default_certificate_validity_datetime(?string $baseDateTime = null)
     return $base->modify('+45 days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
 }
 
+function dra_default_barangay_id_validity_datetime(?string $baseDateTime = null): string
+{
+    try {
+        $base = $baseDateTime !== null && trim($baseDateTime) !== ''
+            ? new DateTimeImmutable($baseDateTime)
+            : new DateTimeImmutable(dr_now());
+    } catch (Throwable $e) {
+        $base = new DateTimeImmutable(dr_now());
+    }
+
+    return $base->modify('+2 years')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+}
+
 function dra_resolve_certificate_validity_datetime(string $documentType, ?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): ?string
 {
     if (!dra_is_certificate_only_document_type($documentType)) {
         return null;
     }
 
-    $normalizedRequested = dra_normalize_validity_date_input($requestedValidity);
+    $normalizedRequested = dra_normalize_validity_selection_input($requestedValidity, $baseDateTime);
     if ($normalizedRequested !== null) {
         return $normalizedRequested;
     }
@@ -521,6 +580,51 @@ function dra_resolve_certificate_validity_datetime(string $documentType, ?string
     }
 
     return dra_default_certificate_validity_datetime($baseDateTime);
+}
+
+function dra_resolve_barangay_id_validity_datetime(?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): string
+{
+    $normalizedRequested = dra_normalize_validity_selection_input($requestedValidity, $baseDateTime);
+    if ($normalizedRequested !== null) {
+        return $normalizedRequested;
+    }
+
+    $existingParsed = dr_parse_datetime_value((string)$existingValidity, true);
+    if ($existingParsed instanceof DateTimeImmutable) {
+        return $existingParsed->format('Y-m-d H:i:s');
+    }
+
+    return dra_default_barangay_id_validity_datetime($baseDateTime);
+}
+
+function dra_resolve_document_validity_datetime(string $documentType, ?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): ?string
+{
+    if (dr_is_barangay_id_document_type($documentType)) {
+        return dra_resolve_barangay_id_validity_datetime($requestedValidity, $existingValidity, $baseDateTime);
+    }
+
+    return dra_resolve_certificate_validity_datetime($documentType, $requestedValidity, $existingValidity, $baseDateTime);
+}
+
+function dra_match_barangay_id_validity_years(?string $validityValue, ?string $baseDateTime = null): ?int
+{
+    $resolvedValidity = dra_normalize_validity_selection_input($validityValue, $baseDateTime);
+    if ($resolvedValidity === null) {
+        $parsed = dr_parse_datetime_value((string)$validityValue, true);
+        $resolvedValidity = $parsed instanceof DateTimeImmutable ? $parsed->format('Y-m-d H:i:s') : null;
+    }
+    if ($resolvedValidity === null) {
+        return null;
+    }
+
+    foreach ([1, 2, 3] as $years) {
+        $candidate = dra_validity_datetime_from_offset($years, 'years', $baseDateTime);
+        if ($candidate !== null && substr($candidate, 0, 10) === substr($resolvedValidity, 0, 10)) {
+            return $years;
+        }
+    }
+
+    return null;
 }
 
 function dra_build_certificate_validity_notice(?string $validityDateTime, ?string $baseDateTime = null): string
@@ -2264,11 +2368,25 @@ function dra_barangay_id_generated_number(array $payload, string $requestId, Dat
     return 'A' . $issuedDateObj->format('Y') . '-' . $serial;
 }
 
-function dra_barangay_id_generated_valid_until(array $payload, DateTimeInterface $issuedDateObj): string
+function dra_barangay_id_generated_valid_until(array $payload, DateTimeInterface $issuedDateObj, ?string $storedValidity = null): string
 {
-    $override = trim((string)($payload['barangay_id_valid_until'] ?? $payload['valid_until'] ?? ''));
-    if ($override !== '') {
-        return strtoupper($override);
+    foreach ([
+        (string)($payload['barangay_id_valid_until'] ?? ''),
+        (string)($payload['valid_until'] ?? ''),
+        (string)($payload['document_validity'] ?? ''),
+        (string)$storedValidity,
+    ] as $candidate) {
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            continue;
+        }
+
+        $parsedCandidate = dr_parse_datetime_value($candidate, true);
+        if ($parsedCandidate instanceof DateTimeImmutable) {
+            return strtoupper($parsedCandidate->format('m/d/Y'));
+        }
+
+        return strtoupper($candidate);
     }
 
     $validUntil = DateTimeImmutable::createFromInterface($issuedDateObj)->modify('+2 years');
@@ -2293,6 +2411,24 @@ function dra_persist_request_payload(mysqli $conn, string $requestId, array &$re
     $requestRow['request_details'] = $encoded;
 }
 
+function dra_update_request_payload_fields(mysqli $conn, string $requestId, array &$requestRow, array $fields): void
+{
+    if ($requestId === '' || !$fields) {
+        return;
+    }
+
+    $payload = dra_decode_request_payload($requestRow);
+    foreach ($fields as $key => $value) {
+        $normalizedKey = trim((string)$key);
+        if ($normalizedKey === '') {
+            continue;
+        }
+        $payload[$normalizedKey] = $value;
+    }
+
+    dra_persist_request_payload($conn, $requestId, $requestRow, $payload);
+}
+
 function dra_ensure_barangay_id_generated_fields(mysqli $conn, string $requestId, array &$requestRow, array &$payload, DateTimeInterface $issuedDateObj): void
 {
     if ($requestId === '') {
@@ -2309,7 +2445,11 @@ function dra_ensure_barangay_id_generated_fields(mysqli $conn, string $requestId
         $payload['barangay_id_number'] = dra_barangay_id_generated_number($payload, $requestId, $issuedDateObj);
     }
     if (!$validUntilExists) {
-        $payload['barangay_id_valid_until'] = dra_barangay_id_generated_valid_until($payload, $issuedDateObj);
+        $payload['barangay_id_valid_until'] = dra_barangay_id_generated_valid_until(
+            $payload,
+            $issuedDateObj,
+            (string)($requestRow['document_validity'] ?? '')
+        );
     }
 
     dra_persist_request_payload($conn, $requestId, $requestRow, $payload);
@@ -3398,8 +3538,8 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $composeCardNumber = static function () use ($payload, $requestId, $issuedDateObj): string {
                     return dra_barangay_id_generated_number($payload, $requestId, $issuedDateObj);
                 };
-                $composeValidUntil = static function () use ($payload, $issuedDateObj): string {
-                    return dra_barangay_id_generated_valid_until($payload, $issuedDateObj);
+                $composeValidUntil = static function () use ($payload, $issuedDateObj, $row): string {
+                    return dra_barangay_id_generated_valid_until($payload, $issuedDateObj, (string)($row['document_validity'] ?? ''));
                 };
                 $resolveFpdfImageType = static function (string $diskPath): string {
                     $diskPath = trim($diskPath);
@@ -5716,7 +5856,22 @@ function dra_generate_issued_document(array $requestRow): ?string
 
             $pdf->SetFont($indigencyFont, 'I', 8);
             $pdf->SetXY(46, 249);
-            $pdf->MultiCell(100, 4, "This certification is only valid for 1 year from the issuance.\nCheck the qr code to verify the authenticity of this document.", 0, 'C');
+            $pdf->MultiCell(
+                100,
+                4,
+                dra_build_certificate_validity_notice(
+                    (string)($row['document_validity'] ?? ''),
+                    (string)dra_manual_first_non_empty([
+                        $row['release_timestamp'] ?? null,
+                        $row['completed_at'] ?? null,
+                        $row['ready_at'] ?? null,
+                        $row['submitted_at'] ?? null,
+                        dr_now(),
+                    ])
+                ),
+                0,
+                'C'
+            );
         } else {
             // Issued by + signatory blocks aligned to the same baseline.
             $signBaseY = ($isGoodMoral || $isResidency || $isCohabitation) ? 230.0 : 214.0;
@@ -7209,6 +7364,23 @@ if ($action === 'create_manual_request') {
         dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID photo is required. Capture and save the photo before submitting the manual request.']);
     }
 
+    $payload['_request_channel'] = 'manual_issuance';
+    $resolvedManualDocumentValidity = dra_resolve_document_validity_datetime(
+        $documentType,
+        (string)($payload['document_validity'] ?? ''),
+        null,
+        $now
+    );
+    if ($resolvedManualDocumentValidity !== null) {
+        $payload['document_validity'] = substr($resolvedManualDocumentValidity, 0, 10);
+        if (dr_is_barangay_id_document_type($documentType)) {
+            $payload['barangay_id_valid_until'] = $resolvedManualDocumentValidity;
+            $matchedBarangayIdYears = dra_match_barangay_id_validity_years($resolvedManualDocumentValidity, $now);
+            if ($matchedBarangayIdYears !== null) {
+                $payload['barangay_id_validity_years'] = $matchedBarangayIdYears;
+            }
+        }
+    }
     $payloadJson = dr_safe_json($payload);
     $values = [];
     $types = '';
@@ -7253,14 +7425,7 @@ if ($action === 'create_manual_request') {
     $setIfColumn(
         'document_validity',
         's',
-        dr_is_barangay_id_document_type($documentType)
-            ? date('Y-m-d H:i:s', strtotime('+2 years'))
-            : dra_resolve_certificate_validity_datetime(
-                $documentType,
-                (string)($payload['document_validity'] ?? ''),
-                null,
-                $now
-            )
+        $resolvedManualDocumentValidity
     );
     $setIfColumn('qr_code_path', 's', '');
     $setIfColumn('issued_file_path', 's', null);
@@ -7666,6 +7831,7 @@ if ($action === 'list') {
                 }
             }
         }
+        dr_hydrate_request_delivery_fields($row, $row['payload']);
         dra_hydrate_request_resident_name($conn, $row, $row['payload']);
         // Keep list payload light to avoid per-row profile queries (major latency source).
         // Full resident profile is loaded on-demand from resident masterlist endpoint when needed.
@@ -7775,6 +7941,7 @@ if ($action === 'get_request') {
     $row['secretary_signatory_name'] = (string)($signatories['secretary']['name'] ?? '');
     $row['secretary_signatory_title'] = (string)($signatories['secretary']['title'] ?? 'Barangay Secretary');
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
+    dr_hydrate_request_delivery_fields($row, $row['payload']);
     $storedFeeAmount = $row['fee_amount'] ?? null;
     if ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {
         $row['fee_amount'] = (float)$storedFeeAmount;
@@ -8237,14 +8404,14 @@ if ($action === 'personnel_approve') {
         'personnel_decision_at' => dr_now(),
         'fee_amount' => $defaultFee,
     ];
-    $resolvedCertificateValidity = dra_resolve_certificate_validity_datetime(
+    $resolvedDocumentValidity = dra_resolve_document_validity_datetime(
         (string)($row['document_type'] ?? ''),
         $requestedValidity,
         (string)($row['document_validity'] ?? ''),
         (string)($patch['personnel_decision_at'] ?? dr_now())
     );
-    if ($resolvedCertificateValidity !== null) {
-        $patch['document_validity'] = $resolvedCertificateValidity;
+    if ($resolvedDocumentValidity !== null) {
+        $patch['document_validity'] = $resolvedDocumentValidity;
     }
 
     if ($isFreeDocument && !$isFirstTimeJobSeeker && !$requiresInspection) {
@@ -8262,6 +8429,18 @@ if ($action === 'personnel_approve') {
     $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
+    }
+
+    if (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && !empty($patch['document_validity'])) {
+        $payloadPatch = [
+            'barangay_id_valid_until' => (string)$patch['document_validity'],
+        ];
+        $matchedBarangayIdYears = dra_match_barangay_id_validity_years((string)$patch['document_validity'], (string)($patch['personnel_decision_at'] ?? dr_now()));
+        if ($matchedBarangayIdYears !== null) {
+            $payloadPatch['barangay_id_validity_years'] = $matchedBarangayIdYears;
+        }
+        dra_update_request_payload_fields($conn, $requestId, $updated, $payloadPatch);
+        $updated = dr_fetch_request($conn, $requestId) ?? $updated;
     }
 
     if ($isFreeDocument && !$isFirstTimeJobSeeker && !$requiresInspection) {
@@ -8378,7 +8557,7 @@ if ($action === 'interview_pass') {
         'ready_at' => dr_now(),
         'verification_code' => $verificationCode,
         'qr_code_path' => $qrCodePath,
-        'document_validity' => dra_resolve_certificate_validity_datetime(
+        'document_validity' => dra_resolve_document_validity_datetime(
             (string)($row['document_type'] ?? ''),
             null,
             (string)($row['document_validity'] ?? ''),
@@ -8633,6 +8812,7 @@ if ($action === 'finance_verify') {
         dr_respond_json(422, ['success' => false, 'message' => 'OR number is required.']);
     }
 
+    $isManualIssuance = dr_is_manual_issuance_request($row);
     $requiresManualIssuedUpload = dra_requires_manual_issued_upload($row);
     if ($requiresManualIssuedUpload) {
         $patch = [
@@ -8641,7 +8821,7 @@ if ($action === 'finance_verify') {
             'status_reason' => null,
             'finance_user_id' => $currentUserId,
             'finance_decision_at' => dr_now(),
-            'document_validity' => dra_resolve_certificate_validity_datetime(
+            'document_validity' => dra_resolve_document_validity_datetime(
                 (string)($row['document_type'] ?? ''),
                 null,
                 (string)($row['document_validity'] ?? ''),
@@ -8689,7 +8869,7 @@ if ($action === 'finance_verify') {
         'status_reason' => null,
         'finance_user_id' => $currentUserId,
         'finance_decision_at' => dr_now(),
-        'document_validity' => dra_resolve_certificate_validity_datetime(
+        'document_validity' => dra_resolve_document_validity_datetime(
             (string)($row['document_type'] ?? ''),
             null,
             (string)($row['document_validity'] ?? ''),
@@ -8734,7 +8914,41 @@ if ($action === 'finance_verify') {
     $patch['ready_at'] = dr_now();
     $patch['issued_file_path'] = (string)$issuedPath;
 
-    // Payment verification immediately makes the document ready for claim/download.
+    if (!$isManualIssuance) {
+        $completedAt = dr_now();
+        $patch['completed_at'] = $completedAt;
+        $updated = dr_update_stage($conn, $requestId, DR_STAGE_COMPLETED, $patch);
+
+        if (!$updated) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Unable to complete the online request after payment verification.']);
+        }
+
+        dra_update_request_payload_fields($conn, $requestId, $updated, [
+            '_request_channel' => 'online',
+            '_soft_copy_available' => true,
+            '_soft_copy_delivery_mode' => 'online_after_payment',
+            '_soft_copy_completed_at' => $completedAt,
+            '_hard_copy_status' => 'not_printed',
+            '_hard_copy_claim_available' => true,
+        ]);
+        $updated = dr_fetch_request($conn, $requestId) ?? $updated;
+
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            'Payment Verified - Soft Copy Ready',
+            dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. Certificate no: ' . $certificateNumber . '. The soft copy is now available online while the barangay hard copy is not yet printed.')
+        );
+        dra_send_invoice_deferred($conn, $updated, (float)$resolvedAmount, $orNumber);
+
+        try {
+            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_COMPLETED, 'OR: ' . $orNumber . ' | Cert: ' . $certificateNumber . ' | soft copy ready online | ₱' . number_format((float)$resolvedAmount, 2));
+        } catch (Throwable $__e) {
+        }
+        dr_respond_json(200, ['success' => true, 'request' => $updated]);
+    }
+
+    // Manual issuance keeps the existing release workflow after payment verification.
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
 
     if (!$updated) {
@@ -8856,7 +9070,7 @@ if ($action === 'mark_ready') {
         'ready_at' => dr_now(),
         'verification_code' => $verificationCode,
         'qr_code_path' => '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png',
-        'document_validity' => dra_resolve_certificate_validity_datetime(
+        'document_validity' => dra_resolve_document_validity_datetime(
             (string)($row['document_type'] ?? ''),
             null,
             (string)($row['document_validity'] ?? ''),
@@ -8868,6 +9082,14 @@ if ($action === 'mark_ready') {
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark request ready.']);
+    }
+
+    if (dr_is_manual_issuance_request($row)) {
+        dra_update_request_payload_fields($conn, $requestId, $updated, [
+            '_request_channel' => 'manual_issuance',
+            '_hard_copy_status' => 'ready_for_claim',
+        ]);
+        $updated = dr_fetch_request($conn, $requestId) ?? $updated;
     }
 
     dra_send_notification_deferred(
@@ -8887,7 +9109,7 @@ if ($action === 'mark_ready') {
 if ($action === 'mark_completed') {
     $patch = [
         'completed_at' => dr_now(),
-        'document_validity' => dra_resolve_certificate_validity_datetime(
+        'document_validity' => dra_resolve_document_validity_datetime(
             (string)($row['document_type'] ?? ''),
             null,
             (string)($row['document_validity'] ?? ''),
@@ -8923,6 +9145,14 @@ if ($action === 'mark_completed') {
 
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to complete request.']);
+    }
+
+    if (dr_is_manual_issuance_request($row)) {
+        dra_update_request_payload_fields($conn, $requestId, $updated, [
+            '_request_channel' => 'manual_issuance',
+            '_hard_copy_status' => 'claimed',
+        ]);
+        $updated = dr_fetch_request($conn, $requestId) ?? $updated;
     }
 
     if (dra_is_first_time_job_seeker($updated)) {

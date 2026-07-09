@@ -825,6 +825,93 @@ function dr_decode_request_payload(array $requestRow): array {
     return dr_decode_request_payload_value($payload);
 }
 
+function dr_normalize_request_channel(string $value): string {
+    $token = strtolower(trim($value));
+    if ($token === '') {
+        return '';
+    }
+    if (in_array($token, ['manual', 'manual_issuance', 'walkin', 'walk_in'], true)) {
+        return 'manual_issuance';
+    }
+    if (in_array($token, ['online', 'resident_online', 'web', 'guest_online'], true)) {
+        return 'online';
+    }
+    return $token;
+}
+
+function dr_normalize_hard_copy_status(string $value): string {
+    $token = strtolower(trim($value));
+    if ($token === '') {
+        return '';
+    }
+    $token = str_replace([' ', '-'], '_', $token);
+    $map = [
+        'notprinted' => 'not_printed',
+        'not_printed' => 'not_printed',
+        'readyforclaim' => 'ready_for_claim',
+        'ready_for_claim' => 'ready_for_claim',
+        'printed' => 'printed',
+        'claimed' => 'claimed',
+    ];
+    return $map[$token] ?? $token;
+}
+
+function dr_request_channel_from_payload(array $payload): string {
+    return dr_normalize_request_channel((string)($payload['_request_channel'] ?? $payload['request_channel'] ?? ''));
+}
+
+function dr_is_manual_issuance_request(array $requestRow): bool {
+    return dr_request_channel_from_payload(dr_decode_request_payload($requestRow)) === 'manual_issuance';
+}
+
+function dr_hard_copy_status_label(string $status): string {
+    $labels = [
+        'not_printed' => 'Not Yet Printed',
+        'ready_for_claim' => 'Ready for Claim',
+        'printed' => 'Printed in Barangay',
+        'claimed' => 'Hard Copy Claimed',
+    ];
+    return $labels[$status] ?? '';
+}
+
+function dr_hydrate_request_delivery_fields(array &$row, ?array $payload = null): void {
+    $payload = is_array($payload) ? $payload : dr_decode_request_payload($row);
+    $stage = strtolower(trim((string)($row['stage'] ?? '')));
+    $requestChannel = dr_request_channel_from_payload($payload);
+    $hardCopyStatus = dr_normalize_hard_copy_status((string)($payload['_hard_copy_status'] ?? $payload['hard_copy_status'] ?? ''));
+    $isManualIssuance = ($requestChannel === 'manual_issuance');
+    $isCompleted = ($stage === DR_STAGE_COMPLETED);
+    $isOnlineSoftCopyCompleted = (
+        !$isManualIssuance
+        && $isCompleted
+        && $hardCopyStatus !== ''
+    );
+
+    $hardCopyNotice = '';
+    if ($isOnlineSoftCopyCompleted) {
+        if ($hardCopyStatus === 'printed' || $hardCopyStatus === 'ready_for_claim') {
+            $hardCopyNotice = 'Soft copy is available online. Hard copy is already prepared in the barangay for claiming.';
+        } elseif ($hardCopyStatus === 'claimed') {
+            $hardCopyNotice = 'Soft copy is available online. Hard copy has already been claimed in the barangay.';
+        } else {
+            $hardCopyNotice = 'Soft copy is available online. Hard copy has not yet been printed in the barangay. You may still claim a hard copy.';
+        }
+    }
+
+    $row['request_channel'] = $requestChannel;
+    $row['is_manual_issuance'] = $isManualIssuance;
+    $row['is_online_soft_copy_completed'] = $isOnlineSoftCopyCompleted;
+    $row['soft_copy_available'] = $isCompleted && (
+        $isOnlineSoftCopyCompleted
+        || strtolower(trim((string)($payload['_soft_copy_available'] ?? ''))) === 'true'
+        || trim((string)($row['issued_file_path'] ?? '')) !== ''
+    );
+    $row['hard_copy_status'] = $hardCopyStatus;
+    $row['hard_copy_status_label'] = dr_hard_copy_status_label($hardCopyStatus);
+    $row['hard_copy_notice'] = $hardCopyNotice;
+    $row['hard_copy_claim_available'] = $isOnlineSoftCopyCompleted && in_array($hardCopyStatus, ['not_printed', 'ready_for_claim', 'printed'], true);
+}
+
 function dr_parse_datetime_value(string $value, bool $endOfDayForDateOnly = false): ?DateTimeImmutable {
     $value = trim($value);
     if ($value === '') {
@@ -921,12 +1008,27 @@ function dr_barangay_id_is_legacy_one_year_valid_until(DateTimeImmutable $resolv
     return $legacyDelta <= 86400 && $policyDelta > 86400;
 }
 
+function dr_barangay_id_has_explicit_validity_selection(array $payload): bool {
+    $years = (int)($payload['barangay_id_validity_years'] ?? 0);
+    if (in_array($years, [1, 2, 3], true)) {
+        return true;
+    }
+
+    $option = strtolower(trim((string)($payload['barangay_id_validity_option'] ?? '')));
+    if (in_array($option, ['1_year', '2_years', '3_years', '1', '2', '3'], true)) {
+        return true;
+    }
+
+    return false;
+}
+
 function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmutable {
     $payload = dr_decode_request_payload($requestRow);
     $issuedAt = dr_barangay_id_issued_at_datetime($requestRow);
     $policyValidUntil = $issuedAt instanceof DateTimeImmutable
         ? $issuedAt->modify('+2 years')->setTime(23, 59, 59)
         : null;
+    $hasExplicitSelection = dr_barangay_id_has_explicit_validity_selection($payload);
 
     $explicitCandidates = [
         (string)($payload['barangay_id_valid_until'] ?? ''),
@@ -936,6 +1038,7 @@ function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmuta
         $resolved = dr_parse_datetime_value($candidate, true);
         if ($resolved instanceof DateTimeImmutable) {
             if ($policyValidUntil instanceof DateTimeImmutable
+                && !$hasExplicitSelection
                 && dr_barangay_id_is_legacy_one_year_valid_until($resolved, $issuedAt)) {
                 return $policyValidUntil;
             }
@@ -1622,6 +1725,7 @@ function dr_hydrate_request_derived_fields(mysqli $conn, array &$row, bool $incl
     if (trim((string)($row['verification_code'] ?? '')) === '') {
         $row['verification_code'] = $issuanceMeta['verification_code'];
     }
+    dr_hydrate_request_delivery_fields($row, $payload);
 }
 
 function dr_sync_stage_from_status_lookup(mysqli $conn, array &$row): void {
@@ -1961,6 +2065,7 @@ function dr_fetch_request(mysqli $conn, string $requestId): ?array {
         dr_hydrate_request_derived_fields($conn, $row);
         dr_merge_finance_transaction_into_request($conn, $row);
         dr_sync_stage_from_status_lookup($conn, $row);
+        dr_hydrate_request_delivery_fields($row);
     }
     return $row ?: null;
 }

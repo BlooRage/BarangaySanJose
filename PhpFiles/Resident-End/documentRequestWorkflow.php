@@ -1883,6 +1883,7 @@ if ($action === 'submit_request') {
     }
 
     $payload = $_POST;
+    $payload['_request_channel'] = 'online';
     unset($payload['action'], $payload['csrf_token']);
 
     $now = dr_now();
@@ -2774,6 +2775,7 @@ if ($action === 'list') {
         if ($row['payload']) {
             $row['request_details'] = dr_safe_json($row['payload']);
         }
+        dr_hydrate_request_delivery_fields($row, $row['payload']);
         unset(
             $row['_tx_amount'],
             $row['_tx_payment_method'],

@@ -208,6 +208,8 @@ if ($purpose === '') {
     $purpose = ti_value($payload, ['request_purpose', 'purpose'], '-');
 }
 
+dr_hydrate_request_delivery_fields($row, $payload);
+
 $validity = trim((string)($row['document_validity'] ?? ''));
 if (dr_is_barangay_id_document_type($documentType)) {
     $barangayIdValidUntil = dr_barangay_id_valid_until_datetime($row);
@@ -236,5 +238,8 @@ ti_json(200, [
         'amount' => $row['amount'] !== null ? (float)$row['amount'] : null,
         'validity' => $validity,
         'submitted_at' => (string)($row['submitted_at'] ?? ''),
+        'hard_copy_status' => (string)($row['hard_copy_status'] ?? ''),
+        'hard_copy_status_label' => (string)($row['hard_copy_status_label'] ?? ''),
+        'hard_copy_notice' => (string)($row['hard_copy_notice'] ?? ''),
     ],
 ]);
