@@ -6193,13 +6193,23 @@
             : `Please confirm that you thoroughly checked the resident's data to ${needsInspection ? `approve the ${docName} for inspection` : `issue a ${docName}`}.`);
       actionPrompt.classList.remove('d-none');
     }
-    if ([
+    const usesPreviewValiditySelection = [
       'personnel_approve',
       'interview_pass',
-    ].includes(type) && actionValidityKind && actionValidityWrap && actionValidity) {
+    ].includes(type);
+    const usesPreviewValidityConfirm = [
+      'personnel_approve_confirm',
+      'interview_pass_confirm',
+    ].includes(type);
+    if (usesPreviewValiditySelection && actionValidityKind && actionValidityWrap && actionValidity) {
       actionValidityWrap.classList.remove('d-none');
       actionValidity.required = true;
       configureValidityField(actionValidityLabel, actionValidityHelp, actionValidity, actionValidityKind, existingDocumentValidity);
+    } else if (usesPreviewValidityConfirm && actionValidityWrap && actionValidity) {
+      // Keep the selected validity from the preview step and prevent a second picker from showing here.
+      actionValidityWrap.classList.add('d-none');
+      actionValidity.required = false;
+      actionValidity.value = existingDocumentValidity;
     }
     if (type === 'mark_completed_confirm' && actionPrompt) {
       actionPrompt.textContent = 'Are you sure you want to release this document now? This will mark the request as completed.';
