@@ -105,20 +105,25 @@
     #table-certificateTracker {
       table-layout: auto;
       width: 100%;
-      min-width: 1100px;
+      min-width: 100%;
     }
     #table-certificateTracker th,
     #table-certificateTracker td {
       vertical-align: middle;
     }
-    #table-certificateTracker .col-request-id { width: 11%; }
-    #table-certificateTracker .col-resident-id { width: 11%; }
-    #table-certificateTracker .col-full-name { width: 18%; }
-    #table-certificateTracker .col-document { width: 15%; }
-    #table-certificateTracker .col-purpose { width: 17%; }
-    #table-certificateTracker .col-status { width: 13%; }
-    #table-certificateTracker .col-submitted { width: 10%; }
-    #table-certificateTracker .col-action { width: 15%; }
+    #table-certificateTracker .col-request-id,
+    #table-certificateTracker .col-resident-id,
+    #table-certificateTracker .col-status,
+    #table-certificateTracker .col-submitted,
+    #table-certificateTracker .col-action {
+      width: 1%;
+      white-space: nowrap;
+    }
+    #table-certificateTracker .col-full-name,
+    #table-certificateTracker .col-document,
+    #table-certificateTracker .col-purpose {
+      width: auto;
+    }
     #table-certificateTracker .cell-truncate {
       display: block;
       white-space: nowrap;
