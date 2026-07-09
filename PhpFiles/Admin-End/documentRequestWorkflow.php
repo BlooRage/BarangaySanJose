@@ -2471,6 +2471,9 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     $businessName = trim((string)($edited['businessName'] ?? ''));
     $fullAddress = trim((string)($edited['fullAddress'] ?? ''));
     $fullName = trim((string)($edited['fullName'] ?? ''));
+    $birthdate = trim((string)($edited['birthdate'] ?? $edited['childBirthdate'] ?? ''));
+    $birthplace = trim((string)($edited['birthplace'] ?? $edited['childBirthplace'] ?? ''));
+    $location = trim((string)($edited['location'] ?? ''));
     $remarks = trim((string)($edited['remarks'] ?? ''));
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
@@ -2515,6 +2518,19 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     }
     if ($fullName !== '') {
         $payload['_preview_full_name'] = $fullName;
+    }
+    if ($birthdate !== '') {
+        $payload['birthdate'] = $birthdate;
+        $payload['date_of_birth'] = $birthdate;
+        $payload['child_dob'] = $birthdate;
+    }
+    if ($birthplace !== '') {
+        $payload['birthplace'] = $birthplace;
+        $payload['place_of_birth'] = $birthplace;
+        $payload['child_birthplace'] = $birthplace;
+    }
+    if ($location !== '') {
+        $payload['location'] = $location;
     }
     if ($remarks !== '') {
         $payload['remarks'] = $remarks;
@@ -2770,10 +2786,10 @@ function dra_generate_issued_document(array $requestRow): ?string
     $resolvedResidentialAddress = dra_pick_most_specific_address([
         $payload['owner_full_address'] ?? '',
         $payload['applicant_full_address'] ?? '',
-        $residentDbAddress,
         $payload['full_address'] ?? '',
         $payload['full_address_display'] ?? '',
         $payload['address'] ?? '',
+        $residentDbAddress,
     ]);
     $applicantResidenceAddress = $resolvedResidentialAddress !== ''
         ? $resolvedResidentialAddress

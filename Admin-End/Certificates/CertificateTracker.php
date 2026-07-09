@@ -444,6 +444,19 @@ if ($certificateLaunchStage === 'release') {
       text-align: center;
       color: #000;
     }
+    #actionModal #actionValidityWrap {
+      text-align: left;
+      max-width: 520px;
+      margin: 0 auto 1rem;
+    }
+    #actionModal #actionValidityWrap .form-label {
+      font-weight: 700;
+      margin-bottom: 0.45rem;
+    }
+    #actionModal #actionValidityWrap .form-text {
+      margin-top: 0.45rem;
+      color: #4b5563;
+    }
     #actionModal .modal-footer {
       flex-wrap: nowrap !important;
     }
@@ -3041,6 +3054,15 @@ if ($certificateLaunchStage === 'release') {
       <div class="modal-body">
         <input type="hidden" id="actionType" name="action">
         <input type="hidden" id="actionRequestId" name="request_id">
+
+        <div id="actionValidityWrap" class="d-none mb-3">
+          <label class="form-label" id="actionValidityLabel">Validity Period</label>
+          <select id="actionValidity" name="document_validity" class="form-select">
+            <option value="">Select validity period</option>
+          </select>
+          <div class="form-text" id="actionValidityHelp">Choose the validity period that will be reflected in the issued document.</div>
+        </div>
+
         <div id="actionPrompt" class="d-none mb-3"></div>
 
         <div id="actionReasonWrap" class="d-none mb-3">
@@ -3056,14 +3078,6 @@ if ($certificateLaunchStage === 'release') {
         <div id="actionOrWrap" class="d-none mb-3">
           <label class="form-label">OR Number</label>
           <input id="actionOr" name="or_number" type="text" class="form-control">
-        </div>
-
-        <div id="actionValidityWrap" class="d-none mb-3">
-          <label class="form-label" id="actionValidityLabel">Validity Period</label>
-          <select id="actionValidity" name="document_validity" class="form-select">
-            <option value="">Select validity period</option>
-          </select>
-          <div class="form-text" id="actionValidityHelp">Choose the validity period that will be reflected in the issued document.</div>
         </div>
 
         <div id="actionIssuedWrap" class="d-none mb-3">

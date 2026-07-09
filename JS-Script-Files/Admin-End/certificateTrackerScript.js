@@ -1093,6 +1093,8 @@
     const key = normalizePreviewDocKey(docType);
     if (key === 'indigency') {
       return [
+        { key: 'fullName', label: 'Name', wide: true },
+        { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
         { key: 'requestOfficerLine1', label: 'Official Name' },
         { key: 'requestOfficerLine2', label: 'Position' },
         { key: 'requestOfficerLine3', label: 'Jurisdiction', wide: true },
@@ -1101,16 +1103,25 @@
     }
     if (key === 'goodmoral') {
       return [
+        { key: 'fullName', label: 'Name', wide: true },
+        { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
         { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
       ];
     }
     if (key === 'residency') {
       return [
-        { key: 'remarks', label: 'Remarks', multiline: true, wide: true }
+        { key: 'fullName', label: 'Name', wide: true },
+        { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
+        { key: 'birthdate', label: 'Birthdate' },
+        { key: 'birthplace', label: 'Birthplace', wide: true },
+        { key: 'remarks', label: 'Remarks', multiline: true, wide: true },
+        { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
       ];
     }
     if (key === 'cohabitation') {
       return [
+        { key: 'fullName', label: 'Applicant Name', wide: true },
+        { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
         { key: 'remarks', label: 'Remarks', multiline: true, wide: true }
       ];
     }
@@ -1126,6 +1137,8 @@
       ];
     }
     return [
+      { key: 'fullName', label: 'Name', wide: true },
+      { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
       { key: 'birthdate', label: 'Birthdate' },
       { key: 'birthplace', label: 'Birthplace' },
       { key: 'location', label: 'Location', multiline: true, wide: true },
@@ -1512,10 +1525,10 @@
       ? row.resident_profile
       : {};
     const fallbackName = firstNonEmptyName([
+      payload._preview_full_name,
       row.full_name,
       row.resident_full_name,
       row.resident_name,
-      payload._preview_full_name,
       payload.resident_name,
       ''
     ]);
@@ -3091,12 +3104,15 @@
       firstNonEmpty([payload.mother_last_name]),
       firstNonEmpty([payload.mother_suffix])
     ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    const cohabitantName = [
-      firstNonEmpty([payload.cohabitant_first]),
-      firstNonEmpty([payload.cohabitant_middle]),
-      firstNonEmpty([payload.cohabitant_last]),
-      firstNonEmpty([payload.cohabitant_suffix])
-    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const cohabitantName = firstNonEmpty([
+      payload.cohabitant_full_name,
+      [
+        firstNonEmpty([payload.cohabitant_first]),
+        firstNonEmpty([payload.cohabitant_middle]),
+        firstNonEmpty([payload.cohabitant_last]),
+        firstNonEmpty([payload.cohabitant_suffix])
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+    ]);
     const durationValue = firstNonEmpty([payload.cohabitation_duration_value]);
     const durationUnit = firstNonEmpty([payload.cohabitation_duration_unit]);
     const cohabitationDurationRaw = firstNonEmpty([
@@ -3565,12 +3581,12 @@
     );
 
     const residencyRows = `
-      <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${esc(safe(fullName))}</strong></div>
-      <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
-      <div class="doc-to-block"><strong>Birthday</strong><strong>:</strong><strong>${esc(safe(birthdate, '${Birthdate}'))}</strong></div>
-      <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${esc(safe(birthplace, '${Birthplace}'))}</strong></div>
+      <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${previewEditable('fullName', safe(fullName), '${FULL_NAME}')}</strong></div>
+      <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress), '${ADDRESS}', 'doc-editable-multiline')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+      <div class="doc-to-block"><strong>Birthday</strong><strong>:</strong><strong>${previewEditable('birthdate', safe(birthdate, '${Birthdate}'), '${Birthdate}')}</strong></div>
+      <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${previewEditable('birthplace', safe(birthplace, '${Birthplace}'), '${Birthplace}')}</strong></div>
       <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
-      <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(safe(purpose, '${PURPOSE}'))}</strong></div>
+      <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${previewEditable('purpose', safe(purpose, '${PURPOSE}'), '${PURPOSE}')}</strong></div>
     `;
 
     const buildIssuedLine = (wrapBeforeLocality = false) => {
@@ -3620,7 +3636,7 @@
       contentHtml = `
         ${toBlock}
         <p>
-          This is to certify that <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong> belongs to one of the indigent families of this Barangay. The income of this family is barely enough to meet their day-to-day needs.
+          This is to certify that <strong>${previewEditable('fullName', safe(fullName, '${FULL_NAME}'), '${FULL_NAME}')}</strong>, resident of <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong>, Barangay San Jose, Montalban, Rizal belongs to one of the indigent families of this Barangay. The income of this family is barely enough to meet their day-to-day needs.
         </p>
         <p>
           This certification is being issued upon the request of the above subject in person in connection with his/her application for
@@ -3644,10 +3660,10 @@
         <p>
           This preview summarizes the submitted Barangay ID application details for staff review before release preparation.
         </p>
-        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${esc(safe(fullName, '-'))}</strong></div>
-        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress, '-'))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
-        <div class="doc-to-block"><strong>Birthdate</strong><strong>:</strong><strong>${esc(safe(birthdate, '-'))}</strong></div>
-        <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${esc(safe(birthplace, '-'))}</strong></div>
+        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${previewEditable('fullName', safe(fullName, '-'), '-')}</strong></div>
+        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress, '-'), '-', 'doc-editable-multiline')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+        <div class="doc-to-block"><strong>Birthdate</strong><strong>:</strong><strong>${previewEditable('birthdate', safe(birthdate, '-'), '-')}</strong></div>
+        <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${previewEditable('birthplace', safe(birthplace, '-'), '-')}</strong></div>
         <div class="doc-to-block"><strong>Contact Number</strong><strong>:</strong><strong>${esc(safe(contactNumber, '-'))}</strong></div>
         ${barangayIdExtraDetails}
       `;
@@ -3665,17 +3681,17 @@
           <div class="doc-preview-generalclearance-field">
             <strong class="doc-preview-generalclearance-field-label">Name</strong>
             <strong class="doc-preview-generalclearance-field-colon">:</strong>
-            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(fullName, '${FULL_NAME}'))}</strong></div>
+            <div class="doc-preview-generalclearance-field-value"><strong>${previewEditable('fullName', templateSafe(fullName, '${FULL_NAME}'), '${FULL_NAME}')}</strong></div>
           </div>
           <div class="doc-preview-generalclearance-field doc-preview-generalclearance-field--address">
             <strong class="doc-preview-generalclearance-field-label">Residential Address</strong>
             <strong class="doc-preview-generalclearance-field-colon">:</strong>
-            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(fullAddress, '${ADDRESS}'))}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
+            <div class="doc-preview-generalclearance-field-value"><strong>${previewEditable('fullAddress', templateSafe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
           </div>
           <div class="doc-preview-generalclearance-field">
             <strong class="doc-preview-generalclearance-field-label">Location</strong>
             <strong class="doc-preview-generalclearance-field-colon">:</strong>
-            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(location, '${LOCATION}'))}</strong></div>
+            <div class="doc-preview-generalclearance-field-value"><strong>${previewEditable('location', templateSafe(location, '${LOCATION}'), '${LOCATION}', 'doc-editable-multiline')}</strong></div>
           </div>
           <div class="doc-preview-generalclearance-field">
             <strong class="doc-preview-generalclearance-field-label">Remarks</strong>
@@ -3685,7 +3701,7 @@
           <div class="doc-preview-generalclearance-field">
             <strong class="doc-preview-generalclearance-field-label">Purpose</strong>
             <strong class="doc-preview-generalclearance-field-colon">:</strong>
-            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(purpose, '${PURPOSE}'))}</strong></div>
+            <div class="doc-preview-generalclearance-field-value"><strong>${previewEditable('purpose', templateSafe(purpose, '${PURPOSE}'), '${PURPOSE}')}</strong></div>
           </div>
         </div>
         <p class="doc-preview-generalclearance-note">
@@ -3735,12 +3751,12 @@
           <div class="doc-preview-tricycle-field">
             <strong class="doc-preview-tricycle-field-label">Name</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullName, '${FULL_NAME}'))}</strong></div>
+            <div class="doc-preview-tricycle-field-value"><strong>${previewEditable('fullName', templateSafe(fullName, '${FULL_NAME}'), '${FULL_NAME}')}</strong></div>
           </div>
           <div class="doc-preview-tricycle-field doc-preview-tricycle-field--address">
             <strong class="doc-preview-tricycle-field-label">Address</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullAddress, '${ADDRESS}'))}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
+            <div class="doc-preview-tricycle-field-value"><strong>${previewEditable('fullAddress', templateSafe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
           </div>
           <div class="doc-preview-tricycle-field">
             <strong class="doc-preview-tricycle-field-label">Location</strong>
@@ -3838,8 +3854,8 @@
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
-          <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
+          This is to certify <strong>${previewEditable('fullName', safe(fullName, '${FULL_NAME}'), '${FULL_NAME}')}</strong>, resident of
+          <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong>, Barangay San Jose, Montalban, Rizal
           is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p>
@@ -3855,8 +3871,8 @@
       contentHtml = `
         <p class="doc-preview-jail-lead"><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p class="doc-preview-jail-center">
-          This is to certify <strong>${esc(safe(fullName, '${NAME}'))}</strong>, resident of
-          <strong>${esc(safe(applicantAddressWithBarangay, '${ADDRESS}'))}</strong>
+          This is to certify <strong>${previewEditable('fullName', safe(fullName, '${NAME}'), '${NAME}')}</strong>, resident of
+          <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong>, Barangay San Jose, Montalban, Rizal
           is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p class="doc-preview-jail-center">
@@ -3875,8 +3891,8 @@
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that <strong>${esc(safe(fullName, '${NAME}'))}</strong>,
-          <strong>${esc(safe(age, '${AGE}'))} y/o</strong> a resident of <strong>${esc(safe(applicantResidenceAddress, '${ADDRESS}'))}</strong>
+          This is to certify that <strong>${previewEditable('fullName', safe(fullName, '${NAME}'), '${NAME}')}</strong>,
+          <strong>${esc(safe(age, '${AGE}'))} y/o</strong> a resident of <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong>, Barangay San Jose, Montalban, Rizal
           and <strong>${esc(safe(cohabitantName, '${PARTNER_NAME}'))}</strong>,
           <strong>${esc(safe(cohabitantAge, '-'))} y/o</strong> a resident of <strong>${esc(safe(cohabitantResidenceAddress, '${PARTNER_ADDRESS}'))}</strong>.
         </p>
@@ -3897,8 +3913,8 @@
         <p>
           This is to certify that the person whose name appears here on has requested a Barangay Certification from this office and the information are listed below:
         </p>
-        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><div><div><strong>${esc(safe(fullName, '-'))}</strong>, ${esc(safe(age, '-'))} y/o</div><div><strong>${esc(safe(cohabitantName, '-'))}</strong>, ${esc(safe(cohabitantAge, '-'))} y/o</div></div></div>
-        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress, '-'))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><div><div><strong>${previewEditable('fullName', safe(fullName, '-'), '-')}</strong>, ${esc(safe(age, '-'))} y/o</div><div><strong>${previewEditable('cohabitantName', safe(cohabitantName, '-'), '-')}</strong>, ${esc(safe(cohabitantAge, '-'))} y/o</div></div></div>
+        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress, '-'), '-', 'doc-editable-multiline')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
         <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
         <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(`COHABITATION SINCE ${safe(cohabitationStartDate || cohabitationDuration, '-')}`)}</strong></div>
         <div class="doc-to-block"><strong>Name of Children</strong><strong>:</strong><span>${esc(safe(cohabitationChildrenList, '-'))}</span></div>
@@ -3931,8 +3947,8 @@
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify <strong>${esc(safe(applicantHonorificText, 'MR./MS.'))} ${esc(safe(fullName, '${NAME}'))}</strong>,
-          resident of <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
+          This is to certify <strong>${esc(safe(applicantHonorificText, 'MR./MS.'))} ${previewEditable('fullName', safe(fullName, '${NAME}'), '${NAME}')}</strong>,
+          resident of <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), '${ADDRESS}', 'doc-editable-multiline')}</strong>, Barangay San Jose, Montalban, Rizal
           since <strong>${esc(safe(residencySinceText, '${RESIDENCY_SINCE}'))}</strong> is a qualified availlee of RA 11261
           or the First Time Jobseekers Act 2019.
         </p>
@@ -6161,11 +6177,11 @@
       actionPrompt.textContent = isFirstTimeJobSeeker
         ? 'This request will be moved to the interview stage. The resident will be notified to report to the barangay within 5 working days for the oath of undertaking and interview.'
         : (isBarangayIdRequest
-            ? 'Choose the Barangay ID validity first, then click Review Application to inspect the submitted details. Once everything is correct, proceed to approve the request for release.'
+            ? 'Choose the Barangay ID validity above, then click Review Application to inspect the submitted details. Once everything is correct, proceed to approve the request for release.'
         : (needsFeeTagging
             ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for ${needsInspection ? 'inspection' : 'payment'}.`
             : (isCertificateRequest
-                ? `Set the certificate validity first, then click View Document to check the document that will be issued. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`
+                ? `Set the certificate validity above first, then click View Document to check the document that will be issued. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`
                 : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`)));
       actionPrompt.classList.remove('d-none');
     }
@@ -6196,7 +6212,7 @@
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass' && actionPrompt) {
-      actionPrompt.textContent = 'Set the certificate validity first, then click View Document to review the First Time Job Seeker certificate. After you save and process it, first-time requests will move to release while repeat requests will move to payment.';
+      actionPrompt.textContent = 'Set the certificate validity above first, then click View Document to review the First Time Job Seeker certificate. After you save and process it, first-time requests will move to release while repeat requests will move to payment.';
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass_confirm' && actionPrompt) {
