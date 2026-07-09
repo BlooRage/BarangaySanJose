@@ -2717,6 +2717,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     $preferDocxOutput = !empty($requestRow['_prefer_docx_output']);
     $docType = trim((string)($requestRow['document_type'] ?? 'Certificate'));
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
+    $isBarangayId = dr_is_barangay_id_document_type($docType);
     $stripTemplateTokens = static function (string $value): string {
         $value = trim($value);
         if ($value === '') {
@@ -2920,7 +2921,6 @@ function dra_generate_issued_document(array $requestRow): ?string
         'tricycleclearance',
         'fortricyclepermit',
     ], true);
-    $isBarangayId = dr_is_barangay_id_document_type($docType);
     $generalPermitPurpose = dra_general_clearance_purpose_from_document_type($docType);
     $isGeneralPermitClearance = ($generalPermitPurpose !== '');
     $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
@@ -5337,7 +5337,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $valueX = 79.0;
             $lineH = 6.2;
 
-            $row = static function (string $label, string $value, bool $valueBold = true, string $emptyFallback = '-') use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
+            $writeResidencyField = static function (string $label, string $value, bool $valueBold = true, string $emptyFallback = '-') use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
                 $rawLines = preg_split('/\R/u', (string)$value) ?: [];
                 $normalizedLines = [];
                 foreach ($rawLines as $line) {
@@ -5362,12 +5362,12 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pdf->SetY($endY);
             };
 
-            $row('Name', $fullName !== '' ? $fullName : '-', false);
-            $row('Address', $applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-', false);
-            $row('Birthday', $birthdateValue !== '' ? $birthdateValue : '-', false);
-            $row('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-', false);
-            $row('Remarks', $remarksValue, false, '');
-            $row('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', false);
+            $writeResidencyField('Name', $fullName !== '' ? $fullName : '-', false);
+            $writeResidencyField('Address', $applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-', false);
+            $writeResidencyField('Birthday', $birthdateValue !== '' ? $birthdateValue : '-', false);
+            $writeResidencyField('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-', false);
+            $writeResidencyField('Remarks', $remarksValue, false, '');
+            $writeResidencyField('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', false);
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
             $writeRichParagraph(
@@ -5876,12 +5876,12 @@ function dra_generate_issued_document(array $requestRow): ?string
                 100,
                 4,
                 dra_build_certificate_validity_notice(
-                    (string)($row['document_validity'] ?? ''),
+                    (string)($requestRow['document_validity'] ?? ''),
                     (string)dra_manual_first_non_empty([
-                        $row['release_timestamp'] ?? null,
-                        $row['completed_at'] ?? null,
-                        $row['ready_at'] ?? null,
-                        $row['submitted_at'] ?? null,
+                        $requestRow['release_timestamp'] ?? null,
+                        $requestRow['completed_at'] ?? null,
+                        $requestRow['ready_at'] ?? null,
+                        $requestRow['submitted_at'] ?? null,
                         dr_now(),
                     ])
                 ),
@@ -5933,12 +5933,12 @@ function dra_generate_issued_document(array $requestRow): ?string
                 118,
                 4,
                 dra_build_certificate_validity_notice(
-                    (string)($row['document_validity'] ?? ''),
+                    (string)($requestRow['document_validity'] ?? ''),
                     (string)dra_manual_first_non_empty([
-                        $row['release_timestamp'] ?? null,
-                        $row['completed_at'] ?? null,
-                        $row['ready_at'] ?? null,
-                        $row['submitted_at'] ?? null,
+                        $requestRow['release_timestamp'] ?? null,
+                        $requestRow['completed_at'] ?? null,
+                        $requestRow['ready_at'] ?? null,
+                        $requestRow['submitted_at'] ?? null,
                         dr_now(),
                     ])
                 ),

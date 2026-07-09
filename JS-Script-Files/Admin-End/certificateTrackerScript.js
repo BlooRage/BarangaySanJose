@@ -6195,9 +6195,7 @@
     }
     if ([
       'personnel_approve',
-      'personnel_approve_confirm',
       'interview_pass',
-      'interview_pass_confirm',
     ].includes(type) && actionValidityKind && actionValidityWrap && actionValidity) {
       actionValidityWrap.classList.remove('d-none');
       actionValidity.required = true;
