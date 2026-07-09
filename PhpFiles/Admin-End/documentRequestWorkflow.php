@@ -6382,6 +6382,71 @@ function dra_backfill_payment_verified_to_ready(mysqli $conn): void
     }
 }
 
+function dra_backfill_online_ready_for_claim_to_completed(mysqli $conn): void
+{
+    try {
+        $legacyStage = DR_STAGE_READY_FOR_CLAIM;
+        $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE stage = ? ORDER BY request_id ASC");
+        if (!$stmt) {
+            return;
+        }
+        $stmt->bind_param('s', $legacyStage);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        $stmt->close();
+
+        foreach ($rows as $row) {
+            $requestId = trim((string)($row['request_id'] ?? ''));
+            if ($requestId === '') {
+                continue;
+            }
+
+            $payload = dra_decode_request_payload($row);
+            if (dr_request_channel_from_payload($payload) !== 'online') {
+                continue;
+            }
+
+            $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
+            if ($issuedPath === '') {
+                $issuedPath = trim((string)(dra_generate_issued_document_safe($row) ?? ''));
+                if ($issuedPath === '') {
+                    continue;
+                }
+            }
+
+            $completedAt = (string)dra_manual_first_non_empty([
+                $row['completed_at'] ?? null,
+                $row['ready_at'] ?? null,
+                $row['release_timestamp'] ?? null,
+                $row['updated_at'] ?? null,
+                dr_now(),
+            ]);
+            $updated = dr_update_stage($conn, $requestId, DR_STAGE_COMPLETED, [
+                'completed_at' => $completedAt,
+                'issued_file_path' => $issuedPath,
+            ]);
+            if (!$updated) {
+                continue;
+            }
+
+            dra_update_request_payload_fields($conn, $requestId, $updated, [
+                '_request_channel' => 'online',
+                '_soft_copy_available' => true,
+                '_soft_copy_delivery_mode' => 'online_after_payment',
+                '_soft_copy_completed_at' => $completedAt,
+                '_hard_copy_status' => 'not_printed',
+                '_hard_copy_claim_available' => true,
+            ]);
+        }
+    } catch (Throwable $e) {
+        // best-effort migration only
+    }
+}
+
 function dra_save_upload(array $file, string $folder): array
 {
     $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
@@ -7595,6 +7660,7 @@ if ($action === 'create_manual_request') {
 if ($action !== 'list') {
     dra_backfill_payment_verified_to_ready($conn);
 }
+dra_backfill_online_ready_for_claim_to_completed($conn);
 
 if ($action === 'list') {
     $where = [];
