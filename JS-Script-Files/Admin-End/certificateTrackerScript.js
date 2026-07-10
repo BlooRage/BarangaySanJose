@@ -3624,8 +3624,9 @@
       { label: 'OR No.:', value: safe(state.orNumber, '_____') },
     ]);
     const buildCertificateFooterNote = () => {
+      const dayWord = sentenceCaseWords(numberToWords(certificateValidityDays || 0)) || 'Forty-five';
       const dayLabel = Number(certificateValidityDays || 0) === 1 ? 'day' : 'days';
-      return `Valid for ${esc(String(certificateValidityDays || 0))} ${dayLabel} from date of issue.<br>Scan QR code to verify this document.`;
+      return `This is valid ${esc(dayWord)} (${esc(String(certificateValidityDays || 0))}) ${dayLabel} from the date of issue, check the<br>QR Code to verify the authenticity of the document`;
     };
 
     let contentHtml = '';

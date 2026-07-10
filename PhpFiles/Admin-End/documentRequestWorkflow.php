@@ -683,9 +683,10 @@ function dra_build_certificate_validity_notice(?string $validityDateTime, ?strin
     $validityMidday = $parsed->setTime(12, 0, 0);
     $dayCount = max(0, (int)$baseMidday->diff($validityMidday)->format('%r%a'));
 
+    $dayWord = dra_ucfirst_words(dra_number_to_words($dayCount));
     $dayLabel = $dayCount === 1 ? 'day' : 'days';
 
-    return "Valid for {$dayCount} {$dayLabel} from date of issue.\nScan QR code to verify this document.";
+    return "This is valid {$dayWord} ({$dayCount}) {$dayLabel} from the date of issue, check the\nQR Code to verify the authenticity of the document";
 }
 
 function dra_number_to_words(int $number): string
