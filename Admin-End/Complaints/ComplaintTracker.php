@@ -95,69 +95,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             max-width: 420px;
         }
 
-        .complaint-substatus-toolbar {
-            max-width: var(--admin-table-shell-max-width);
-            margin: 0 auto 1rem;
-            padding: 0.85rem 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.9rem;
-            border: 1px solid #e7dfd4;
-            border-radius: 1rem;
-            background: #fff9f1;
-        }
-
-        body.admin-sidebar-collapsed .complaint-substatus-toolbar {
-            max-width: var(--admin-table-shell-max-width-collapsed);
-        }
-
-        .complaint-substatus-label {
-            flex: 0 0 auto;
-            margin: 0;
-            color: #9a5b05;
-            font-size: 0.9rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-        }
-
-        .complaint-substatus-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.6rem;
-        }
-
-        .complaint-substatus-tab {
-            border: 1px solid #ead7c1;
-            border-radius: 999px;
-            background: #ffffff;
-            color: #91530a;
-            font-size: 0.92rem;
-            font-weight: 600;
-            line-height: 1.2;
-            padding: 0.48rem 0.9rem;
-            transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
-        }
-
-        .complaint-substatus-tab:hover,
-        .complaint-substatus-tab:focus-visible {
-            border-color: #d7862d;
-            color: #7c4703;
-            background: #fff4e6;
-            box-shadow: 0 8px 18px rgba(207, 111, 20, 0.12);
-            transform: translateY(-1px);
-            outline: none;
-        }
-
-        .complaint-substatus-tab.active,
-        .complaint-substatus-tab.active:hover,
-        .complaint-substatus-tab.active:focus-visible {
-            border-color: #cf6f14;
-            background: #cf6f14;
-            color: #ffffff;
-            box-shadow: 0 10px 20px rgba(176, 90, 6, 0.18);
-        }
-
         #viewModal .modal-content {
             border: 1px solid #e9ecef;
             border-radius: 16px;
@@ -712,20 +649,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 width: 100%;
             }
 
-            .complaint-substatus-toolbar {
-                padding: 0.85rem;
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .complaint-substatus-list {
-                gap: 0.45rem;
-            }
-
-            .complaint-substatus-tab {
-                width: 100%;
-            }
-
             .complaint-tracker-shell .admin-search {
                 min-width: 0;
                 max-width: none;
@@ -786,11 +709,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <button class="nav-link complaint-status-scope-tab fw-semibold" type="button" data-filter="finalized">Dropped/Referred</button>
             </li>
         </ul>
-
-        <div class="complaint-substatus-toolbar" id="complaintSubstatusToolbar" aria-label="Complaint sub-status filters">
-            <p class="complaint-substatus-label">Sub-status</p>
-            <div class="complaint-substatus-list" id="complaintSubstatusTabs"></div>
-        </div>
 
         <div id="complaintTrackerPanel" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
