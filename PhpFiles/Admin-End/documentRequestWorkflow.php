@@ -2441,12 +2441,14 @@ function dra_barangay_id_generated_number(array $payload, string $requestId, Dat
 
 function dra_barangay_id_generated_valid_until(array $payload, DateTimeInterface $issuedDateObj, ?string $storedValidity = null): string
 {
-    foreach ([
-        (string)($payload['barangay_id_valid_until'] ?? ''),
-        (string)($payload['valid_until'] ?? ''),
-        (string)($payload['document_validity'] ?? ''),
-        (string)$storedValidity,
-    ] as $candidate) {
+    foreach (
+        [
+            (string)($payload['barangay_id_valid_until'] ?? ''),
+            (string)($payload['valid_until'] ?? ''),
+            (string)($payload['document_validity'] ?? ''),
+            (string)$storedValidity,
+        ] as $candidate
+    ) {
         $candidate = trim($candidate);
         if ($candidate === '') {
             continue;
@@ -2668,7 +2670,7 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void
     if ($requestOfficerLine1 !== '' || $requestOfficerLine2 !== '' || $requestOfficerLine3 !== '') {
         $payload['request_officer_line1'] = $requestOfficerLine1;
         $payload['request_officer_line2'] = $requestOfficerLine2;
-        $payload['request_officer_line3'] = $requestOfficerLine3; 
+        $payload['request_officer_line3'] = $requestOfficerLine3;
         $requestOfficer = implode(' - ', array_values(array_filter([
             $requestOfficerLine1,
             $requestOfficerLine2,
