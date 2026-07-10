@@ -35,6 +35,8 @@ if ($certificateLaunchStage === 'release') {
   <style>
     .certificate-tracker-shell {
       max-width: var(--admin-table-shell-max-width);
+      width: 100%;
+      min-width: 0;
       margin: 0 auto;
     }
     #certTrackerPageTabs {
@@ -138,9 +140,22 @@ if ($certificateLaunchStage === 'release') {
       max-width: 360px;
     }
     .certificate-tracker-shell .table-responsive {
+      width: 100%;
+      max-width: 100%;
       overflow-x: auto;
       overflow-y: visible;
       -webkit-overflow-scrolling: touch;
+      padding-bottom: 8px;
+      scrollbar-gutter: stable;
+    }
+    #docRequestsPanel {
+      max-width: 100%;
+      min-width: 0;
+      overflow-x: hidden;
+    }
+    #docRequestsPanel .compact-admin-table-shell {
+      width: 100%;
+      max-width: 100%;
     }
     .certificate-tracker-shell .fee-catalog-table-shell {
       border: 1px solid #eceff3;
@@ -202,26 +217,44 @@ if ($certificateLaunchStage === 'release') {
       }
     }
     #table-certificateTracker {
-      table-layout: auto;
+      table-layout: fixed;
       width: 100%;
-      min-width: 100%;
+      min-width: 1480px;
     }
     #table-certificateTracker th,
     #table-certificateTracker td {
       vertical-align: middle;
     }
     #table-certificateTracker .col-request-id,
-    #table-certificateTracker .col-resident-id,
-    #table-certificateTracker .col-status,
-    #table-certificateTracker .col-submitted,
+    #table-certificateTracker .col-resident-id {
+      width: 11%;
+      white-space: nowrap;
+    }
+    #table-certificateTracker .col-status {
+      width: 19%;
+      min-width: 260px;
+      white-space: normal;
+    }
+    #table-certificateTracker .col-submitted {
+      width: 14%;
+      min-width: 180px;
+      white-space: nowrap;
+    }
     #table-certificateTracker .col-action {
-      width: 1%;
+      width: 12%;
+      min-width: 150px;
       white-space: nowrap;
     }
     #table-certificateTracker .col-full-name,
     #table-certificateTracker .col-document,
     #table-certificateTracker .col-purpose {
-      width: auto;
+      width: 11%;
+    }
+    #table-certificateTracker .col-document {
+      width: 17%;
+    }
+    #table-certificateTracker .col-purpose {
+      width: 16%;
     }
     #table-certificateTracker .cell-truncate {
       display: block;
@@ -239,6 +272,22 @@ if ($certificateLaunchStage === 'release') {
       white-space: normal;
       word-break: break-word;
       line-height: 1.35;
+    }
+    #table-certificateTracker td.col-status-cell {
+      white-space: normal;
+      vertical-align: top;
+    }
+    #table-certificateTracker td:last-child {
+      text-align: left;
+      white-space: nowrap;
+    }
+    #table-certificateTracker td:last-child .btn,
+    #table-certificateTracker td:last-child .compact-table-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      padding-inline: 0.8rem;
     }
     #viewModal .modal-dialog {
       width: 75vw;
@@ -1953,55 +2002,8 @@ if ($certificateLaunchStage === 'release') {
       gap: 16px;
       flex-wrap: wrap;
     }
-    .manual-issuance-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      background: #fff3e6;
-      border: 1px solid #fed7aa;
-      color: #9a3412;
-      font-size: .85rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
     .manual-issuance-steps {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .manual-step {
-      border: 1px solid #e5e7eb;
-      border-radius: 18px;
-      background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
-      padding: 14px 16px;
-      min-height: 130px;
-    }
-    .manual-step-index {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      background: #ea580c;
-      color: #fff;
-      font-size: .85rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-    .manual-step-title {
-      font-size: .95rem;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 6px;
-    }
-    .manual-step-copy {
-      font-size: .82rem;
-      color: #6b7280;
-      line-height: 1.45;
-      margin: 0;
+      display: none !important;
     }
     .manual-issuance-card {
       border: 1px solid #e5e7eb;
@@ -2404,9 +2406,6 @@ if ($certificateLaunchStage === 'release') {
         min-width: 100%;
         max-width: 100%;
       }
-      .manual-issuance-steps {
-        grid-template-columns: 1fr;
-      }
       .manual-photo-workspace {
         --manual-photo-frame-size: min(72vw, 290px);
         min-height: 360px;
@@ -2446,7 +2445,7 @@ if ($certificateLaunchStage === 'release') {
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-  <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
+  <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" style="min-width:0;">
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
     <hr class="mb-4">
 
@@ -2524,18 +2523,11 @@ if ($certificateLaunchStage === 'release') {
     <div id="manualIssuancePanel" class="d-none bg-white p-4 rounded-4 shadow-sm border certificate-tracker-shell">
       <div class="manual-issuance-header mb-4">
         <div>
-          <h5 class="fw-bold mb-1">Manual / Walk-in Document Issuance</h5>
-          <p class="text-muted mb-0">
-            Encode handwritten applications here, preview the final document before submission, then send the request into the release workflow. Paid documents still pass through finance, while free documents such as Barangay ID go straight to release. QR verification still applies to issued files.
-          </p>
-        </div>
-        <div class="manual-issuance-badge">
-          <i class="fas fa-shield-halved"></i>
-          Admin-only issuance flow
+          <h5 class="fw-bold mb-0">Manual / Walk-in Document Issuance</h5>
         </div>
       </div>
 
-      <div class="manual-issuance-steps mb-4">
+      <div class="manual-issuance-steps mb-4 d-none">
         <div class="manual-step">
           <div class="manual-step-index">1</div>
           <div class="manual-step-title">Receive Form</div>
