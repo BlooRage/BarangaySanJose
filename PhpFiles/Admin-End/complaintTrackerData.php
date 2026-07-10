@@ -921,6 +921,17 @@ if ($action === 'list') {
     if (!in_array($statusFilter, ['', 'active', 'resolved', 'finalized'], true)) {
         $statusFilter = '';
     }
+    $subStatusFilter = strtolower(trim((string)($_GET['sub_status'] ?? '')));
+    $allowedSubStatusFilters = [
+        '' => ['received', 'under_investigation', 'action_in_progress', 'resolved', 'dropped', 'referred'],
+        'active' => ['received', 'under_investigation', 'action_in_progress'],
+        'resolved' => ['resolved'],
+        'finalized' => ['dropped', 'referred'],
+    ];
+    $validSubStatuses = $allowedSubStatusFilters[$statusFilter] ?? $allowedSubStatusFilters[''];
+    if ($subStatusFilter !== '' && !in_array($subStatusFilter, $validSubStatuses, true)) {
+        $subStatusFilter = '';
+    }
     $dateFrom = trim((string)($_GET['date_from'] ?? ''));
     $dateTo = trim((string)($_GET['date_to'] ?? ''));
     $complaintTypeFilters = parseCsvValues($_GET['complaint_type'] ?? '');
@@ -1030,6 +1041,11 @@ if ($action === 'list') {
         $filterSql .= " AND complaint_rows.status_key = ?";
         $filterTypes .= 's';
         $filterParams[] = $statusFilter;
+    }
+    if ($subStatusFilter !== '') {
+        $filterSql .= " AND complaint_rows.status_key = ?";
+        $filterTypes .= 's';
+        $filterParams[] = $subStatusFilter;
     }
 
     if ($dateFrom !== '') {

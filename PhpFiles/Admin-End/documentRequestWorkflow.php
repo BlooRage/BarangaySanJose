@@ -2264,6 +2264,47 @@ function dra_request_notice(array $requestRow, string $requestId, string $suffix
     return 'Your ' . $docType . ' Request #' . $rid . ' has been ' . $suffix;
 }
 
+function dra_sms_clip(string $value, int $maxLength): string
+{
+    $value = preg_replace('/\s+/', ' ', trim($value));
+    if (!is_string($value) || $value === '') {
+        return '';
+    }
+
+    $length = function_exists('mb_strlen')
+        ? (int)mb_strlen($value, 'UTF-8')
+        : strlen($value);
+    if ($maxLength < 4 || $length <= $maxLength) {
+        return $value;
+    }
+
+    if (function_exists('mb_substr')) {
+        return rtrim((string)mb_substr($value, 0, $maxLength - 3, 'UTF-8')) . '...';
+    }
+    return rtrim(substr($value, 0, $maxLength - 3)) . '...';
+}
+
+function dra_short_negative_notice(array $requestRow, string $statusLabel, string $reason = ''): string
+{
+    $docType = dra_sms_clip(dra_humanize_document_type((string)($requestRow['document_type'] ?? '')), 40);
+    if ($docType === '') {
+        $docType = 'Document Request';
+    }
+
+    $prefix = trim($docType . ' ' . trim($statusLabel));
+    $reason = trim($reason);
+    if ($reason === '') {
+        return $prefix . '.';
+    }
+
+    $prefixLength = function_exists('mb_strlen')
+        ? (int)mb_strlen($prefix, 'UTF-8')
+        : strlen($prefix);
+    $reasonLimit = max(12, 155 - $prefixLength - 2);
+
+    return $prefix . ': ' . dra_sms_clip($reason, $reasonLimit);
+}
+
 function dra_is_first_time_job_seeker(array $requestRow): bool
 {
     $docType = strtolower(trim((string)($requestRow['document_type'] ?? '')));
@@ -8490,14 +8531,16 @@ if ($action === 'personnel_approve') {
         'personnel_decision_at' => dr_now(),
         'fee_amount' => $defaultFee,
     ];
-    $resolvedDocumentValidity = dra_resolve_document_validity_datetime(
-        (string)($row['document_type'] ?? ''),
-        $requestedValidity,
-        (string)($row['document_validity'] ?? ''),
-        (string)($patch['personnel_decision_at'] ?? dr_now())
-    );
-    if ($resolvedDocumentValidity !== null) {
-        $patch['document_validity'] = $resolvedDocumentValidity;
+    if (!$isFirstTimeJobSeeker) {
+        $resolvedDocumentValidity = dra_resolve_document_validity_datetime(
+            (string)($row['document_type'] ?? ''),
+            $requestedValidity,
+            (string)($row['document_validity'] ?? ''),
+            (string)($patch['personnel_decision_at'] ?? dr_now())
+        );
+        if ($resolvedDocumentValidity !== null) {
+            $patch['document_validity'] = $resolvedDocumentValidity;
+        }
     }
 
     if ($isFreeDocument && !$isFirstTimeJobSeeker && !$requiresInspection) {
@@ -8603,7 +8646,7 @@ if ($action === 'personnel_reject') {
         $conn,
         $updated,
         'Document Request Rejected',
-        dra_request_notice($updated, $requestId, 'rejected. Reason: ' . $reason)
+        dra_short_negative_notice($updated, 'Rejected', $reason)
     );
 
     try {
@@ -8622,20 +8665,43 @@ if ($action === 'interview_pass') {
         dr_respond_json(422, ['success' => false, 'message' => 'Request is not currently waiting for interview approval.']);
     }
 
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    $requestedValidity = trim((string)($_POST['document_validity'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
+    }
+    if (!empty($editedPreview)) {
+        dra_apply_preview_edits($conn, $requestId, $row, $editedPreview);
+        $row = dr_fetch_request($conn, $requestId) ?? $row;
+    }
+
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     if ($verificationCode === '') {
         $verificationCode = strtoupper(bin2hex(random_bytes(8)));
     }
     $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+    $resolvedDocumentValidity = dra_resolve_document_validity_datetime(
+        (string)($row['document_type'] ?? ''),
+        $requestedValidity,
+        (string)($row['document_validity'] ?? ''),
+        dr_now()
+    );
     $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
         'verification_code' => $verificationCode,
         'fee_amount' => 0,
+        'document_validity' => $resolvedDocumentValidity !== null
+            ? $resolvedDocumentValidity
+            : (string)($row['document_validity'] ?? ''),
     ]));
     if ($issuedPath === null || trim((string)$issuedPath) === '') {
         dr_respond_json(500, ['success' => false, 'message' => 'Interview passed, but issued document generation failed.']);
     }
 
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
+    $patch = [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
         'personnel_decision_at' => dr_now(),
@@ -8643,14 +8709,13 @@ if ($action === 'interview_pass') {
         'ready_at' => dr_now(),
         'verification_code' => $verificationCode,
         'qr_code_path' => $qrCodePath,
-        'document_validity' => dra_resolve_document_validity_datetime(
-            (string)($row['document_type'] ?? ''),
-            null,
-            (string)($row['document_validity'] ?? ''),
-            dr_now()
-        ),
         'issued_file_path' => (string)$issuedPath,
-    ]);
+    ];
+    if ($resolvedDocumentValidity !== null) {
+        $patch['document_validity'] = $resolvedDocumentValidity;
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
 
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark interview as passed.']);
@@ -8699,7 +8764,7 @@ if ($action === 'interview_fail') {
         $conn,
         $updated,
         'First Time Job Seeker Interview Failed',
-        dra_request_notice($updated, $requestId, 'did not pass the interview. Reason: ' . $reason)
+        dra_short_negative_notice($updated, 'Interview Failed', $reason)
     );
 
     try {
@@ -8834,7 +8899,7 @@ if ($action === 'inspection_fail') {
         $conn,
         $updated,
         'Inspection Failed',
-        dra_request_notice($updated, $requestId, 'did not pass inspection. Reason: ' . $reason)
+        dra_short_negative_notice($updated, 'Inspection Failed', $reason)
     );
 
     try {
@@ -9083,7 +9148,7 @@ if ($action === 'finance_reject') {
         $conn,
         $updated,
         'Payment Rejected',
-        dra_request_notice($updated, $requestId, 'payment rejected. Reason: ' . $reason)
+        dra_short_negative_notice($updated, 'Payment Rejected', $reason)
     );
 
     try {

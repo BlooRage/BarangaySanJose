@@ -6193,10 +6193,10 @@
             : `Please confirm that you thoroughly checked the resident's data to ${needsInspection ? `approve the ${docName} for inspection` : `issue a ${docName}`}.`);
       actionPrompt.classList.remove('d-none');
     }
-    const usesPreviewValiditySelection = [
-      'personnel_approve',
-      'interview_pass',
-    ].includes(type);
+    const usesPreviewValiditySelection = (
+      type === 'interview_pass'
+      || (type === 'personnel_approve' && !isFirstTimeJobSeeker)
+    );
     const usesPreviewValidityConfirm = [
       'personnel_approve_confirm',
       'interview_pass_confirm',
@@ -6220,11 +6220,11 @@
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass' && actionPrompt) {
-      actionPrompt.textContent = 'Set the certificate validity above first, then click View Document to review the First Time Job Seeker certificate. After you save and process it, first-time requests will move to release while repeat requests will move to payment.';
+      actionPrompt.textContent = 'Set the certificate validity above first, then click View Document to review the First Time Job Seeker certificate. Once everything is correct, save and process it for release.';
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass_confirm' && actionPrompt) {
-      actionPrompt.textContent = 'Please confirm the interview result and the document details. First-time requests will move to release, while repeat requests will move to payment.';
+      actionPrompt.textContent = 'Please confirm the interview result and the document details. This will save the preview and move the request to release.';
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_fail' && actionPrompt) {

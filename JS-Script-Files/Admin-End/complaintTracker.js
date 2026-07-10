@@ -13,6 +13,8 @@
     const paginationEl = document.getElementById("complaintPagination");
     const refreshBtn = document.getElementById("btnComplaintTableRefresh");
     const filterButtons = Array.from(document.querySelectorAll(".complaint-status-scope-tab"));
+    const subStatusToolbar = document.getElementById("complaintSubstatusToolbar");
+    const subStatusTabsEl = document.getElementById("complaintSubstatusTabs");
     const pendingComplaintBadge = document.getElementById("pendingComplaintBadge");
     const filterModalEl = document.getElementById("modalComplaintFilter");
     const filterDateFromEl = document.getElementById("complaintFilterDateFrom");
@@ -59,6 +61,7 @@
     let totalPages = 1;
     let totalItems = 0;
     let activeFilter = "";
+    let activeSubStatus = "";
     let modalFilters = {
         dateFrom: "",
         dateTo: "",
@@ -71,6 +74,32 @@
     let pendingComplaintAction = null;
     const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
     const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
+    const SUB_STATUS_SCOPE_OPTIONS = {
+        "": [
+            { value: "", label: "All Statuses" },
+            { value: "received", label: "Received" },
+            { value: "under_investigation", label: "Under Investigation" },
+            { value: "action_in_progress", label: "Action In Progress" },
+            { value: "resolved", label: "Resolved" },
+            { value: "dropped", label: "Dropped" },
+            { value: "referred", label: "Referred" },
+        ],
+        active: [
+            { value: "", label: "All Active" },
+            { value: "received", label: "Received" },
+            { value: "under_investigation", label: "Under Investigation" },
+            { value: "action_in_progress", label: "Action In Progress" },
+        ],
+        resolved: [
+            { value: "", label: "Resolved Cases" },
+            { value: "resolved", label: "Resolved" },
+        ],
+        finalized: [
+            { value: "", label: "All Finalized" },
+            { value: "dropped", label: "Dropped" },
+            { value: "referred", label: "Referred" },
+        ],
+    };
     const complaintActionButtonsByType = {
         under_investigation: investigateBtn,
         action_in_progress: actionInProgressBtn,
@@ -220,6 +249,41 @@
         if (status.includes("drop")) return "dropped";
         if (status.includes("refer") || status.includes("endorse")) return "referred";
         return status.replace(/[^a-z0-9]+/g, "_");
+    }
+
+    function getCurrentSubStatusOptions() {
+        return SUB_STATUS_SCOPE_OPTIONS[activeFilter] || SUB_STATUS_SCOPE_OPTIONS[""];
+    }
+
+    function syncActiveSubStatus() {
+        const allowedValues = new Set(getCurrentSubStatusOptions().map((option) => option.value));
+        if (!allowedValues.has(activeSubStatus)) {
+            activeSubStatus = "";
+        }
+    }
+
+    function renderSubStatusTabs() {
+        if (!subStatusTabsEl) return;
+        const options = getCurrentSubStatusOptions();
+        syncActiveSubStatus();
+        subStatusTabsEl.innerHTML = options.map((option) => `
+            <button
+                type="button"
+                class="complaint-substatus-tab${option.value === activeSubStatus ? " active" : ""}"
+                data-sub-status="${esc(option.value)}"
+            >${esc(option.label)}</button>
+        `).join("");
+        subStatusToolbar?.classList.toggle("d-none", !options.length);
+        subStatusTabsEl.querySelectorAll("[data-sub-status]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const nextSubStatus = String(button.getAttribute("data-sub-status") || "").trim().toLowerCase();
+                if (nextSubStatus === activeSubStatus) return;
+                activeSubStatus = nextSubStatus;
+                renderSubStatusTabs();
+                currentPage = 1;
+                loadList();
+            });
+        });
     }
 
     function complaintActionConfig(actionType) {
@@ -430,6 +494,7 @@
         const searchTerm = String(searchInput?.value || "").trim();
         if (searchTerm) params.set("search", searchTerm);
         if (activeFilter) params.set("status", activeFilter);
+        if (activeSubStatus) params.set("sub_status", activeSubStatus);
         if (modalFilters.dateFrom) params.set("date_from", modalFilters.dateFrom);
         if (modalFilters.dateTo) params.set("date_to", modalFilters.dateTo);
         if (modalFilters.complaint_type.length) params.set("complaint_type", modalFilters.complaint_type.join(","));
@@ -1614,11 +1679,14 @@
             });
             button.classList.add("active");
             activeFilter = String(button.dataset.filter || "").trim().toLowerCase();
+            activeSubStatus = "";
+            renderSubStatusTabs();
             currentPage = 1;
             loadList();
         });
     });
 
     initComplaintActionFlow();
+    renderSubStatusTabs();
     loadList();
 })();
