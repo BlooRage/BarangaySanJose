@@ -2668,7 +2668,7 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void
     if ($requestOfficerLine1 !== '' || $requestOfficerLine2 !== '' || $requestOfficerLine3 !== '') {
         $payload['request_officer_line1'] = $requestOfficerLine1;
         $payload['request_officer_line2'] = $requestOfficerLine2;
-        $payload['request_officer_line3'] = $requestOfficerLine3;
+        $payload['request_officer_line3'] = $requestOfficerLine3; 
         $requestOfficer = implode(' - ', array_values(array_filter([
             $requestOfficerLine1,
             $requestOfficerLine2,
@@ -9185,6 +9185,10 @@ if ($action === 'finance_reject') {
 }
 
 if ($action === 'mark_ready') {
+    if (!dr_is_manual_issuance_request($row)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Release tagging is only available for manual issuance requests. Online requests are released automatically after payment.']);
+    }
+
     $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
     $resolvedFeeAmount = null;
     if (strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0) {
@@ -9284,6 +9288,10 @@ if ($action === 'mark_ready') {
 }
 
 if ($action === 'mark_completed') {
+    if (!dr_is_manual_issuance_request($row)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Release tagging is only available for manual issuance requests. Online requests are released automatically after payment.']);
+    }
+
     $patch = [
         'completed_at' => dr_now(),
         'document_validity' => dra_resolve_document_validity_datetime(
