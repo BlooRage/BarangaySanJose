@@ -12,6 +12,7 @@
     const entriesPerPageInput = document.getElementById("entriesPerPageInput");
     const paginationEl = document.getElementById("complaintPagination");
     const refreshBtn = document.getElementById("btnComplaintTableRefresh");
+    const complaintSubtabsEl = document.getElementById("complaintSubtabs");
     const filterButtons = Array.from(document.querySelectorAll(".complaint-status-scope-tab"));
     const pendingComplaintBadge = document.getElementById("pendingComplaintBadge");
     const filterModalEl = document.getElementById("modalComplaintFilter");
@@ -59,6 +60,7 @@
     let totalPages = 1;
     let totalItems = 0;
     let activeFilter = "";
+    let activeSubStatus = "";
     let modalFilters = {
         dateFrom: "",
         dateTo: "",
@@ -71,6 +73,27 @@
     let pendingComplaintAction = null;
     const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
     const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
+    const complaintSubtabConfig = {
+        "": [
+            { value: "", label: "All" },
+            { value: "active", label: "Active" },
+            { value: "closed", label: "Closed" },
+        ],
+        active: [
+            { value: "", label: "All" },
+            { value: "received", label: "Received" },
+            { value: "under_investigation", label: "Under Investigation" },
+            { value: "action_in_progress", label: "Action In Progress" },
+        ],
+        resolved: [
+            { value: "", label: "Resolved" },
+        ],
+        finalized: [
+            { value: "", label: "All" },
+            { value: "dropped", label: "Dropped" },
+            { value: "referred", label: "Referred" },
+        ],
+    };
     const complaintActionButtonsByType = {
         under_investigation: investigateBtn,
         action_in_progress: actionInProgressBtn,
@@ -220,6 +243,37 @@
         if (status.includes("drop")) return "dropped";
         if (status.includes("refer") || status.includes("endorse")) return "referred";
         return status.replace(/[^a-z0-9]+/g, "_");
+    }
+
+    function getComplaintSubtabOptions() {
+        return complaintSubtabConfig[activeFilter] || complaintSubtabConfig[""];
+    }
+
+    function renderComplaintSubtabs() {
+        if (!complaintSubtabsEl) return;
+        const options = getComplaintSubtabOptions();
+        const validValues = new Set(options.map((option) => option.value));
+        if (!validValues.has(activeSubStatus)) {
+            activeSubStatus = "";
+        }
+        complaintSubtabsEl.innerHTML = options.map((option) => `
+            <button
+                type="button"
+                class="complaint-subtab-btn${option.value === activeSubStatus ? " active" : ""}"
+                data-sub-status="${esc(option.value)}"
+            >${esc(option.label)}</button>
+        `).join("");
+
+        complaintSubtabsEl.querySelectorAll("[data-sub-status]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const nextValue = String(button.getAttribute("data-sub-status") || "").trim().toLowerCase();
+                if (nextValue === activeSubStatus) return;
+                activeSubStatus = nextValue;
+                currentPage = 1;
+                renderComplaintSubtabs();
+                loadList();
+            });
+        });
     }
 
     function complaintActionConfig(actionType) {
@@ -430,6 +484,7 @@
         const searchTerm = String(searchInput?.value || "").trim();
         if (searchTerm) params.set("search", searchTerm);
         if (activeFilter) params.set("status", activeFilter);
+        if (activeSubStatus) params.set("sub_status", activeSubStatus);
         if (modalFilters.dateFrom) params.set("date_from", modalFilters.dateFrom);
         if (modalFilters.dateTo) params.set("date_to", modalFilters.dateTo);
         if (modalFilters.complaint_type.length) params.set("complaint_type", modalFilters.complaint_type.join(","));
@@ -1614,11 +1669,14 @@
             });
             button.classList.add("active");
             activeFilter = String(button.dataset.filter || "").trim().toLowerCase();
+            activeSubStatus = "";
             currentPage = 1;
+            renderComplaintSubtabs();
             loadList();
         });
     });
 
     initComplaintActionFlow();
+    renderComplaintSubtabs();
     loadList();
 })();

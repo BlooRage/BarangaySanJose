@@ -646,12 +646,12 @@
     return formatDateInputValue(date);
   }
 
-  function certificateDefaultValidityDate() {
-    return addDaysDateInputValue(45);
+  function certificateDefaultValidityDate(baseDate = new Date()) {
+    return addDaysDateInputValue(45, baseDate);
   }
 
-  function barangayIdDefaultValidityDate() {
-    return addYearsDateInputValue(2);
+  function barangayIdDefaultValidityDate(baseDate = new Date()) {
+    return addYearsDateInputValue(2, baseDate);
   }
 
   function certificateValidityPresets(baseDate = new Date()) {
@@ -678,10 +678,10 @@
       : certificateValidityPresets(baseDate);
   }
 
-  function defaultValidityDateForKind(kind) {
+  function defaultValidityDateForKind(kind, baseDate = new Date()) {
     return kind === 'barangay_id'
-      ? barangayIdDefaultValidityDate()
-      : certificateDefaultValidityDate();
+      ? barangayIdDefaultValidityDate(baseDate)
+      : certificateDefaultValidityDate(baseDate);
   }
 
   function normalizeDateInputValue(value, fallback = '') {
@@ -690,18 +690,36 @@
     return String(fallback || '').trim();
   }
 
-  function resolveCertificateValidityDate(value, fallback = '') {
-    return normalizeDateInputValue(value, '') || normalizeDateInputValue(fallback, '') || certificateDefaultValidityDate();
+  function resolveCertificateValidityDate(value, fallback = '', baseDate = new Date()) {
+    const options = validityPresetOptions('certificate', baseDate);
+    const normalizedValue = normalizeDateInputValue(value, '');
+    if (normalizedValue && options.some((option) => option.value === normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = normalizeDateInputValue(fallback, '');
+    if (normalizedFallback && options.some((option) => option.value === normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return certificateDefaultValidityDate(baseDate);
   }
 
-  function resolveBarangayIdValidityDate(value, fallback = '') {
-    return normalizeDateInputValue(value, '') || normalizeDateInputValue(fallback, '') || barangayIdDefaultValidityDate();
+  function resolveBarangayIdValidityDate(value, fallback = '', baseDate = new Date()) {
+    const options = validityPresetOptions('barangay_id', baseDate);
+    const normalizedValue = normalizeDateInputValue(value, '');
+    if (normalizedValue && options.some((option) => option.value === normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = normalizeDateInputValue(fallback, '');
+    if (normalizedFallback && options.some((option) => option.value === normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return barangayIdDefaultValidityDate(baseDate);
   }
 
-  function resolveValidityDateByKind(kind, value, fallback = '') {
+  function resolveValidityDateByKind(kind, value, fallback = '', baseDate = new Date()) {
     return kind === 'barangay_id'
-      ? resolveBarangayIdValidityDate(value, fallback)
-      : resolveCertificateValidityDate(value, fallback);
+      ? resolveBarangayIdValidityDate(value, fallback, baseDate)
+      : resolveCertificateValidityDate(value, fallback, baseDate);
   }
 
   function diffCalendarDays(startValue, endValue) {
@@ -3526,9 +3544,13 @@
     const punongSignatoryTitleText = String(state.punongSignatoryTitle || 'Punong Barangay').trim() || 'Punong Barangay';
     const secretarySignatoryNameText = String(state.secretarySignatoryName || 'MINERVA D. QUITA').trim() || 'MINERVA D. QUITA';
     const secretarySignatoryTitleText = String(state.secretarySignatoryTitle || 'Barangay Secretary').trim() || 'Barangay Secretary';
-    const documentValidityText = resolveCertificateValidityDate(state.documentValidity || '', certificateDefaultValidityDate());
+    const issuedBase = firstNonEmpty([state.issuedOn, state.issuedDate, formatDateInputValue(new Date())]);
+    const documentValidityText = resolveCertificateValidityDate(
+      state.documentValidity || '',
+      certificateDefaultValidityDate(issuedBase),
+      issuedBase
+    );
     const certificateValidityDays = (() => {
-      const issuedBase = firstNonEmpty([state.issuedOn, state.issuedDate, formatDateInputValue(new Date())]);
       const resolvedDays = diffCalendarDays(issuedBase, documentValidityText);
       return resolvedDays === null ? 45 : Math.max(0, resolvedDays);
     })();
@@ -3602,9 +3624,8 @@
       { label: 'OR No.:', value: safe(state.orNumber, '_____') },
     ]);
     const buildCertificateFooterNote = () => {
-      const dayWord = sentenceCaseWords(numberToWords(certificateValidityDays || 0)) || 'Forty-five';
       const dayLabel = Number(certificateValidityDays || 0) === 1 ? 'day' : 'days';
-      return `This certificate is valid for ${esc(dayWord)} (${esc(String(certificateValidityDays || 0))}) ${dayLabel} from the date of issue,<br>check the QR code to verify the authenticity of this document.`;
+      return `Valid for ${esc(String(certificateValidityDays || 0))} ${dayLabel} from date of issue.<br>Scan QR code to verify this document.`;
     };
 
     let contentHtml = '';
@@ -6143,7 +6164,7 @@
           viewPreviewState?.documentValidity,
           row?.document_validity,
           row?.payload?.document_validity,
-          row?.payload?.barangay_id_valid_until
+          ...(actionValidityKind === 'barangay_id' ? [row?.payload?.barangay_id_valid_until] : [])
         ]), defaultValidityDateForKind(actionValidityKind))
       : '';
 
@@ -7523,7 +7544,7 @@
           actionValidity?.value || '',
           firstNonEmpty([
             currentRow?.document_validity,
-            currentRow?.payload?.barangay_id_valid_until,
+            ...(previewValidityKind === 'barangay_id' ? [currentRow?.payload?.barangay_id_valid_until] : []),
             viewPreviewState?.documentValidity
           ])
         );

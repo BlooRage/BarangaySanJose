@@ -576,10 +576,36 @@ function dra_resolve_certificate_validity_datetime(string $documentType, ?string
 
     $existingParsed = dr_parse_datetime_value((string)$existingValidity, true);
     if ($existingParsed instanceof DateTimeImmutable) {
-        return $existingParsed->format('Y-m-d H:i:s');
+        $matchedDays = dra_match_certificate_validity_days($existingParsed->format('Y-m-d H:i:s'), $baseDateTime);
+        if ($matchedDays !== null) {
+            return $existingParsed->format('Y-m-d H:i:s');
+        }
     }
 
     return dra_default_certificate_validity_datetime($baseDateTime);
+}
+
+function dra_match_certificate_validity_days(?string $validityValue, ?string $baseDateTime = null): ?int
+{
+    $resolvedValidity = dra_normalize_validity_selection_input($validityValue, $baseDateTime);
+    if ($resolvedValidity === null) {
+        $parsed = dr_parse_datetime_value((string)$validityValue, true);
+        if ($parsed instanceof DateTimeImmutable) {
+            $resolvedValidity = $parsed->format('Y-m-d H:i:s');
+        }
+    }
+    if ($resolvedValidity === null) {
+        return null;
+    }
+
+    foreach ([3, 15, 30, 45, 60] as $days) {
+        $candidate = dra_validity_datetime_from_offset($days, 'days', $baseDateTime);
+        if ($candidate !== null && substr($candidate, 0, 10) === substr($resolvedValidity, 0, 10)) {
+            return $days;
+        }
+    }
+
+    return null;
 }
 
 function dra_resolve_barangay_id_validity_datetime(?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): string
@@ -657,10 +683,9 @@ function dra_build_certificate_validity_notice(?string $validityDateTime, ?strin
     $validityMidday = $parsed->setTime(12, 0, 0);
     $dayCount = max(0, (int)$baseMidday->diff($validityMidday)->format('%r%a'));
 
-    $dayWord = dra_ucfirst_words(dra_number_to_words($dayCount));
     $dayLabel = $dayCount === 1 ? 'day' : 'days';
 
-    return "This certificate is valid for {$dayWord} ({$dayCount}) {$dayLabel} from the date of issue, check the\nQR code to verify the authenticity of this document.";
+    return "Valid for {$dayCount} {$dayLabel} from date of issue.\nScan QR code to verify this document.";
 }
 
 function dra_number_to_words(int $number): string

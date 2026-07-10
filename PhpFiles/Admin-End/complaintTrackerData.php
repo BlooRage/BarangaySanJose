@@ -921,6 +921,17 @@ if ($action === 'list') {
     if (!in_array($statusFilter, ['', 'active', 'resolved', 'finalized'], true)) {
         $statusFilter = '';
     }
+    $subStatusFilter = strtolower(trim((string)($_GET['sub_status'] ?? '')));
+    $allowedSubStatusFilters = [
+        '' => ['active', 'closed'],
+        'active' => ['received', 'under_investigation', 'action_in_progress'],
+        'resolved' => [],
+        'finalized' => ['dropped', 'referred'],
+    ];
+    $validSubStatusFilters = $allowedSubStatusFilters[$statusFilter] ?? [];
+    if ($subStatusFilter !== '' && !in_array($subStatusFilter, $validSubStatusFilters, true)) {
+        $subStatusFilter = '';
+    }
     $dateFrom = trim((string)($_GET['date_from'] ?? ''));
     $dateTo = trim((string)($_GET['date_to'] ?? ''));
     $complaintTypeFilters = parseCsvValues($_GET['complaint_type'] ?? '');
@@ -1030,6 +1041,16 @@ if ($action === 'list') {
         $filterSql .= " AND complaint_rows.status_key = ?";
         $filterTypes .= 's';
         $filterParams[] = $statusFilter;
+    }
+
+    if ($subStatusFilter === 'active') {
+        $filterSql .= " AND complaint_rows.status_key IN ('received', 'under_investigation', 'action_in_progress')";
+    } elseif ($subStatusFilter === 'closed') {
+        $filterSql .= " AND complaint_rows.status_key IN ('resolved', 'dropped')";
+    } elseif (in_array($subStatusFilter, ['received', 'under_investigation', 'action_in_progress', 'dropped', 'referred'], true)) {
+        $filterSql .= " AND complaint_rows.status_key = ?";
+        $filterTypes .= 's';
+        $filterParams[] = $subStatusFilter;
     }
 
     if ($dateFrom !== '') {
