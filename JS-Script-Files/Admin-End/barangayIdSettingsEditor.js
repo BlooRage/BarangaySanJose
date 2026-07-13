@@ -47,7 +47,6 @@
   ];
   const fieldTemplates = {
     text: { type: 'text', label: 'Text Field', source: 'cardFullName', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6.0, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
-    label: { type: 'label', label: 'Label Field', text: 'Label', w: 16, h: 3.0, fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, uppercase: false, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
     image: { type: 'image', label: 'Image Field', source: 'photoUrl', w: 16, h: 16, fit: 'cover' },
     qr: { type: 'qr', label: 'QR Field', source: 'qrUrl', w: 16, h: 16, fit: 'fill' },
     signatory: { type: 'signatory', label: 'Signatory Block', w: 28, h: 12 },
@@ -113,24 +112,16 @@
     if (!field || typeof field !== 'object') return 'Field';
     const byId = {
       front_photo: 'Resident Photo',
-      front_name_label: 'Printed Label: Name',
       front_name_value: 'Resident Name',
-      front_address_label: 'Printed Label: Address',
       front_address_value: 'Resident Address',
-      front_birthdate_label: 'Printed Label: Birthdate',
       front_birthdate_value: 'Birthdate Value',
-      front_sex_label: 'Printed Label: Sex',
       front_sex_value: 'Sex Value',
-      front_birthplace_label: 'Printed Label: Birthplace',
       front_birthplace_value: 'Birthplace Value',
       front_valid_until_value: 'Valid Until Text',
       front_card_number_value: 'Card Number',
       back_card_number_value: 'Card Number',
-      back_emergency_name_label: 'Printed Label: Emergency Name',
       back_emergency_name_value: 'Emergency Contact Name',
-      back_emergency_address_label: 'Printed Label: Emergency Address',
       back_emergency_address_value: 'Emergency Address',
-      back_emergency_contact_label: 'Printed Label: Emergency Contact',
       back_emergency_contact_value: 'Emergency Contact Number',
       back_validity_notice: 'Validity Note',
       back_signatory: 'Punong Barangay Signatory',
@@ -141,17 +132,12 @@
 
     const rawLabel = String(field.label || '').trim();
     if (rawLabel) {
-      if (/^label\s*:/i.test(rawLabel)) {
-        return `Printed Label: ${rawLabel.replace(/^label\s*:\s*/i, '').trim() || 'Text'}`;
-      }
       if (/^text field$/i.test(rawLabel)) return 'Text Value';
-      if (/^label field$/i.test(rawLabel)) return 'Printed Label';
       if (/^image field$/i.test(rawLabel)) return 'Image Field';
       if (/^qr field$/i.test(rawLabel)) return 'QR Code';
       return rawLabel;
     }
 
-    if (field.type === 'label') return 'Printed Label';
     if (field.type === 'text') return 'Text Value';
     if (field.type === 'image') return 'Image Field';
     if (field.type === 'qr') return 'QR Code';
@@ -162,9 +148,6 @@
 
   function fieldPurposeText(field) {
     if (!field || typeof field !== 'object') return '';
-    if (field.type === 'label') {
-      return `Static printed word: ${String(field.text || 'Label').trim() || 'Label'}`;
-    }
     if (field.type === 'text') {
       const source = sourceOptions.find((option) => option.value === String(field.source || '').trim());
       return source ? `Uses sample data: ${source.label}` : 'Uses linked text data';
@@ -178,27 +161,30 @@
 
   function compactFieldName(field) {
     const full = friendlyFieldName(field);
+    const source = String(field?.source || '').trim();
+    if (field?.type === 'text') {
+      const valueBySource = {
+        cardFullName: 'Value: Name',
+        cardFullAddress: 'Value: Address',
+        cardBirthdate: 'Value: Birthdate',
+        cardBirthplace: 'Value: Birthplace',
+        cardSex: 'Value: Sex',
+        cardContactNumber: 'Value: Contact No.',
+        cardEmergencyName: 'Value: Emergency Name',
+        cardEmergencyAddress: 'Value: Emergency Address',
+        cardEmergencyContact: 'Value: Emergency Contact',
+        cardNumber: 'Value: Card No.',
+        validUntil: 'Value: Valid Until',
+        validityNotice: 'Value: Notice'
+      };
+      if (valueBySource[source]) {
+        return valueBySource[source];
+      }
+    }
     const compactById = {
-      front_name_label: 'Label: Name',
-      front_name_value: 'Name',
-      front_address_label: 'Label: Address',
-      front_address_value: 'Address',
-      front_birthdate_label: 'Label: Birthdate',
-      front_birthdate_value: 'Birthdate',
-      front_sex_label: 'Label: Sex',
-      front_sex_value: 'Sex',
-      front_birthplace_label: 'Label: Birthplace',
-      front_birthplace_value: 'Birthplace',
-      front_valid_until_value: 'Valid Until',
-      front_card_number_value: 'Card No.',
-      back_card_number_value: 'Card No.',
-      back_emergency_name_label: 'Label: Name',
-      back_emergency_name_value: 'Emergency Name',
-      back_emergency_address_label: 'Label: Address',
-      back_emergency_address_value: 'Emergency Address',
-      back_emergency_contact_label: 'Label: Contact',
-      back_emergency_contact_value: 'Emergency Contact',
-      back_validity_notice: 'Validity Note',
+      front_valid_until_value: 'Value: Valid Until',
+      front_card_number_value: 'Value: Card No.',
+      back_card_number_value: 'Value: Card No.',
       back_signatory: 'Signatory',
       back_qr: 'QR Code'
     };
@@ -232,9 +218,6 @@
     }
     if (field.type === 'cover') {
       return dimension === 'h' ? 6 : 10;
-    }
-    if (field.type === 'label') {
-      return dimension === 'h' ? 4.5 : 14;
     }
     if (field.type === 'text') {
       const source = String(field.source || '').trim();
@@ -297,9 +280,6 @@
   }
 
   function sampleValueForField(field) {
-    if (field.type === 'label') {
-      return String(field.text || 'Label').trim() || 'Label';
-    }
     if (field.type === 'cover') {
       return 'Cover Block';
     }
@@ -333,7 +313,6 @@
       fieldEl.type = 'button';
       fieldEl.className = `bid-editor-field${field.id === state.selectedFieldId ? ' is-selected' : ''}`;
       fieldEl.dataset.fieldId = field.id;
-      fieldEl.dataset.bidFieldType = String(field.type || '').trim().toLowerCase();
       fieldEl.style.left = mmToPctX(field.x);
       fieldEl.style.top = mmToPctY(field.y);
       fieldEl.style.width = mmToPctX(field.w);
@@ -468,7 +447,7 @@
       inputMarkup({ label: 'Layer Order', prop: 'z', type: 'number', value: field.z, min: '1', max: '20', step: '1' }),
     ];
 
-    if (field.type === 'text' || field.type === 'label') {
+    if (field.type === 'text') {
       blocks.push(inputMarkup({ label: 'Font Size', prop: 'fontSize', type: 'number', value: field.fontSize, min: '2.8', max: '20' }));
       blocks.push(inputMarkup({ label: 'Min Font Size', prop: 'minFontSize', type: 'number', value: field.minFontSize, min: '2.4', max: '18' }));
       blocks.push(inputMarkup({
@@ -493,26 +472,22 @@
         ].join('')
       }));
       blocks.push(inputMarkup({ label: 'Text Color', prop: 'color', type: 'color', value: field.color, step: '1' }));
-      if (field.type === 'label') {
-        blocks.push(inputMarkup({ label: 'Literal Text', prop: 'text', value: field.text }));
-      } else {
-        blocks.push(inputMarkup({
-          label: 'Data Source',
-          prop: 'source',
-          type: 'select',
-          options: sourceOptionsMarkup(field.source)
-        }));
-        blocks.push(inputMarkup({
-          label: 'Fallback Source',
-          prop: 'fallbackSource',
-          type: 'select',
-          options: selectMarkup(field.fallbackSource, '', 'None') + sourceOptionsMarkup(field.fallbackSource)
-        }));
-        blocks.push(inputMarkup({ label: 'Prefix', prop: 'prefix', value: field.prefix }));
-        blocks.push(inputMarkup({ label: 'Uppercase Text', prop: 'uppercase', type: 'checkbox', checked: !!field.uppercase }));
-        blocks.push(inputMarkup({ label: 'Multiline Fit', prop: 'multiline', type: 'checkbox', checked: !!field.multiline }));
-        blocks.push(inputMarkup({ label: 'Max Lines', prop: 'maxLines', type: 'number', value: field.maxLines, min: '1', max: '5', step: '1' }));
-      }
+      blocks.push(inputMarkup({
+        label: 'Data Source',
+        prop: 'source',
+        type: 'select',
+        options: sourceOptionsMarkup(field.source)
+      }));
+      blocks.push(inputMarkup({
+        label: 'Fallback Source',
+        prop: 'fallbackSource',
+        type: 'select',
+        options: selectMarkup(field.fallbackSource, '', 'None') + sourceOptionsMarkup(field.fallbackSource)
+      }));
+      blocks.push(inputMarkup({ label: 'Prefix', prop: 'prefix', value: field.prefix }));
+      blocks.push(inputMarkup({ label: 'Uppercase Text', prop: 'uppercase', type: 'checkbox', checked: !!field.uppercase }));
+      blocks.push(inputMarkup({ label: 'Multiline Fit', prop: 'multiline', type: 'checkbox', checked: !!field.multiline }));
+      blocks.push(inputMarkup({ label: 'Max Lines', prop: 'maxLines', type: 'number', value: field.maxLines, min: '1', max: '5', step: '1' }));
     }
 
     if (field.type === 'image' || field.type === 'qr') {

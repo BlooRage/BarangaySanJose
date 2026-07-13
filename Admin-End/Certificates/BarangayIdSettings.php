@@ -103,7 +103,6 @@ $pagePayload = [
     'sampleData' => $barangayIdTemplateSettings['sample_data'] ?? dms_barangay_id_default_sample_data(),
     'fieldLibrary' => [
         ['type' => 'text', 'label' => 'Text Field'],
-        ['type' => 'label', 'label' => 'Label Field'],
         ['type' => 'image', 'label' => 'Image Field'],
         ['type' => 'qr', 'label' => 'QR Field'],
         ['type' => 'signatory', 'label' => 'Signatory Block'],
@@ -276,46 +275,16 @@ $pagePayload = [
       box-shadow: inset 0 0 0 1px rgba(140, 102, 64, 0.12);
       user-select: none;
       touch-action: none;
-      isolation: isolate;
-    }
-    .bid-editor-canvas::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: rgba(255, 255, 255, 0.48);
-      pointer-events: none;
-      z-index: 0;
     }
     .bid-editor-field {
       position: absolute;
       border: 1.5px solid rgba(222, 113, 12, 0.75);
-      background: rgba(255, 255, 255, 0.94);
+      background: rgba(255, 250, 245, 0.5);
       border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(85, 49, 13, 0.1);
+      backdrop-filter: blur(2px);
+      box-shadow: 0 6px 16px rgba(85, 49, 13, 0.08);
       cursor: move;
       overflow: hidden;
-    }
-    .bid-editor-field[data-bid-field-type="label"] {
-      background: rgba(255, 246, 234, 0.96);
-    }
-    .bid-editor-field[data-bid-field-type="image"],
-    .bid-editor-field[data-bid-field-type="qr"] {
-      background: rgba(255, 255, 255, 0.96);
-    }
-    .bid-editor-field[data-bid-field-type="signatory"] {
-      background: rgba(240, 253, 250, 0.96);
-      border-color: rgba(20, 184, 166, 0.58);
-    }
-    .bid-editor-field[data-bid-field-type="cover"] {
-      border-style: dashed;
-      background:
-        repeating-linear-gradient(
-          135deg,
-          rgba(255, 247, 237, 0.98) 0,
-          rgba(255, 247, 237, 0.98) 10px,
-          rgba(255, 232, 204, 0.98) 10px,
-          rgba(255, 232, 204, 0.98) 20px
-        );
     }
     .bid-editor-field.is-selected {
       border-color: #0f766e;
@@ -357,17 +326,6 @@ $pagePayload = [
       overflow: hidden;
       display: flex;
       align-items: center;
-      font-weight: 700;
-    }
-    .bid-editor-field[data-bid-field-type="label"] .bid-editor-field__sample {
-      font-size: clamp(0.78rem, 0.2vw + 0.72rem, 0.92rem);
-      font-style: italic;
-      font-weight: 600;
-    }
-    .bid-editor-field[data-bid-field-type="cover"] .bid-editor-field__sample {
-      justify-content: center;
-      text-align: center;
-      font-size: clamp(0.74rem, 0.18vw + 0.68rem, 0.88rem);
     }
     .bid-editor-field__sample.is-center {
       justify-content: center;
@@ -623,7 +581,7 @@ $pagePayload = [
                 <div class="bid-toolbar">
                   <div>
                     <h3 class="bid-section__title">Drag and Drop Field Layout</h3>
-                    <p class="bid-section__copy">Move every guide box on top of the selected card side. The uploaded ID artwork stays faint in the background so positioning is easier, while the finished look is shown in the sample preview below.</p>
+                    <p class="bid-section__copy">Move every text, image, QR, and signatory block directly on top of the selected card side. Resize from the corner handle and fine-tune values in the inspector.</p>
                   </div>
                   <div class="bid-segmented" role="tablist" aria-label="Template side selector">
                     <button type="button" class="is-active" data-bid-side-btn="front">Front Editor</button>
@@ -635,7 +593,6 @@ $pagePayload = [
                 <div class="bid-toolbar">
                   <div class="bid-add-tools">
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="text"><i class="fa-solid fa-font me-1"></i>Add Text</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="label"><i class="fa-solid fa-tag me-1"></i>Add Label</button>
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="image"><i class="fa-solid fa-image me-1"></i>Add Image</button>
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="qr"><i class="fa-solid fa-qrcode me-1"></i>Add QR</button>
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="signatory"><i class="fa-solid fa-signature me-1"></i>Add Signatory</button>
@@ -648,7 +605,6 @@ $pagePayload = [
 
                 <div class="bid-editor-shell">
                   <div class="bid-editor-canvas-wrap">
-                    <p class="small text-muted mb-3">The orange boxes are only placement guides. If your PNG already has printed words or a sample photo, that background will stay visible here but the final saved layout uses the positions you set.</p>
                     <div class="bid-editor-canvas" id="barangayIdEditorCanvas" aria-label="Barangay ID template editor"></div>
                   </div>
                   <div class="bid-editor-sidebar">
@@ -666,16 +622,12 @@ $pagePayload = [
                     <div class="bid-preview-card">
                       <div class="mb-3">
                         <h4 class="h6 mb-1">Field Name Guide</h4>
-                        <p class="small text-muted mb-0">These are the names you will usually see in the editor.</p>
+                        <p class="small text-muted mb-0">The template already contains the printed labels, so the editor only keeps the real data fields you need to position.</p>
                       </div>
                       <div class="bid-guide-list">
                         <div class="bid-guide-item">
-                          <strong>Printed Label</strong>
-                          Small static words already printed on the card like `Name`, `Address`, or `Sex`.
-                        </div>
-                        <div class="bid-guide-item">
                           <strong>Value Field</strong>
-                          The actual resident data shown on the ID like `Resident Name`, `Birthdate Value`, or `Card Number`.
+                          The actual resident data shown on the ID like `Resident Name`, `Birthdate`, `Address`, or `Card Number`.
                         </div>
                         <div class="bid-guide-item">
                           <strong>Resident Photo / QR Code / Signatory</strong>
@@ -801,7 +753,7 @@ $pagePayload = [
                   <li>Drag inside a field box to move it. Use the corner handle to resize.</li>
                   <li>Text fields use auto-font fitting in the live preview so long names and addresses stay inside the card.</li>
                   <li>The saved layout is reused by the generated Barangay ID output, not just the admin settings preview.</li>
-                  <li>Use cover blocks if you need to mask printed labels from an uploaded background before placing your new field content.</li>
+                  <li>Use cover blocks only if you need to hide something already printed on the uploaded template.</li>
                 </ul>
               </div>
             </div>
@@ -817,7 +769,7 @@ $pagePayload = [
   </div>
 
   <script id="barangayIdSettingsPayload" type="application/json"><?= htmlspecialchars(json_encode($pagePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_NOQUOTES, 'UTF-8') ?></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260713-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260713-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260714-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260714-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>

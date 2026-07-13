@@ -886,7 +886,7 @@ if (!function_exists('dms_barangay_id_default_sample_data')) {
 if (!function_exists('dms_barangay_id_default_layout')) {
     function dms_barangay_id_default_layout(): array
     {
-        return [
+        $layout = [
             'version' => 1,
             'page' => [
                 'width_mm' => 85.6,
@@ -1282,6 +1282,11 @@ if (!function_exists('dms_barangay_id_default_layout')) {
                 ],
             ],
         ];
+        $layout['fields'] = array_values(array_filter(
+            (array)($layout['fields'] ?? []),
+            static fn(array $field): bool => strtolower(trim((string)($field['type'] ?? ''))) !== 'label'
+        ));
+        return $layout;
     }
 }
 
@@ -1333,7 +1338,7 @@ if (!function_exists('dms_normalize_int_range')) {
 if (!function_exists('dms_barangay_id_allowed_field_types')) {
     function dms_barangay_id_allowed_field_types(): array
     {
-        return ['text', 'label', 'image', 'qr', 'signatory', 'cover'];
+        return ['text', 'image', 'qr', 'signatory', 'cover'];
     }
 }
 
@@ -1359,7 +1364,7 @@ if (!function_exists('dms_normalize_barangay_id_field')) {
 
         $fontStyle = strtoupper(trim((string)($field['fontStyle'] ?? '')));
         if (!in_array($fontStyle, ['', 'B', 'I', 'BI', 'IB'], true)) {
-            $fontStyle = $type === 'label' ? 'I' : 'B';
+            $fontStyle = 'B';
         }
         if ($fontStyle === 'IB') {
             $fontStyle = 'BI';
@@ -1396,11 +1401,11 @@ if (!function_exists('dms_normalize_barangay_id_field')) {
             'text' => trim((string)($field['text'] ?? '')),
             'align' => $align,
             'fontStyle' => $fontStyle,
-            'fontSize' => dms_normalize_float_range($field['fontSize'] ?? ($type === 'label' ? 5.0 : 6.0), $type === 'label' ? 5.0 : 6.0, 2.8, 20.0),
-            'minFontSize' => dms_normalize_float_range($field['minFontSize'] ?? ($type === 'label' ? 4.0 : 4.2), $type === 'label' ? 4.0 : 4.2, 2.4, 18.0),
+            'fontSize' => dms_normalize_float_range($field['fontSize'] ?? 6.0, 6.0, 2.8, 20.0),
+            'minFontSize' => dms_normalize_float_range($field['minFontSize'] ?? 4.2, 4.2, 2.4, 18.0),
             'color' => $color,
             'backgroundColor' => $backgroundColor,
-            'uppercase' => dms_normalize_bool($field['uppercase'] ?? ($type !== 'label' && $type !== 'cover'), $type !== 'label' && $type !== 'cover'),
+            'uppercase' => dms_normalize_bool($field['uppercase'] ?? ($type !== 'cover'), $type !== 'cover'),
             'multiline' => dms_normalize_bool($field['multiline'] ?? false, false),
             'maxLines' => dms_normalize_int_range($field['maxLines'] ?? 2, 2, 1, 5),
             'fit' => $fit,
@@ -1431,6 +1436,9 @@ if (!function_exists('dms_normalize_barangay_id_layout')) {
         $normalizedFields = [];
         foreach ($fields as $index => $field) {
             if (!is_array($field)) {
+                continue;
+            }
+            if (strtolower(trim((string)($field['type'] ?? ''))) === 'label') {
                 continue;
             }
             $normalizedFields[] = dms_normalize_barangay_id_field($field, (int)$index);

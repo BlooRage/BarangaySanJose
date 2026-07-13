@@ -1,7 +1,7 @@
 (() => {
   const PAGE_WIDTH_MM = 85.6;
   const PAGE_HEIGHT_MM = 54.1;
-  const TEMPLATE_ASSET_VERSION = '20260713-01';
+  const TEMPLATE_ASSET_VERSION = '20260714-02';
   const DEFAULT_IMAGE_PLACEHOLDER = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><rect width="320" height="320" rx="32" fill="#f8efe4"/><circle cx="160" cy="118" r="54" fill="#e2c8aa"/><path d="M76 262c18-45 56-70 84-70s66 25 84 70" fill="#e2c8aa"/><text x="160" y="300" font-family="Arial" font-size="24" font-weight="700" text-anchor="middle" fill="#8a5c2b">PHOTO</text></svg>'
   );
@@ -186,24 +186,16 @@
       },
       fields: [
         { id: 'front_photo', label: 'Resident Photo', type: 'image', source: 'photoUrl', side: 'front', x: 7.9, y: 22.1, w: 22, h: 22, fit: 'cover', z: 2 },
-        { id: 'front_name_label', label: 'Label: Name', type: 'label', text: 'Name', side: 'front', x: 32.2, y: 24.08, w: 10, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'front_name_value', label: 'Full Name', type: 'text', source: 'cardFullName', side: 'front', x: 32.2, y: 25.8, w: 44.8, h: 4.8, align: 'left', fontStyle: 'B', fontSize: 7.2, minFontSize: 4.6, uppercase: true, z: 2 },
-        { id: 'front_address_label', label: 'Label: Address', type: 'label', text: 'Address', side: 'front', x: 32.2, y: 30.58, w: 13.5, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'front_address_value', label: 'Address', type: 'text', source: 'cardFullAddress', side: 'front', x: 31.2, y: 32.78, w: 44.8, h: 6, align: 'left', fontStyle: 'B', fontSize: 5.6, minFontSize: 3.2, uppercase: true, multiline: true, maxLines: 2, z: 2 },
-        { id: 'front_birthdate_label', label: 'Label: Date of Birth', type: 'label', text: 'Date of Birth', side: 'front', x: 32.2, y: 38.48, w: 20, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'front_birthdate_value', label: 'Birthdate', type: 'text', source: 'cardBirthdate', side: 'front', x: 32.2, y: 40.78, w: 20.5, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.4, minFontSize: 4.4, uppercase: true, z: 2 },
-        { id: 'front_sex_label', label: 'Label: Sex', type: 'label', text: 'Sex', side: 'front', x: 57.2, y: 38.48, w: 10, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'front_sex_value', label: 'Sex', type: 'text', source: 'cardSex', side: 'front', x: 57.2, y: 40.78, w: 19.5, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.4, minFontSize: 4.4, uppercase: true, z: 2 },
-        { id: 'front_birthplace_label', label: 'Label: Place of Birth', type: 'label', text: 'Place of Birth', side: 'front', x: 32.2, y: 44.78, w: 20, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'front_birthplace_value', label: 'Birthplace', type: 'text', source: 'cardBirthplace', side: 'front', x: 32.2, y: 46.98, w: 44.8, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 5.5, minFontSize: 4.0, uppercase: true, z: 2 },
         { id: 'front_valid_until_value', label: 'Valid Until', type: 'text', source: 'validUntil', prefix: 'VALID UNTIL: ', side: 'front', x: 6.0, y: 44.78, w: 28.6, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 4.8, minFontSize: 3.7, uppercase: true, z: 2 },
         { id: 'front_card_number_value', label: 'Card Number', type: 'text', source: 'cardNumber', side: 'front', x: 6.4, y: 49.58, w: 28.4, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.8, minFontSize: 4.4, uppercase: true, color: '#c62828', z: 2 },
         { id: 'back_card_number_value', label: 'Card Number (Back)', type: 'text', source: 'cardNumber', side: 'back', x: 59.5, y: 3.3, w: 21.5, h: 4.6, align: 'right', fontStyle: 'B', fontSize: 7.6, minFontSize: 5.0, uppercase: true, color: '#c62828', z: 2 },
-        { id: 'back_emergency_name_label', label: 'Label: Emergency Name', type: 'label', text: 'Name', side: 'back', x: 6.9, y: 17.5, w: 10, h: 3, align: 'left', fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'back_emergency_name_value', label: 'Emergency Contact Name', type: 'text', source: 'cardEmergencyName', side: 'back', x: 6.9, y: 19.7, w: 33, h: 4.6, align: 'left', fontStyle: 'B', fontSize: 6.0, minFontSize: 4.3, uppercase: true, z: 2 },
-        { id: 'back_emergency_address_label', label: 'Label: Emergency Address', type: 'label', text: 'Address', side: 'back', x: 6.9, y: 23.8, w: 12, h: 3, align: 'left', fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'back_emergency_address_value', label: 'Emergency Address', type: 'text', source: 'cardEmergencyAddress', side: 'back', x: 6.9, y: 26.0, w: 39.6, h: 6, align: 'left', fontStyle: 'B', fontSize: 5.0, minFontSize: 3.2, uppercase: true, multiline: true, maxLines: 2, z: 2 },
-        { id: 'back_emergency_contact_label', label: 'Label: Emergency Contact', type: 'label', text: 'Contact', side: 'back', x: 6.9, y: 30.0, w: 12, h: 3, align: 'left', fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, color: '#111111', z: 2 },
         { id: 'back_emergency_contact_value', label: 'Emergency Contact Number', type: 'text', source: 'cardEmergencyContact', fallbackSource: 'cardContactNumber', side: 'back', x: 6.9, y: 32.2, w: 22, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.0, minFontSize: 4.3, uppercase: true, z: 2 },
         { id: 'back_validity_notice', label: 'Validity Notice', type: 'text', source: 'validityNotice', side: 'back', x: 7.3, y: 36.6, w: 40.5, h: 6.4, align: 'center', fontStyle: 'I', fontSize: 4.2, minFontSize: 3.2, uppercase: false, multiline: true, maxLines: 3, z: 2 },
         { id: 'back_signatory', label: 'Punong Barangay Signatory', type: 'signatory', side: 'back', x: 9.1, y: 38.2, w: 30.8, h: 12, z: 3 },
@@ -215,7 +207,6 @@
   function fieldLibrary() {
     return [
       { type: 'text', label: 'Text Field', source: 'cardFullName', side: 'front', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
-      { type: 'label', label: 'Label Field', text: 'Label', side: 'front', w: 16, h: 3, fontStyle: 'I', fontSize: 5, minFontSize: 4, uppercase: false, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
       { type: 'image', label: 'Image Field', source: 'photoUrl', side: 'front', w: 18, h: 18, fit: 'cover' },
       { type: 'qr', label: 'QR Field', source: 'qrUrl', side: 'back', w: 18, h: 18, fit: 'fill' },
       { type: 'signatory', label: 'Signatory Block', side: 'back', w: 30, h: 12 },
@@ -245,12 +236,12 @@
 
   function normalizeLayoutField(field = {}, index = 0) {
     const rawType = String(field.type || 'text').trim().toLowerCase();
-    const type = ['text', 'label', 'image', 'qr', 'signatory', 'cover'].includes(rawType) ? rawType : 'text';
+    const type = ['text', 'image', 'qr', 'signatory', 'cover'].includes(rawType) ? rawType : 'text';
     const rawAlign = String(field.align || 'left').trim().toLowerCase();
     const align = ['left', 'center', 'right'].includes(rawAlign) ? rawAlign : 'left';
-    let fontStyle = String(field.fontStyle || (type === 'label' ? 'I' : 'B')).trim().toUpperCase();
+    let fontStyle = String(field.fontStyle || 'B').trim().toUpperCase();
     if (!['', 'B', 'I', 'BI', 'IB'].includes(fontStyle)) {
-      fontStyle = type === 'label' ? 'I' : 'B';
+      fontStyle = 'B';
     }
     if (fontStyle === 'IB') fontStyle = 'BI';
     const color = /^#[0-9A-Fa-f]{6}$/.test(String(field.color || '').trim()) ? String(field.color).trim() : '#111111';
@@ -276,11 +267,11 @@
       text: String(field.text || '').trim(),
       align,
       fontStyle,
-      fontSize: normalizeNumber(field.fontSize, type === 'label' ? 5 : 6, 2.8, 20),
-      minFontSize: normalizeNumber(field.minFontSize, type === 'label' ? 4 : 4.2, 2.4, 18),
+      fontSize: normalizeNumber(field.fontSize, 6, 2.8, 20),
+      minFontSize: normalizeNumber(field.minFontSize, 4.2, 2.4, 18),
       color,
       backgroundColor,
-      uppercase: normalizeBoolean(field.uppercase, type !== 'label' && type !== 'cover'),
+      uppercase: normalizeBoolean(field.uppercase, type !== 'cover'),
       multiline: normalizeBoolean(field.multiline, false),
       maxLines: normalizeInteger(field.maxLines, 2, 1, 5),
       fit
@@ -294,9 +285,12 @@
   function normalizeLayoutConfig(layoutConfig = null) {
     const defaults = defaultLayoutConfig();
     const config = layoutConfig && typeof layoutConfig === 'object' ? layoutConfig : defaults;
-    const fields = Array.isArray(config.fields) && config.fields.length
-      ? config.fields.map((field, index) => normalizeLayoutField(field, index))
-      : defaults.fields.map((field, index) => normalizeLayoutField(field, index));
+    const rawFields = Array.isArray(config.fields) && config.fields.length
+      ? config.fields
+      : defaults.fields;
+    const fields = rawFields
+      .map((field, index) => normalizeLayoutField(field, index))
+      .filter((field) => field.type !== 'label');
     fields.sort((left, right) => {
       const sideCompare = String(left.side || '').localeCompare(String(right.side || ''));
       if (sideCompare !== 0) return sideCompare;
@@ -485,7 +479,6 @@
 
   function getStateValue(state, field) {
     if (!field || typeof field !== 'object') return '';
-    if (field.type === 'label') return String(field.text || '').trim();
     if (field.type === 'cover') return '';
     if (field.type === 'signatory') return '';
 
@@ -561,7 +554,6 @@
     }
 
     const value = getStateValue(state, field) || '-';
-    const baseClass = field.type === 'label' ? 'barangay-id-card__label' : 'barangay-id-card__field';
     const multilineClass = field.multiline ? ' barangay-id-card__text--multiline' : '';
     const alignClass = field.align === 'center'
       ? ' barangay-id-card__text--center'
@@ -571,7 +563,7 @@
     const lineHeight = field.multiline ? 1.04 : 1.05;
     return `
       <div
-        class="${baseClass}${multilineClass}${alignClass}"
+        class="barangay-id-card__field${multilineClass}${alignClass}"
         data-bid-autofit="1"
         data-bid-max-font="${esc(field.fontSize)}"
         data-bid-min-font="${esc(field.minFontSize)}"
