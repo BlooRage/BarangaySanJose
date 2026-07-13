@@ -333,6 +333,7 @@
       fieldEl.type = 'button';
       fieldEl.className = `bid-editor-field${field.id === state.selectedFieldId ? ' is-selected' : ''}`;
       fieldEl.dataset.fieldId = field.id;
+      fieldEl.dataset.bidFieldType = String(field.type || '').trim().toLowerCase();
       fieldEl.style.left = mmToPctX(field.x);
       fieldEl.style.top = mmToPctY(field.y);
       fieldEl.style.width = mmToPctX(field.w);

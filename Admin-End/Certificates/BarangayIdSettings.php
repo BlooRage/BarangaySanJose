@@ -276,16 +276,46 @@ $pagePayload = [
       box-shadow: inset 0 0 0 1px rgba(140, 102, 64, 0.12);
       user-select: none;
       touch-action: none;
+      isolation: isolate;
+    }
+    .bid-editor-canvas::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.48);
+      pointer-events: none;
+      z-index: 0;
     }
     .bid-editor-field {
       position: absolute;
       border: 1.5px solid rgba(222, 113, 12, 0.75);
-      background: rgba(255, 250, 245, 0.5);
+      background: rgba(255, 255, 255, 0.94);
       border-radius: 10px;
-      backdrop-filter: blur(2px);
-      box-shadow: 0 6px 16px rgba(85, 49, 13, 0.08);
+      box-shadow: 0 6px 16px rgba(85, 49, 13, 0.1);
       cursor: move;
       overflow: hidden;
+    }
+    .bid-editor-field[data-bid-field-type="label"] {
+      background: rgba(255, 246, 234, 0.96);
+    }
+    .bid-editor-field[data-bid-field-type="image"],
+    .bid-editor-field[data-bid-field-type="qr"] {
+      background: rgba(255, 255, 255, 0.96);
+    }
+    .bid-editor-field[data-bid-field-type="signatory"] {
+      background: rgba(240, 253, 250, 0.96);
+      border-color: rgba(20, 184, 166, 0.58);
+    }
+    .bid-editor-field[data-bid-field-type="cover"] {
+      border-style: dashed;
+      background:
+        repeating-linear-gradient(
+          135deg,
+          rgba(255, 247, 237, 0.98) 0,
+          rgba(255, 247, 237, 0.98) 10px,
+          rgba(255, 232, 204, 0.98) 10px,
+          rgba(255, 232, 204, 0.98) 20px
+        );
     }
     .bid-editor-field.is-selected {
       border-color: #0f766e;
@@ -327,6 +357,17 @@ $pagePayload = [
       overflow: hidden;
       display: flex;
       align-items: center;
+      font-weight: 700;
+    }
+    .bid-editor-field[data-bid-field-type="label"] .bid-editor-field__sample {
+      font-size: clamp(0.78rem, 0.2vw + 0.72rem, 0.92rem);
+      font-style: italic;
+      font-weight: 600;
+    }
+    .bid-editor-field[data-bid-field-type="cover"] .bid-editor-field__sample {
+      justify-content: center;
+      text-align: center;
+      font-size: clamp(0.74rem, 0.18vw + 0.68rem, 0.88rem);
     }
     .bid-editor-field__sample.is-center {
       justify-content: center;
@@ -582,7 +623,7 @@ $pagePayload = [
                 <div class="bid-toolbar">
                   <div>
                     <h3 class="bid-section__title">Drag and Drop Field Layout</h3>
-                    <p class="bid-section__copy">Move every text, image, QR, and signatory block directly on top of the selected card side. Resize from the corner handle and fine-tune values in the inspector.</p>
+                    <p class="bid-section__copy">Move every guide box on top of the selected card side. The uploaded ID artwork stays faint in the background so positioning is easier, while the finished look is shown in the sample preview below.</p>
                   </div>
                   <div class="bid-segmented" role="tablist" aria-label="Template side selector">
                     <button type="button" class="is-active" data-bid-side-btn="front">Front Editor</button>
@@ -607,6 +648,7 @@ $pagePayload = [
 
                 <div class="bid-editor-shell">
                   <div class="bid-editor-canvas-wrap">
+                    <p class="small text-muted mb-3">The orange boxes are only placement guides. If your PNG already has printed words or a sample photo, that background will stay visible here but the final saved layout uses the positions you set.</p>
                     <div class="bid-editor-canvas" id="barangayIdEditorCanvas" aria-label="Barangay ID template editor"></div>
                   </div>
                   <div class="bid-editor-sidebar">
