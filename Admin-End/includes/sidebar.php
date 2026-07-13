@@ -94,6 +94,9 @@ $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminRecordsActive = in_array($current, $adminRecordsPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isWebsiteSettingsActive = ($current === 'WebsiteSettings.php');
+$isCertificateIssuanceSettingsActive = ($current === 'CertificateIssuanceSettings.php');
+$isBusinessMonitoringSettingsActive = ($current === 'BusinessMonitoringSettings.php');
+$isBarangayIdSettingsActive = ($current === 'BarangayIdSettings.php');
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
 $isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);
 $isOfficialTransitionActive = in_array($current, $officialTransitionPages);
@@ -126,6 +129,7 @@ $isIdIssuanceTrackerActive = $current === 'CertificateTracker.php'
         || strcasecmp($certificateFilterDocument, 'Barangay ID') === 0
     );
 $isIdIssuanceActive = $isIdIssuanceTrackerActive || $isIdIssuanceManualActive;
+$isIdIssuanceActive = $isIdIssuanceActive || $isBarangayIdSettingsActive;
 $isCertificateTrackerActive = $current === 'CertificateTracker.php' && !$isIdIssuanceActive;
 $isCertActive = $isCertificateTrackerActive;
 $isClearanceIssuanceActive = $current === 'CertificateTracker.php'
@@ -182,6 +186,7 @@ $isClearanceIssuanceSectionActive = $isClearanceIssuanceActive
     || $isClearanceResidentialPermitActive
     || $isClearanceCommercialPermitActive;
 $isBusinessMonitoringActive = $current === 'BusinessMonitoring.php'
+    || $isBusinessMonitoringSettingsActive
     || (
         $current === 'CertificateTracker.php'
         && !$isIdIssuanceActive
@@ -194,6 +199,7 @@ $isCertificateIssuanceSectionActive = $current === 'CertificateTracker.php'
     && !$isIdIssuanceActive
     && !$isClearanceIssuanceSectionActive
     && !$isBusinessMonitoringActive;
+$isCertificateIssuanceSectionActive = $isCertificateIssuanceSectionActive || $isCertificateIssuanceSettingsActive;
 $isCertificateCohabitationActive = $isCertificateIssuanceSectionActive
     && (
         $certificateFilterDocumentToken === '__cert_cohabitation__'
@@ -1322,6 +1328,16 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
           <span class="sidebar-button-label sidebar-button-label--certificate">Certificate Issuance</span>
         </a>
       </li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isCertificateIssuanceSettingsActive ? 'active' : '' ?>"
+           style="<?= $isCertificateIssuanceSettingsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-gear"></i>
+          </span>
+          <span class="sidebar-button-label">Issuance Settings</span>
+        </a>
+      </li>
       <?php endif; ?>
       <?php if ($sbHasAny($sbIdIssuanceKeys)): ?>
       <li class="mb-2">
@@ -1358,6 +1374,14 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
             <?php endif; ?>
+            <?php if ($sbCan('id_issuance_tracker')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/BarangayIdSettings.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isBarangayIdSettingsActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Settings</span>
+              </a>
+            </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
@@ -1390,6 +1414,16 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
             <i class="fas fa-store"></i>
           </span>
           <span class="sidebar-button-label">Business Monitoring</span>
+        </a>
+      </li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoringSettings.php')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isBusinessMonitoringSettingsActive ? 'active' : '' ?>"
+           style="<?= $isBusinessMonitoringSettingsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-gear"></i>
+          </span>
+          <span class="sidebar-button-label">Monitoring Settings</span>
         </a>
       </li>
       <?php endif; ?>

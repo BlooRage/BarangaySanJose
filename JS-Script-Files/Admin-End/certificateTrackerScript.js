@@ -3428,6 +3428,9 @@
         row.punong_signatory_title,
         'Punong Barangay'
       ]) || 'Punong Barangay',
+      punongSignatorySignatureUrl: resolvePublicUrl(firstNonEmpty([
+        row.punong_signatory_signature_path
+      ])),
       secretarySignatoryName: upperText(firstNonEmptyName([
         row.secretary_signatory_name
       ]), 'MINERVA D. QUITA'),
@@ -3435,6 +3438,19 @@
         row.secretary_signatory_title,
         'Barangay Secretary'
       ]) || 'Barangay Secretary',
+      secretarySignatorySignatureUrl: resolvePublicUrl(firstNonEmpty([
+        row.secretary_signatory_signature_path
+      ])),
+      monitoringSignatoryName: upperText(firstNonEmptyName([
+        row.monitoring_signatory_name
+      ]), 'MR. JOSEPH C. PATRICIO'),
+      monitoringSignatoryTitle: firstNonEmpty([
+        row.monitoring_signatory_title,
+        'Head, Monitoring & Collection Dept.'
+      ]) || 'Head, Monitoring & Collection Dept.',
+      monitoringSignatorySignatureUrl: resolvePublicUrl(firstNonEmpty([
+        row.monitoring_signatory_signature_path
+      ])),
       requestOfficer: requestOfficerText,
       requestOfficerLine1: requestOfficerLine1Text,
       requestOfficerLine2: requestOfficerLine2Text,
@@ -3542,8 +3558,13 @@
     const approvedByNameText = String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA';
     const punongSignatoryNameText = String(state.punongSignatoryName || approvedByNameText).trim() || approvedByNameText;
     const punongSignatoryTitleText = String(state.punongSignatoryTitle || 'Punong Barangay').trim() || 'Punong Barangay';
+    const punongSignatorySignatureUrl = String(state.punongSignatorySignatureUrl || '').trim();
     const secretarySignatoryNameText = String(state.secretarySignatoryName || 'MINERVA D. QUITA').trim() || 'MINERVA D. QUITA';
     const secretarySignatoryTitleText = String(state.secretarySignatoryTitle || 'Barangay Secretary').trim() || 'Barangay Secretary';
+    const secretarySignatorySignatureUrl = String(state.secretarySignatorySignatureUrl || '').trim();
+    const monitoringSignatoryNameText = String(state.monitoringSignatoryName || 'MR. JOSEPH C. PATRICIO').trim() || 'MR. JOSEPH C. PATRICIO';
+    const monitoringSignatoryTitleText = String(state.monitoringSignatoryTitle || 'Head, Monitoring & Collection Dept.').trim() || 'Head, Monitoring & Collection Dept.';
+    const monitoringSignatorySignatureUrl = String(state.monitoringSignatorySignatureUrl || '').trim();
     const issuedBase = firstNonEmpty([state.issuedOn, state.issuedDate, formatDateInputValue(new Date())]);
     const documentValidityText = resolveCertificateValidityDate(
       state.documentValidity || '',
@@ -3592,6 +3613,14 @@
           <span class="doc-preview-business-check-line"></span>
         </span>
       `;
+    };
+    const renderSignatureInk = (url, alt, extraClass = '') => {
+      const classes = ['doc-preview-signature-ink'];
+      if (extraClass) classes.push(extraClass);
+      if (!url) {
+        return `<div class="${classes.join(' ')}"></div>`;
+      }
+      return `<div class="${classes.join(' ')}"><img src="${esc(url)}" alt="${esc(alt)}"></div>`;
     };
     const fullAddressWithBarangay = composeBarangayAddress(fullAddress);
     const applicantAddressWithBarangay = composeBarangayAddress(applicantResidenceAddress || fullAddress);
@@ -4026,15 +4055,17 @@
       footerAreaHtml = `
         <div class="doc-preview-business-footer-area${qrBlockHtml ? '' : ' doc-preview-business-footer-area--noqr'}">
           <div class="doc-preview-business-footer-main">
-            <div class="doc-preview-business-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+            <div class="doc-preview-business-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
             <div class="doc-preview-business-signing">
               <div class="doc-preview-signature doc-preview-business-signature">
+                ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
                 <div class="name">${esc(punongSignatoryNameText)}</div>
                 <div>${esc(punongSignatoryTitleText)}</div>
               </div>
               <div class="doc-preview-signature doc-preview-business-signature">
-                <div class="name">MR. JOSEPH C. PATRICIO</div>
-                <div>Head, Monitoring &amp; Collection Dept.</div>
+                ${renderSignatureInk(monitoringSignatorySignatureUrl, `${monitoringSignatoryNameText} signature`)}
+                <div class="name">${esc(monitoringSignatoryNameText)}</div>
+                <div>${esc(monitoringSignatoryTitleText)}</div>
               </div>
             </div>
           </div>
@@ -4072,15 +4103,17 @@
     } else if (isGeneralPermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-generalclearance-footer-area${qrBlockHtml ? '' : ' doc-preview-generalclearance-footer-area--noqr'}">
-          <div class="doc-preview-generalclearance-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+          <div class="doc-preview-generalclearance-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
           <div class="doc-preview-generalclearance-signing">
             <div class="doc-preview-signature doc-preview-generalclearance-signature">
+              ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
               <div class="name">${esc(punongSignatoryNameText)}</div>
               <div>${esc(punongSignatoryTitleText)}</div>
             </div>
             <div class="doc-preview-signature doc-preview-generalclearance-signature">
-              <div class="name">MR. JOSEPH C. PATRICIO</div>
-              <div>Head, Monitoring &amp; Collection Dept.</div>
+              ${renderSignatureInk(monitoringSignatorySignatureUrl, `${monitoringSignatoryNameText} signature`)}
+              <div class="name">${esc(monitoringSignatoryNameText)}</div>
+              <div>${esc(monitoringSignatoryTitleText)}</div>
             </div>
           </div>
           ${qrBlockHtml}
@@ -4090,15 +4123,17 @@
     } else if (isTricyclePermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-tricycle-footer-area${qrBlockHtml ? '' : ' doc-preview-tricycle-footer-area--noqr'}">
-          <div class="doc-preview-tricycle-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+          <div class="doc-preview-tricycle-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
           <div class="doc-preview-tricycle-signing">
             <div class="doc-preview-signature doc-preview-tricycle-signature">
+              ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
               <div class="name">${esc(punongSignatoryNameText)}</div>
               <div>${esc(punongSignatoryTitleText)}</div>
             </div>
             <div class="doc-preview-signature doc-preview-tricycle-signature">
-              <div class="name">MR. JOSEPH C. PATRICIO</div>
-              <div>Head, Monitoring &amp; Collection Dept.</div>
+              ${renderSignatureInk(monitoringSignatorySignatureUrl, `${monitoringSignatoryNameText} signature`)}
+              <div class="name">${esc(monitoringSignatoryNameText)}</div>
+              <div>${esc(monitoringSignatoryTitleText)}</div>
             </div>
           </div>
           ${qrBlockHtml}
@@ -4113,6 +4148,7 @@
               <div></div>
               <div class="doc-preview-ftjs-signing">
                 <div class="doc-preview-ftjs-block">
+                  ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`, 'doc-preview-signature-ink--ftjs')}
                   <div class="doc-preview-ftjs-name">${esc(punongSignatoryNameText)}</div>
                   <div class="doc-preview-ftjs-role">${esc(punongSignatoryTitleText)}</div>
                 </div>
@@ -4120,6 +4156,7 @@
                 <div class="doc-preview-ftjs-date-label">Date</div>
                 <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
                 <div class="doc-preview-ftjs-block doc-preview-ftjs-witness">
+                  ${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--ftjs')}
                   <div class="doc-preview-ftjs-name">${esc(secretarySignatoryNameText)}</div>
                   <div class="doc-preview-ftjs-role">${esc(secretarySignatoryTitleText)}</div>
                 </div>
@@ -4131,8 +4168,9 @@
           `
         : `
             <div class="${footerAreaClass}">
-              <div class="doc-preview-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+              <div class="doc-preview-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
               <div class="doc-preview-signature">
+                ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
                 <div class="name">${esc(punongSignatoryNameText)}</div>
                 <div>${esc(punongSignatoryTitleText)}</div>
               </div>

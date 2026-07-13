@@ -291,7 +291,8 @@
       .barangay-id-card__cover,
       .barangay-id-card__photo,
       .barangay-id-card__qr,
-      .barangay-id-card__note {
+      .barangay-id-card__note,
+      .barangay-id-card__signatory {
         position: absolute;
       }
       .barangay-id-card__cover {
@@ -302,7 +303,8 @@
       .barangay-id-card__label,
       .barangay-id-card__photo,
       .barangay-id-card__qr,
-      .barangay-id-card__note {
+      .barangay-id-card__note,
+      .barangay-id-card__signatory {
         z-index: 2;
       }
       .barangay-id-card__label {
@@ -431,6 +433,45 @@
         line-height: 1.24;
         font-size: var(--bid-note-size);
         text-align: center;
+      }
+      .barangay-id-card__signatory {
+        z-index: 3;
+        display: grid;
+        justify-items: center;
+        color: #111;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .barangay-id-card__signatory-ink {
+        width: 100%;
+        min-height: 11%;
+        display: flex;
+        align-items: end;
+        justify-content: center;
+      }
+      .barangay-id-card__signatory-ink img {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        object-fit: contain;
+      }
+      .barangay-id-card__signatory-line {
+        width: 100%;
+        border-top: 1.2px solid #111;
+        margin-top: 0.5%;
+      }
+      .barangay-id-card__signatory-name {
+        font-size: clamp(8.2px, 0.28rem + 0.56vw, 11.2px);
+        line-height: 1.05;
+        font-weight: 800;
+        text-align: center;
+        text-transform: uppercase;
+        margin-top: 1.2%;
+      }
+      .barangay-id-card__signatory-title {
+        font-size: clamp(7.6px, 0.24rem + 0.48vw, 9.8px);
+        line-height: 1.02;
+        text-align: center;
+        margin-top: 0.4%;
       }
       @container barangay-id-card (max-width: 500px) {
         .barangay-id-card {
@@ -597,6 +638,9 @@
       photoUrl,
       qrUrl,
       qrFallbackUrl,
+      punongSignatoryName: upper(firstNonEmpty([row.punong_signatory_name]), 'HON. GLENN S. EVANGELISTA'),
+      punongSignatoryTitle: firstNonEmpty([row.punong_signatory_title], 'Punong Barangay') || 'Punong Barangay',
+      punongSignatorySignatureUrl: resolvePublicUrl(appBase, firstNonEmpty([row.punong_signatory_signature_path])),
       templateVariant: resolvedTemplateVariant,
       frontTemplateUrl: resolvedFrontTemplateUrl,
       frontTemplateFallbackUrl: resolvedFrontTemplateUrl,
@@ -628,6 +672,14 @@
     const qrHtml = state.qrUrl
       ? `<div class="barangay-id-card__qr" style="left:${positionX(49)};top:${positionY(11.5)};width:${widthPct(32.3)};height:${heightPct(31.4)};"><img src="${esc(state.qrUrl)}" alt="Verification QR code"${state.qrFallbackUrl ? ` data-fallback="${esc(state.qrFallbackUrl)}"` : ''} onerror="const fallback=this.getAttribute('data-fallback');if(fallback&&this.dataset.fallbackTried!=='1'){this.dataset.fallbackTried='1';this.src=fallback;return;}this.parentElement.remove();"></div>`
       : `<div class="barangay-id-card__qr barangay-id-card__qr--placeholder" style="left:${positionX(49)};top:${positionY(11.5)};width:${widthPct(32.3)};height:${heightPct(31.4)};">QR HERE</div>`;
+    const punongSignatoryHtml = `
+      <div class="barangay-id-card__signatory" style="left:${positionX(9.1)};top:${positionY(38.2)};width:${widthPct(30.8)};height:${heightPct(12.0)};">
+        <div class="barangay-id-card__signatory-ink">${state.punongSignatorySignatureUrl ? `<img src="${esc(state.punongSignatorySignatureUrl)}" alt="${esc(state.punongSignatoryName || 'Punong Barangay')} signature">` : ''}</div>
+        <div class="barangay-id-card__signatory-line"></div>
+        <div class="barangay-id-card__signatory-name">${esc(state.punongSignatoryName || 'HON. GLENN S. EVANGELISTA')}</div>
+        <div class="barangay-id-card__signatory-title">${esc(state.punongSignatoryTitle || 'Punong Barangay')}</div>
+      </div>
+    `;
 
     const frontCovers = usesEmptyTemplate
       ? ''
@@ -640,12 +692,14 @@
 
     const backCovers = usesEmptyTemplate
       ? [
+          [8.3, 42.2, 33.5, 9.6]
         ].map(([x, y, w, h]) => (
           `<div class="barangay-id-card__cover" style="left:${positionX(x)};top:${positionY(y)};width:${widthPct(w)};height:${heightPct(h)};"></div>`
         )).join('')
       : [
           [57.8, 1.0, 25.0, 6.0],
-          [5.8, 14.8, 45.5, 30.6]
+          [5.8, 14.8, 45.5, 30.6],
+          [8.3, 42.2, 33.5, 9.6]
         ].map(([x, y, w, h]) => (
           `<div class="barangay-id-card__cover" style="left:${positionX(x)};top:${positionY(y)};width:${widthPct(w)};height:${heightPct(h)};"></div>`
         )).join('');
@@ -680,6 +734,7 @@
       <div class="barangay-id-card__field barangay-id-card__field--name barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(17)};width:${widthPct(35)};text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
       <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--address-wrap barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(22.08)};width:${widthPct(35)};">${esc(state.cardEmergencyAddress || '-')}</div>
       <div class="barangay-id-card__field barangay-id-card__field--meta barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(28.5)};width:${widthPct(19.0)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
+      ${punongSignatoryHtml}
       ${qrHtml}
     ` : `
       <div class="barangay-id-card__field barangay-id-card__field--cardno barangay-id-card__field--cardno-back" style="left:${positionX(59.5)};top:${positionY(3.3)};width:${widthPct(21.5)};text-align:right;">${esc(state.cardNumber || '-')}</div>
@@ -690,6 +745,7 @@
       <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(30.0)};width:${widthPct(12)};">Contact</div>
       <div class="barangay-id-card__field barangay-id-card__field--meta barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(32.2)};width:${widthPct(22)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
       <div class="barangay-id-card__note" style="left:${positionX(7.3)};top:${positionY(36.6)};width:${widthPct(40.5)};">${esc(state.validityNotice || '')}</div>
+      ${punongSignatoryHtml}
       ${qrHtml}
     `;
 

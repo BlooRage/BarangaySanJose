@@ -7,6 +7,7 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/audit.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
+require_once __DIR__ . '/../General/documentModuleSettings.php';
 
 if (!($conn instanceof mysqli)) {
     throw new RuntimeException('Database connection is unavailable.');
@@ -262,161 +263,7 @@ function dra_format_official_display_name(string $firstName, string $middleName,
 
 function dra_current_barangay_signatories(mysqli $conn): array
 {
-    static $cache = null;
-    if ($cache !== null) {
-        return $cache;
-    }
-
-    $fallback = [
-        'punong' => [
-            'name' => 'HON. GLENN S. EVANGELISTA',
-            'title' => 'Punong Barangay',
-        ],
-        'secretary' => [
-            'name' => 'MINERVA D. QUITA',
-            'title' => 'Barangay Secretary',
-        ],
-    ];
-
-    if (!dr_table_exists($conn, 'barangaycounciltbl') || !dr_table_exists($conn, 'officialinformationtbl')) {
-        if (!dr_table_exists($conn, 'officialinformationtbl')) {
-            $cache = $fallback;
-            return $cache;
-        }
-    }
-
-    $resolved = $fallback;
-    $positionField = dr_column_exists($conn, 'officialinformationtbl', 'position_access')
-        ? 'COALESCE(oi.position_access, oi.role_access)'
-        : 'oi.role_access';
-    $officialsResult = $conn->query("
-        SELECT
-            oi.official_id,
-            {$positionField} AS position_access,
-            oi.firstname,
-            oi.middlename,
-            oi.lastname,
-            oi.suffix
-        FROM officialinformationtbl oi
-        WHERE {$positionField} IN ('Barangay Chairman', 'Barangay Secretary', 'Punong Barangay', 'Barangay Captain')
-        ORDER BY oi.official_id DESC
-    ");
-    if ($officialsResult instanceof mysqli_result) {
-        while ($row = $officialsResult->fetch_assoc()) {
-            $row = pii_decrypt_official_row($row) ?? $row;
-            $positionAccess = strtolower(trim((string)($row['position_access'] ?? '')));
-            if ($positionAccess === '') {
-                continue;
-            }
-            $fullName = dra_format_official_display_name(
-                (string)($row['firstname'] ?? ''),
-                (string)($row['middlename'] ?? ''),
-                (string)($row['lastname'] ?? ''),
-                (string)($row['suffix'] ?? '')
-            );
-            if ($fullName === '') {
-                continue;
-            }
-
-            if (
-                !isset($resolved['_from_position_punong'])
-                && (
-                    $positionAccess === 'barangay chairman'
-                    || $positionAccess === 'punong barangay'
-                    || $positionAccess === 'barangay captain'
-                )
-            ) {
-                $resolved['punong'] = [
-                    'name' => dra_format_official_display_name(
-                        (string)($row['firstname'] ?? ''),
-                        (string)($row['middlename'] ?? ''),
-                        (string)($row['lastname'] ?? ''),
-                        (string)($row['suffix'] ?? ''),
-                        true
-                    ),
-                    'title' => 'Punong Barangay',
-                ];
-                $resolved['_from_position_punong'] = true;
-            }
-
-            if (!isset($resolved['_from_position_secretary']) && $positionAccess === 'barangay secretary') {
-                $resolved['secretary'] = [
-                    'name' => $fullName,
-                    'title' => 'Barangay Secretary',
-                ];
-                $resolved['_from_position_secretary'] = true;
-            }
-        }
-        $officialsResult->free();
-    }
-
-    if (
-        !isset($resolved['_from_position_punong']) || !isset($resolved['_from_position_secretary'])
-    ) {
-        $result = $conn->query("
-            SELECT bc.seat_name, oi.firstname, oi.middlename, oi.lastname, oi.suffix
-            FROM barangaycounciltbl bc
-            LEFT JOIN officialinformationtbl oi
-                ON oi.official_id = bc.current_official_id
-            WHERE bc.is_active = 1
-              AND bc.current_official_id IS NOT NULL
-            ORDER BY bc.sort_order, bc.council_id
-        ");
-        if ($result instanceof mysqli_result) {
-            while ($row = $result->fetch_assoc()) {
-                $row = pii_decrypt_official_row($row) ?? $row;
-                $seatName = trim((string)($row['seat_name'] ?? ''));
-                if ($seatName === '') {
-                    continue;
-                }
-
-                $fullName = dra_format_official_display_name(
-                    (string)($row['firstname'] ?? ''),
-                    (string)($row['middlename'] ?? ''),
-                    (string)($row['lastname'] ?? ''),
-                    (string)($row['suffix'] ?? '')
-                );
-                if ($fullName === '') {
-                    continue;
-                }
-
-                $seatLower = strtolower($seatName);
-                if (
-                    !isset($resolved['_from_position_punong'])
-                    && (
-                        strpos($seatLower, 'punong barangay') !== false
-                        || strpos($seatLower, 'barangay captain') !== false
-                        || $seatLower === 'barangay chairman'
-                    )
-                ) {
-                    $resolved['punong'] = [
-                        'name' => dra_format_official_display_name(
-                            (string)($row['firstname'] ?? ''),
-                            (string)($row['middlename'] ?? ''),
-                            (string)($row['lastname'] ?? ''),
-                            (string)($row['suffix'] ?? ''),
-                            true
-                        ),
-                        'title' => 'Punong Barangay',
-                    ];
-                    continue;
-                }
-
-                if (!isset($resolved['_from_position_secretary']) && $seatLower === 'barangay secretary') {
-                    $resolved['secretary'] = [
-                        'name' => $fullName,
-                        'title' => 'Barangay Secretary',
-                    ];
-                }
-            }
-            $result->free();
-        }
-    }
-
-    unset($resolved['_from_position_punong'], $resolved['_from_position_secretary']);
-
-    $cache = $resolved;
-    return $cache;
+    return dms_current_barangay_signatories($conn);
 }
 
 function dra_resolve_resident_display_name(mysqli $conn, string $residentUserId, string $residentId): string
@@ -2754,6 +2601,35 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void
     $requestRow['request_details'] = dr_safe_json($payload);
 }
 
+function dra_signature_image_type(string $diskPath): string
+{
+    $ext = strtolower(pathinfo($diskPath, PATHINFO_EXTENSION));
+    return match ($ext) {
+        'jpg', 'jpeg' => 'JPEG',
+        'png' => 'PNG',
+        'webp' => 'WEBP',
+        default => '',
+    };
+}
+
+function dra_render_signature_image(object $pdf, string $publicPath, float $x, float $y, float $w, float $h): void
+{
+    $diskPath = dms_signature_public_path_to_disk($publicPath);
+    if ($diskPath === '' || !is_file($diskPath)) {
+        return;
+    }
+
+    $imageType = dra_signature_image_type($diskPath);
+    if ($imageType === '') {
+        return;
+    }
+
+    try {
+        $pdf->Image($diskPath, $x, $y, $w, $h, $imageType);
+    } catch (Throwable $ignored) {
+    }
+}
+
 function dra_generate_issued_document(array $requestRow): ?string
 {
     global $conn;
@@ -2791,6 +2667,18 @@ function dra_generate_issued_document(array $requestRow): ?string
     $docType = trim((string)($requestRow['document_type'] ?? 'Certificate'));
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
     $isBarangayId = dr_is_barangay_id_document_type($docType);
+    $moduleSettingsKey = dms_module_key_for_document_type($docType);
+    $moduleSettings = ($conn instanceof mysqli)
+        ? dms_resolve_module_signatories($conn, $moduleSettingsKey)
+        : [];
+    $monitoringSettings = ($conn instanceof mysqli)
+        ? dms_resolve_module_signatories($conn, 'monitoring')
+        : [];
+    $punongSignaturePath = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
+    $secretarySignaturePath = trim((string)($moduleSettings['secretary']['signature_path'] ?? ''));
+    $monitoringSignatoryName = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
+    $monitoringSignatoryTitle = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
+    $monitoringSignaturePath = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
     $stripTemplateTokens = static function (string $value): string {
         $value = trim($value);
         if ($value === '') {
@@ -3834,6 +3722,14 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $pdf->MultiCell(40.5, 2.8, $validityNotice, 0, 'C', false);
                 }
 
+                $coverRect($pdf, 8.2, 42.1, 34.8, 9.7);
+                dra_render_signature_image($pdf, $punongSignaturePath, 10.2, 38.1, 28.8, 6.2);
+                $pdf->SetDrawColor(0, 0, 0);
+                $pdf->SetLineWidth(0.2);
+                $pdf->Line(9.2, 45.8, 39.8, 45.8);
+                $fitSingleLine($pdf, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 9.8, 46.0, 29.6, 'B', 4.9, 3.9, 'C');
+                $fitSingleLine($pdf, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 10.0, 48.7, 29.2, '', 4.3, 3.4, 'C');
+
                 if ($allowQr && is_file($qrDiskPath)) {
                     $pdf->Image($qrDiskPath, 47.6, 16.2, 32.3, 31.4);
                 }
@@ -4174,6 +4070,26 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $footerRowY += 6.0;
                 }
 
+                $pdf->Rect(13.5, 209.5, 69.0, 28.5, 'F');
+                dra_render_signature_image($pdf, $secretarySignaturePath, 16.8, 205.2, 28.0, 8.2);
+                $pdf->SetFont('Arial', '', 10.6);
+                $pdf->SetXY(14.5, 220.2);
+                $pdf->Cell(19.0, 5.5, 'Issued by:', 0, 0, 'L');
+                $writeFittedCell($pdf, 33.5, 220.0, 46.0, 5.5, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.6, 8.4, 'L');
+                $writeFittedCell($pdf, 23.5, 226.0, 54.0, 5.2, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 10.0, 8.0, 'C');
+
+                $pdf->Rect(120.5, 203.5, 80.0, 24.5, 'F');
+                dra_render_signature_image($pdf, $punongSignaturePath, 132.0, 198.8, 52.0, 9.2);
+                $pdf->Line(126.2, 213.3, 194.6, 213.3);
+                $writeFittedCell($pdf, 124.0, 214.5, 72.0, 5.6, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.8, 8.4, 'C');
+                $writeFittedCell($pdf, 124.0, 220.1, 72.0, 5.1, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 10.0, 8.0, 'C');
+
+                $pdf->Rect(120.5, 229.5, 80.0, 24.5, 'F');
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 132.0, 224.8, 52.0, 9.2);
+                $pdf->Line(126.2, 239.3, 194.6, 239.3);
+                $writeFittedCell($pdf, 124.0, 240.5, 72.0, 5.6, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.8, 8.4, 'C');
+                $writeFittedCell($pdf, 124.0, 246.0, 72.0, 5.0, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+
                 if (is_file($qrDiskPath)) {
                     $qrSize = 20.0;
                     $qrRightMargin = 9.0;
@@ -4502,6 +4418,26 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $metaY += 6.1;
                 }
 
+                $pdf->Rect(15.0, 208.5, 69.0, 28.5, 'F');
+                dra_render_signature_image($pdf, $secretarySignaturePath, 18.3, 204.2, 28.0, 8.2);
+                $pdf->SetFont('Arial', '', 10.6);
+                $pdf->SetXY(16.0, 219.2);
+                $pdf->Cell(19.0, 5.5, 'Issued by:', 0, 0, 'L');
+                $writeFittedCell($pdf, 35.0, 219.0, 46.0, 5.5, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.6, 8.4, 'L');
+                $writeFittedCell($pdf, 24.0, 225.0, 54.0, 5.2, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 10.0, 8.0, 'C');
+
+                $pdf->Rect(121.0, 202.5, 80.0, 24.5, 'F');
+                dra_render_signature_image($pdf, $punongSignaturePath, 132.2, 197.8, 52.0, 9.2);
+                $pdf->Line(126.7, 212.5, 194.6, 212.5);
+                $writeFittedCell($pdf, 124.5, 213.8, 72.0, 5.6, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.8, 8.4, 'C');
+                $writeFittedCell($pdf, 124.5, 219.3, 72.0, 5.1, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 10.0, 8.0, 'C');
+
+                $pdf->Rect(121.0, 228.5, 80.0, 24.5, 'F');
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 132.2, 223.8, 52.0, 9.2);
+                $pdf->Line(126.7, 238.4, 194.6, 238.4);
+                $writeFittedCell($pdf, 124.5, 239.6, 72.0, 5.6, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.8, 8.4, 'C');
+                $writeFittedCell($pdf, 124.5, 245.1, 72.0, 5.0, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+
                 if (is_file($qrDiskPath)) {
                     $qrSize = 20.0;
                     $qrRightMargin = 9.0;
@@ -4702,6 +4638,26 @@ function dra_generate_issued_document(array $requestRow): ?string
                     }
                     $metaY += 6.0;
                 }
+
+                $pdf->Rect(12.8, 195.8, 71.0, 27.0, 'F');
+                dra_render_signature_image($pdf, $secretarySignaturePath, 16.0, 191.7, 28.0, 8.0);
+                $pdf->SetFont('Arial', '', 10.4);
+                $pdf->SetXY(13.6, 206.2);
+                $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
+                $writeFittedCell($pdf, 32.0, 206.0, 48.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.4, 8.2, 'L');
+                $writeFittedCell($pdf, 22.0, 211.6, 56.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+
+                $pdf->Rect(114.0, 188.8, 83.0, 24.0, 'F');
+                dra_render_signature_image($pdf, $punongSignaturePath, 125.5, 184.2, 52.0, 8.8);
+                $pdf->Line(119.8, 198.6, 191.2, 198.6);
+                $writeFittedCell($pdf, 118.0, 199.7, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 205.0, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+
+                $pdf->Rect(114.0, 214.8, 83.0, 24.0, 'F');
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 125.5, 210.2, 52.0, 8.8);
+                $pdf->Line(119.8, 224.6, 191.2, 224.6);
+                $writeFittedCell($pdf, 118.0, 225.7, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 231.0, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.6, 7.6, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
@@ -5914,6 +5870,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $signBaseY = 168.0;
             $signX = 126.0;
             $signW = 46.0;
+            dra_render_signature_image($pdf, $punongSignaturePath, $signX + 6.0, $signBaseY - 9.0, $signW - 12.0, 8.0);
             $pdf->Line($signX, $signBaseY, $signX + $signW, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 10);
             $pdf->SetXY($signX, $signBaseY + 1.5);
@@ -5931,6 +5888,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->Cell($signW, 4, 'Witnesses by:', 0, 1, 'C');
 
             $witnessBaseY = $signBaseY + 34;
+            dra_render_signature_image($pdf, $secretarySignaturePath, $signX + 6.0, $witnessBaseY - 9.0, $signW - 12.0, 8.0);
             $pdf->Line($signX, $witnessBaseY, $signX + $signW, $witnessBaseY);
             $pdf->SetFont($indigencyFont, 'B', 10);
             $pdf->SetXY($signX, $witnessBaseY + 1.5);
@@ -5980,6 +5938,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             }
 
             // Issued by block (lower-left)
+            dra_render_signature_image($pdf, $secretarySignaturePath, 34.0, $signBaseY - 9.0, 42.0, 8.0);
             $pdf->SetFont($indigencyFont, '', 11);
             $pdf->SetXY(26, $issuedByY);
             $pdf->Cell(20, 6, 'Issued by:', 0, 0, 'L');
@@ -5990,6 +5949,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->Cell(44, 6, $secretarySignatoryTitle, 0, 1, 'C');
 
             // Punong Barangay signature block (lower-right)
+            dra_render_signature_image($pdf, $punongSignaturePath, 136.0, $signBaseY - 9.0, 46.0, 8.0);
             $pdf->Line(124, $signBaseY, 194, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 11);
             $pdf->SetXY(124, $signBaseY + 2);
@@ -6067,6 +6027,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     }
 
     $pdf->SetY(250);
+    dra_render_signature_image($pdf, $punongSignaturePath, 28.0, 241.0, 42.0, 8.0);
     $pdf->Line(18, 250, 88, 250);
     $pdf->SetFont($fontFace, 'B', 11);
     $pdf->Cell(70, 7, $punongSignatoryName, 0, 1, 'L');
@@ -7889,6 +7850,9 @@ if ($action === 'list') {
     $items = [];
     $feeByDocType = [];
     $signatories = dra_current_barangay_signatories($conn);
+    $issuanceSettings = dms_resolve_module_signatories($conn, 'issuance');
+    $monitoringSettings = dms_resolve_module_signatories($conn, 'monitoring');
+    $barangayIdSettings = dms_resolve_module_signatories($conn, 'barangay_id');
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
         $docType = trim((string)($row['document_type'] ?? ''));
@@ -7921,6 +7885,16 @@ if ($action === 'list') {
         $row['punong_signatory_title'] = (string)($signatories['punong']['title'] ?? 'Punong Barangay');
         $row['secretary_signatory_name'] = (string)($signatories['secretary']['name'] ?? '');
         $row['secretary_signatory_title'] = (string)($signatories['secretary']['title'] ?? 'Barangay Secretary');
+        $moduleSettingsKey = dms_module_key_for_document_type($docType);
+        $moduleSettings = $moduleSettingsKey === 'barangay_id'
+            ? $barangayIdSettings
+            : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
+        $row['document_settings_module_key'] = $moduleSettingsKey;
+        $row['punong_signatory_signature_path'] = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
+        $row['secretary_signatory_signature_path'] = trim((string)($moduleSettings['secretary']['signature_path'] ?? ''));
+        $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
+        $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
+        $row['monitoring_signatory_signature_path'] = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
         $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
         if ($isBarangayIdDocument) {
             $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
@@ -8091,10 +8065,23 @@ if ($action === 'get_request') {
         }
     }
     $signatories = dra_current_barangay_signatories($conn);
+    $issuanceSettings = dms_resolve_module_signatories($conn, 'issuance');
+    $monitoringSettings = dms_resolve_module_signatories($conn, 'monitoring');
+    $barangayIdSettings = dms_resolve_module_signatories($conn, 'barangay_id');
     $row['punong_signatory_name'] = (string)($signatories['punong']['name'] ?? '');
     $row['punong_signatory_title'] = (string)($signatories['punong']['title'] ?? 'Punong Barangay');
     $row['secretary_signatory_name'] = (string)($signatories['secretary']['name'] ?? '');
     $row['secretary_signatory_title'] = (string)($signatories['secretary']['title'] ?? 'Barangay Secretary');
+    $moduleSettingsKey = dms_module_key_for_document_type((string)($row['document_type'] ?? ''));
+    $moduleSettings = $moduleSettingsKey === 'barangay_id'
+        ? $barangayIdSettings
+        : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
+    $row['document_settings_module_key'] = $moduleSettingsKey;
+    $row['punong_signatory_signature_path'] = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
+    $row['secretary_signatory_signature_path'] = trim((string)($moduleSettings['secretary']['signature_path'] ?? ''));
+    $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
+    $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
+    $row['monitoring_signatory_signature_path'] = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     dr_hydrate_request_delivery_fields($row, $row['payload']);
     $storedFeeAmount = $row['fee_amount'] ?? null;

@@ -173,9 +173,14 @@ require_once __DIR__ . '/includes/admin_guard.php';
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
-        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
-            Business Monitoring
-        </h2>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
+                Business Monitoring
+            </h2>
+            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoringSettings.php'), ENT_QUOTES, 'UTF-8') ?>">
+                <i class="fa-solid fa-gear me-2"></i>Monitoring Settings
+            </a>
+        </div>
         <hr><br>
 
         <div class="bg-white p-4 rounded-4 shadow-sm border business-monitoring-shell resident-masterlist-shell">

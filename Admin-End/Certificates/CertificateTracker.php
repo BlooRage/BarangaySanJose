@@ -13,6 +13,20 @@ $certificateTrackerHeading = $isIdIssuanceTrackerView
   : ($certificateLaunchFilterDocument === '__clearances__'
       ? 'Clearance Issuance'
       : 'Certificate Issuance');
+$certificateLaunchFilterToken = strtolower(trim($certificateLaunchFilterDocument));
+$certificateSettingsHref = appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php');
+$certificateSettingsLabel = 'Issuance Settings';
+if ($isIdIssuanceTrackerView) {
+  $certificateSettingsHref = appUrl('Admin-End/Certificates/BarangayIdSettings.php');
+  $certificateSettingsLabel = 'Barangay ID Settings';
+} elseif (
+  $certificateLaunchFilterToken === '__clearances__'
+  || str_contains($certificateLaunchFilterToken, 'clearance')
+  || str_contains($certificateLaunchFilterToken, 'business')
+) {
+  $certificateSettingsHref = appUrl('Admin-End/BusinessMonitoringSettings.php');
+  $certificateSettingsLabel = 'Monitoring Settings';
+}
 $barangayIdAdminNavActive = 'applications';
 
 if ($certificateLaunchStage === 'release') {
@@ -1922,6 +1936,37 @@ if ($certificateLaunchStage === 'release') {
       justify-items: end;
       color: #111827;
     }
+    #viewModal .doc-preview-signature-ink {
+      min-height: 42px;
+      width: 160px;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      margin-bottom: 4px;
+    }
+    #viewModal .doc-preview-signature-ink img {
+      max-width: 100%;
+      max-height: 40px;
+      object-fit: contain;
+      display: block;
+    }
+    #viewModal .doc-preview-signature-ink--issuedby {
+      justify-content: flex-start;
+      width: 140px;
+      min-height: 36px;
+      margin-bottom: 6px;
+    }
+    #viewModal .doc-preview-signature-ink--issuedby img {
+      max-height: 34px;
+    }
+    #viewModal .doc-preview-signature-ink--ftjs {
+      width: 136px;
+      min-height: 34px;
+      margin: 0 auto 6px;
+    }
+    #viewModal .doc-preview-signature-ink--ftjs img {
+      max-height: 32px;
+    }
     #viewModal .doc-preview-signature .name {
       margin-top: 18px;
       font-weight: 700;
@@ -2445,8 +2490,18 @@ if ($certificateLaunchStage === 'release') {
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
+<<<<<<< Updated upstream
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" style="min-width:0;">
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
+=======
+  <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+      <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
+      <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($certificateSettingsHref, ENT_QUOTES, 'UTF-8') ?>">
+        <i class="fa-solid fa-gear me-2"></i><?= htmlspecialchars($certificateSettingsLabel, ENT_QUOTES, 'UTF-8') ?>
+      </a>
+    </div>
+>>>>>>> Stashed changes
     <hr class="mb-4">
 
     <!-- Page-level navigation -->
