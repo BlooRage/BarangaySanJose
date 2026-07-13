@@ -3,7 +3,7 @@ require_once __DIR__ . '/includes/admin_guard.php';
 require_once __DIR__ . '/../PhpFiles/General/websiteMaintenance.php';
 require_once __DIR__ . '/../PhpFiles/General/audit.php';
 
-$websiteSettings = wms_load_settings();
+$websiteSettings = wms_load_settings(isset($conn) && $conn instanceof mysqli ? $conn : null);
 $websiteSettingsUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $websiteSettingsRole = trim((string)($_SESSION['role'] ?? 'SuperAdmin'));
 $websiteSettingsPath = appUrl('Admin-End/WebsiteSettings.php');
@@ -11,13 +11,13 @@ $websiteSettingsPath = appUrl('Admin-End/WebsiteSettings.php');
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_website_settings') {
     verifyCsrfToken(false);
 
-    $existingSettings = wms_load_settings();
+    $existingSettings = wms_load_settings(isset($conn) && $conn instanceof mysqli ? $conn : null);
     try {
         $savedSettings = wms_save_settings([
             'enabled' => isset($_POST['maintenance_enabled']),
             'message' => (string)($_POST['maintenance_message'] ?? ''),
             'subcopy' => (string)($_POST['maintenance_subcopy'] ?? ''),
-        ], $websiteSettingsUserId);
+        ], $websiteSettingsUserId, isset($conn) && $conn instanceof mysqli ? $conn : null);
 
         if (isset($conn) && $conn instanceof mysqli) {
             insertUnifiedAuditLog(
@@ -49,7 +49,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
     }
 }
 
-$websiteSettings = wms_load_settings();
+$websiteSettings = wms_load_settings(isset($conn) && $conn instanceof mysqli ? $conn : null);
 $websiteSettingsEnabled = !empty($websiteSettings['enabled']);
 $websiteSettingsUpdatedBy = trim((string)($websiteSettings['updated_by_user_id'] ?? ''));
 $websiteSettingsUpdatedAt = trim((string)($websiteSettings['updated_at'] ?? ''));

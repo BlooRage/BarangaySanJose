@@ -1,7 +1,10 @@
 (() => {
   const PAGE_WIDTH_MM = 85.6;
   const PAGE_HEIGHT_MM = 54.1;
-  const TEMPLATE_ASSET_VERSION = '20260321-02';
+  const TEMPLATE_ASSET_VERSION = '20260713-01';
+  const DEFAULT_IMAGE_PLACEHOLDER = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><rect width="320" height="320" rx="32" fill="#f8efe4"/><circle cx="160" cy="118" r="54" fill="#e2c8aa"/><path d="M76 262c18-45 56-70 84-70s66 25 84 70" fill="#e2c8aa"/><text x="160" y="300" font-family="Arial" font-size="24" font-weight="700" text-anchor="middle" fill="#8a5c2b">PHOTO</text></svg>'
+  );
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (match) => ({
@@ -45,7 +48,7 @@
     if (/^data:/i.test(raw)) return raw;
 
     let normalized = raw.replace(/\\/g, '/');
-    if (normalized.startsWith(appBase + '/')) {
+    if (normalized.startsWith(`${appBase}/`)) {
       return normalized;
     }
     if (normalized.startsWith('/')) {
@@ -157,374 +160,208 @@
     return formatDisplayDate(baseDate.toISOString());
   }
 
-  function positionX(mm) {
-    return `${(mm / PAGE_WIDTH_MM) * 100}%`;
+  function defaultSampleData() {
+    return {
+      cardFullName: 'DELA CRUZ, JUAN S.',
+      cardFullAddress: 'AREA 1, BARANGAY SAN JOSE, RODRIGUEZ, RIZAL',
+      cardBirthdate: '04/16/1998',
+      cardBirthplace: 'RODRIGUEZ, RIZAL',
+      cardSex: 'MALE',
+      cardContactNumber: '09171234567',
+      cardEmergencyName: 'DELA CRUZ, MARIA L.',
+      cardEmergencyAddress: 'AREA 1, BARANGAY SAN JOSE, RODRIGUEZ, RIZAL',
+      cardEmergencyContact: '09179876543',
+      cardNumber: 'A2026-0001',
+      validUntil: '07/13/2028',
+      validityNotice: 'This ID is valid until 07/13/2028 except when the holder requests for a new one.'
+    };
   }
 
-  function positionY(mm) {
-    return `${(mm / PAGE_HEIGHT_MM) * 100}%`;
+  function defaultLayoutConfig() {
+    return {
+      version: 1,
+      page: {
+        width_mm: PAGE_WIDTH_MM,
+        height_mm: PAGE_HEIGHT_MM
+      },
+      fields: [
+        { id: 'front_photo', label: 'Resident Photo', type: 'image', source: 'photoUrl', side: 'front', x: 7.9, y: 22.1, w: 22, h: 22, fit: 'cover', z: 2 },
+        { id: 'front_name_label', label: 'Label: Name', type: 'label', text: 'Name', side: 'front', x: 32.2, y: 24.08, w: 10, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'front_name_value', label: 'Full Name', type: 'text', source: 'cardFullName', side: 'front', x: 32.2, y: 25.8, w: 44.8, h: 4.8, align: 'left', fontStyle: 'B', fontSize: 7.2, minFontSize: 4.6, uppercase: true, z: 2 },
+        { id: 'front_address_label', label: 'Label: Address', type: 'label', text: 'Address', side: 'front', x: 32.2, y: 30.58, w: 13.5, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'front_address_value', label: 'Address', type: 'text', source: 'cardFullAddress', side: 'front', x: 31.2, y: 32.78, w: 44.8, h: 6, align: 'left', fontStyle: 'B', fontSize: 5.6, minFontSize: 3.2, uppercase: true, multiline: true, maxLines: 2, z: 2 },
+        { id: 'front_birthdate_label', label: 'Label: Date of Birth', type: 'label', text: 'Date of Birth', side: 'front', x: 32.2, y: 38.48, w: 20, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'front_birthdate_value', label: 'Birthdate', type: 'text', source: 'cardBirthdate', side: 'front', x: 32.2, y: 40.78, w: 20.5, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.4, minFontSize: 4.4, uppercase: true, z: 2 },
+        { id: 'front_sex_label', label: 'Label: Sex', type: 'label', text: 'Sex', side: 'front', x: 57.2, y: 38.48, w: 10, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'front_sex_value', label: 'Sex', type: 'text', source: 'cardSex', side: 'front', x: 57.2, y: 40.78, w: 19.5, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.4, minFontSize: 4.4, uppercase: true, z: 2 },
+        { id: 'front_birthplace_label', label: 'Label: Place of Birth', type: 'label', text: 'Place of Birth', side: 'front', x: 32.2, y: 44.78, w: 20, h: 3.2, align: 'left', fontStyle: 'I', fontSize: 5.1, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'front_birthplace_value', label: 'Birthplace', type: 'text', source: 'cardBirthplace', side: 'front', x: 32.2, y: 46.98, w: 44.8, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 5.5, minFontSize: 4.0, uppercase: true, z: 2 },
+        { id: 'front_valid_until_value', label: 'Valid Until', type: 'text', source: 'validUntil', prefix: 'VALID UNTIL: ', side: 'front', x: 6.0, y: 44.78, w: 28.6, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 4.8, minFontSize: 3.7, uppercase: true, z: 2 },
+        { id: 'front_card_number_value', label: 'Card Number', type: 'text', source: 'cardNumber', side: 'front', x: 6.4, y: 49.58, w: 28.4, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.8, minFontSize: 4.4, uppercase: true, color: '#c62828', z: 2 },
+        { id: 'back_card_number_value', label: 'Card Number (Back)', type: 'text', source: 'cardNumber', side: 'back', x: 59.5, y: 3.3, w: 21.5, h: 4.6, align: 'right', fontStyle: 'B', fontSize: 7.6, minFontSize: 5.0, uppercase: true, color: '#c62828', z: 2 },
+        { id: 'back_emergency_name_label', label: 'Label: Emergency Name', type: 'label', text: 'Name', side: 'back', x: 6.9, y: 17.5, w: 10, h: 3, align: 'left', fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'back_emergency_name_value', label: 'Emergency Contact Name', type: 'text', source: 'cardEmergencyName', side: 'back', x: 6.9, y: 19.7, w: 33, h: 4.6, align: 'left', fontStyle: 'B', fontSize: 6.0, minFontSize: 4.3, uppercase: true, z: 2 },
+        { id: 'back_emergency_address_label', label: 'Label: Emergency Address', type: 'label', text: 'Address', side: 'back', x: 6.9, y: 23.8, w: 12, h: 3, align: 'left', fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'back_emergency_address_value', label: 'Emergency Address', type: 'text', source: 'cardEmergencyAddress', side: 'back', x: 6.9, y: 26.0, w: 39.6, h: 6, align: 'left', fontStyle: 'B', fontSize: 5.0, minFontSize: 3.2, uppercase: true, multiline: true, maxLines: 2, z: 2 },
+        { id: 'back_emergency_contact_label', label: 'Label: Emergency Contact', type: 'label', text: 'Contact', side: 'back', x: 6.9, y: 30.0, w: 12, h: 3, align: 'left', fontStyle: 'I', fontSize: 5.0, minFontSize: 4.0, color: '#111111', z: 2 },
+        { id: 'back_emergency_contact_value', label: 'Emergency Contact Number', type: 'text', source: 'cardEmergencyContact', fallbackSource: 'cardContactNumber', side: 'back', x: 6.9, y: 32.2, w: 22, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.0, minFontSize: 4.3, uppercase: true, z: 2 },
+        { id: 'back_validity_notice', label: 'Validity Notice', type: 'text', source: 'validityNotice', side: 'back', x: 7.3, y: 36.6, w: 40.5, h: 6.4, align: 'center', fontStyle: 'I', fontSize: 4.2, minFontSize: 3.2, uppercase: false, multiline: true, maxLines: 3, z: 2 },
+        { id: 'back_signatory', label: 'Punong Barangay Signatory', type: 'signatory', side: 'back', x: 9.1, y: 38.2, w: 30.8, h: 12, z: 3 },
+        { id: 'back_qr', label: 'Verification QR', type: 'qr', source: 'qrUrl', side: 'back', x: 49.0, y: 11.5, w: 32.3, h: 31.4, fit: 'fill', z: 2 }
+      ]
+    };
   }
 
-  function widthPct(mm) {
-    return `${(mm / PAGE_WIDTH_MM) * 100}%`;
+  function fieldLibrary() {
+    return [
+      { type: 'text', label: 'Text Field', source: 'cardFullName', side: 'front', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
+      { type: 'label', label: 'Label Field', text: 'Label', side: 'front', w: 16, h: 3, fontStyle: 'I', fontSize: 5, minFontSize: 4, uppercase: false, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
+      { type: 'image', label: 'Image Field', source: 'photoUrl', side: 'front', w: 18, h: 18, fit: 'cover' },
+      { type: 'qr', label: 'QR Field', source: 'qrUrl', side: 'back', w: 18, h: 18, fit: 'fill' },
+      { type: 'signatory', label: 'Signatory Block', side: 'back', w: 30, h: 12 },
+      { type: 'cover', label: 'Cover Block', side: 'front', w: 18, h: 8, backgroundColor: '#ffffff' }
+    ];
   }
 
-  function heightPct(mm) {
-    return `${(mm / PAGE_HEIGHT_MM) * 100}%`;
+  function normalizeNumber(value, fallback, min, max) {
+    const parsed = Number.parseFloat(value);
+    const safe = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.min(max, Math.max(min, Number(safe.toFixed(2))));
+  }
+
+  function normalizeInteger(value, fallback, min, max) {
+    const parsed = Number.parseInt(value, 10);
+    const safe = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.min(max, Math.max(min, safe));
+  }
+
+  function normalizeBoolean(value, fallback = false) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (!normalized) return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(normalized);
+  }
+
+  function normalizeLayoutField(field = {}, index = 0) {
+    const rawType = String(field.type || 'text').trim().toLowerCase();
+    const type = ['text', 'label', 'image', 'qr', 'signatory', 'cover'].includes(rawType) ? rawType : 'text';
+    const rawAlign = String(field.align || 'left').trim().toLowerCase();
+    const align = ['left', 'center', 'right'].includes(rawAlign) ? rawAlign : 'left';
+    let fontStyle = String(field.fontStyle || (type === 'label' ? 'I' : 'B')).trim().toUpperCase();
+    if (!['', 'B', 'I', 'BI', 'IB'].includes(fontStyle)) {
+      fontStyle = type === 'label' ? 'I' : 'B';
+    }
+    if (fontStyle === 'IB') fontStyle = 'BI';
+    const color = /^#[0-9A-Fa-f]{6}$/.test(String(field.color || '').trim()) ? String(field.color).trim() : '#111111';
+    const backgroundColor = /^#[0-9A-Fa-f]{6}$/.test(String(field.backgroundColor || '').trim()) ? String(field.backgroundColor).trim() : '#ffffff';
+    const rawFit = String(field.fit || 'cover').trim().toLowerCase();
+    const fit = ['cover', 'contain', 'fill'].includes(rawFit) ? rawFit : 'cover';
+    const side = String(field.side || 'front').trim().toLowerCase() === 'back' ? 'back' : 'front';
+    const rawId = String(field.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+
+    const normalized = {
+      id: rawId || `field_${index + 1}`,
+      label: String(field.label || 'Field').trim() || `Field ${index + 1}`,
+      type,
+      side,
+      x: normalizeNumber(field.x, 0, 0, PAGE_WIDTH_MM),
+      y: normalizeNumber(field.y, 0, 0, PAGE_HEIGHT_MM),
+      w: normalizeNumber(field.w, 10, 1.2, PAGE_WIDTH_MM),
+      h: normalizeNumber(field.h, 4, 1.0, PAGE_HEIGHT_MM),
+      z: normalizeInteger(field.z, 2, 1, 20),
+      source: String(field.source || '').trim(),
+      fallbackSource: String(field.fallbackSource || '').trim(),
+      prefix: String(field.prefix || '').trim(),
+      text: String(field.text || '').trim(),
+      align,
+      fontStyle,
+      fontSize: normalizeNumber(field.fontSize, type === 'label' ? 5 : 6, 2.8, 20),
+      minFontSize: normalizeNumber(field.minFontSize, type === 'label' ? 4 : 4.2, 2.4, 18),
+      color,
+      backgroundColor,
+      uppercase: normalizeBoolean(field.uppercase, type !== 'label' && type !== 'cover'),
+      multiline: normalizeBoolean(field.multiline, false),
+      maxLines: normalizeInteger(field.maxLines, 2, 1, 5),
+      fit
+    };
+    if (normalized.minFontSize > normalized.fontSize) {
+      normalized.minFontSize = normalized.fontSize;
+    }
+    return normalized;
+  }
+
+  function normalizeLayoutConfig(layoutConfig = null) {
+    const defaults = defaultLayoutConfig();
+    const config = layoutConfig && typeof layoutConfig === 'object' ? layoutConfig : defaults;
+    const fields = Array.isArray(config.fields) && config.fields.length
+      ? config.fields.map((field, index) => normalizeLayoutField(field, index))
+      : defaults.fields.map((field, index) => normalizeLayoutField(field, index));
+    fields.sort((left, right) => {
+      const sideCompare = String(left.side || '').localeCompare(String(right.side || ''));
+      if (sideCompare !== 0) return sideCompare;
+      if (left.z !== right.z) return left.z - right.z;
+      return String(left.id || '').localeCompare(String(right.id || ''));
+    });
+    return {
+      version: normalizeInteger(config.version, 1, 1, 10),
+      page: {
+        width_mm: PAGE_WIDTH_MM,
+        height_mm: PAGE_HEIGHT_MM
+      },
+      fields
+    };
+  }
+
+  function mmToPct(value, total) {
+    return `${(Number(value || 0) / total) * 100}%`;
+  }
+
+  function sideFields(layoutConfig, side) {
+    const normalizedSide = side === 'back' ? 'back' : 'front';
+    return normalizeLayoutConfig(layoutConfig).fields.filter((field) => field.side === normalizedSide);
+  }
+
+  function fitToObjectPosition(fit) {
+    if (fit === 'contain') return 'contain';
+    if (fit === 'fill') return 'fill';
+    return 'cover';
   }
 
   function verificationUrl(appBase, row = {}, payload = {}) {
-    const requestId = String(firstNonEmpty([
-      row.request_id,
-      payload.request_id
-    ]) || '').trim();
+    const requestId = String(firstNonEmpty([row.request_id, payload.request_id]) || '').trim();
     if (!requestId || typeof window === 'undefined' || !window.location || !window.location.origin) {
       return '';
     }
-
-    const verificationCode = String(firstNonEmpty([
-      row.verification_code,
-      payload.verification_code,
-      requestId
-    ]) || '').trim();
+    const verificationCode = String(firstNonEmpty([row.verification_code, payload.verification_code, requestId]) || '').trim();
     const appOrigin = `${window.location.origin}${appBase}`;
     return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode || requestId)}`;
   }
 
   function qrPreviewUrl(appBase, row = {}, payload = {}) {
-    const existing = resolvePublicUrl(appBase, firstNonEmpty([
-      row.qr_code_path,
-      payload.qr_code_path
-    ]));
+    const existing = resolvePublicUrl(appBase, firstNonEmpty([row.qr_code_path, payload.qr_code_path]));
     const verifyUrl = verificationUrl(appBase, row, payload);
     const fallback = verifyUrl
       ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(verifyUrl)}`
       : '';
-
     return {
       primary: existing || fallback,
-      fallback: existing && fallback && existing !== fallback ? fallback : '',
+      fallback: existing && fallback && existing !== fallback ? fallback : ''
     };
   }
 
-  function ensureStyles() {
-    if (document.getElementById('barangay-id-digital-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'barangay-id-digital-styles';
-    style.textContent = `
-      .barangay-id-digital {
-        display: grid;
-        gap: 18px;
+  function mergeSampleData(baseState, sampleData = {}) {
+    const defaults = defaultSampleData();
+    const merged = { ...baseState };
+    Object.keys(defaults).forEach((key) => {
+      if (sampleData && Object.prototype.hasOwnProperty.call(sampleData, key)) {
+        merged[key] = String(sampleData[key] ?? '').trim() || defaults[key];
       }
-      .barangay-id-digital__intro {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-      .barangay-id-digital__eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 12px;
-        border-radius: 999px;
-        background: #fff2df;
-        color: #8a4b00;
-        border: 1px solid #f2cf9e;
-        font-weight: 700;
-        font-size: 0.85rem;
-      }
-      .barangay-id-digital__copy {
-        margin: 0;
-        color: #5f4a32;
-        font-size: 0.92rem;
-      }
-      .barangay-id-digital__grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 18px;
-      }
-      .barangay-id-digital__panel {
-        display: grid;
-        gap: 10px;
-      }
-      .barangay-id-digital__label {
-        font-size: 0.78rem;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #7a6146;
-      }
-      .barangay-id-card {
-        position: relative;
-        width: 100%;
-        aspect-ratio: 856 / 541;
-        border-radius: 18px;
-        overflow: hidden;
-        box-shadow: 0 22px 44px rgba(32, 20, 7, 0.18);
-        background: linear-gradient(135deg, #fbf6ef 0%, #f0e4d4 100%);
-        border: 1px solid rgba(122, 97, 70, 0.18);
-        container-type: inline-size;
-        container-name: barangay-id-card;
-        --bid-body-size: clamp(10.6px, 0.36rem + 0.76vw, 14.6px);
-        --bid-label-size: var(--bid-body-size);
-        --bid-field-size: var(--bid-body-size);
-        --bid-name-size: clamp(12px, 0.46rem + 1.02vw, 18.6px);
-        --bid-address-size: var(--bid-body-size);
-        --bid-meta-size: var(--bid-body-size);
-        --bid-cardno-size: clamp(10.4px, 0.36rem + 0.88vw, 15.8px);
-        --bid-cardno-back-size: clamp(10.8px, 0.38rem + 0.96vw, 16.8px);
-        --bid-emergency-size: var(--bid-body-size);
-        --bid-note-size: clamp(8px, 0.28rem + 0.52vw, 10.8px);
-        --bid-photo-bleed: 4%;
-      }
-      .barangay-id-card__bg {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-      .barangay-id-card__field,
-      .barangay-id-card__label,
-      .barangay-id-card__cover,
-      .barangay-id-card__photo,
-      .barangay-id-card__qr,
-      .barangay-id-card__note,
-      .barangay-id-card__signatory {
-        position: absolute;
-      }
-      .barangay-id-card__cover {
-        z-index: 1;
-        background: #fff;
-      }
-      .barangay-id-card__field,
-      .barangay-id-card__label,
-      .barangay-id-card__photo,
-      .barangay-id-card__qr,
-      .barangay-id-card__note,
-      .barangay-id-card__signatory {
-        z-index: 2;
-      }
-      .barangay-id-card__label {
-        color: #111;
-        font-family: Arial, Helvetica, sans-serif;
-        font-style: italic;
-        font-weight: 500;
-        line-height: 1.05;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: var(--bid-label-size);
-      }
-      .barangay-id-card__field {
-        color: #111;
-        font-family: Arial, Helvetica, sans-serif;
-        font-weight: 700;
-        line-height: 1.08;
-        text-align: left;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-transform: uppercase;
-        font-size: var(--bid-field-size);
-      }
-      .barangay-id-card__field--name {
-        font-size: var(--bid-name-size);
-        letter-spacing: 0.01em;
-      }
-      .barangay-id-card__field--address,
-      .barangay-id-card__field--birthplace {
-        font-size: var(--bid-address-size);
-      }
-      .barangay-id-card__field--address-wrap {
-        white-space: normal;
-        text-overflow: clip;
-        display: -webkit-box;
-        display: box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        line-height: 1.02;
-        max-height: calc(2 * 1.02em);
-        word-break: break-word;
-        overflow-wrap: anywhere;
-      }
-      .barangay-id-card__field--meta {
-        font-size: var(--bid-meta-size);
-      }
-      .barangay-id-card__field--cardno {
-        font-size: var(--bid-cardno-size);
-        color: #c62828;
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        text-shadow: 0 0 0 rgba(0, 0, 0, 0.01);
-      }
-      .barangay-id-card__field--cardno-front {
-        font-size: var(--bid-cardno-size);
-      }
-      .barangay-id-card__field--cardno-back {
-        font-size: var(--bid-cardno-back-size);
-      }
-      .barangay-id-card__field--emergency {
-        font-size: var(--bid-emergency-size);
-        line-height: 1.04;
-      }
-      .barangay-id-card__photo {
-        overflow: hidden;
-        border-radius: 0;
-        background: transparent;
-      }
-      .barangay-id-card__photo img,
-      .barangay-id-card__qr img {
-        width: 100%;
-        height: 100%;
-        display: block;
-      }
-      .barangay-id-card__photo img {
-        object-fit: cover;
-        object-position: center center;
-        width: calc(100% + var(--bid-photo-bleed));
-        height: calc(100% + var(--bid-photo-bleed));
-        max-width: none;
-        margin-top: calc(var(--bid-photo-bleed) * -0.5);
-        margin-left: calc(var(--bid-photo-bleed) * -0.5);
-        border-radius: 0 !important;
-        box-shadow: none !important;
-      }
-      .barangay-id-card__qr img {
-        object-fit: fill;
-        image-rendering: pixelated;
-      }
-      .barangay-id-card__photo--placeholder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #6b7280;
-        font-size: 0.72rem;
-        text-align: center;
-        padding: 8px;
-        font-weight: 700;
-      }
-      .barangay-id-card__qr {
-        border-radius: 0;
-        overflow: hidden;
-        background: transparent;
-        border: 0;
-      }
-      .barangay-id-card__qr--placeholder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #5c5c5c;
-        font-size: var(--bid-address-size);
-        font-style: italic;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        background: rgba(255, 255, 255, 0.78);
-        border: 1.5px dashed rgba(222, 113, 12, 0.7);
-      }
-      .barangay-id-card__note {
-        color: #111;
-        font-family: Arial, Helvetica, sans-serif;
-        font-style: italic;
-        font-weight: 500;
-        line-height: 1.24;
-        font-size: var(--bid-note-size);
-        text-align: center;
-      }
-      .barangay-id-card__signatory {
-        z-index: 3;
-        display: grid;
-        justify-items: center;
-        color: #111;
-        font-family: Arial, Helvetica, sans-serif;
-      }
-      .barangay-id-card__signatory-ink {
-        width: 100%;
-        min-height: 11%;
-        display: flex;
-        align-items: end;
-        justify-content: center;
-      }
-      .barangay-id-card__signatory-ink img {
-        max-width: 100%;
-        max-height: 100%;
-        display: block;
-        object-fit: contain;
-      }
-      .barangay-id-card__signatory-line {
-        width: 100%;
-        border-top: 1.2px solid #111;
-        margin-top: 0.5%;
-      }
-      .barangay-id-card__signatory-name {
-        font-size: clamp(8.2px, 0.28rem + 0.56vw, 11.2px);
-        line-height: 1.05;
-        font-weight: 800;
-        text-align: center;
-        text-transform: uppercase;
-        margin-top: 1.2%;
-      }
-      .barangay-id-card__signatory-title {
-        font-size: clamp(7.6px, 0.24rem + 0.48vw, 9.8px);
-        line-height: 1.02;
-        text-align: center;
-        margin-top: 0.4%;
-      }
-      @container barangay-id-card (max-width: 500px) {
-        .barangay-id-card {
-          --bid-body-size: clamp(9.3px, 2.5cqw, 12.6px);
-          --bid-label-size: var(--bid-body-size);
-          --bid-field-size: var(--bid-body-size);
-          --bid-name-size: clamp(10.4px, 2.92cqw, 14.8px);
-          --bid-address-size: var(--bid-body-size);
-          --bid-meta-size: var(--bid-body-size);
-          --bid-cardno-size: clamp(8.9px, 2.46cqw, 12.8px);
-          --bid-cardno-back-size: clamp(9.4px, 2.62cqw, 13.6px);
-          --bid-emergency-size: var(--bid-body-size);
-          --bid-note-size: clamp(7.6px, 1.96cqw, 9.6px);
-        }
-      }
-      @container barangay-id-card (min-width: 760px) {
-        .barangay-id-card {
-          --bid-body-size: clamp(11px, 0.4rem + 0.74vw, 15px);
-          --bid-label-size: var(--bid-body-size);
-          --bid-field-size: var(--bid-body-size);
-          --bid-name-size: clamp(12.9px, 0.48rem + 0.9vw, 19px);
-          --bid-address-size: var(--bid-body-size);
-          --bid-meta-size: var(--bid-body-size);
-          --bid-cardno-size: clamp(10.8px, 0.4rem + 0.72vw, 16.1px);
-          --bid-cardno-back-size: clamp(11.3px, 0.42rem + 0.78vw, 17.1px);
-          --bid-emergency-size: var(--bid-body-size);
-          --bid-note-size: clamp(8.2px, 0.3rem + 0.44vw, 11px);
-        }
-      }
-      .barangay-id-digital__actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      @container barangay-id-card (max-width: 420px) {
-        .barangay-id-card {
-          border-radius: 14px;
-        }
-        .barangay-id-card__field {
-          letter-spacing: 0;
-        }
-        .barangay-id-card__field--address-wrap {
-          line-height: 0.98;
-          max-height: calc(2 * 0.98em);
-        }
-      }
-      @media (max-width: 991.98px) {
-        .barangay-id-digital__grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    `;
-    document.head.appendChild(style);
+    });
+    if (!String(merged.validityNotice || '').trim()) {
+      merged.validityNotice = `This ID is valid until ${merged.validUntil || '____'} except when the holder requests for a new one.`;
+    }
+    return merged;
   }
 
   function createState({
@@ -537,6 +374,8 @@
     frontTemplateUrl = '',
     backTemplateUrl = '',
     templateVariant = '',
+    layoutConfig = null,
+    sampleData = null
   } = {}) {
     const requestId = firstNonEmpty([row.request_id]);
     const issuedDate = computeIssuedDate(row);
@@ -555,23 +394,14 @@
       firstNonEmpty([payload.middle_name, payload.middlename, residentProfile.middle_name]),
       firstNonEmpty([payload.suffix_name, payload.suffix, residentProfile.suffix])
     ) || upper(firstNonEmpty([payload.resident_name, row.resident_name]), 'RESIDENT');
-
     const fullAddress = upper(issuedResidenceAddress(firstNonEmpty([
       payload.full_address,
       payload.full_address_display,
       payload.address,
       residentProfile.full_address
     ])));
-    const birthdate = upper(formatDisplayDate(firstNonEmpty([
-      payload.birthdate,
-      payload.date_of_birth,
-      residentProfile.birthdate
-    ])));
-    const birthplace = upper(firstNonEmpty([
-      payload.birthplace,
-      payload.place_of_birth,
-      residentProfile.birthplace
-    ]));
+    const birthdate = upper(formatDisplayDate(firstNonEmpty([payload.birthdate, payload.date_of_birth, residentProfile.birthdate])));
+    const birthplace = upper(firstNonEmpty([payload.birthplace, payload.place_of_birth, residentProfile.birthplace]));
     const sex = upper(firstNonEmpty([
       payload.card_sex,
       residentProfile.sex,
@@ -589,10 +419,7 @@
       row.contact_number
     ])));
     const emergencyName = formatEmergencyName(payload, residentProfile);
-    const emergencyAddress = upper(firstNonEmpty([
-      payload.emergency_address,
-      residentProfile.emergency_address
-    ]));
+    const emergencyAddress = upper(firstNonEmpty([payload.emergency_address, residentProfile.emergency_address]));
     const emergencyContact = upper(normalizePhone(firstNonEmpty([
       payload.emergency_contact,
       payload.emergency_phone_number,
@@ -604,23 +431,16 @@
       residentProfile.id_picture_url,
       residentProfile.id_picture_path,
       profileImageUrl,
-      fallbackProfileImageUrl
+      fallbackProfileImageUrl,
+      DEFAULT_IMAGE_PLACEHOLDER
     ]));
     const qrConfig = qrPreviewUrl(appBase, row, payload);
     const qrUrl = String(qrConfig?.primary || '').trim();
     const qrFallbackUrl = String(qrConfig?.fallback || '').trim();
     const resolvedFrontTemplateUrl = frontTemplateUrl || `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${TEMPLATE_ASSET_VERSION}`;
     const resolvedBackTemplateUrl = backTemplateUrl || `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${TEMPLATE_ASSET_VERSION}`;
-    const resolvedTemplateVariant = firstNonEmpty([
-      templateVariant,
-      (
-        /_EMPTY\.[a-z0-9]+(?:[?#].*)?$/i.test(resolvedFrontTemplateUrl)
-        && /_EMPTY\.[a-z0-9]+(?:[?#].*)?$/i.test(resolvedBackTemplateUrl)
-      ) ? 'empty' : '',
-      'empty'
-    ]);
 
-    return {
+    const baseState = {
       appBase,
       requestId,
       cardFullName: fullName,
@@ -635,28 +455,228 @@
       cardNumber,
       validUntil,
       validityNotice: `This ID is valid until ${validUntil || '____'} except when the holder requests for a new one.`,
-      photoUrl,
+      photoUrl: photoUrl || DEFAULT_IMAGE_PLACEHOLDER,
       qrUrl,
       qrFallbackUrl,
       punongSignatoryName: upper(firstNonEmpty([row.punong_signatory_name]), 'HON. GLENN S. EVANGELISTA'),
       punongSignatoryTitle: firstNonEmpty([row.punong_signatory_title], 'Punong Barangay') || 'Punong Barangay',
       punongSignatorySignatureUrl: resolvePublicUrl(appBase, firstNonEmpty([row.punong_signatory_signature_path])),
-      templateVariant: resolvedTemplateVariant,
+      templateVariant: firstNonEmpty([templateVariant, 'empty']),
       frontTemplateUrl: resolvedFrontTemplateUrl,
       frontTemplateFallbackUrl: resolvedFrontTemplateUrl,
       backTemplateUrl: resolvedBackTemplateUrl,
       backTemplateFallbackUrl: resolvedBackTemplateUrl,
+      layoutConfig: normalizeLayoutConfig(layoutConfig)
     };
+
+    return sampleData && typeof sampleData === 'object'
+      ? { ...mergeSampleData(baseState, sampleData), layoutConfig: normalizeLayoutConfig(layoutConfig) }
+      : baseState;
+  }
+
+  function createSampleState(options = {}) {
+    return createState({
+      ...options,
+      sampleData: options.sampleData && typeof options.sampleData === 'object'
+        ? options.sampleData
+        : defaultSampleData()
+    });
+  }
+
+  function getStateValue(state, field) {
+    if (!field || typeof field !== 'object') return '';
+    if (field.type === 'label') return String(field.text || '').trim();
+    if (field.type === 'cover') return '';
+    if (field.type === 'signatory') return '';
+
+    const source = String(field.source || '').trim();
+    const fallbackSource = String(field.fallbackSource || '').trim();
+    const prefix = String(field.prefix || '');
+    let value = source ? String(state?.[source] ?? '').trim() : '';
+    if (!value && fallbackSource) {
+      value = String(state?.[fallbackSource] ?? '').trim();
+    }
+    if (!value && field.type === 'qr') {
+      value = String(state?.qrUrl || '').trim();
+    }
+    if (field.type === 'image' && !value) {
+      value = String(state?.photoUrl || '').trim();
+    }
+    if (value && field.uppercase) {
+      value = value.toUpperCase();
+    }
+    return `${prefix}${value}`.trim();
+  }
+
+  function signatoryHtml(state, field, page) {
+    const left = mmToPct(field.x, page.width_mm);
+    const top = mmToPct(field.y, page.height_mm);
+    const width = mmToPct(field.w, page.width_mm);
+    const height = mmToPct(field.h, page.height_mm);
+    return `
+      <div class="barangay-id-card__signatory" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">
+        <div class="barangay-id-card__signatory-ink">
+          ${state.punongSignatorySignatureUrl ? `<img src="${esc(state.punongSignatorySignatureUrl)}" alt="${esc(state.punongSignatoryName || 'Punong Barangay')} signature">` : ''}
+        </div>
+        <div class="barangay-id-card__signatory-line"></div>
+        <div class="barangay-id-card__signatory-name">${esc(state.punongSignatoryName || 'HON. GLENN S. EVANGELISTA')}</div>
+        <div class="barangay-id-card__signatory-title">${esc(state.punongSignatoryTitle || 'Punong Barangay')}</div>
+      </div>
+    `;
+  }
+
+  function renderField(state, field, page) {
+    const left = mmToPct(field.x, page.width_mm);
+    const top = mmToPct(field.y, page.height_mm);
+    const width = mmToPct(field.w, page.width_mm);
+    const height = mmToPct(field.h, page.height_mm);
+
+    if (field.type === 'cover') {
+      return `<div class="barangay-id-card__cover" style="left:${left};top:${top};width:${width};height:${height};background:${esc(field.backgroundColor || '#ffffff')};z-index:${field.z};"></div>`;
+    }
+
+    if (field.type === 'signatory') {
+      return signatoryHtml(state, field, page);
+    }
+
+    if (field.type === 'image' || field.type === 'qr') {
+      const imageUrl = getStateValue(state, field);
+      const placeholderText = field.type === 'qr' ? 'QR HERE' : 'IMAGE';
+      const className = field.type === 'qr' ? 'barangay-id-card__qr' : 'barangay-id-card__photo';
+      const objectFit = fitToObjectPosition(field.fit);
+      if (!imageUrl) {
+        return `<div class="${className} ${className}--placeholder" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">${esc(placeholderText)}</div>`;
+      }
+      const fallbackAttr = field.type === 'qr' && state.qrFallbackUrl
+        ? ` data-fallback="${esc(state.qrFallbackUrl)}"`
+        : '';
+      const onError = field.type === 'qr'
+        ? "const fallback=this.getAttribute('data-fallback');if(fallback&&this.dataset.fallbackTried!=='1'){this.dataset.fallbackTried='1';this.src=fallback;return;}this.parentElement.remove();"
+        : 'this.src="' + esc(DEFAULT_IMAGE_PLACEHOLDER) + '";this.onerror=null;';
+      return `
+        <div class="${className}" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">
+          <img src="${esc(imageUrl)}" alt="${esc(field.label || placeholderText)}"${fallbackAttr} onerror="${onError}" style="object-fit:${objectFit};">
+        </div>
+      `;
+    }
+
+    const value = getStateValue(state, field) || '-';
+    const baseClass = field.type === 'label' ? 'barangay-id-card__label' : 'barangay-id-card__field';
+    const multilineClass = field.multiline ? ' barangay-id-card__text--multiline' : '';
+    const alignClass = field.align === 'center'
+      ? ' barangay-id-card__text--center'
+      : field.align === 'right'
+        ? ' barangay-id-card__text--right'
+        : '';
+    const lineHeight = field.multiline ? 1.04 : 1.05;
+    return `
+      <div
+        class="${baseClass}${multilineClass}${alignClass}"
+        data-bid-autofit="1"
+        data-bid-max-font="${esc(field.fontSize)}"
+        data-bid-min-font="${esc(field.minFontSize)}"
+        data-bid-max-lines="${esc(field.maxLines || 1)}"
+        data-bid-multiline="${field.multiline ? '1' : '0'}"
+        style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};color:${esc(field.color)};font-weight:${field.fontStyle.includes('B') ? '800' : '500'};font-style:${field.fontStyle.includes('I') ? 'italic' : 'normal'};text-align:${esc(field.align)};line-height:${lineHeight};"
+      >${esc(value)}</div>
+    `;
+  }
+
+  function ensureStyles() {
+    if (document.getElementById('barangay-id-digital-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'barangay-id-digital-styles';
+    style.textContent = `
+      .barangay-id-digital { display:grid; gap:18px; }
+      .barangay-id-digital__intro { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+      .barangay-id-digital__eyebrow { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; background:#fff2df; color:#8a4b00; border:1px solid #f2cf9e; font-weight:700; font-size:0.85rem; }
+      .barangay-id-digital__copy { margin:0; color:#5f4a32; font-size:0.92rem; }
+      .barangay-id-digital__grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; }
+      .barangay-id-digital__panel { display:grid; gap:10px; }
+      .barangay-id-digital__label { font-size:0.78rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:#7a6146; }
+      .barangay-id-card { position:relative; width:100%; aspect-ratio:856 / 541; border-radius:18px; overflow:hidden; box-shadow:0 22px 44px rgba(32, 20, 7, 0.18); background:linear-gradient(135deg, #fbf6ef 0%, #f0e4d4 100%); border:1px solid rgba(122, 97, 70, 0.18); container-type:inline-size; container-name:barangay-id-card; }
+      .barangay-id-card__bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+      .barangay-id-card__cover,
+      .barangay-id-card__field,
+      .barangay-id-card__label,
+      .barangay-id-card__photo,
+      .barangay-id-card__qr,
+      .barangay-id-card__signatory { position:absolute; }
+      .barangay-id-card__cover { z-index:1; }
+      .barangay-id-card__field,
+      .barangay-id-card__label,
+      .barangay-id-card__photo,
+      .barangay-id-card__qr { z-index:2; overflow:hidden; }
+      .barangay-id-card__field,
+      .barangay-id-card__label { font-family:Arial, Helvetica, sans-serif; color:#111; overflow:hidden; }
+      .barangay-id-card__label { white-space:nowrap; text-overflow:ellipsis; }
+      .barangay-id-card__field { letter-spacing:0.01em; }
+      .barangay-id-card__text--multiline { white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+      .barangay-id-card__text--center { text-align:center; }
+      .barangay-id-card__text--right { text-align:right; }
+      .barangay-id-card__photo img,
+      .barangay-id-card__qr img { width:100%; height:100%; display:block; }
+      .barangay-id-card__photo { background:transparent; }
+      .barangay-id-card__photo img { object-position:center center; }
+      .barangay-id-card__qr { background:transparent; }
+      .barangay-id-card__qr img { image-rendering:pixelated; }
+      .barangay-id-card__qr--placeholder,
+      .barangay-id-card__photo--placeholder { display:flex; align-items:center; justify-content:center; text-align:center; font:700 10px/1 Arial, Helvetica, sans-serif; color:#7a5a35; background:rgba(255,255,255,0.72); border:1.5px dashed rgba(222,113,12,0.72); }
+      .barangay-id-card__signatory { z-index:3; display:grid; justify-items:center; color:#111; font-family:Arial, Helvetica, sans-serif; }
+      .barangay-id-card__signatory-ink { width:100%; min-height:52%; display:flex; align-items:end; justify-content:center; }
+      .barangay-id-card__signatory-ink img { max-width:100%; max-height:100%; display:block; object-fit:contain; }
+      .barangay-id-card__signatory-line { width:100%; border-top:1.2px solid #111; margin-top:0.5%; }
+      .barangay-id-card__signatory-name { font-size:clamp(8.2px, 0.28rem + 0.56vw, 11.2px); line-height:1.05; font-weight:800; text-align:center; text-transform:uppercase; margin-top:1.2%; }
+      .barangay-id-card__signatory-title { font-size:clamp(7.6px, 0.24rem + 0.48vw, 9.8px); line-height:1.02; text-align:center; margin-top:0.4%; }
+      @media (max-width: 991.98px) { .barangay-id-digital__grid { grid-template-columns:1fr; } }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function autoFitElement(element) {
+    if (!(element instanceof HTMLElement)) return;
+    const maxFont = Number.parseFloat(element.dataset.bidMaxFont || '6') || 6;
+    const minFont = Number.parseFloat(element.dataset.bidMinFont || '4') || 4;
+    const isMultiline = element.dataset.bidMultiline === '1';
+    const maxLines = Math.max(1, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1);
+    element.style.fontSize = `${maxFont}px`;
+    if (isMultiline) {
+      element.style.display = '-webkit-box';
+      element.style.webkitBoxOrient = 'vertical';
+      element.style.webkitLineClamp = String(maxLines);
+    } else {
+      element.style.whiteSpace = 'nowrap';
+      element.style.textOverflow = 'ellipsis';
+    }
+
+    let size = maxFont;
+    while (size > minFont) {
+      const fitsWidth = element.scrollWidth <= element.clientWidth + 1;
+      const fitsHeight = element.scrollHeight <= element.clientHeight + 1;
+      if (fitsWidth && fitsHeight) {
+        break;
+      }
+      size = Number((size - 0.2).toFixed(2));
+      element.style.fontSize = `${size}px`;
+    }
+  }
+
+  function hydrate(root) {
+    ensureStyles();
+    const scope = root instanceof Element ? root : document;
+    scope.querySelectorAll('[data-bid-autofit="1"]').forEach((element) => autoFitElement(element));
   }
 
   function render(state, options = {}) {
     ensureStyles();
-    const usesEmptyTemplate = String(state.templateVariant || '').toLowerCase() === 'empty';
+    const layout = normalizeLayoutConfig(options.layoutConfig || state?.layoutConfig || null);
     const eyebrow = String(options.eyebrow || 'Digital Barangay ID').trim();
     const helper = String(options.helper || '').trim();
     const showIntro = options.showIntro !== false;
     const frontLabel = String(options.frontLabel || 'Front').trim();
     const backLabel = String(options.backLabel || 'Back').trim();
+    const frontFields = sideFields(layout, 'front').map((field) => renderField(state, field, layout.page)).join('');
+    const backFields = sideFields(layout, 'back').map((field) => renderField(state, field, layout.page)).join('');
 
     const introHtml = showIntro ? `
       <div class="barangay-id-digital__intro">
@@ -665,90 +685,6 @@
       </div>
     ` : '';
 
-    const photoHtml = state.photoUrl
-      ? `<div class="barangay-id-card__photo" style="left:${positionX(7.9)};top:${positionY(22.1)};width:${widthPct(22)};height:${heightPct(22)};"><img src="${esc(state.photoUrl)}" alt="Resident photo" onerror="this.parentElement.remove();"></div>`
-      : '';
-
-    const qrHtml = state.qrUrl
-      ? `<div class="barangay-id-card__qr" style="left:${positionX(49)};top:${positionY(11.5)};width:${widthPct(32.3)};height:${heightPct(31.4)};"><img src="${esc(state.qrUrl)}" alt="Verification QR code"${state.qrFallbackUrl ? ` data-fallback="${esc(state.qrFallbackUrl)}"` : ''} onerror="const fallback=this.getAttribute('data-fallback');if(fallback&&this.dataset.fallbackTried!=='1'){this.dataset.fallbackTried='1';this.src=fallback;return;}this.parentElement.remove();"></div>`
-      : `<div class="barangay-id-card__qr barangay-id-card__qr--placeholder" style="left:${positionX(49)};top:${positionY(11.5)};width:${widthPct(32.3)};height:${heightPct(31.4)};">QR HERE</div>`;
-    const punongSignatoryHtml = `
-      <div class="barangay-id-card__signatory" style="left:${positionX(9.1)};top:${positionY(38.2)};width:${widthPct(30.8)};height:${heightPct(12.0)};">
-        <div class="barangay-id-card__signatory-ink">${state.punongSignatorySignatureUrl ? `<img src="${esc(state.punongSignatorySignatureUrl)}" alt="${esc(state.punongSignatoryName || 'Punong Barangay')} signature">` : ''}</div>
-        <div class="barangay-id-card__signatory-line"></div>
-        <div class="barangay-id-card__signatory-name">${esc(state.punongSignatoryName || 'HON. GLENN S. EVANGELISTA')}</div>
-        <div class="barangay-id-card__signatory-title">${esc(state.punongSignatoryTitle || 'Punong Barangay')}</div>
-      </div>
-    `;
-
-    const frontCovers = usesEmptyTemplate
-      ? ''
-      : [
-          [31.0, 22.8, 49.2, 27.2],
-          [4.8, 43.7, 31.8, 10.4]
-        ].map(([x, y, w, h]) => (
-          `<div class="barangay-id-card__cover" style="left:${positionX(x)};top:${positionY(y)};width:${widthPct(w)};height:${heightPct(h)};"></div>`
-        )).join('');
-
-    const backCovers = usesEmptyTemplate
-      ? [
-          [8.3, 42.2, 33.5, 9.6]
-        ].map(([x, y, w, h]) => (
-          `<div class="barangay-id-card__cover" style="left:${positionX(x)};top:${positionY(y)};width:${widthPct(w)};height:${heightPct(h)};"></div>`
-        )).join('')
-      : [
-          [57.8, 1.0, 25.0, 6.0],
-          [5.8, 14.8, 45.5, 30.6],
-          [8.3, 42.2, 33.5, 9.6]
-        ].map(([x, y, w, h]) => (
-          `<div class="barangay-id-card__cover" style="left:${positionX(x)};top:${positionY(y)};width:${widthPct(w)};height:${heightPct(h)};"></div>`
-        )).join('');
-
-    const frontFieldsHtml = usesEmptyTemplate ? `
-      ${photoHtml}
-      <div class="barangay-id-card__field barangay-id-card__field--name" style="left:${positionX(32.5)};top:${positionY(25)};width:${widthPct(45)};">${esc(state.cardFullName || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--address-wrap" style="left:${positionX(32.5)};top:${positionY(31)};width:${widthPct(47)};">${esc(state.cardFullAddress || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(32.5)};top:${positionY(39)};width:${widthPct(20.5)};">${esc(state.cardBirthdate || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(57.5)};top:${positionY(39)};width:${widthPct(19.5)};">${esc(state.cardSex || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--birthplace" style="left:${positionX(32.5)};top:${positionY(45)};width:${widthPct(44.8)};">${esc(state.cardBirthplace || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(16.8)};top:${positionY(45)};width:${widthPct(17.4)};">${esc(state.validUntil || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--cardno barangay-id-card__field--cardno-front" style="left:${positionX(11)};top:${positionY(47.7)};width:${widthPct(28.4)};">${esc(state.cardNumber || '-')}</div>
-    ` : `
-      ${photoHtml}
-      <div class="barangay-id-card__label" style="left:${positionX(32.2)};top:${positionY(24.08)};width:${widthPct(10)};">Name</div>
-      <div class="barangay-id-card__field barangay-id-card__field--name" style="left:${positionX(32.2)};top:${positionY(25.8)};width:${widthPct(44.8)};">${esc(state.cardFullName || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(32.2)};top:${positionY(30.58)};width:${widthPct(13.5)};">Address</div>
-      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--address-wrap" style="left:${positionX(31.2)};top:${positionY(32.78)};width:${widthPct(44.8)};">${esc(state.cardFullAddress || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(32.2)};top:${positionY(38.48)};width:${widthPct(20)};">Date of Birth</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(32.2)};top:${positionY(40.78)};width:${widthPct(20.5)};">${esc(state.cardBirthdate || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(57.2)};top:${positionY(38.48)};width:${widthPct(10)};">Sex</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(57.2)};top:${positionY(40.78)};width:${widthPct(19.5)};">${esc(state.cardSex || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(32.2)};top:${positionY(44.78)};width:${widthPct(20)};">Place of Birth</div>
-      <div class="barangay-id-card__field barangay-id-card__field--birthplace" style="left:${positionX(32.2)};top:${positionY(46.98)};width:${widthPct(44.8)};">${esc(state.cardBirthplace || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(6.0)};top:${positionY(44.78)};width:${widthPct(28.6)};">VALID UNTIL: ${esc(state.validUntil || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--cardno" style="left:${positionX(6.4)};top:${positionY(49.58)};width:${widthPct(28.4)};">${esc(state.cardNumber || '-')}</div>
-    `;
-
-    const backFieldsHtml = usesEmptyTemplate ? `
-      <div class="barangay-id-card__field barangay-id-card__field--cardno barangay-id-card__field--cardno-back" style="left:${positionX(63)};top:${positionY(3.6)};width:${widthPct(19.8)};text-align:right;">${esc(state.cardNumber || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--name barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(17)};width:${widthPct(35)};text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--address-wrap barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(22.08)};width:${widthPct(35)};">${esc(state.cardEmergencyAddress || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(28.5)};width:${widthPct(19.0)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
-      ${punongSignatoryHtml}
-      ${qrHtml}
-    ` : `
-      <div class="barangay-id-card__field barangay-id-card__field--cardno barangay-id-card__field--cardno-back" style="left:${positionX(59.5)};top:${positionY(3.3)};width:${widthPct(21.5)};text-align:right;">${esc(state.cardNumber || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(17.5)};width:${widthPct(10)};">Name</div>
-      <div class="barangay-id-card__field barangay-id-card__field--name barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(19.7)};width:${widthPct(33)};text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(23.8)};width:${widthPct(12)};">Address</div>
-      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(26.0)};width:${widthPct(39.6)};">${esc(state.cardEmergencyAddress || '-')}</div>
-      <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(30.0)};width:${widthPct(12)};">Contact</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(32.2)};width:${widthPct(22)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
-      <div class="barangay-id-card__note" style="left:${positionX(7.3)};top:${positionY(36.6)};width:${widthPct(40.5)};">${esc(state.validityNotice || '')}</div>
-      ${punongSignatoryHtml}
-      ${qrHtml}
-    `;
-
     return `
       <div class="barangay-id-digital">
         ${introHtml}
@@ -756,17 +692,15 @@
           <section class="barangay-id-digital__panel">
             <span class="barangay-id-digital__label">${esc(frontLabel)}</span>
             <div class="barangay-id-card">
-              <img class="barangay-id-card__bg" src="${esc(state.frontTemplateUrl)}" alt="Barangay ID front template" onerror="this.onerror=null;this.src='${esc(state.frontTemplateFallbackUrl)}';">
-              ${frontCovers}
-              ${frontFieldsHtml}
+              <img class="barangay-id-card__bg" src="${esc(state.frontTemplateUrl || '')}" alt="Barangay ID front template" onerror="this.onerror=null;this.src='${esc(state.frontTemplateFallbackUrl || '')}';">
+              ${frontFields}
             </div>
           </section>
           <section class="barangay-id-digital__panel">
             <span class="barangay-id-digital__label">${esc(backLabel)}</span>
             <div class="barangay-id-card">
-              <img class="barangay-id-card__bg" src="${esc(state.backTemplateUrl)}" alt="Barangay ID back template" onerror="this.onerror=null;this.src='${esc(state.backTemplateFallbackUrl)}';">
-              ${backCovers}
-              ${backFieldsHtml}
+              <img class="barangay-id-card__bg" src="${esc(state.backTemplateUrl || '')}" alt="Barangay ID back template" onerror="this.onerror=null;this.src='${esc(state.backTemplateFallbackUrl || '')}';">
+              ${backFields}
             </div>
           </section>
         </div>
@@ -774,8 +708,21 @@
     `;
   }
 
+  function renderInto(container, state, options = {}) {
+    if (!(container instanceof Element)) return;
+    container.innerHTML = render(state, options);
+    hydrate(container);
+  }
+
   window.BarangayIdDigital = {
     createState,
+    createSampleState,
+    defaultLayoutConfig,
+    defaultSampleData,
+    fieldLibrary,
+    normalizeLayoutConfig,
     render,
+    renderInto,
+    hydrate
   };
 })();

@@ -123,6 +123,39 @@
   let feeTaggingLoadToken = 0;
   let feeCatalogModalBound = false;
   let feeTaggingReturnState = null;
+  let barangayIdTemplateConfigCache = null;
+  let barangayIdTemplateConfigPromise = null;
+
+  async function fetchBarangayIdTemplateConfig(options = {}) {
+    const force = !!options.force;
+    if (!force && barangayIdTemplateConfigCache && typeof barangayIdTemplateConfigCache === 'object') {
+      return barangayIdTemplateConfigCache;
+    }
+    if (!force && barangayIdTemplateConfigPromise) {
+      return barangayIdTemplateConfigPromise;
+    }
+
+    const runner = (async () => {
+      const data = await fetchJson(`${endpoint}?action=barangay_id_template_config`);
+      barangayIdTemplateConfigCache = {
+        frontTemplateUrl: String(data?.front_template_url || '').trim(),
+        backTemplateUrl: String(data?.back_template_url || '').trim(),
+        templateVariant: String(data?.template_variant || 'empty').trim() || 'empty',
+        layoutConfig: data?.layout && typeof data.layout === 'object' ? data.layout : null,
+        sampleData: data?.sample_data && typeof data.sample_data === 'object' ? data.sample_data : null
+      };
+      return barangayIdTemplateConfigCache;
+    })();
+
+    barangayIdTemplateConfigPromise = runner;
+    try {
+      return await runner;
+    } finally {
+      barangayIdTemplateConfigPromise = null;
+    }
+  }
+
+  fetchBarangayIdTemplateConfig().catch(() => null);
 
   async function fetchFeeTypeCatalog(options = {}) {
     const force = !!options.force;
@@ -3257,35 +3290,40 @@
       !!businessName
       || /business\s+permit/i.test(firstNonEmpty([row.purpose, payload.request_purpose, payload.purpose]))
     );
-    const barangayIdDigitalState = (
-      isBarangayIdDocument
-      && window.BarangayIdDigital
-      && typeof window.BarangayIdDigital.createState === 'function'
-    )
-      ? window.BarangayIdDigital.createState({
-          appBase,
-          row: {
-            ...row,
-            qr_code_path: barangayIdQrPreviewUrl(row, payload),
-            sex: sexValue || row?.sex || ''
-          },
-          payload: {
-            ...payload,
-            qr_code_path: barangayIdQrPreviewUrl(row, payload),
-            sex: sexValue || payload.sex || payload.gender || '',
-            gender: sexValue || payload.gender || payload.sex || '',
-            card_sex: sexValue || payload.card_sex || ''
-          },
-          residentProfile: {
-            ...residentProfile,
-            sex: sexValue || residentProfile.sex || ''
-          },
-          frontTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${Date.now()}`,
-          backTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${Date.now()}`,
-          templateVariant: 'empty',
-          fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
-        })
-      : {};
+    const barangayIdDigitalState = (() => {
+      if (!isBarangayIdDocument || !window.BarangayIdDigital || typeof window.BarangayIdDigital.createState !== 'function') {
+        return {};
+      }
+      const templateConfig = barangayIdTemplateConfigCache && typeof barangayIdTemplateConfigCache === 'object'
+        ? barangayIdTemplateConfigCache
+        : {};
+      const fallbackFrontTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${Date.now()}`;
+      const fallbackBackTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${Date.now()}`;
+      return window.BarangayIdDigital.createState({
+        appBase,
+        row: {
+          ...row,
+          qr_code_path: barangayIdQrPreviewUrl(row, payload),
+          sex: sexValue || row?.sex || ''
+        },
+        payload: {
+          ...payload,
+          qr_code_path: barangayIdQrPreviewUrl(row, payload),
+          sex: sexValue || payload.sex || payload.gender || '',
+          gender: sexValue || payload.gender || payload.sex || '',
+          card_sex: sexValue || payload.card_sex || ''
+        },
+        residentProfile: {
+          ...residentProfile,
+          sex: sexValue || residentProfile.sex || ''
+        },
+        frontTemplateUrl: templateConfig.frontTemplateUrl || fallbackFrontTemplateUrl,
+        backTemplateUrl: templateConfig.backTemplateUrl || fallbackBackTemplateUrl,
+        templateVariant: templateConfig.templateVariant || 'empty',
+        layoutConfig: templateConfig.layoutConfig || null,
+        fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
+      });
+    })();
 
     const basePurposeText = generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '']);
     const residencyPurposeText = requestedDocKey === 'residency'
@@ -3438,9 +3476,6 @@
         row.secretary_signatory_title,
         'Barangay Secretary'
       ]) || 'Barangay Secretary',
-      secretarySignatorySignatureUrl: resolvePublicUrl(firstNonEmpty([
-        row.secretary_signatory_signature_path
-      ])),
       monitoringSignatoryName: upperText(firstNonEmptyName([
         row.monitoring_signatory_name
       ]), 'MR. JOSEPH C. PATRICIO'),
@@ -3561,7 +3596,6 @@
     const punongSignatorySignatureUrl = String(state.punongSignatorySignatureUrl || '').trim();
     const secretarySignatoryNameText = String(state.secretarySignatoryName || 'MINERVA D. QUITA').trim() || 'MINERVA D. QUITA';
     const secretarySignatoryTitleText = String(state.secretarySignatoryTitle || 'Barangay Secretary').trim() || 'Barangay Secretary';
-    const secretarySignatorySignatureUrl = String(state.secretarySignatorySignatureUrl || '').trim();
     const monitoringSignatoryNameText = String(state.monitoringSignatoryName || 'MR. JOSEPH C. PATRICIO').trim() || 'MR. JOSEPH C. PATRICIO';
     const monitoringSignatoryTitleText = String(state.monitoringSignatoryTitle || 'Head, Monitoring & Collection Dept.').trim() || 'Head, Monitoring & Collection Dept.';
     const monitoringSignatorySignatureUrl = String(state.monitoringSignatorySignatureUrl || '').trim();
@@ -4055,7 +4089,7 @@
       footerAreaHtml = `
         <div class="doc-preview-business-footer-area${qrBlockHtml ? '' : ' doc-preview-business-footer-area--noqr'}">
           <div class="doc-preview-business-footer-main">
-            <div class="doc-preview-business-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+            <div class="doc-preview-business-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
             <div class="doc-preview-business-signing">
               <div class="doc-preview-signature doc-preview-business-signature">
                 ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
@@ -4103,7 +4137,7 @@
     } else if (isGeneralPermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-generalclearance-footer-area${qrBlockHtml ? '' : ' doc-preview-generalclearance-footer-area--noqr'}">
-          <div class="doc-preview-generalclearance-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+          <div class="doc-preview-generalclearance-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
           <div class="doc-preview-generalclearance-signing">
             <div class="doc-preview-signature doc-preview-generalclearance-signature">
               ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
@@ -4123,7 +4157,7 @@
     } else if (isTricyclePermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-tricycle-footer-area${qrBlockHtml ? '' : ' doc-preview-tricycle-footer-area--noqr'}">
-          <div class="doc-preview-tricycle-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+          <div class="doc-preview-tricycle-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
           <div class="doc-preview-tricycle-signing">
             <div class="doc-preview-signature doc-preview-tricycle-signature">
               ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
@@ -4156,7 +4190,6 @@
                 <div class="doc-preview-ftjs-date-label">Date</div>
                 <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
                 <div class="doc-preview-ftjs-block doc-preview-ftjs-witness">
-                  ${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--ftjs')}
                   <div class="doc-preview-ftjs-name">${esc(secretarySignatoryNameText)}</div>
                   <div class="doc-preview-ftjs-role">${esc(secretarySignatoryTitleText)}</div>
                 </div>
@@ -4168,7 +4201,7 @@
           `
         : `
             <div class="${footerAreaClass}">
-              <div class="doc-preview-issuedby">${renderSignatureInk(secretarySignatorySignatureUrl, `${secretarySignatoryNameText} signature`, 'doc-preview-signature-ink--issuedby')}Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+              <div class="doc-preview-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
               <div class="doc-preview-signature">
                 ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
                 <div class="name">${esc(punongSignatoryNameText)}</div>
@@ -5298,13 +5331,35 @@
       openBarangayIdCardModal(row, docUrl, title, returnTarget, options);
     };
 
-    const state = buildBarangayIdCardModalState(row, options);
-    paymentProofWrap.innerHTML = window.BarangayIdDigital.render(state, {
-      showIntro: false,
-      frontLabel: 'Front Template',
-      backLabel: 'Back Template',
-    });
+    paymentProofWrap.innerHTML = `
+      <div class="d-flex flex-column align-items-center justify-content-center py-5 gap-3 text-muted">
+        <div class="spinner-border" role="status" aria-hidden="true"></div>
+        <div>Loading Barangay ID preview...</div>
+      </div>
+    `;
     paymentProofModal.show();
+
+    fetchBarangayIdTemplateConfig()
+      .catch(() => null)
+      .then((templateConfig) => {
+        const state = buildBarangayIdCardModalState(row, options, templateConfig);
+        if (typeof window.BarangayIdDigital.renderInto === 'function') {
+          window.BarangayIdDigital.renderInto(paymentProofWrap, state, {
+            showIntro: false,
+            frontLabel: 'Front Template',
+            backLabel: 'Back Template',
+          });
+          return;
+        }
+        paymentProofWrap.innerHTML = window.BarangayIdDigital.render(state, {
+          showIntro: false,
+          frontLabel: 'Front Template',
+          backLabel: 'Back Template',
+        });
+        if (typeof window.BarangayIdDigital.hydrate === 'function') {
+          window.BarangayIdDigital.hydrate(paymentProofWrap);
+        }
+      });
   }
 
   function openSubmittedFileModal(docUrl, title = 'Submitted Attachment Viewer', returnTarget = '') {
@@ -5876,7 +5931,7 @@
     return row;
   }
 
-  function buildBarangayIdCardModalState(row, options = {}) {
+  function buildBarangayIdCardModalState(row, options = {}, templateConfig = null) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
     const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
       ? row.resident_profile
@@ -5885,17 +5940,21 @@
       ? options.previewState
       : buildPreviewState(row, payload, residentProfile, null);
     const qrPreviewUrl = barangayIdQrPreviewUrl(row, payload);
-    const frontTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=20260324-01`;
-    const backTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=20260324-01`;
+    const resolvedConfig = templateConfig && typeof templateConfig === 'object' ? templateConfig : {};
+    const fallbackFrontTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=20260324-01`;
+    const fallbackBackTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=20260324-01`;
+    const frontTemplateUrl = String(resolvedConfig.frontTemplateUrl || fallbackFrontTemplateUrl).trim() || fallbackFrontTemplateUrl;
+    const backTemplateUrl = String(resolvedConfig.backTemplateUrl || fallbackBackTemplateUrl).trim() || fallbackBackTemplateUrl;
 
     return {
       ...(previewState && typeof previewState === 'object' ? previewState : {}),
       appBase,
-      templateVariant: 'empty',
+      templateVariant: String(resolvedConfig.templateVariant || 'empty').trim() || 'empty',
       frontTemplateUrl,
       frontTemplateFallbackUrl: frontTemplateUrl,
       backTemplateUrl,
       backTemplateFallbackUrl: backTemplateUrl,
+      layoutConfig: resolvedConfig.layoutConfig || null,
       qrUrl: resolvePublicUrl(firstNonEmpty([qrPreviewUrl, previewState?.qrUrl])),
       photoUrl: firstNonEmpty([
         previewState?.photoUrl,

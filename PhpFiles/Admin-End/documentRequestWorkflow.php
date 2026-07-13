@@ -47,6 +47,28 @@ if ($action === 'optimize_indexes') {
     dr_respond_json(200, ['success' => true, 'message' => 'List indexes checked/applied.']);
 }
 
+if ($action === 'barangay_id_template_config') {
+    $templateAssets = dra_barangay_id_template_assets();
+    $frontPublicPath = trim((string)($templateAssets['front_public_path'] ?? ''));
+    $backPublicPath = trim((string)($templateAssets['back_public_path'] ?? ''));
+    $frontDiskPath = trim((string)($templateAssets['front'] ?? ''));
+    $backDiskPath = trim((string)($templateAssets['back'] ?? ''));
+    $frontVersion = $frontDiskPath !== '' && is_file($frontDiskPath) ? (string)@filemtime($frontDiskPath) : '';
+    $backVersion = $backDiskPath !== '' && is_file($backDiskPath) ? (string)@filemtime($backDiskPath) : '';
+    dr_respond_json(200, [
+        'success' => true,
+        'front_template_url' => $frontPublicPath !== ''
+            ? appUrl($frontPublicPath . ($frontVersion !== '' ? '?v=' . rawurlencode($frontVersion) : ''))
+            : '',
+        'back_template_url' => $backPublicPath !== ''
+            ? appUrl($backPublicPath . ($backVersion !== '' ? '?v=' . rawurlencode($backVersion) : ''))
+            : '',
+        'template_variant' => trim((string)($templateAssets['variant'] ?? 'empty')) ?: 'empty',
+        'layout' => is_array($templateAssets['layout'] ?? null) ? $templateAssets['layout'] : dms_barangay_id_default_layout(),
+        'sample_data' => is_array($templateAssets['sample_data'] ?? null) ? $templateAssets['sample_data'] : dms_barangay_id_default_sample_data(),
+    ]);
+}
+
 if ($action === 'bulk_regenerate_issued') {
     $currentRenderRevision = 'r20260318ac';
     $limit = (int)($_REQUEST['limit'] ?? 200);
@@ -2195,20 +2217,54 @@ function dra_barangay_id_template_assets(): array
         return $resolved;
     }
 
-    $resolved = ['front' => '', 'back' => '', 'variant' => ''];
+    $resolved = [
+        'front' => '',
+        'back' => '',
+        'front_public_path' => '',
+        'back_public_path' => '',
+        'variant' => 'empty',
+        'layout' => dms_barangay_id_default_layout(),
+        'sample_data' => dms_barangay_id_default_sample_data(),
+    ];
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         return $resolved;
     }
 
-    $front = $baseDir . '/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png';
-    $back = $baseDir . '/Resident-End/Certificates/BarangayID/BACK_EMPTY.png';
-    if (is_file($front) && is_file($back)) {
-        $resolved = [
-            'front' => $front,
-            'back' => $back,
-            'variant' => 'empty',
-        ];
+    $defaultPaths = dms_barangay_id_default_template_paths();
+    $defaultFront = $baseDir . $defaultPaths['front'];
+    $defaultBack = $baseDir . $defaultPaths['back'];
+    $resolved = [
+        'front' => is_file($defaultFront) ? $defaultFront : '',
+        'back' => is_file($defaultBack) ? $defaultBack : '',
+        'front_public_path' => $defaultPaths['front'],
+        'back_public_path' => $defaultPaths['back'],
+        'variant' => 'empty',
+        'layout' => dms_barangay_id_default_layout(),
+        'sample_data' => dms_barangay_id_default_sample_data(),
+    ];
+
+    global $conn;
+    if ($conn instanceof mysqli) {
+        try {
+            $settings = dms_resolve_barangay_id_template_settings($conn);
+            $frontDisk = trim((string)($settings['front_template_disk_path'] ?? ''));
+            $backDisk = trim((string)($settings['back_template_disk_path'] ?? ''));
+            $frontPublic = trim((string)($settings['front_template_path'] ?? $defaultPaths['front']));
+            $backPublic = trim((string)($settings['back_template_path'] ?? $defaultPaths['back']));
+            if ($frontDisk !== '' && $backDisk !== '') {
+                $resolved = [
+                    'front' => $frontDisk,
+                    'back' => $backDisk,
+                    'front_public_path' => $frontPublic,
+                    'back_public_path' => $backPublic,
+                    'variant' => trim((string)($settings['template_variant'] ?? 'empty')) ?: 'empty',
+                    'layout' => is_array($settings['layout'] ?? null) ? $settings['layout'] : dms_barangay_id_default_layout(),
+                    'sample_data' => is_array($settings['sample_data'] ?? null) ? $settings['sample_data'] : dms_barangay_id_default_sample_data(),
+                ];
+            }
+        } catch (Throwable $ignored) {
+        }
     }
 
     return $resolved;
@@ -2222,7 +2278,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260320bid08';
+    return 'r20260713bid09';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -2675,7 +2731,6 @@ function dra_generate_issued_document(array $requestRow): ?string
         ? dms_resolve_module_signatories($conn, 'monitoring')
         : [];
     $punongSignaturePath = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
-    $secretarySignaturePath = trim((string)($moduleSettings['secretary']['signature_path'] ?? ''));
     $monitoringSignatoryName = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
     $monitoringSignatoryTitle = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
     $monitoringSignaturePath = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
@@ -3635,9 +3690,6 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $cardIdText = $composeCardNumber();
                 $validUntilText = $composeValidUntil();
                 $validityNotice = 'This ID is valid until ' . $validUntilText . ' except when the holder requests for a new one.';
-                $templateVariant = strtolower(trim((string)($templateAssets['variant'] ?? 'sample')));
-                $usesBlankTemplate = $templateVariant === 'empty';
-
                 $photoDiskPath = $resolveDiskPath(dra_manual_first_non_empty([
                     $payload['id_picture_url'] ?? null,
                     $payload['id_picture_path'] ?? null,
@@ -3645,6 +3697,29 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $residentProfile['id_picture_path'] ?? null,
                 ]));
                 $photoImageType = $resolveFpdfImageType($photoDiskPath);
+                $layoutConfig = dms_normalize_barangay_id_layout(
+                    is_array($templateAssets['layout'] ?? null) ? $templateAssets['layout'] : []
+                );
+                $layoutFields = is_array($layoutConfig['fields'] ?? null) ? $layoutConfig['fields'] : [];
+                $pdfFieldState = [
+                    'cardFullName' => $displayName,
+                    'cardFullAddress' => $frontAddress,
+                    'cardBirthdate' => $birthdateText,
+                    'cardBirthplace' => $birthplaceText,
+                    'cardSex' => $sexText,
+                    'cardContactNumber' => $contactNumberText,
+                    'cardEmergencyName' => $emergencyDisplayName,
+                    'cardEmergencyAddress' => $emergencyAddressText,
+                    'cardEmergencyContact' => $emergencyContactText !== '' ? $emergencyContactText : $contactNumberText,
+                    'cardNumber' => $cardIdText,
+                    'validUntil' => $validUntilText,
+                    'validityNotice' => $validityNotice,
+                    'punongSignatoryName' => $punongSignatoryName,
+                    'punongSignatoryTitle' => $punongSignatoryTitle,
+                    'punongSignatorySignatureUrl' => $punongSignaturePath,
+                    'photoUrl' => $photoDiskPath,
+                    'qrUrl' => $qrDiskPath,
+                ];
 
                 $pageWidth = 85.6;
                 $pageHeight = 54.1;
@@ -3652,86 +3727,243 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pdf->SetMargins(0, 0, 0);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetTextColor(0, 0, 0);
+                $alignToPdf = static function (string $align): string {
+                    $normalized = strtolower(trim($align));
+                    if ($normalized === 'center') {
+                        return 'C';
+                    }
+                    if ($normalized === 'right') {
+                        return 'R';
+                    }
+                    return 'L';
+                };
+                $hexToRgb = static function (string $hex): array {
+                    $hex = ltrim(trim($hex), '#');
+                    if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) {
+                        return [0, 0, 0];
+                    }
+                    return [
+                        hexdec(substr($hex, 0, 2)),
+                        hexdec(substr($hex, 2, 2)),
+                        hexdec(substr($hex, 4, 2)),
+                    ];
+                };
+                $applyTextColor = static function (FPDF $pdf, string $hex) use ($hexToRgb): void {
+                    [$red, $green, $blue] = $hexToRgb($hex);
+                    $pdf->SetTextColor($red, $green, $blue);
+                };
+                $fitMultiline = static function (
+                    FPDF $pdf,
+                    string $text,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    int $maxLines = 2,
+                    string $style = 'B',
+                    float $maxSize = 6.0,
+                    float $minSize = 4.0,
+                    string $align = 'L'
+                ) use ($safeSubstr, $safeLen, $wrapTextToWidth): void {
+                    $text = trim($text);
+                    if ($text === '') {
+                        return;
+                    }
+
+                    $lineHeight = max(1.8, min(3.0, $h / max(1, $maxLines)));
+                    $size = $maxSize;
+                    $lines = [];
+                    while ($size >= $minSize) {
+                        $pdf->SetFont('Arial', $style, $size);
+                        $lines = $wrapTextToWidth($pdf, $text, $w);
+                        if (count($lines) <= $maxLines && (count($lines) * $lineHeight) <= ($h + 0.2)) {
+                            break;
+                        }
+                        $size -= 0.2;
+                    }
+
+                    if (count($lines) > $maxLines) {
+                        $pdf->SetFont('Arial', $style, max($minSize, $size));
+                        $lines = array_slice($lines, 0, $maxLines);
+                        $ellipsis = '...';
+                        $lastIndex = max(0, $maxLines - 1);
+                        $lastLine = trim((string)($lines[$lastIndex] ?? ''));
+                        while ($lastLine !== '' && $pdf->GetStringWidth($lastLine . $ellipsis) > $w) {
+                            $lastLine = rtrim($safeSubstr($lastLine, 0, max(0, $safeLen($lastLine) - 1)));
+                        }
+                        $lines[$lastIndex] = $lastLine === '' ? $ellipsis : ($lastLine . $ellipsis);
+                    }
+
+                    $pdf->SetFont('Arial', $style, max($minSize, $size));
+                    $pdf->SetXY($x, $y);
+                    $pdf->MultiCell($w, $lineHeight, implode("\n", $lines), 0, $align, false);
+                };
+                $resolveLayoutFieldValue = static function (array $field) use ($pdfFieldState, $upperText): string {
+                    $type = strtolower(trim((string)($field['type'] ?? 'text')));
+                    if ($type === 'label') {
+                        return trim((string)($field['text'] ?? ''));
+                    }
+                    $source = trim((string)($field['source'] ?? ''));
+                    $fallbackSource = trim((string)($field['fallbackSource'] ?? ''));
+                    $prefix = trim((string)($field['prefix'] ?? ''));
+                    $value = $source !== '' ? trim((string)($pdfFieldState[$source] ?? '')) : '';
+                    if ($value === '' && $fallbackSource !== '') {
+                        $value = trim((string)($pdfFieldState[$fallbackSource] ?? ''));
+                    }
+                    if (!empty($field['uppercase'])) {
+                        $value = $upperText($value);
+                    }
+                    return trim($prefix . $value);
+                };
+                $resolveLayoutImage = static function (array $field) use (
+                    $resolveDiskPath,
+                    $resolveFpdfImageType,
+                    $pdfFieldState,
+                    $photoDiskPath,
+                    $photoImageType,
+                    $allowQr,
+                    $qrDiskPath
+                ): array {
+                    $type = strtolower(trim((string)($field['type'] ?? '')));
+                    $source = trim((string)($field['source'] ?? ''));
+                    if ($type === 'qr') {
+                        if (!$allowQr || !is_file($qrDiskPath)) {
+                            return ['', ''];
+                        }
+                        return [$qrDiskPath, $resolveFpdfImageType($qrDiskPath)];
+                    }
+                    if ($source === 'photoUrl') {
+                        return [$photoDiskPath, $photoImageType];
+                    }
+                    $candidate = $source !== '' ? trim((string)($pdfFieldState[$source] ?? '')) : '';
+                    $disk = $resolveDiskPath($candidate);
+                    return [$disk, $resolveFpdfImageType($disk)];
+                };
+                $renderLayoutField = static function (FPDF $pdf, array $field) use (
+                    $coverRect,
+                    $fitSingleLine,
+                    $fitMultiline,
+                    $alignToPdf,
+                    $applyTextColor,
+                    $resolveLayoutFieldValue,
+                    $resolveLayoutImage,
+                    $punongSignaturePath,
+                    $punongSignatoryName,
+                    $punongSignatoryTitle
+                ): void {
+                    $type = strtolower(trim((string)($field['type'] ?? 'text')));
+                    $x = (float)($field['x'] ?? 0.0);
+                    $y = (float)($field['y'] ?? 0.0);
+                    $w = (float)($field['w'] ?? 0.0);
+                    $h = (float)($field['h'] ?? 0.0);
+                    if ($w <= 0 || $h <= 0) {
+                        return;
+                    }
+
+                    if ($type === 'cover') {
+                        $coverRect($pdf, $x, $y, $w, $h);
+                        return;
+                    }
+
+                    if ($type === 'image' || $type === 'qr') {
+                        [$diskPath, $imageType] = $resolveLayoutImage($field);
+                        if ($diskPath === '' || $imageType === '') {
+                            return;
+                        }
+                        try {
+                            $pdf->Image($diskPath, $x, $y, $w, $h, $imageType);
+                        } catch (Throwable $imageError) {
+                            error_log('[dra_generate_issued_document][barangay_id_image] ' . $imageError->getMessage());
+                        }
+                        return;
+                    }
+
+                    if ($type === 'signatory') {
+                        dra_render_signature_image($pdf, $punongSignaturePath, $x + 1.1, max(0.0, $y - 0.1), max(4.0, $w - 2.0), max(2.4, $h * 0.52));
+                        $pdf->SetDrawColor(0, 0, 0);
+                        $pdf->SetLineWidth(0.2);
+                        $lineY = $y + min(max(4.4, $h * 0.64), max(4.4, $h - 2.4));
+                        $pdf->Line($x + 0.1, $lineY, $x + max(0.2, $w - 0.1), $lineY);
+                        $fitSingleLine(
+                            $pdf,
+                            $punongSignatoryName !== '' ? $punongSignatoryName : '-',
+                            $x + 0.7,
+                            min($y + max(4.8, $h * 0.66), $y + max(3.8, $h - 3.0)),
+                            max(1.0, $w - 1.2),
+                            'B',
+                            4.9,
+                            3.4,
+                            'C'
+                        );
+                        $fitSingleLine(
+                            $pdf,
+                            $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-',
+                            $x + 0.9,
+                            min($y + max(7.4, $h * 0.86), $y + max(4.8, $h - 1.0)),
+                            max(1.0, $w - 1.6),
+                            '',
+                            4.3,
+                            3.0,
+                            'C'
+                        );
+                        return;
+                    }
+
+                    $text = $resolveLayoutFieldValue($field);
+                    if ($text === '') {
+                        $text = '-';
+                    }
+
+                    $applyTextColor($pdf, trim((string)($field['color'] ?? '#111111')));
+                    $fontStyle = trim((string)($field['fontStyle'] ?? ($type === 'label' ? 'I' : 'B')));
+                    $fontSize = (float)($field['fontSize'] ?? ($type === 'label' ? 5.0 : 6.0));
+                    $minFontSize = (float)($field['minFontSize'] ?? ($type === 'label' ? 4.0 : 4.2));
+                    if (!empty($field['multiline'])) {
+                        $fitMultiline(
+                            $pdf,
+                            $text,
+                            $x,
+                            $y,
+                            $w,
+                            $h,
+                            max(1, (int)($field['maxLines'] ?? 2)),
+                            $fontStyle,
+                            $fontSize,
+                            $minFontSize,
+                            $alignToPdf((string)($field['align'] ?? 'left'))
+                        );
+                    } else {
+                        $fitSingleLine(
+                            $pdf,
+                            $text,
+                            $x,
+                            $y,
+                            $w,
+                            $fontStyle,
+                            $fontSize,
+                            $minFontSize,
+                            $alignToPdf((string)($field['align'] ?? 'left'))
+                        );
+                    }
+                    $pdf->SetTextColor(0, 0, 0);
+                };
 
                 $pdf->AddPage('L', [$pageWidth, $pageHeight]);
                 $pdf->Image($frontTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
-                if ($photoDiskPath !== '' && $photoImageType !== '') {
-                    try {
-                        $pdf->Image($photoDiskPath, 7.9, 22.1, 22.0, 22.0, $photoImageType);
-                    } catch (Throwable $photoError) {
-                        error_log('[dra_generate_issued_document][barangay_id_photo] ' . $photoError->getMessage());
+                foreach ($layoutFields as $layoutField) {
+                    if (strtolower(trim((string)($layoutField['side'] ?? 'front'))) !== 'front') {
+                        continue;
                     }
-                }
-                if ($usesBlankTemplate) {
-                    $fitSingleLine($pdf, $displayName, 32.5, 25.0, 45.0, 'B', 7.2, 4.6);
-                    $fitTwoLines($pdf, $frontAddress, 32.5, 31.0, 47.0, 2.15, 'B', 5.6, 3.2);
-                    $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.5, 39.0, 20.5, 'B', 6.4, 4.4);
-                    $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.5, 39.0, 19.5, 'B', 6.4, 4.4);
-                    $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.5, 45.0, 44.8, 'B', 5.5, 4.0);
-                    $fitSingleLine($pdf, $validUntilText !== '' ? $validUntilText : '-', 16.8, 45.0, 17.4, 'B', 4.8, 3.7);
-                    $pdf->SetTextColor(198, 40, 40);
-                    $fitSingleLine($pdf, $cardIdText, 11.0, 47.7, 28.4, 'B', 7.8, 5.0);
-                    $pdf->SetTextColor(0, 0, 0);
-                } else {
-                    $coverRect($pdf, 31.0, 22.8, 49.2, 27.2);
-                    $coverRect($pdf, 4.8, 43.7, 31.8, 10.4);
-
-                    $fitSingleLine($pdf, 'Name', 32.2, 24.08, 9.0, 'I', 5.1, 4.0);
-                    $fitSingleLine($pdf, $displayName, 32.2, 26.28, 44.8, 'B', 7.2, 4.6);
-                    $fitSingleLine($pdf, 'Address', 32.2, 30.58, 12.0, 'I', 5.1, 4.0);
-                    $fitTwoLines($pdf, $frontAddress, 32.2, 32.78, 44.8, 2.15, 'B', 5.6, 3.2);
-                    $fitSingleLine($pdf, 'Date of Birth', 32.2, 38.48, 18.0, 'I', 5.1, 4.0);
-                    $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.2, 40.78, 20.5, 'B', 6.4, 4.4);
-                    $fitSingleLine($pdf, 'Sex', 57.2, 38.48, 8.0, 'I', 5.1, 4.0);
-                    $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.2, 40.78, 19.5, 'B', 6.4, 4.4);
-                    $fitSingleLine($pdf, 'Place of Birth', 32.2, 44.78, 18.0, 'I', 5.1, 4.0);
-                    $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.2, 46.98, 44.8, 'B', 5.5, 4.0);
-                    $fitSingleLine($pdf, 'VALID UNTIL: ' . ($validUntilText !== '' ? $validUntilText : '-'), 6.0, 44.78, 28.6, 'B', 4.8, 3.7);
-                    $pdf->SetTextColor(198, 40, 40);
-                    $fitSingleLine($pdf, $cardIdText, 6.4, 49.58, 28.4, 'B', 6.8, 4.4);
-                    $pdf->SetTextColor(0, 0, 0);
+                    $renderLayoutField($pdf, $layoutField);
                 }
 
                 $pdf->AddPage('L', [$pageWidth, $pageHeight]);
                 $pdf->Image($backTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight, 'PNG');
-                if ($usesBlankTemplate) {
-                    $pdf->SetTextColor(198, 40, 40);
-                    $fitSingleLine($pdf, $cardIdText, 63.0, 3.6, 19.8, 'B', 7.6, 5.0, 'R');
-                    $pdf->SetTextColor(0, 0, 0);
-                    $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 7.0, 17.0, 35.0, 'B', 5.4, 4.0);
-                    $fitTwoLines($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 7.0, 22.08, 35.0, 2.0, 'B', 4.7, 3.0);
-                    $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 7.0, 28.5, 19.0, 'B', 5.0, 3.8);
-                } else {
-                    $coverRect($pdf, 57.8, 1.0, 25.0, 6.0);
-                    $coverRect($pdf, 5.8, 14.8, 45.5, 30.6);
-
-                    $pdf->SetTextColor(198, 40, 40);
-                    $fitSingleLine($pdf, $cardIdText, 59.5, 3.3, 21.5, 'B', 7.6, 5.0, 'R');
-                    $pdf->SetTextColor(0, 0, 0);
-                    $fitSingleLine($pdf, 'Name', 6.9, 17.5, 8.0, 'I', 5.0, 4.0);
-                    $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 6.9, 19.7, 33.0, 'B', 6.0, 4.3);
-                    $fitSingleLine($pdf, 'Address', 6.9, 23.8, 10.0, 'I', 5.0, 4.0);
-                    $fitTwoLines($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 6.9, 26.0, 39.6, 2.0, 'B', 5.0, 3.2);
-                    $fitSingleLine($pdf, 'Contact', 6.9, 30.0, 10.0, 'I', 5.0, 4.0);
-                    $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 6.9, 32.2, 22.0, 'B', 6.0, 4.3);
-                }
-
-                if (!$usesBlankTemplate) {
-                    $pdf->SetFont('Arial', 'I', 4.2);
-                    $pdf->SetXY(7.3, 36.6);
-                    $pdf->MultiCell(40.5, 2.8, $validityNotice, 0, 'C', false);
-                }
-
-                $coverRect($pdf, 8.2, 42.1, 34.8, 9.7);
-                dra_render_signature_image($pdf, $punongSignaturePath, 10.2, 38.1, 28.8, 6.2);
-                $pdf->SetDrawColor(0, 0, 0);
-                $pdf->SetLineWidth(0.2);
-                $pdf->Line(9.2, 45.8, 39.8, 45.8);
-                $fitSingleLine($pdf, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 9.8, 46.0, 29.6, 'B', 4.9, 3.9, 'C');
-                $fitSingleLine($pdf, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 10.0, 48.7, 29.2, '', 4.3, 3.4, 'C');
-
-                if ($allowQr && is_file($qrDiskPath)) {
-                    $pdf->Image($qrDiskPath, 47.6, 16.2, 32.3, 31.4);
+                foreach ($layoutFields as $layoutField) {
+                    if (strtolower(trim((string)($layoutField['side'] ?? 'front'))) !== 'back') {
+                        continue;
+                    }
+                    $renderLayoutField($pdf, $layoutField);
                 }
 
                 $pdf->Output('F', $diskPath);
@@ -4070,8 +4302,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $footerRowY += 6.0;
                 }
 
-                $pdf->Rect(13.5, 209.5, 69.0, 28.5, 'F');
-                dra_render_signature_image($pdf, $secretarySignaturePath, 16.8, 205.2, 28.0, 8.2);
+                $pdf->Rect(13.5, 215.0, 69.0, 17.0, 'F');
                 $pdf->SetFont('Arial', '', 10.6);
                 $pdf->SetXY(14.5, 220.2);
                 $pdf->Cell(19.0, 5.5, 'Issued by:', 0, 0, 'L');
@@ -4418,8 +4649,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $metaY += 6.1;
                 }
 
-                $pdf->Rect(15.0, 208.5, 69.0, 28.5, 'F');
-                dra_render_signature_image($pdf, $secretarySignaturePath, 18.3, 204.2, 28.0, 8.2);
+                $pdf->Rect(15.0, 214.0, 69.0, 17.5, 'F');
                 $pdf->SetFont('Arial', '', 10.6);
                 $pdf->SetXY(16.0, 219.2);
                 $pdf->Cell(19.0, 5.5, 'Issued by:', 0, 0, 'L');
@@ -4639,8 +4869,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $metaY += 6.0;
                 }
 
-                $pdf->Rect(12.8, 195.8, 71.0, 27.0, 'F');
-                dra_render_signature_image($pdf, $secretarySignaturePath, 16.0, 191.7, 28.0, 8.0);
+                $pdf->Rect(12.8, 201.0, 71.0, 17.0, 'F');
                 $pdf->SetFont('Arial', '', 10.4);
                 $pdf->SetXY(13.6, 206.2);
                 $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
@@ -5888,7 +6117,6 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->Cell($signW, 4, 'Witnesses by:', 0, 1, 'C');
 
             $witnessBaseY = $signBaseY + 34;
-            dra_render_signature_image($pdf, $secretarySignaturePath, $signX + 6.0, $witnessBaseY - 9.0, $signW - 12.0, 8.0);
             $pdf->Line($signX, $witnessBaseY, $signX + $signW, $witnessBaseY);
             $pdf->SetFont($indigencyFont, 'B', 10);
             $pdf->SetXY($signX, $witnessBaseY + 1.5);
@@ -5938,7 +6166,6 @@ function dra_generate_issued_document(array $requestRow): ?string
             }
 
             // Issued by block (lower-left)
-            dra_render_signature_image($pdf, $secretarySignaturePath, 34.0, $signBaseY - 9.0, 42.0, 8.0);
             $pdf->SetFont($indigencyFont, '', 11);
             $pdf->SetXY(26, $issuedByY);
             $pdf->Cell(20, 6, 'Issued by:', 0, 0, 'L');
@@ -7891,7 +8118,7 @@ if ($action === 'list') {
             : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
         $row['document_settings_module_key'] = $moduleSettingsKey;
         $row['punong_signatory_signature_path'] = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
-        $row['secretary_signatory_signature_path'] = trim((string)($moduleSettings['secretary']['signature_path'] ?? ''));
+        $row['secretary_signatory_signature_path'] = '';
         $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
         $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
         $row['monitoring_signatory_signature_path'] = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
@@ -8078,7 +8305,7 @@ if ($action === 'get_request') {
         : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
     $row['document_settings_module_key'] = $moduleSettingsKey;
     $row['punong_signatory_signature_path'] = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
-    $row['secretary_signatory_signature_path'] = trim((string)($moduleSettings['secretary']['signature_path'] ?? ''));
+    $row['secretary_signatory_signature_path'] = '';
     $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
     $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
     $row['monitoring_signatory_signature_path'] = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
@@ -8263,8 +8490,8 @@ if ($action === 'view_issued_card') {
         trim((string)($row['resident_id'] ?? ''))
     );
     $templateAssets = dra_barangay_id_template_assets();
-    $frontTemplateUrl = dra_public_asset_path((string)($templateAssets['front'] ?? ''));
-    $backTemplateUrl = dra_public_asset_path((string)($templateAssets['back'] ?? ''));
+    $frontTemplateUrl = dra_public_asset_path((string)($templateAssets['front_public_path'] ?? ''));
+    $backTemplateUrl = dra_public_asset_path((string)($templateAssets['back_public_path'] ?? ''));
     $frontTemplateVersion = '';
     $backTemplateVersion = '';
     $frontTemplateDiskPath = (string)($templateAssets['front'] ?? '');
@@ -8290,7 +8517,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-03', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260713-01', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
@@ -8310,9 +8537,10 @@ if ($action === 'view_issued_card') {
     echo '  frontTemplateUrl: ' . json_encode($frontTemplateUrl !== '' ? ($baseUrl . $frontTemplateUrl . ($frontTemplateVersion !== '' ? '?v=' . rawurlencode($frontTemplateVersion) : '')) : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
     echo '  backTemplateUrl: ' . json_encode($backTemplateUrl !== '' ? ($baseUrl . $backTemplateUrl . ($backTemplateVersion !== '' ? '?v=' . rawurlencode($backTemplateVersion) : '')) : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
     echo '  templateVariant: ' . json_encode($templateVariant, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
+    echo '  layoutConfig: ' . json_encode($templateAssets['layout'] ?? dms_barangay_id_default_layout(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
     echo '  fallbackProfileImageUrl: appBase + "/Images/Profile-Placeholder.png"';
     echo '});';
-    echo 'wrap.innerHTML = window.BarangayIdDigital.render(state, { showIntro: false, frontLabel: "Front Template", backLabel: "Back Template" });';
+    echo 'window.BarangayIdDigital.renderInto(wrap, state, { showIntro: false, frontLabel: "Front Template", backLabel: "Back Template" });';
     echo '} catch (error) {';
     echo 'wrap.innerHTML = "<div style=\"max-width:720px;margin:24px auto;padding:16px 18px;border:1px solid #fecaca;border-radius:12px;background:#fff1f2;color:#991b1b;font:600 14px/1.4 Arial,Helvetica,sans-serif;\">Unable to render the digital Barangay ID preview.<br><span style=\"font-weight:500;\">"+ String(error && error.message ? error.message : error) +"</span></div>";';
     echo '}';

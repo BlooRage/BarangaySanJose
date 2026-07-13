@@ -17,6 +17,7 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . '/../includes/resident_access_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentRequestWorkflow.php';
+require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
 
 if (!function_exists('drd_public_asset_path')) {
     function drd_public_asset_path(string $baseUrl, string $storedPath): string
@@ -211,6 +212,21 @@ if ($requestId === '') {
 
 $documentRequestsUrl = appUrl('/Resident-End/document_requests.php');
 $profileImageEndpoint = appUrl('/PhpFiles/Resident-End/getVerifiedProfileImage.php');
+$barangayIdTemplateSettings = isset($conn) && $conn instanceof mysqli
+    ? dms_resolve_barangay_id_template_settings($conn)
+    : [
+        'front_template_path' => dms_barangay_id_default_template_paths()['front'],
+        'back_template_path' => dms_barangay_id_default_template_paths()['back'],
+        'layout' => dms_barangay_id_default_layout(),
+    ];
+$frontTemplatePublicPath = (string)($barangayIdTemplateSettings['front_template_path'] ?? dms_barangay_id_default_template_paths()['front']);
+$backTemplatePublicPath = (string)($barangayIdTemplateSettings['back_template_path'] ?? dms_barangay_id_default_template_paths()['back']);
+$frontTemplateDiskPath = dms_module_asset_public_path_to_disk($frontTemplatePublicPath);
+$backTemplateDiskPath = dms_module_asset_public_path_to_disk($backTemplatePublicPath);
+$frontTemplateVersion = $frontTemplateDiskPath !== '' && is_file($frontTemplateDiskPath) ? (string)@filemtime($frontTemplateDiskPath) : '';
+$backTemplateVersion = $backTemplateDiskPath !== '' && is_file($backTemplateDiskPath) ? (string)@filemtime($backTemplateDiskPath) : '';
+$frontTemplateUrl = rtrim($baseUrl, '/') . $frontTemplatePublicPath . ($frontTemplateVersion !== '' ? '?v=' . rawurlencode($frontTemplateVersion) : '');
+$backTemplateUrl = rtrim($baseUrl, '/') . $backTemplatePublicPath . ($backTemplateVersion !== '' ? '?v=' . rawurlencode($backTemplateVersion) : '');
 $serializedRow = $requestRow ? [
     'request_id' => (string)($requestRow['request_id'] ?? ''),
     'document_type' => (string)($requestRow['document_type'] ?? ''),
@@ -688,7 +704,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-03"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260713-01"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');
@@ -703,6 +719,9 @@ $serializedRow = $requestRow ? [
             const initialProfileImageUrl = <?= json_encode($resolvedProfileImageUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const documentRequestsUrl = <?= json_encode($documentRequestsUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const embedMode = <?= $embedMode ? 'true' : 'false' ?>;
+            const frontTemplateUrl = <?= json_encode($frontTemplateUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const backTemplateUrl = <?= json_encode($backTemplateUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const layoutConfig = <?= json_encode($barangayIdTemplateSettings['layout'] ?? dms_barangay_id_default_layout(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
             function closeDigitalIdView() {
                 if (!embedMode) {
@@ -738,6 +757,7 @@ $serializedRow = $requestRow ? [
                     frontLabel: 'Front Template',
                     backLabel: 'Back Template',
                 });
+                window.BarangayIdDigital.hydrate(scratch);
 
                 const renderedCards = scratch.querySelectorAll('.barangay-id-card');
                 const frontCard = renderedCards[0] || null;
@@ -837,6 +857,9 @@ $serializedRow = $requestRow ? [
                     row,
                     payload,
                     profileImageUrl,
+                    frontTemplateUrl,
+                    backTemplateUrl,
+                    layoutConfig,
                     fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
                 });
                 buildDigitalViewer(state);

@@ -19,11 +19,6 @@ if (!function_exists('dms_module_catalog')) {
                         'source' => 'seat_punong',
                         'signature_help' => 'Shown on the certificate signatory block.',
                     ],
-                    'secretary' => [
-                        'label' => 'Barangay Secretary',
-                        'source' => 'seat_secretary',
-                        'signature_help' => 'Shown on the issued-by block and witness block when the template uses it.',
-                    ],
                 ],
             ],
             'monitoring' => [
@@ -38,11 +33,6 @@ if (!function_exists('dms_module_catalog')) {
                         'source' => 'seat_punong',
                         'signature_help' => 'Shown on the clearance signatory block.',
                     ],
-                    'secretary' => [
-                        'label' => 'Barangay Secretary',
-                        'source' => 'seat_secretary',
-                        'signature_help' => 'Shown on the issued-by block for monitoring documents.',
-                    ],
                     'monitoring_head' => [
                         'label' => 'Monitoring Head',
                         'source' => 'manual',
@@ -55,7 +45,7 @@ if (!function_exists('dms_module_catalog')) {
             'barangay_id' => [
                 'key' => 'barangay_id',
                 'label' => 'Barangay ID Settings',
-                'description' => 'Manage the signatory asset used on the generated Barangay ID card.',
+                'description' => 'Manage the Barangay ID template editor, uploaded front/back assets, and the signatory asset used on the generated card.',
                 'applies_to' => 'Barangay ID preview and generated digital/print-ready ID output.',
                 'back_href' => 'Admin-End/Certificates/CertificateTracker.php?entry=id_issuance',
                 'signatories' => [
@@ -667,5 +657,976 @@ if (!function_exists('dms_module_key_for_document_type')) {
         }
 
         return 'issuance';
+    }
+}
+
+if (!function_exists('dms_module_asset_public_path_to_disk')) {
+    function dms_module_asset_public_path_to_disk(string $storedPath): string
+    {
+        $normalized = str_replace('\\', '/', trim($storedPath));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $baseDir = realpath(__DIR__ . '/../../');
+        if ($baseDir === false) {
+            return '';
+        }
+
+        if (strpos($normalized, $baseDir) === 0 && is_file($normalized)) {
+            return $normalized;
+        }
+
+        if (preg_match('/^https?:\/\//i', $normalized)) {
+            $urlPath = parse_url($normalized, PHP_URL_PATH);
+            $normalized = is_string($urlPath) ? $urlPath : '';
+        }
+
+        $marker = '/UnifiedFileAttachment/';
+        $markerPos = strpos($normalized, $marker);
+        if ($markerPos !== false) {
+            $normalized = substr($normalized, $markerPos);
+        }
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        if ($normalized[0] !== '/') {
+            $normalized = '/' . $normalized;
+        }
+
+        $candidate = $baseDir . $normalized;
+        return is_file($candidate) ? $candidate : '';
+    }
+}
+
+if (!function_exists('dms_json_encode_pretty')) {
+    function dms_json_encode_pretty($value): string
+    {
+        $encoded = json_encode(
+            $value,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
+        );
+        return is_string($encoded) ? $encoded : '{}';
+    }
+}
+
+if (!function_exists('dms_ensure_module_template_config_table')) {
+    function dms_ensure_module_template_config_table(mysqli $conn): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS documentmoduleconfigtbl (
+                config_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+                module_key VARCHAR(32) NOT NULL,
+                template_front_path VARCHAR(255) DEFAULT NULL,
+                template_back_path VARCHAR(255) DEFAULT NULL,
+                layout_json LONGTEXT DEFAULT NULL,
+                sample_data_json LONGTEXT DEFAULT NULL,
+                updated_by_user_id VARCHAR(12) DEFAULT NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (config_id),
+                UNIQUE KEY uq_document_module_config (module_key),
+                KEY idx_document_module_config_updated (updated_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+
+        $done = true;
+    }
+}
+
+if (!function_exists('dms_fetch_module_template_config_row')) {
+    function dms_fetch_module_template_config_row(mysqli $conn, string $moduleKey): array
+    {
+        dms_ensure_module_template_config_table($conn);
+
+        $stmt = $conn->prepare("
+            SELECT
+                module_key,
+                template_front_path,
+                template_back_path,
+                layout_json,
+                sample_data_json,
+                updated_by_user_id,
+                updated_at
+            FROM documentmoduleconfigtbl
+            WHERE module_key = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return [];
+        }
+
+        $stmt->bind_param('s', $moduleKey);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result instanceof mysqli_result ? ($result->fetch_assoc() ?: []) : [];
+        $stmt->close();
+
+        return is_array($row) ? $row : [];
+    }
+}
+
+if (!function_exists('dms_template_upload_directory')) {
+    function dms_template_upload_directory(string $moduleKey): array
+    {
+        $baseDir = realpath(__DIR__ . '/../../');
+        if ($baseDir === false) {
+            throw new RuntimeException('Unable to resolve workspace path.');
+        }
+
+        $moduleSafe = preg_replace('/[^a-z0-9_-]/i', '', strtolower($moduleKey)) ?: 'module';
+        $relativeDir = '/UnifiedFileAttachment/DocumentSettings/Templates/' . $moduleSafe;
+        return [
+            'disk_dir' => $baseDir . $relativeDir,
+            'public_dir' => $relativeDir,
+        ];
+    }
+}
+
+if (!function_exists('dms_detect_png_extension')) {
+    function dms_detect_png_extension(string $tmpName, string $originalName = ''): string
+    {
+        $mime = '';
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $mime = (string)(finfo_file($finfo, $tmpName) ?: '');
+                finfo_close($finfo);
+            }
+        }
+
+        if (strtolower($mime) === 'image/png') {
+            return 'png';
+        }
+
+        return strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) === 'png' ? 'png' : '';
+    }
+}
+
+if (!function_exists('dms_store_uploaded_template_png')) {
+    function dms_store_uploaded_template_png(string $moduleKey, string $assetKey, array $file): string
+    {
+        $uploadError = app_upload_validate_file($file, 'admin', 'Template PNG', false);
+        if ($uploadError !== null) {
+            throw new RuntimeException($uploadError);
+        }
+
+        $tmpName = trim((string)($file['tmp_name'] ?? ''));
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            throw new RuntimeException('Invalid upload source for template PNG.');
+        }
+
+        $extension = dms_detect_png_extension($tmpName, (string)($file['name'] ?? ''));
+        if ($extension !== 'png') {
+            throw new RuntimeException('Template upload must be a PNG image.');
+        }
+
+        $dirs = dms_template_upload_directory($moduleKey);
+        if (!is_dir($dirs['disk_dir']) && !mkdir($dirs['disk_dir'], 0775, true) && !is_dir($dirs['disk_dir'])) {
+            throw new RuntimeException('Unable to prepare the template upload directory.');
+        }
+
+        $assetSafe = preg_replace('/[^a-z0-9_-]/i', '', strtolower($assetKey)) ?: 'template';
+        $targetName = $assetSafe . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.png';
+        $targetDiskPath = rtrim($dirs['disk_dir'], '/') . '/' . $targetName;
+        if (!move_uploaded_file($tmpName, $targetDiskPath)) {
+            throw new RuntimeException('Unable to save the uploaded template image.');
+        }
+
+        return rtrim($dirs['public_dir'], '/') . '/' . $targetName;
+    }
+}
+
+if (!function_exists('dms_delete_module_asset_file')) {
+    function dms_delete_module_asset_file(string $publicPath): void
+    {
+        $diskPath = dms_module_asset_public_path_to_disk($publicPath);
+        if ($diskPath !== '' && is_file($diskPath)) {
+            @unlink($diskPath);
+        }
+    }
+}
+
+if (!function_exists('dms_barangay_id_default_template_paths')) {
+    function dms_barangay_id_default_template_paths(): array
+    {
+        return [
+            'front' => '/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png',
+            'back' => '/Resident-End/Certificates/BarangayID/BACK_EMPTY.png',
+        ];
+    }
+}
+
+if (!function_exists('dms_barangay_id_default_sample_data')) {
+    function dms_barangay_id_default_sample_data(): array
+    {
+        return [
+            'cardFullName' => 'DELA CRUZ, JUAN S.',
+            'cardFullAddress' => 'AREA 1, BARANGAY SAN JOSE, RODRIGUEZ, RIZAL',
+            'cardBirthdate' => '04/16/1998',
+            'cardBirthplace' => 'RODRIGUEZ, RIZAL',
+            'cardSex' => 'MALE',
+            'cardContactNumber' => '09171234567',
+            'cardEmergencyName' => 'DELA CRUZ, MARIA L.',
+            'cardEmergencyAddress' => 'AREA 1, BARANGAY SAN JOSE, RODRIGUEZ, RIZAL',
+            'cardEmergencyContact' => '09179876543',
+            'cardNumber' => 'A2026-0001',
+            'validUntil' => '07/13/2028',
+            'validityNotice' => 'This ID is valid until 07/13/2028 except when the holder requests for a new one.',
+        ];
+    }
+}
+
+if (!function_exists('dms_barangay_id_default_layout')) {
+    function dms_barangay_id_default_layout(): array
+    {
+        return [
+            'version' => 1,
+            'page' => [
+                'width_mm' => 85.6,
+                'height_mm' => 54.1,
+            ],
+            'fields' => [
+                [
+                    'id' => 'front_photo',
+                    'label' => 'Resident Photo',
+                    'type' => 'image',
+                    'source' => 'photoUrl',
+                    'side' => 'front',
+                    'x' => 7.9,
+                    'y' => 22.1,
+                    'w' => 22.0,
+                    'h' => 22.0,
+                    'fit' => 'cover',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_name_label',
+                    'label' => 'Label: Name',
+                    'type' => 'label',
+                    'text' => 'Name',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 24.08,
+                    'w' => 10.0,
+                    'h' => 3.2,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.1,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_name_value',
+                    'label' => 'Full Name',
+                    'type' => 'text',
+                    'source' => 'cardFullName',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 25.8,
+                    'w' => 44.8,
+                    'h' => 4.8,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 7.2,
+                    'minFontSize' => 4.6,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_address_label',
+                    'label' => 'Label: Address',
+                    'type' => 'label',
+                    'text' => 'Address',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 30.58,
+                    'w' => 13.5,
+                    'h' => 3.2,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.1,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_address_value',
+                    'label' => 'Address',
+                    'type' => 'text',
+                    'source' => 'cardFullAddress',
+                    'side' => 'front',
+                    'x' => 31.2,
+                    'y' => 32.78,
+                    'w' => 44.8,
+                    'h' => 6.0,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 5.6,
+                    'minFontSize' => 3.2,
+                    'uppercase' => true,
+                    'multiline' => true,
+                    'maxLines' => 2,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_birthdate_label',
+                    'label' => 'Label: Date of Birth',
+                    'type' => 'label',
+                    'text' => 'Date of Birth',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 38.48,
+                    'w' => 20.0,
+                    'h' => 3.2,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.1,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_birthdate_value',
+                    'label' => 'Birthdate',
+                    'type' => 'text',
+                    'source' => 'cardBirthdate',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 40.78,
+                    'w' => 20.5,
+                    'h' => 4.4,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 6.4,
+                    'minFontSize' => 4.4,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_sex_label',
+                    'label' => 'Label: Sex',
+                    'type' => 'label',
+                    'text' => 'Sex',
+                    'side' => 'front',
+                    'x' => 57.2,
+                    'y' => 38.48,
+                    'w' => 10.0,
+                    'h' => 3.2,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.1,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_sex_value',
+                    'label' => 'Sex',
+                    'type' => 'text',
+                    'source' => 'cardSex',
+                    'side' => 'front',
+                    'x' => 57.2,
+                    'y' => 40.78,
+                    'w' => 19.5,
+                    'h' => 4.4,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 6.4,
+                    'minFontSize' => 4.4,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_birthplace_label',
+                    'label' => 'Label: Place of Birth',
+                    'type' => 'label',
+                    'text' => 'Place of Birth',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 44.78,
+                    'w' => 20.0,
+                    'h' => 3.2,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.1,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_birthplace_value',
+                    'label' => 'Birthplace',
+                    'type' => 'text',
+                    'source' => 'cardBirthplace',
+                    'side' => 'front',
+                    'x' => 32.2,
+                    'y' => 46.98,
+                    'w' => 44.8,
+                    'h' => 4.2,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 5.5,
+                    'minFontSize' => 4.0,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_valid_until_value',
+                    'label' => 'Valid Until',
+                    'type' => 'text',
+                    'source' => 'validUntil',
+                    'prefix' => 'VALID UNTIL: ',
+                    'side' => 'front',
+                    'x' => 6.0,
+                    'y' => 44.78,
+                    'w' => 28.6,
+                    'h' => 4.2,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 4.8,
+                    'minFontSize' => 3.7,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'front_card_number_value',
+                    'label' => 'Card Number',
+                    'type' => 'text',
+                    'source' => 'cardNumber',
+                    'side' => 'front',
+                    'x' => 6.4,
+                    'y' => 49.58,
+                    'w' => 28.4,
+                    'h' => 4.4,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 6.8,
+                    'minFontSize' => 4.4,
+                    'uppercase' => true,
+                    'color' => '#c62828',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_card_number_value',
+                    'label' => 'Card Number (Back)',
+                    'type' => 'text',
+                    'source' => 'cardNumber',
+                    'side' => 'back',
+                    'x' => 59.5,
+                    'y' => 3.3,
+                    'w' => 21.5,
+                    'h' => 4.6,
+                    'align' => 'right',
+                    'fontStyle' => 'B',
+                    'fontSize' => 7.6,
+                    'minFontSize' => 5.0,
+                    'uppercase' => true,
+                    'color' => '#c62828',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_emergency_name_label',
+                    'label' => 'Label: Emergency Name',
+                    'type' => 'label',
+                    'text' => 'Name',
+                    'side' => 'back',
+                    'x' => 6.9,
+                    'y' => 17.5,
+                    'w' => 10.0,
+                    'h' => 3.0,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.0,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_emergency_name_value',
+                    'label' => 'Emergency Contact Name',
+                    'type' => 'text',
+                    'source' => 'cardEmergencyName',
+                    'side' => 'back',
+                    'x' => 6.9,
+                    'y' => 19.7,
+                    'w' => 33.0,
+                    'h' => 4.6,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 6.0,
+                    'minFontSize' => 4.3,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_emergency_address_label',
+                    'label' => 'Label: Emergency Address',
+                    'type' => 'label',
+                    'text' => 'Address',
+                    'side' => 'back',
+                    'x' => 6.9,
+                    'y' => 23.8,
+                    'w' => 12.0,
+                    'h' => 3.0,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.0,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_emergency_address_value',
+                    'label' => 'Emergency Address',
+                    'type' => 'text',
+                    'source' => 'cardEmergencyAddress',
+                    'side' => 'back',
+                    'x' => 6.9,
+                    'y' => 26.0,
+                    'w' => 39.6,
+                    'h' => 6.0,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 5.0,
+                    'minFontSize' => 3.2,
+                    'uppercase' => true,
+                    'multiline' => true,
+                    'maxLines' => 2,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_emergency_contact_label',
+                    'label' => 'Label: Emergency Contact',
+                    'type' => 'label',
+                    'text' => 'Contact',
+                    'side' => 'back',
+                    'x' => 6.9,
+                    'y' => 30.0,
+                    'w' => 12.0,
+                    'h' => 3.0,
+                    'align' => 'left',
+                    'fontStyle' => 'I',
+                    'fontSize' => 5.0,
+                    'minFontSize' => 4.0,
+                    'color' => '#111111',
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_emergency_contact_value',
+                    'label' => 'Emergency Contact Number',
+                    'type' => 'text',
+                    'source' => 'cardEmergencyContact',
+                    'fallbackSource' => 'cardContactNumber',
+                    'side' => 'back',
+                    'x' => 6.9,
+                    'y' => 32.2,
+                    'w' => 22.0,
+                    'h' => 4.4,
+                    'align' => 'left',
+                    'fontStyle' => 'B',
+                    'fontSize' => 6.0,
+                    'minFontSize' => 4.3,
+                    'uppercase' => true,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_validity_notice',
+                    'label' => 'Validity Notice',
+                    'type' => 'text',
+                    'source' => 'validityNotice',
+                    'side' => 'back',
+                    'x' => 7.3,
+                    'y' => 36.6,
+                    'w' => 40.5,
+                    'h' => 6.4,
+                    'align' => 'center',
+                    'fontStyle' => 'I',
+                    'fontSize' => 4.2,
+                    'minFontSize' => 3.2,
+                    'uppercase' => false,
+                    'multiline' => true,
+                    'maxLines' => 3,
+                    'z' => 2,
+                ],
+                [
+                    'id' => 'back_signatory',
+                    'label' => 'Punong Barangay Signatory',
+                    'type' => 'signatory',
+                    'side' => 'back',
+                    'x' => 9.1,
+                    'y' => 38.2,
+                    'w' => 30.8,
+                    'h' => 12.0,
+                    'z' => 3,
+                ],
+                [
+                    'id' => 'back_qr',
+                    'label' => 'Verification QR',
+                    'type' => 'qr',
+                    'source' => 'qrUrl',
+                    'side' => 'back',
+                    'x' => 49.0,
+                    'y' => 11.5,
+                    'w' => 32.3,
+                    'h' => 31.4,
+                    'fit' => 'fill',
+                    'z' => 2,
+                ],
+            ],
+        ];
+    }
+}
+
+if (!function_exists('dms_normalize_bool')) {
+    function dms_normalize_bool($value, bool $default = false): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (bool)$value;
+        }
+        $normalized = strtolower(trim((string)$value));
+        if ($normalized === '') {
+            return $default;
+        }
+        return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+    }
+}
+
+if (!function_exists('dms_normalize_float_range')) {
+    function dms_normalize_float_range($value, float $default, float $min, float $max): float
+    {
+        $parsed = is_numeric($value) ? (float)$value : $default;
+        if ($parsed < $min) {
+            return $min;
+        }
+        if ($parsed > $max) {
+            return $max;
+        }
+        return round($parsed, 2);
+    }
+}
+
+if (!function_exists('dms_normalize_int_range')) {
+    function dms_normalize_int_range($value, int $default, int $min, int $max): int
+    {
+        $parsed = is_numeric($value) ? (int)$value : $default;
+        if ($parsed < $min) {
+            return $min;
+        }
+        if ($parsed > $max) {
+            return $max;
+        }
+        return $parsed;
+    }
+}
+
+if (!function_exists('dms_barangay_id_allowed_field_types')) {
+    function dms_barangay_id_allowed_field_types(): array
+    {
+        return ['text', 'label', 'image', 'qr', 'signatory', 'cover'];
+    }
+}
+
+if (!function_exists('dms_normalize_barangay_id_field')) {
+    function dms_normalize_barangay_id_field(array $field, int $index = 0): array
+    {
+        $type = strtolower(trim((string)($field['type'] ?? 'text')));
+        if (!in_array($type, dms_barangay_id_allowed_field_types(), true)) {
+            $type = 'text';
+        }
+
+        $side = strtolower(trim((string)($field['side'] ?? 'front'))) === 'back' ? 'back' : 'front';
+        $fieldId = trim((string)($field['id'] ?? ''));
+        $fieldId = preg_replace('/[^a-z0-9_-]+/i', '_', strtolower($fieldId)) ?? '';
+        if ($fieldId === '') {
+            $fieldId = 'field_' . ($index + 1);
+        }
+
+        $align = strtolower(trim((string)($field['align'] ?? 'left')));
+        if (!in_array($align, ['left', 'center', 'right'], true)) {
+            $align = 'left';
+        }
+
+        $fontStyle = strtoupper(trim((string)($field['fontStyle'] ?? '')));
+        if (!in_array($fontStyle, ['', 'B', 'I', 'BI', 'IB'], true)) {
+            $fontStyle = $type === 'label' ? 'I' : 'B';
+        }
+        if ($fontStyle === 'IB') {
+            $fontStyle = 'BI';
+        }
+
+        $color = trim((string)($field['color'] ?? '#111111'));
+        if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $color)) {
+            $color = '#111111';
+        }
+
+        $backgroundColor = trim((string)($field['backgroundColor'] ?? '#ffffff'));
+        if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $backgroundColor)) {
+            $backgroundColor = '#ffffff';
+        }
+
+        $fit = strtolower(trim((string)($field['fit'] ?? 'cover')));
+        if (!in_array($fit, ['cover', 'contain', 'fill'], true)) {
+            $fit = 'cover';
+        }
+
+        $normalized = [
+            'id' => $fieldId,
+            'label' => trim((string)($field['label'] ?? 'Field')),
+            'type' => $type,
+            'side' => $side,
+            'x' => dms_normalize_float_range($field['x'] ?? 0, 0.0, 0.0, 85.6),
+            'y' => dms_normalize_float_range($field['y'] ?? 0, 0.0, 0.0, 54.1),
+            'w' => dms_normalize_float_range($field['w'] ?? 10, 10.0, 1.2, 85.6),
+            'h' => dms_normalize_float_range($field['h'] ?? 4, 4.0, 1.0, 54.1),
+            'z' => dms_normalize_int_range($field['z'] ?? 2, 2, 1, 20),
+            'source' => trim((string)($field['source'] ?? '')),
+            'fallbackSource' => trim((string)($field['fallbackSource'] ?? '')),
+            'prefix' => trim((string)($field['prefix'] ?? '')),
+            'text' => trim((string)($field['text'] ?? '')),
+            'align' => $align,
+            'fontStyle' => $fontStyle,
+            'fontSize' => dms_normalize_float_range($field['fontSize'] ?? ($type === 'label' ? 5.0 : 6.0), $type === 'label' ? 5.0 : 6.0, 2.8, 20.0),
+            'minFontSize' => dms_normalize_float_range($field['minFontSize'] ?? ($type === 'label' ? 4.0 : 4.2), $type === 'label' ? 4.0 : 4.2, 2.4, 18.0),
+            'color' => $color,
+            'backgroundColor' => $backgroundColor,
+            'uppercase' => dms_normalize_bool($field['uppercase'] ?? ($type !== 'label' && $type !== 'cover'), $type !== 'label' && $type !== 'cover'),
+            'multiline' => dms_normalize_bool($field['multiline'] ?? false, false),
+            'maxLines' => dms_normalize_int_range($field['maxLines'] ?? 2, 2, 1, 5),
+            'fit' => $fit,
+        ];
+
+        if ($normalized['minFontSize'] > $normalized['fontSize']) {
+            $normalized['minFontSize'] = $normalized['fontSize'];
+        }
+
+        if ($normalized['label'] === '') {
+            $normalized['label'] = ucfirst(str_replace('_', ' ', $fieldId));
+        }
+
+        return $normalized;
+    }
+}
+
+if (!function_exists('dms_normalize_barangay_id_layout')) {
+    function dms_normalize_barangay_id_layout(array $layout): array
+    {
+        $defaults = dms_barangay_id_default_layout();
+        $page = (array)($layout['page'] ?? []);
+        $fields = isset($layout['fields']) && is_array($layout['fields']) ? $layout['fields'] : [];
+        if ($fields === []) {
+            $fields = $defaults['fields'];
+        }
+
+        $normalizedFields = [];
+        foreach ($fields as $index => $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+            $normalizedFields[] = dms_normalize_barangay_id_field($field, (int)$index);
+        }
+
+        usort($normalizedFields, static function (array $left, array $right): int {
+            $sideCompare = strcmp((string)($left['side'] ?? ''), (string)($right['side'] ?? ''));
+            if ($sideCompare !== 0) {
+                return $sideCompare;
+            }
+            $zCompare = ((int)($left['z'] ?? 0)) <=> ((int)($right['z'] ?? 0));
+            if ($zCompare !== 0) {
+                return $zCompare;
+            }
+            return strcmp((string)($left['id'] ?? ''), (string)($right['id'] ?? ''));
+        });
+
+        return [
+            'version' => dms_normalize_int_range($layout['version'] ?? 1, 1, 1, 10),
+            'page' => [
+                'width_mm' => dms_normalize_float_range($page['width_mm'] ?? $defaults['page']['width_mm'], (float)$defaults['page']['width_mm'], 85.6, 85.6),
+                'height_mm' => dms_normalize_float_range($page['height_mm'] ?? $defaults['page']['height_mm'], (float)$defaults['page']['height_mm'], 54.1, 54.1),
+            ],
+            'fields' => $normalizedFields,
+        ];
+    }
+}
+
+if (!function_exists('dms_normalize_barangay_id_sample_data')) {
+    function dms_normalize_barangay_id_sample_data(array $sample): array
+    {
+        $defaults = dms_barangay_id_default_sample_data();
+        $normalized = $defaults;
+        foreach ($defaults as $key => $defaultValue) {
+            $value = $sample[$key] ?? $defaultValue;
+            $normalized[$key] = trim((string)$value);
+        }
+        if ($normalized['validityNotice'] === '') {
+            $normalized['validityNotice'] = 'This ID is valid until ' . ($normalized['validUntil'] !== '' ? $normalized['validUntil'] : '____') . ' except when the holder requests for a new one.';
+        }
+        return $normalized;
+    }
+}
+
+if (!function_exists('dms_decode_json_array')) {
+    function dms_decode_json_array(?string $json): array
+    {
+        $json = trim((string)$json);
+        if ($json === '') {
+            return [];
+        }
+
+        $decoded = json_decode($json, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+}
+
+if (!function_exists('dms_resolve_barangay_id_template_settings')) {
+    function dms_resolve_barangay_id_template_settings(mysqli $conn): array
+    {
+        $stored = dms_fetch_module_template_config_row($conn, 'barangay_id');
+        $defaultPaths = dms_barangay_id_default_template_paths();
+        $storedFront = trim((string)($stored['template_front_path'] ?? ''));
+        $storedBack = trim((string)($stored['template_back_path'] ?? ''));
+        $frontResolved = $storedFront !== '' ? $storedFront : $defaultPaths['front'];
+        $backResolved = $storedBack !== '' ? $storedBack : $defaultPaths['back'];
+
+        $layout = dms_normalize_barangay_id_layout(
+            dms_decode_json_array((string)($stored['layout_json'] ?? ''))
+        );
+        $sampleData = dms_normalize_barangay_id_sample_data(
+            dms_decode_json_array((string)($stored['sample_data_json'] ?? ''))
+        );
+
+        return [
+            'module_key' => 'barangay_id',
+            'front_template_path' => $frontResolved,
+            'back_template_path' => $backResolved,
+            'front_template_custom_path' => $storedFront,
+            'back_template_custom_path' => $storedBack,
+            'front_template_disk_path' => dms_module_asset_public_path_to_disk($frontResolved),
+            'back_template_disk_path' => dms_module_asset_public_path_to_disk($backResolved),
+            'layout' => $layout,
+            'sample_data' => $sampleData,
+            'updated_at' => trim((string)($stored['updated_at'] ?? '')),
+            'updated_by_user_id' => trim((string)($stored['updated_by_user_id'] ?? '')),
+            'template_variant' => ($storedFront !== '' || $storedBack !== '') ? 'custom' : 'empty',
+        ];
+    }
+}
+
+if (!function_exists('dms_upsert_module_template_config')) {
+    function dms_upsert_module_template_config(
+        mysqli $conn,
+        string $moduleKey,
+        string $frontTemplatePath,
+        string $backTemplatePath,
+        array $layout,
+        array $sampleData,
+        string $updatedByUserId
+    ): void {
+        dms_ensure_module_template_config_table($conn);
+
+        $layoutJson = dms_json_encode_pretty($layout);
+        $sampleJson = dms_json_encode_pretty($sampleData);
+
+        $stmt = $conn->prepare("
+            INSERT INTO documentmoduleconfigtbl (
+                module_key,
+                template_front_path,
+                template_back_path,
+                layout_json,
+                sample_data_json,
+                updated_by_user_id
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                template_front_path = VALUES(template_front_path),
+                template_back_path = VALUES(template_back_path),
+                layout_json = VALUES(layout_json),
+                sample_data_json = VALUES(sample_data_json),
+                updated_by_user_id = VALUES(updated_by_user_id),
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to prepare Barangay ID template settings update.');
+        }
+
+        $stmt->bind_param('ssssss', $moduleKey, $frontTemplatePath, $backTemplatePath, $layoutJson, $sampleJson, $updatedByUserId);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+if (!function_exists('dms_save_barangay_id_template_settings')) {
+    function dms_save_barangay_id_template_settings(mysqli $conn, array $post, array $files, string $updatedByUserId): array
+    {
+        $before = dms_resolve_barangay_id_template_settings($conn);
+        $stored = dms_fetch_module_template_config_row($conn, 'barangay_id');
+        $frontStored = trim((string)($stored['template_front_path'] ?? ''));
+        $backStored = trim((string)($stored['template_back_path'] ?? ''));
+        $frontTemplatePath = $frontStored;
+        $backTemplatePath = $backStored;
+
+        if (!empty($post['remove_front_template'])) {
+            dms_delete_module_asset_file($frontStored);
+            $frontTemplatePath = '';
+        }
+        if (!empty($post['remove_back_template'])) {
+            dms_delete_module_asset_file($backStored);
+            $backTemplatePath = '';
+        }
+
+        if (isset($files['front_template_file']) && is_array($files['front_template_file'])) {
+            $uploadErrorCode = (int)($files['front_template_file']['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($uploadErrorCode !== UPLOAD_ERR_NO_FILE) {
+                $newFrontPath = dms_store_uploaded_template_png('barangay_id', 'front', $files['front_template_file']);
+                if ($frontStored !== '' && $frontStored !== $newFrontPath) {
+                    dms_delete_module_asset_file($frontStored);
+                }
+                $frontTemplatePath = $newFrontPath;
+            }
+        }
+
+        if (isset($files['back_template_file']) && is_array($files['back_template_file'])) {
+            $uploadErrorCode = (int)($files['back_template_file']['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($uploadErrorCode !== UPLOAD_ERR_NO_FILE) {
+                $newBackPath = dms_store_uploaded_template_png('barangay_id', 'back', $files['back_template_file']);
+                if ($backStored !== '' && $backStored !== $newBackPath) {
+                    dms_delete_module_asset_file($backStored);
+                }
+                $backTemplatePath = $newBackPath;
+            }
+        }
+
+        $layoutInput = dms_decode_json_array((string)($post['barangay_id_layout_json'] ?? ''));
+        $layout = dms_normalize_barangay_id_layout($layoutInput);
+        if (empty($layout['fields'])) {
+            throw new RuntimeException('Barangay ID layout must contain at least one field.');
+        }
+
+        $sampleInput = dms_decode_json_array((string)($post['barangay_id_sample_json'] ?? ''));
+        $sampleData = dms_normalize_barangay_id_sample_data($sampleInput);
+
+        dms_upsert_module_template_config(
+            $conn,
+            'barangay_id',
+            $frontTemplatePath,
+            $backTemplatePath,
+            $layout,
+            $sampleData,
+            $updatedByUserId
+        );
+
+        return [
+            'before' => $before,
+            'after' => dms_resolve_barangay_id_template_settings($conn),
+        ];
     }
 }

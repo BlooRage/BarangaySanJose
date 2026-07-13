@@ -23,3 +23,7 @@ PhpFiles/General/runtime.php
 .env
 .env.*
 hi.php
+
+# Disposable maintenance routing cache; durable state lives in the database.
+.maintenance-mode.flag
+.maintenance-settings.json
