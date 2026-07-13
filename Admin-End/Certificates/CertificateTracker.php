@@ -2490,18 +2490,13 @@ if ($certificateLaunchStage === 'release') {
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-<<<<<<< Updated upstream
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" style="min-width:0;">
-    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
-=======
-  <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
       <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
       <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($certificateSettingsHref, ENT_QUOTES, 'UTF-8') ?>">
         <i class="fa-solid fa-gear me-2"></i><?= htmlspecialchars($certificateSettingsLabel, ENT_QUOTES, 'UTF-8') ?>
       </a>
     </div>
->>>>>>> Stashed changes
     <hr class="mb-4">
 
     <!-- Page-level navigation -->
