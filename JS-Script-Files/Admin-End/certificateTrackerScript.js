@@ -1349,6 +1349,9 @@
         window.requestAnimationFrame(hydrateBarangayId);
       });
       window.setTimeout(hydrateBarangayId, 120);
+      window.setTimeout(hydrateBarangayId, 400);
+      window.setTimeout(hydrateBarangayId, 700);
+      viewModalEl?.addEventListener('shown.bs.modal', hydrateBarangayId, { once: true });
     }
     bindPreviewEditHandlers();
   }

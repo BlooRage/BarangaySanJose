@@ -8,6 +8,7 @@
   const SAMPLE_SIGNATURE = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="180" viewBox="0 0 640 180"><path d="M42 132c62-10 76-78 112-74 28 3-9 69 17 72 32 4 55-89 86-91 25-2-1 88 29 90 29 2 48-61 73-60 18 1 4 50 28 52 30 3 64-28 103-22 31 5 55 20 108 12" fill="none" stroke="#172033" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M118 151c122 13 279 13 456-3" fill="none" stroke="#172033" stroke-width="5" stroke-linecap="round"/></svg>'
   );
+  const observedAutoFitElements = new WeakSet();
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (match) => ({
@@ -692,6 +693,9 @@
     const maxLines = Math.max(1, Math.min(12, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1));
     const lineHeight = Math.max(0.9, Math.min(1.4, Number.parseFloat(element.dataset.bidLineHeight || (isMultiline ? '1.04' : '1.05')) || 1.05));
     const measureBox = element.parentElement instanceof HTMLElement ? element.parentElement : element;
+    if (measureBox.clientWidth <= 1 || measureBox.clientHeight <= 1) {
+      return;
+    }
     const applyTextSize = (size) => {
       element.style.fontSize = `${size}px`;
       element.style.lineHeight = String(lineHeight);
@@ -762,7 +766,15 @@
         }
       });
     });
-    scope.querySelectorAll('[data-bid-autofit="1"]').forEach((element) => autoFitElement(element));
+    scope.querySelectorAll('[data-bid-autofit="1"]').forEach((element) => {
+      autoFitElement(element);
+      if (!observedAutoFitElements.has(element) && typeof ResizeObserver === 'function') {
+        observedAutoFitElements.add(element);
+        const measureBox = element.parentElement instanceof HTMLElement ? element.parentElement : element;
+        const observer = new ResizeObserver(() => autoFitElement(element));
+        observer.observe(measureBox);
+      }
+    });
   }
 
   function render(state, options = {}) {
