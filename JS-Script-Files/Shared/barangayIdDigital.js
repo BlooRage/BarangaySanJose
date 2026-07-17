@@ -679,7 +679,7 @@
       .barangay-id-card__qr { background:transparent; }
       .barangay-id-card__qr img { image-rendering:pixelated; }
       .barangay-id-card__qr--placeholder,
-      .barangay-id-card__photo--placeholder { display:flex; align-items:center; justify-content:center; text-align:center; font-family:Arial, Helvetica, sans-serif; font-size:1.67cqw; font-weight:700; line-height:1; color:#7a5a35; background:rgba(255,255,255,0.72); border:1.5px dashed rgba(222,113,12,0.72); }
+      .barangay-id-card__photo--placeholder { display:flex; align-items:center; justify-content:center; text-align:center; font-family:Arial, Helvetica, sans-serif; font-size:3.33cqw; font-weight:700; line-height:1; color:#7a5a35; background:rgba(255,255,255,0.72); border:1.5px dashed rgba(222,113,12,0.72); }
       .barangay-id-card__signatory { z-index:3; display:grid; justify-items:center; color:#111; font-family:Arial, Helvetica, sans-serif; }
       .barangay-id-card__signatory-ink { width:100%; min-height:52%; display:flex; align-items:end; justify-content:center; }
       .barangay-id-card__signatory-ink img { max-width:100%; max-height:100%; display:block; object-fit:contain; }
@@ -701,8 +701,10 @@
       return;
     }
     const card = element.closest('.barangay-id-card');
-    const cardWidth = card instanceof HTMLElement ? card.clientWidth : 600;
-    const cardScale = Math.max(0.35, Math.min(3, cardWidth / 600));
+    const cardWidth = card instanceof HTMLElement ? card.clientWidth : 300;
+    // The Settings preview is approximately 300 CSS pixels per card. Treat it
+    // as scale 1 so issuance/final previews grow from the admin-approved view.
+    const cardScale = Math.max(0.35, Math.min(4, cardWidth / 300));
     const maxFont = (Number.parseFloat(element.dataset.bidMaxFont || '6') || 6) * cardScale;
     const preferredMinFont = (Number.parseFloat(element.dataset.bidMinFont || '4') || 4) * cardScale;
     const hardMinFont = 1.4 * cardScale;
