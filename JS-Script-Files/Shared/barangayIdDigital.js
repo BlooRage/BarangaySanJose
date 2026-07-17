@@ -679,7 +679,7 @@
       .barangay-id-card__qr { background:transparent; }
       .barangay-id-card__qr img { image-rendering:pixelated; }
       .barangay-id-card__qr--placeholder,
-      .barangay-id-card__photo--placeholder { display:flex; align-items:center; justify-content:center; text-align:center; font:700 10px/1 Arial, Helvetica, sans-serif; color:#7a5a35; background:rgba(255,255,255,0.72); border:1.5px dashed rgba(222,113,12,0.72); }
+      .barangay-id-card__photo--placeholder { display:flex; align-items:center; justify-content:center; text-align:center; font-family:Arial, Helvetica, sans-serif; font-size:1.67cqw; font-weight:700; line-height:1; color:#7a5a35; background:rgba(255,255,255,0.72); border:1.5px dashed rgba(222,113,12,0.72); }
       .barangay-id-card__signatory { z-index:3; display:grid; justify-items:center; color:#111; font-family:Arial, Helvetica, sans-serif; }
       .barangay-id-card__signatory-ink { width:100%; min-height:52%; display:flex; align-items:end; justify-content:center; }
       .barangay-id-card__signatory-ink img { max-width:100%; max-height:100%; display:block; object-fit:contain; }
@@ -693,9 +693,6 @@
 
   function autoFitElement(element) {
     if (!(element instanceof HTMLElement)) return;
-    const maxFont = Number.parseFloat(element.dataset.bidMaxFont || '6') || 6;
-    const preferredMinFont = Number.parseFloat(element.dataset.bidMinFont || '4') || 4;
-    const hardMinFont = 1.4;
     const isMultiline = element.dataset.bidMultiline === '1';
     const maxLines = Math.max(1, Math.min(12, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1));
     const lineHeight = Math.max(0.9, Math.min(1.4, Number.parseFloat(element.dataset.bidLineHeight || (isMultiline ? '1.04' : '1.05')) || 1.05));
@@ -703,6 +700,13 @@
     if (measureBox.clientWidth <= 1 || measureBox.clientHeight <= 1) {
       return;
     }
+    const card = element.closest('.barangay-id-card');
+    const cardWidth = card instanceof HTMLElement ? card.clientWidth : 600;
+    const cardScale = Math.max(0.35, Math.min(3, cardWidth / 600));
+    const maxFont = (Number.parseFloat(element.dataset.bidMaxFont || '6') || 6) * cardScale;
+    const preferredMinFont = (Number.parseFloat(element.dataset.bidMinFont || '4') || 4) * cardScale;
+    const hardMinFont = 1.4 * cardScale;
+    const fontStep = 0.2 * cardScale;
     const applyTextSize = (size) => {
       element.style.fontSize = `${size}px`;
       element.style.lineHeight = String(lineHeight);
@@ -741,7 +745,7 @@
       if (fitsText()) {
         break;
       }
-      size = Number((size - 0.2).toFixed(2));
+      size = Number((size - fontStep).toFixed(2));
       applyTextSize(size);
     }
 
@@ -749,7 +753,7 @@
       if (fitsText()) {
         break;
       }
-      size = Number((size - 0.2).toFixed(2));
+      size = Number((size - fontStep).toFixed(2));
       applyTextSize(size);
     }
 
