@@ -26,6 +26,25 @@
   const sideButtons = Array.from(document.querySelectorAll('[data-bid-side-btn]'));
   const addButtons = Array.from(document.querySelectorAll('[data-bid-add-type]'));
   const sampleInputs = Array.from(document.querySelectorAll('[data-bid-sample-input]'));
+  const processStepButtons = Array.from(document.querySelectorAll('[data-bid-step]'));
+  const processShortcutButtons = Array.from(document.querySelectorAll('[data-bid-go-step]'));
+  const previousStepBtn = document.querySelector('[data-bid-step-prev]');
+  const nextStepBtn = document.querySelector('[data-bid-step-next]');
+  const saveStepBtn = document.querySelector('[data-bid-step-save]');
+  const uploadActionSelects = Array.from(document.querySelectorAll('[data-bid-upload-action]'));
+  const addFieldSelect = document.getElementById('barangayIdAddFieldSelect');
+  const quickColorInput = document.getElementById('barangayIdQuickColor');
+  const quickFontStyleSelect = document.getElementById('barangayIdQuickFontStyle');
+  const quickAlignmentWrap = document.getElementById('barangayIdQuickAlignment');
+  const quickAlignmentButtons = Array.from(document.querySelectorAll('[data-bid-quick-align]'));
+  const quickUppercaseInput = document.getElementById('barangayIdQuickUppercase');
+  const quickMultilineInput = document.getElementById('barangayIdQuickMultiline');
+  const quickMaxLinesInput = document.getElementById('barangayIdQuickMaxLines');
+  const quickCornerRadiusWrap = document.getElementById('barangayIdQuickCornerRadiusWrap');
+  const quickCornerRadiusInput = document.getElementById('barangayIdQuickCornerRadius');
+  const editorViewButtons = Array.from(document.querySelectorAll('[data-bid-editor-view-btn]'));
+  const editorViewPanels = Array.from(document.querySelectorAll('[data-bid-editor-view-panel]'));
+  const sideSelector = document.getElementById('barangayIdSideSelector');
 
   const defaultLayout = window.BarangayIdDigital.defaultLayoutConfig();
   const defaultSample = window.BarangayIdDigital.defaultSampleData();
@@ -47,7 +66,7 @@
   ];
   const fieldTemplates = {
     text: { type: 'text', label: 'Text Field', source: 'cardFullName', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6.0, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
-    image: { type: 'image', label: 'Image Field', source: 'photoUrl', w: 16, h: 16, fit: 'cover' },
+    image: { type: 'image', label: 'Image Field', source: 'photoUrl', w: 16, h: 16, fit: 'cover', cornerRadius: 0 },
     qr: { type: 'qr', label: 'QR Field', source: 'qrUrl', w: 16, h: 16, fit: 'fill' },
     signature: { type: 'image', label: 'Signature', source: 'punongSignatorySignatureUrl', w: 30, h: 8, fit: 'contain' },
     cover: { type: 'cover', label: 'Cover Block', w: 18, h: 8, backgroundColor: '#ffffff' },
@@ -55,6 +74,7 @@
 
   const state = {
     activeSide: 'front',
+    editorView: 'editor',
     layout: window.BarangayIdDigital.normalizeLayoutConfig(payload.layoutConfig || defaultLayout),
     sampleData: { ...defaultSample, ...(payload.sampleData && typeof payload.sampleData === 'object' ? payload.sampleData : {}) },
     selectedFieldId: '',
@@ -67,6 +87,10 @@
     },
     interaction: null,
     objectUrls: []
+  };
+  const originalTemplateUrls = {
+    front: state.frontTemplateUrl,
+    back: state.backTemplateUrl
   };
 
   function escapeHtml(value) {
@@ -84,6 +108,24 @@
       try { URL.revokeObjectURL(url); } catch (_) {}
     });
     state.objectUrls = [];
+  }
+
+  function setProcessStep(rawStep, options = {}) {
+    const step = Math.max(1, Math.min(3, Number.parseInt(rawStep, 10) || 1));
+    form.dataset.bidActiveStep = String(step);
+    processStepButtons.forEach((button) => {
+      const buttonStep = Number.parseInt(button.dataset.bidStep || '1', 10) || 1;
+      button.classList.toggle('is-active', buttonStep === step);
+      button.classList.toggle('is-complete', buttonStep < step);
+      button.setAttribute('aria-current', buttonStep === step ? 'step' : 'false');
+    });
+    if (previousStepBtn) previousStepBtn.hidden = step === 1;
+    if (nextStepBtn) nextStepBtn.hidden = step === 3;
+    if (saveStepBtn) saveStepBtn.hidden = step !== 3;
+    renderAll();
+    if (options.scroll !== false) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   function pageWidth() {
@@ -226,6 +268,10 @@
     if (field.type === 'signatory') {
       return dimension === 'h' ? 10 : 22;
     }
+
+    if (state.editorView === 'layout' && field.type === 'cover') {
+      return `<span class="bid-editor-field__resize" data-bid-resize="1"></span>`;
+    }
     if (field.type === 'cover') {
       return dimension === 'h' ? 6 : 10;
     }
@@ -362,6 +408,9 @@
   }
 
   function editorFieldInnerHtml(field, displayName, purpose) {
+    const deleteControl = state.editorView === 'editor'
+      ? `<span class="bid-editor-field__delete" data-bid-delete-field="1" title="Remove ${escapeHtml(displayName)}" aria-label="Remove ${escapeHtml(displayName)}">×</span>`
+      : '';
     if (field.type === 'image' || field.type === 'qr') {
       const mediaUrl = mediaUrlForField(field);
       const label = field.type === 'qr'
@@ -371,8 +420,9 @@
           : 'Photo';
       return `
         ${mediaUrl ? `<img class="bid-editor-field__media${label === 'Signature' ? ' is-signature' : ''}" src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(displayName)}">` : `<span class="bid-editor-field__placeholder${label === 'Signature' ? ' is-signature' : ''}">${escapeHtml(label)}</span>`}
-        <span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>
+        ${state.editorView === 'editor' ? `<span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>` : ''}
         ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
+        ${deleteControl}
         <span class="bid-editor-field__resize" data-bid-resize="1"></span>
       `;
     }
@@ -381,6 +431,35 @@
       return `
         <span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>
         ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
+        ${deleteControl}
+        <span class="bid-editor-field__resize" data-bid-resize="1"></span>
+      `;
+    }
+
+    if (state.editorView === 'layout' && field.type === 'text') {
+      const alignmentClass = field.align === 'center' ? ' is-center' : field.align === 'right' ? ' is-right' : '';
+      const multilineClass = fieldIsMultiline(field) ? ' is-multiline' : '';
+      const maxLines = Math.max(1, Math.min(3, Number(field.maxLines || 1)));
+      const addressMultiplier = ['cardFullAddress', 'cardEmergencyAddress'].includes(String(field.source || '')) ? 3 : 1;
+      const configuredMaxFont = Number(field.fontSize || 6);
+      const heightDrivenFont = fieldIsMultiline(field)
+        ? (Number(field.h || 0) / Math.max(1, Math.min(maxLines, 3))) * 4.15
+        : Number(field.h || 0) * 4.15;
+      // Keep these values in the same unscaled units used by the final ID
+      // renderer. fitLayoutSample applies the live card-width scale below.
+      const maxFont = Math.max(2.8, Math.min(72, Math.max(configuredMaxFont * 1.33, heightDrivenFont || configuredMaxFont) * addressMultiplier));
+      const minFont = Math.max(1.4, Math.min(Number(field.minFontSize || 3.2) * 1.15 * addressMultiplier, maxFont));
+      const sampleValue = sampleValueForField(field);
+      return `
+        <span class="bid-editor-field__sample${alignmentClass}${multilineClass}"
+          data-bid-autofit="1"
+          data-bid-scale="1"
+          data-bid-max-font="${maxFont.toFixed(2)}"
+          data-bid-min-font="${Math.min(minFont, maxFont).toFixed(2)}"
+          data-bid-max-lines="${maxLines}"
+          data-bid-line-height="${fieldIsMultiline(field) ? '1.04' : '1.05'}"
+          data-bid-multiline="${fieldIsMultiline(field) ? '1' : '0'}"
+          data-bid-value="${escapeHtml(sampleValue)}">${escapeHtml(sampleValue)}</span>
         <span class="bid-editor-field__resize" data-bid-resize="1"></span>
       `;
     }
@@ -388,12 +467,59 @@
     return `
       <span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>
       ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
+      ${deleteControl}
       <span class="bid-editor-field__resize" data-bid-resize="1"></span>
     `;
   }
 
   function fieldIsMultiline(field) {
     return !!field?.multiline || Number(field?.maxLines || 1) > 1;
+  }
+
+  function fitLayoutSample(element) {
+    if (!(element instanceof HTMLElement)) return;
+    const fieldBox = element.parentElement;
+    if (!(fieldBox instanceof HTMLElement) || fieldBox.clientWidth <= 1 || fieldBox.clientHeight <= 1) return;
+
+    const multiline = element.dataset.bidMultiline === '1';
+    const maxLines = Math.max(1, Math.min(3, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1));
+    // This is deliberately identical to barangayIdDigital.autoFitElement:
+    // previews scale configured font units from a 300px reference card.
+    const cardScale = Math.max(0.35, canvas.clientWidth / 300);
+    const maxFont = Math.max(2, (Number.parseFloat(element.dataset.bidMaxFont || '8') || 8) * cardScale);
+    const minFont = Math.max(1.4 * cardScale, Math.min(maxFont, (Number.parseFloat(element.dataset.bidMinFont || '3') || 3) * cardScale));
+    const lineHeight = Math.max(0.9, Math.min(1.4, Number.parseFloat(element.dataset.bidLineHeight || '1.05') || 1.05));
+    const originalValue = String(element.dataset.bidValue || element.textContent || '').trim();
+
+    // Always restore the sample value before measuring. The shared final-ID
+    // fitter may replace text nodes with line breaks, but editable layout
+    // fields must remain deterministic across every re-render and resize.
+    element.textContent = originalValue;
+    element.style.display = 'block';
+    element.style.lineHeight = String(lineHeight);
+    element.style.whiteSpace = 'nowrap';
+    element.style.overflowWrap = multiline ? 'normal' : '';
+    element.style.wordBreak = 'normal';
+
+    const fontStep = 0.2 * cardScale;
+    let size = maxFont;
+    element.style.fontSize = `${size}px`;
+    if (multiline && maxLines > 1 && element.scrollWidth > fieldBox.clientWidth + 1) {
+      size = maxFont / 2;
+      element.style.fontSize = `${size}px`;
+    }
+    element.style.whiteSpace = multiline ? 'normal' : 'nowrap';
+    const fits = () => {
+      const renderedLines = Math.max(1, Math.round(element.scrollHeight / Math.max(1, size * lineHeight)));
+      return element.scrollWidth <= fieldBox.clientWidth + 1
+        && element.scrollHeight <= fieldBox.clientHeight + 1
+        && (!multiline || renderedLines <= maxLines);
+    };
+
+    while (size > minFont && !fits()) {
+      size = Math.max(minFont, Number((size - fontStep).toFixed(2)));
+      element.style.fontSize = `${size}px`;
+    }
   }
 
   function renderCanvas() {
@@ -411,11 +537,13 @@
       fieldEl.style.top = mmToPctY(field.y);
       fieldEl.style.width = mmToPctX(field.w);
       fieldEl.style.height = mmToPctY(field.h);
+      fieldEl.style.borderRadius = `${Math.max(0, Math.min(50, Number(field.cornerRadius || 0)))}%`;
       fieldEl.style.zIndex = String(field.z || 2);
+      if (field.type === 'cover') fieldEl.style.backgroundColor = field.backgroundColor || '#ffffff';
       fieldEl.style.setProperty('--bid-editor-font-size', `${editorFontPx(field)}px`);
       fieldEl.style.setProperty('--bid-editor-line-height', fieldIsMultiline(field) ? '1.04' : '1.05');
       fieldEl.style.setProperty('--bid-editor-color', field.color || '#111111');
-      fieldEl.style.setProperty('--bid-editor-font-weight', String(field.fontStyle || '').includes('B') ? '800' : '500');
+      fieldEl.style.setProperty('--bid-editor-font-weight', String(field.fontStyle || '').includes('B') ? '800' : '400');
       fieldEl.style.setProperty('--bid-editor-font-style', String(field.fontStyle || '').includes('I') ? 'italic' : 'normal');
       fieldEl.style.setProperty('--bid-editor-text-transform', field.uppercase ? 'uppercase' : 'none');
       fieldEl.style.setProperty('--bid-editor-object-fit', fitToObjectPosition(field.fit));
@@ -429,13 +557,25 @@
         renderAll();
       });
 
+      fieldEl.querySelector('[data-bid-delete-field="1"]')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.layout.fields = state.layout.fields.filter((candidate) => candidate.id !== field.id);
+        state.selectedFieldId = '';
+        renderAll();
+      });
+
       fieldEl.addEventListener('pointerdown', (event) => {
+        if (event.target instanceof HTMLElement && event.target.dataset.bidDeleteField === '1') return;
         const isResize = event.target instanceof HTMLElement && event.target.dataset.bidResize === '1';
         beginPointerInteraction(event, field.id, isResize ? 'resize' : 'move');
       });
 
       canvas.appendChild(fieldEl);
     });
+    if (state.editorView === 'layout') {
+      canvas.querySelectorAll('.bid-editor-field__sample').forEach(fitLayoutSample);
+    }
   }
 
   function renderFieldList() {
@@ -555,30 +695,32 @@
     }
 
     if (field.type === 'text') {
-      blocks.push(inputMarkup({ label: 'Max Font Size', prop: 'fontSize', type: 'number', value: field.fontSize, min: '2.8', max: '36' }));
-      blocks.push(inputMarkup({ label: 'Min Font Size', prop: 'minFontSize', type: 'number', value: field.minFontSize, min: '2.4', max: '24' }));
-      blocks.push(inputMarkup({
-        label: 'Alignment',
-        prop: 'align',
-        type: 'select',
-        options: [
-          selectMarkup(field.align, 'left', 'Left'),
-          selectMarkup(field.align, 'center', 'Center'),
-          selectMarkup(field.align, 'right', 'Right')
-        ].join('')
-      }));
-      blocks.push(inputMarkup({
-        label: 'Font Style',
-        prop: 'fontStyle',
-        type: 'select',
-        options: [
-          selectMarkup(field.fontStyle, 'B', 'Bold'),
-          selectMarkup(field.fontStyle, 'I', 'Italic'),
-          selectMarkup(field.fontStyle, 'BI', 'Bold + Italic'),
-          selectMarkup(field.fontStyle, '', 'Regular')
-        ].join('')
-      }));
-      blocks.push(inputMarkup({ label: 'Text Color', prop: 'color', type: 'color', value: field.color, step: '1' }));
+      blocks.splice(2, 0,
+        inputMarkup({
+          label: 'Alignment',
+          prop: 'align',
+          type: 'select',
+          options: [
+            selectMarkup(field.align, 'left', 'Left'),
+            selectMarkup(field.align, 'center', 'Center'),
+            selectMarkup(field.align, 'right', 'Right')
+          ].join('')
+        }),
+        inputMarkup({
+          label: 'Font Style',
+          prop: 'fontStyle',
+          type: 'select',
+          options: [
+            selectMarkup(field.fontStyle, 'B', 'Bold'),
+            selectMarkup(field.fontStyle, 'I', 'Italic'),
+            selectMarkup(field.fontStyle, 'BI', 'Bold + Italic'),
+            selectMarkup(field.fontStyle, '', 'Regular')
+          ].join('')
+        }),
+        inputMarkup({ label: 'Text Color', prop: 'color', type: 'color', value: field.color, step: '1' }),
+        inputMarkup({ label: 'Max Font Size', prop: 'fontSize', type: 'number', value: field.fontSize, min: '2.8', max: '36' }),
+        inputMarkup({ label: 'Min Font Size', prop: 'minFontSize', type: 'number', value: field.minFontSize, min: '2.4', max: '24' })
+      );
       blocks.push(inputMarkup({
         label: 'Data Source',
         prop: 'source',
@@ -645,14 +787,63 @@
     });
   }
 
+  function renderEditorView() {
+    editorViewButtons.forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.bidEditorViewBtn === state.editorView);
+    });
+    editorViewPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.bidEditorViewPanel !== 'editor';
+    });
+    if (sideSelector) sideSelector.hidden = false;
+  }
+
+  function renderQuickControls() {
+    const field = getFieldById(state.selectedFieldId);
+    const isText = field?.type === 'text';
+    const isImage = field?.type === 'image';
+    [quickColorInput, quickFontStyleSelect, quickUppercaseInput, quickMultilineInput, quickMaxLinesInput].forEach((control) => {
+      if (control) control.disabled = !isText;
+    });
+    quickAlignmentButtons.forEach((button) => {
+      button.disabled = !isText;
+      button.classList.toggle('is-active', isText && button.dataset.bidQuickAlign === field.align);
+    });
+    quickAlignmentWrap?.classList.toggle('is-disabled', !isText);
+    if (quickCornerRadiusWrap) quickCornerRadiusWrap.hidden = !isImage;
+    if (quickCornerRadiusInput) {
+      quickCornerRadiusInput.disabled = !isImage;
+      quickCornerRadiusInput.value = String(Math.max(0, Math.min(50, Number(field?.cornerRadius || 0))));
+    }
+    if (!isText) return;
+    if (quickColorInput) quickColorInput.value = /^#[0-9a-f]{6}$/i.test(field.color || '') ? field.color : '#111111';
+    if (quickFontStyleSelect) {
+      const fontStyle = String(field.fontStyle || '').toUpperCase();
+      quickFontStyleSelect.value = fontStyle.includes('B') && fontStyle.includes('I')
+        ? 'BI'
+        : fontStyle.includes('B')
+          ? 'B'
+          : fontStyle.includes('I')
+            ? 'I'
+            : '';
+    }
+    if (quickUppercaseInput) quickUppercaseInput.checked = !!field.uppercase;
+    if (quickMultilineInput) quickMultilineInput.checked = !!field.multiline || Number(field.maxLines || 1) > 1;
+    if (quickMaxLinesInput) {
+      quickMaxLinesInput.value = String(Math.max(1, Math.min(3, Number(field.maxLines || 1))));
+      quickMaxLinesInput.disabled = !isText || !quickMultilineInput?.checked;
+    }
+  }
+
   function renderAll() {
     state.layout = window.BarangayIdDigital.normalizeLayoutConfig(state.layout);
     ensureSelection();
     syncHiddenFields();
+    renderEditorView();
     renderSideButtons();
     renderCanvas();
     renderFieldList();
     renderInspector();
+    renderQuickControls();
     renderSamplePreview();
   }
 
@@ -663,7 +854,7 @@
     const minWidth = fieldMinimumSize(field, 'w');
     const minHeight = fieldMinimumSize(field, 'h');
 
-    const numericProps = new Set(['x', 'y', 'w', 'h', 'maxW', 'maxH', 'fontSize', 'minFontSize', 'z', 'maxLines']);
+    const numericProps = new Set(['x', 'y', 'w', 'h', 'maxW', 'maxH', 'fontSize', 'minFontSize', 'z', 'maxLines', 'cornerRadius']);
     const booleanProps = new Set(['uppercase', 'multiline']);
 
     if (numericProps.has(prop)) {
@@ -718,21 +909,35 @@
       field.maxLines = 1;
     }
     if (prop === 'z') field.z = Math.max(1, Math.min(20, Number(field.z || 1)));
+    if (prop === 'cornerRadius') field.cornerRadius = Math.max(0, Math.min(50, Number(field.cornerRadius || 0)));
     renderAll();
   }
 
   function addField(type) {
-    const template = fieldTemplates[type];
+    const requested = String(type || '').trim();
+    const source = requested.startsWith('source:') ? requested.slice(7) : '';
+    const resolvedType = source === 'photoUrl'
+      ? 'image'
+      : source === 'qrUrl'
+        ? 'qr'
+        : source === 'punongSignatorySignatureUrl'
+          ? 'signature'
+          : source
+            ? 'text'
+            : requested;
+    const template = fieldTemplates[resolvedType];
     if (!template) return;
     const existingIds = new Set(state.layout.fields.map((field) => String(field.id || '')));
     let suffix = 1;
-    let nextId = `${type}_${suffix}`;
+    const idPrefix = (source || resolvedType).replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+    let nextId = `${idPrefix}_${suffix}`;
     while (existingIds.has(nextId)) {
       suffix += 1;
-      nextId = `${type}_${suffix}`;
+      nextId = `${idPrefix}_${suffix}`;
     }
     const field = {
       ...template,
+      ...(source ? { source, label: sourceOptions.find((option) => option.value === source)?.label || template.label } : {}),
       id: nextId,
       side: state.activeSide,
       x: 8,
@@ -827,6 +1032,33 @@
     });
   }
 
+  function bindUploadAction(select) {
+    const side = select.dataset.bidUploadAction === 'back' ? 'back' : 'front';
+    const fileInput = document.getElementById(side === 'front' ? 'frontTemplateFile' : 'backTemplateFile');
+    const removeInput = document.getElementById(side === 'front' ? 'removeFrontTemplate' : 'removeBackTemplate');
+    const fileWrap = document.querySelector(`[data-bid-upload-file-wrap="${side}"]`);
+    if (!(fileInput instanceof HTMLInputElement) || !(removeInput instanceof HTMLInputElement) || !fileWrap) return;
+
+    select.addEventListener('change', () => {
+      const action = String(select.value || 'keep');
+      fileWrap.hidden = action !== 'upload';
+      removeInput.checked = action === 'default';
+      if (action !== 'upload') {
+        fileInput.value = '';
+      }
+      const previewImg = side === 'front' ? frontTemplatePreview : backTemplatePreview;
+      const defaultUrl = `${String(payload.appBase || '').replace(/\/$/, '')}/Resident-End/Certificates/BarangayID/${side === 'front' ? 'FRONT_EMPTY.png' : 'BACK_EMPTY.png'}`;
+      const nextUrl = action === 'default' ? defaultUrl : originalTemplateUrls[side];
+      if (side === 'front') {
+        state.frontTemplateUrl = nextUrl;
+      } else {
+        state.backTemplateUrl = nextUrl;
+      }
+      if (previewImg) previewImg.src = nextUrl;
+      renderAll();
+    });
+  }
+
   function renderSignaturePreview(url) {
     if (!signaturePreview) return;
     if (!url) {
@@ -853,8 +1085,69 @@
     });
   });
 
+  editorViewButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      state.editorView = button.dataset.bidEditorViewBtn === 'layout' ? 'layout' : 'editor';
+      renderAll();
+    });
+  });
+
   addButtons.forEach((button) => {
     button.addEventListener('click', () => addField(String(button.dataset.bidAddType || '').trim()));
+  });
+
+  addFieldSelect?.addEventListener('change', () => {
+    const type = String(addFieldSelect.value || '').trim();
+    if (type) addField(type);
+    addFieldSelect.value = '';
+  });
+
+  quickColorInput?.addEventListener('input', () => {
+    if (state.selectedFieldId) updateFieldProp(state.selectedFieldId, 'color', quickColorInput.value);
+  });
+
+  quickFontStyleSelect?.addEventListener('change', () => {
+    if (state.selectedFieldId) {
+      updateFieldProp(state.selectedFieldId, 'fontStyle', quickFontStyleSelect.value);
+    }
+  });
+
+  quickAlignmentButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (state.selectedFieldId && !button.disabled) {
+        updateFieldProp(state.selectedFieldId, 'align', button.dataset.bidQuickAlign || 'left');
+      }
+    });
+  });
+
+  quickUppercaseInput?.addEventListener('change', () => {
+    if (state.selectedFieldId) updateFieldProp(state.selectedFieldId, 'uppercase', quickUppercaseInput.checked);
+  });
+
+  quickMultilineInput?.addEventListener('change', () => {
+    if (!state.selectedFieldId) return;
+    const field = getFieldById(state.selectedFieldId);
+    if (!field || field.type !== 'text') return;
+    field.multiline = quickMultilineInput.checked;
+    field.maxLines = quickMultilineInput.checked
+      ? Math.max(2, Math.min(3, Number(quickMaxLinesInput?.value || field.maxLines || 2)))
+      : 1;
+    renderAll();
+  });
+
+  quickMaxLinesInput?.addEventListener('change', () => {
+    if (!state.selectedFieldId || quickMaxLinesInput.disabled) return;
+    const field = getFieldById(state.selectedFieldId);
+    if (!field || field.type !== 'text') return;
+    field.maxLines = Math.max(1, Math.min(3, Number.parseInt(quickMaxLinesInput.value || '1', 10) || 1));
+    field.multiline = field.maxLines > 1;
+    renderAll();
+  });
+
+  quickCornerRadiusInput?.addEventListener('change', () => {
+    if (state.selectedFieldId && !quickCornerRadiusInput.disabled) {
+      updateFieldProp(state.selectedFieldId, 'cornerRadius', quickCornerRadiusInput.value);
+    }
   });
 
   deleteSelectedFieldBtn?.addEventListener('click', deleteSelectedField);
@@ -867,6 +1160,7 @@
 
   handleTemplatePreview(document.getElementById('frontTemplateFile'), frontTemplatePreview, 'front');
   handleTemplatePreview(document.getElementById('backTemplateFile'), backTemplatePreview, 'back');
+  uploadActionSelects.forEach(bindUploadAction);
 
   signatureFileInput?.addEventListener('change', () => {
     const file = signatureFileInput.files && signatureFileInput.files[0];
@@ -883,6 +1177,19 @@
     renderAll();
   });
 
+  processStepButtons.forEach((button) => {
+    button.addEventListener('click', () => setProcessStep(button.dataset.bidStep));
+  });
+  processShortcutButtons.forEach((button) => {
+    button.addEventListener('click', () => setProcessStep(button.dataset.bidGoStep));
+  });
+  previousStepBtn?.addEventListener('click', () => {
+    setProcessStep((Number.parseInt(form.dataset.bidActiveStep || '1', 10) || 1) - 1);
+  });
+  nextStepBtn?.addEventListener('click', () => {
+    setProcessStep((Number.parseInt(form.dataset.bidActiveStep || '1', 10) || 1) + 1);
+  });
+
   canvas?.addEventListener('pointermove', handlePointerMove);
   canvas?.addEventListener('pointerup', endPointerInteraction);
   canvas?.addEventListener('pointercancel', endPointerInteraction);
@@ -893,11 +1200,17 @@
   });
 
   window.addEventListener('beforeunload', cleanupObjectUrls);
-  form?.addEventListener('submit', () => {
+  form?.addEventListener('submit', (event) => {
+    const activeStep = Number.parseInt(form.dataset.bidActiveStep || '1', 10) || 1;
+    if (activeStep < 3) {
+      event.preventDefault();
+      setProcessStep(activeStep + 1);
+      return;
+    }
     syncHiddenFields();
   });
 
   renderSignaturePreview(state.signatory.signatureUrl);
   ensureSelection();
-  renderAll();
+  setProcessStep(1, { scroll: false });
 })();

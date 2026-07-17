@@ -158,8 +158,13 @@ $payload = [];
 $resolvedProfileImageUrl = '';
 $resolvedProfileImagePath = '';
 $resolvedQrCodeUrl = '';
+$barangayIdOperationalSettings = isset($conn) && $conn instanceof mysqli
+    ? dms_resolve_barangay_id_operational_settings($conn)
+    : ['digital_id_enabled' => true, 'digital_id_has_signature' => true, 'digital_id_capture_disabled' => false, 'deactivate_previous_digital_id' => true, 'default_validity_years' => 2];
 
-if ($requestId === '') {
+if (!$barangayIdOperationalSettings['digital_id_enabled']) {
+    $errorMessage = 'Digital Barangay ID is currently unavailable.';
+} elseif ($requestId === '') {
     $errorMessage = 'Missing request ID.';
 } else {
     $requestRow = dr_fetch_request($conn, $requestId);
@@ -169,7 +174,30 @@ if ($requestId === '') {
         $errorMessage = 'This request is not a Barangay ID.';
     } elseif (strtolower(trim((string)($requestRow['stage'] ?? ''))) !== strtolower((string)DR_STAGE_COMPLETED)) {
         $errorMessage = 'Your digital Barangay ID will be available once the request is marked completed.';
-    } else {
+    } elseif ($barangayIdOperationalSettings['deactivate_previous_digital_id']) {
+        $newestRequestId = '';
+        $stmtNewest = $conn->prepare("
+            SELECT request_id
+            FROM documentrequesttbl
+            WHERE resident_user_id = ?
+              AND LOWER(REPLACE(document_type, ' ', '')) = 'barangayid'
+              AND LOWER(stage) = 'completed'
+            ORDER BY COALESCE(completed_at, release_timestamp, ready_at, submitted_at) DESC, request_id DESC
+            LIMIT 1
+        ");
+        if ($stmtNewest) {
+            $stmtNewest->bind_param('s', $userId);
+            $stmtNewest->execute();
+            $stmtNewest->bind_result($newestRequestId);
+            $stmtNewest->fetch();
+            $stmtNewest->close();
+        }
+        if ($newestRequestId !== '' && $newestRequestId !== $requestId) {
+            $errorMessage = 'This Digital ID was deactivated when a newer Barangay ID was issued.';
+        }
+    }
+
+    if ($errorMessage === '' && $requestRow) {
         $payload = function_exists('dr_decode_request_payload')
             ? dr_decode_request_payload($requestRow)
             : json_decode((string)($requestRow['request_details'] ?? '{}'), true);
@@ -227,6 +255,12 @@ $frontTemplateVersion = $frontTemplateDiskPath !== '' && is_file($frontTemplateD
 $backTemplateVersion = $backTemplateDiskPath !== '' && is_file($backTemplateDiskPath) ? (string)@filemtime($backTemplateDiskPath) : '';
 $frontTemplateUrl = rtrim($baseUrl, '/') . $frontTemplatePublicPath . ($frontTemplateVersion !== '' ? '?v=' . rawurlencode($frontTemplateVersion) : '');
 $backTemplateUrl = rtrim($baseUrl, '/') . $backTemplatePublicPath . ($backTemplateVersion !== '' ? '?v=' . rawurlencode($backTemplateVersion) : '');
+$barangayIdSignatories = isset($conn) && $conn instanceof mysqli
+    ? dms_resolve_module_signatories($conn, 'barangay_id')
+    : [];
+$digitalSignaturePath = $barangayIdOperationalSettings['digital_id_has_signature']
+    ? trim((string)($barangayIdSignatories['punong']['signature_path'] ?? ''))
+    : '';
 $serializedRow = $requestRow ? [
     'request_id' => (string)($requestRow['request_id'] ?? ''),
     'document_type' => (string)($requestRow['document_type'] ?? ''),
@@ -241,6 +275,7 @@ $serializedRow = $requestRow ? [
     'release_timestamp' => (string)($requestRow['release_timestamp'] ?? ''),
     'stage' => (string)($requestRow['stage'] ?? ''),
     'purpose' => (string)($requestRow['purpose'] ?? ''),
+    'punong_signatory_signature_path' => $digitalSignaturePath,
 ] : null;
 ?>
 <!DOCTYPE html>
@@ -320,6 +355,24 @@ $serializedRow = $requestRow ? [
         }
         .digital-id-embed {
             background: #fff;
+        }
+        .digital-id-capture-protected .digital-id-viewer__stage {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        .digital-id-capture-protected.is-capture-masked .digital-id-viewer__stage {
+            filter: blur(28px);
+        }
+        @media print {
+            .digital-id-capture-protected .digital-id-page { display: none !important; }
+            .digital-id-capture-protected::after {
+                content: 'Printing and downloading this Digital ID is disabled.';
+                display: block;
+                padding: 3rem;
+                font: 700 18px Arial, sans-serif;
+                text-align: center;
+            }
         }
         .digital-id-embed .digital-id-card-shell {
             border: 0;
@@ -647,7 +700,7 @@ $serializedRow = $requestRow ? [
         }
     </style>
 </head>
-<body class="<?= $embedMode ? 'digital-id-embed' : '' ?>">
+<body class="<?= trim(($embedMode ? 'digital-id-embed ' : '') . ($barangayIdOperationalSettings['digital_id_capture_disabled'] ? 'digital-id-capture-protected' : '')) ?>">
 <?php if ($embedMode): ?>
     <main class="digital-id-main p-3">
         <section class="digital-id-card-shell p-3 p-md-4">
@@ -704,7 +757,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-27"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');
@@ -886,6 +939,29 @@ $serializedRow = $requestRow ? [
 <?php if (!$embedMode): ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
+<?php endif; ?>
+<?php if ($barangayIdOperationalSettings['digital_id_capture_disabled']): ?>
+<script>
+(() => {
+    const body = document.body;
+    const maskBriefly = () => {
+        body.classList.add('is-capture-masked');
+        window.setTimeout(() => body.classList.remove('is-capture-masked'), 1600);
+    };
+    document.addEventListener('contextmenu', (event) => event.preventDefault());
+    document.addEventListener('dragstart', (event) => event.preventDefault());
+    document.addEventListener('keydown', (event) => {
+        const key = String(event.key || '').toLowerCase();
+        if (key === 'printscreen' || ((event.ctrlKey || event.metaKey) && ['p', 's'].includes(key))) {
+            event.preventDefault();
+            maskBriefly();
+        }
+    });
+    window.addEventListener('beforeprint', maskBriefly);
+    window.addEventListener('blur', () => body.classList.add('is-capture-masked'));
+    window.addEventListener('focus', () => body.classList.remove('is-capture-masked'));
+})();
+</script>
 <?php endif; ?>
 </body>
 </html>

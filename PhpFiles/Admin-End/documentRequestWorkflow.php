@@ -437,7 +437,13 @@ function dra_default_barangay_id_validity_datetime(?string $baseDateTime = null)
         $base = new DateTimeImmutable(dr_now());
     }
 
-    return $base->modify('+2 years')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+    $years = 2;
+    global $conn;
+    if ($conn instanceof mysqli && function_exists('dms_resolve_barangay_id_operational_settings')) {
+        $settings = dms_resolve_barangay_id_operational_settings($conn);
+        $years = max(1, min(5, (int)($settings['default_validity_years'] ?? 2)));
+    }
+    return $base->modify('+' . $years . ' years')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
 }
 
 function dra_resolve_certificate_validity_datetime(string $documentType, ?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): ?string
@@ -520,7 +526,7 @@ function dra_match_barangay_id_validity_years(?string $validityValue, ?string $b
         return null;
     }
 
-    foreach ([1, 2, 3] as $years) {
+    foreach ([1, 2, 3, 4, 5] as $years) {
         $candidate = dra_validity_datetime_from_offset($years, 'years', $baseDateTime);
         if ($candidate !== null && substr($candidate, 0, 10) === substr($resolvedValidity, 0, 10)) {
             return $years;
@@ -2737,6 +2743,12 @@ function dra_generate_issued_document(array $requestRow): ?string
         ? dms_resolve_module_signatories($conn, 'monitoring')
         : [];
     $punongSignaturePath = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
+    if ($isBarangayId && $conn instanceof mysqli) {
+        $idOperations = dms_resolve_barangay_id_operational_settings($conn);
+        if (!$idOperations['printed_id_has_signature']) {
+            $punongSignaturePath = '';
+        }
+    }
     $monitoringSignatoryName = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
     $monitoringSignatoryTitle = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
     $monitoringSignaturePath = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
@@ -6683,6 +6695,11 @@ function dra_backfill_online_ready_for_claim_to_completed(mysqli $conn): void
             if (dr_request_channel_from_payload($payload) !== 'online') {
                 continue;
             }
+            // Barangay IDs require a physical print-and-claim workflow. Never
+            // auto-complete them merely because a digital file exists.
+            if (dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))) {
+                continue;
+            }
 
             $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
             if ($issuedPath === '') {
@@ -8132,7 +8149,11 @@ if ($action === 'list') {
             ? $barangayIdSettings
             : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
         $row['document_settings_module_key'] = $moduleSettingsKey;
-        $row['punong_signatory_signature_path'] = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
+        $showBarangayIdSignature = $moduleSettingsKey !== 'barangay_id'
+            || dms_resolve_barangay_id_operational_settings($conn)['printed_id_has_signature'];
+        $row['punong_signatory_signature_path'] = $showBarangayIdSignature
+            ? trim((string)($moduleSettings['punong']['signature_path'] ?? ''))
+            : '';
         $row['secretary_signatory_signature_path'] = '';
         $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
         $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
@@ -8319,7 +8340,11 @@ if ($action === 'get_request') {
         ? $barangayIdSettings
         : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
     $row['document_settings_module_key'] = $moduleSettingsKey;
-    $row['punong_signatory_signature_path'] = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
+    $showBarangayIdSignature = $moduleSettingsKey !== 'barangay_id'
+        || dms_resolve_barangay_id_operational_settings($conn)['printed_id_has_signature'];
+    $row['punong_signatory_signature_path'] = $showBarangayIdSignature
+        ? trim((string)($moduleSettings['punong']['signature_path'] ?? ''))
+        : '';
     $row['secretary_signatory_signature_path'] = '';
     $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
     $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
@@ -8493,6 +8518,10 @@ if ($action === 'view_issued_card') {
         http_response_code(404);
         exit('Card preview is available for Barangay ID only.');
     }
+    if (!dms_resolve_barangay_id_operational_settings($conn)['digital_id_enabled']) {
+        http_response_code(403);
+        exit('Digital Barangay ID is currently disabled in issuance settings.');
+    }
     if (!dra_has_barangay_id_template_assets()) {
         http_response_code(404);
         exit('Barangay ID template assets are not configured.');
@@ -8532,7 +8561,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-27', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
@@ -8780,9 +8809,10 @@ if ($action === 'personnel_approve') {
     }
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
     $requiresInspection = !$isFirstTimeJobSeeker && dr_requires_clearance_inspection((string)($row['document_type'] ?? ''));
+    $isBarangayIdDocument = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
     $nextStage = $isFirstTimeJobSeeker
         ? DR_STAGE_FOR_INTERVIEW
-        : ($requiresInspection ? DR_STAGE_FOR_INSPECTION : ($isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT));
+        : ($requiresInspection ? DR_STAGE_FOR_INSPECTION : ($isBarangayIdDocument ? DR_STAGE_FOR_PRINTING : ($isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT)));
     $patch = [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
@@ -8810,7 +8840,9 @@ if ($action === 'personnel_approve') {
         // Keep approval fast: defer heavy PDF/QR generation until view/release time.
         $patch['verification_code'] = $verificationCode;
         $patch['qr_code_path'] = $qrCodePath;
-        $patch['ready_at'] = dr_now();
+        if (!$isBarangayIdDocument) {
+            $patch['ready_at'] = dr_now();
+        }
     }
 
     $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
@@ -8865,6 +8897,9 @@ if ($action === 'personnel_approve') {
         if ($requiresInspection) {
             $notificationTitle = 'Document Request Approved for Inspection';
             $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now pending inspection.');
+        } elseif ($isBarangayIdDocument) {
+            $notificationTitle = 'Barangay ID Approved - For Printing';
+            $notificationMessage = dra_request_notice($updated, $requestId, 'approved and has been tagged for printing. You will be notified again once it is ready for claim.');
         } elseif ($isFreeDocument) {
             $notificationTitle = 'Document Request Approved for Release';
             $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now for release.');
@@ -9417,11 +9452,15 @@ if ($action === 'finance_reject') {
 }
 
 if ($action === 'mark_ready') {
-    if (!dr_is_manual_issuance_request($row)) {
-        dr_respond_json(422, ['success' => false, 'message' => 'Release tagging is only available for manual issuance requests. Online requests are released automatically after payment.']);
+    $isBarangayIdRequest = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
+    if (!dr_is_manual_issuance_request($row) && !$isBarangayIdRequest) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Release tagging is only available for manual issuance requests and Barangay IDs.']);
     }
 
     $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($isBarangayIdRequest && $currentStage !== DR_STAGE_FOR_PRINTING) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Only a Barangay ID tagged for printing can be marked printed and ready for claim.']);
+    }
     $resolvedFeeAmount = null;
     if (strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0) {
         $resolvedFeeAmount = 0.0;
@@ -9497,9 +9536,9 @@ if ($action === 'mark_ready') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark request ready.']);
     }
 
-    if (dr_is_manual_issuance_request($row)) {
+    if (dr_is_manual_issuance_request($row) || $isBarangayIdRequest) {
         dra_update_request_payload_fields($conn, $requestId, $updated, [
-            '_request_channel' => 'manual_issuance',
+            '_request_channel' => dr_is_manual_issuance_request($row) ? 'manual_issuance' : 'online',
             '_hard_copy_status' => 'ready_for_claim',
         ]);
         $updated = dr_fetch_request($conn, $requestId) ?? $updated;
@@ -9508,8 +9547,8 @@ if ($action === 'mark_ready') {
     dra_send_notification_deferred(
         $conn,
         $updated,
-        $requiresManualIssuedUpload ? 'Barangay ID Ready for Claim' : 'Document Ready for Claim',
-        dra_request_notice($updated, $requestId, $requiresManualIssuedUpload ? 'prepared and is now ready for ID release.' : 'prepared and is now for release.')
+        $isBarangayIdRequest ? 'Barangay ID Ready for Claim' : 'Document Ready for Claim',
+        dra_request_notice($updated, $requestId, $isBarangayIdRequest ? 'printed and is now ready for claim.' : 'prepared and is now for release.')
     );
 
     try {
@@ -9520,8 +9559,12 @@ if ($action === 'mark_ready') {
 }
 
 if ($action === 'mark_completed') {
-    if (!dr_is_manual_issuance_request($row)) {
-        dr_respond_json(422, ['success' => false, 'message' => 'Release tagging is only available for manual issuance requests. Online requests are released automatically after payment.']);
+    $isBarangayIdRequest = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
+    if (!dr_is_manual_issuance_request($row) && !$isBarangayIdRequest) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Claim completion is only available for manual issuance requests and Barangay IDs.']);
+    }
+    if ($isBarangayIdRequest && strtolower(trim((string)($row['stage'] ?? ''))) !== DR_STAGE_READY_FOR_CLAIM) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Only a Barangay ID marked for claim can be completed.']);
     }
 
     $patch = [
@@ -9564,9 +9607,9 @@ if ($action === 'mark_completed') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to complete request.']);
     }
 
-    if (dr_is_manual_issuance_request($row)) {
+    if (dr_is_manual_issuance_request($row) || $isBarangayIdRequest) {
         dra_update_request_payload_fields($conn, $requestId, $updated, [
-            '_request_channel' => 'manual_issuance',
+            '_request_channel' => dr_is_manual_issuance_request($row) ? 'manual_issuance' : 'online',
             '_hard_copy_status' => 'claimed',
         ]);
         $updated = dr_fetch_request($conn, $requestId) ?? $updated;

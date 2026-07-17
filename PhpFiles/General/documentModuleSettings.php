@@ -772,6 +772,24 @@ if (!function_exists('dms_ensure_module_template_config_table')) {
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'template_back_blob')) {
             $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN template_back_blob LONGBLOB NULL AFTER template_front_blob");
         }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'digital_id_enabled')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER sample_data_json");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'digital_id_has_signature')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_has_signature TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_enabled");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'default_validity_years')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN default_validity_years TINYINT UNSIGNED NOT NULL DEFAULT 2 AFTER digital_id_has_signature");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'printed_id_has_signature')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN printed_id_has_signature TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_has_signature");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'digital_id_capture_disabled')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_capture_disabled TINYINT(1) NOT NULL DEFAULT 0 AFTER printed_id_has_signature");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'deactivate_previous_digital_id')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN deactivate_previous_digital_id TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_capture_disabled");
+        }
 
         $done = true;
     }
@@ -791,6 +809,12 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
                 template_back_blob,
                 layout_json,
                 sample_data_json,
+                digital_id_enabled,
+                digital_id_has_signature,
+                printed_id_has_signature,
+                digital_id_capture_disabled,
+                deactivate_previous_digital_id,
+                default_validity_years,
                 updated_by_user_id,
                 updated_at
             FROM documentmoduleconfigtbl
@@ -808,6 +832,57 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
         $stmt->close();
 
         return is_array($row) ? $row : [];
+    }
+}
+
+if (!function_exists('dms_resolve_barangay_id_operational_settings')) {
+    function dms_resolve_barangay_id_operational_settings(mysqli $conn): array
+    {
+        $stored = dms_fetch_module_template_config_row($conn, 'barangay_id');
+        return [
+            'digital_id_enabled' => !array_key_exists('digital_id_enabled', $stored) || (int)$stored['digital_id_enabled'] === 1,
+            'digital_id_has_signature' => !array_key_exists('digital_id_has_signature', $stored) || (int)$stored['digital_id_has_signature'] === 1,
+            'printed_id_has_signature' => !array_key_exists('printed_id_has_signature', $stored) || (int)$stored['printed_id_has_signature'] === 1,
+            'digital_id_capture_disabled' => array_key_exists('digital_id_capture_disabled', $stored) && (int)$stored['digital_id_capture_disabled'] === 1,
+            'deactivate_previous_digital_id' => !array_key_exists('deactivate_previous_digital_id', $stored) || (int)$stored['deactivate_previous_digital_id'] === 1,
+            'default_validity_years' => max(1, min(5, (int)($stored['default_validity_years'] ?? 2))),
+        ];
+    }
+}
+
+if (!function_exists('dms_save_barangay_id_operational_settings')) {
+    function dms_save_barangay_id_operational_settings(mysqli $conn, array $post, string $updatedByUserId): array
+    {
+        dms_ensure_module_template_config_table($conn);
+        $before = dms_resolve_barangay_id_operational_settings($conn);
+        $enabled = !empty($post['digital_id_enabled']) ? 1 : 0;
+        $hasSignature = !empty($post['digital_id_has_signature']) ? 1 : 0;
+        $printedHasSignature = !empty($post['printed_id_has_signature']) ? 1 : 0;
+        $captureDisabled = !empty($post['digital_id_capture_disabled']) ? 1 : 0;
+        $deactivatePrevious = !empty($post['deactivate_previous_digital_id']) ? 1 : 0;
+        $validityYears = max(1, min(5, (int)($post['default_validity_years'] ?? 2)));
+        $moduleKey = 'barangay_id';
+        $stmt = $conn->prepare("
+            INSERT INTO documentmoduleconfigtbl
+                (module_key, digital_id_enabled, digital_id_has_signature, printed_id_has_signature, digital_id_capture_disabled, deactivate_previous_digital_id, default_validity_years, updated_by_user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                digital_id_enabled = VALUES(digital_id_enabled),
+                digital_id_has_signature = VALUES(digital_id_has_signature),
+                printed_id_has_signature = VALUES(printed_id_has_signature),
+                digital_id_capture_disabled = VALUES(digital_id_capture_disabled),
+                deactivate_previous_digital_id = VALUES(deactivate_previous_digital_id),
+                default_validity_years = VALUES(default_validity_years),
+                updated_by_user_id = VALUES(updated_by_user_id),
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to prepare Barangay ID settings update.');
+        }
+        $stmt->bind_param('siiiiiis', $moduleKey, $enabled, $hasSignature, $printedHasSignature, $captureDisabled, $deactivatePrevious, $validityYears, $updatedByUserId);
+        $stmt->execute();
+        $stmt->close();
+        return ['before' => $before, 'after' => dms_resolve_barangay_id_operational_settings($conn)];
     }
 }
 
@@ -1444,6 +1519,7 @@ if (!function_exists('dms_normalize_barangay_id_field')) {
                 1,
                 12
             ),
+            'cornerRadius' => dms_normalize_float_range($field['cornerRadius'] ?? 0, 0.0, 0.0, 50.0),
             'fit' => $fit,
         ];
 

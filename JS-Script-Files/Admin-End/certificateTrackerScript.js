@@ -687,7 +687,8 @@
   }
 
   function barangayIdDefaultValidityDate(baseDate = new Date()) {
-    return addYearsDateInputValue(2, baseDate);
+    const configuredYears = Number.parseInt(String(window.BARANGAY_ID_SETTINGS?.default_validity_years || '2'), 10);
+    return addYearsDateInputValue(Math.max(1, Math.min(5, configuredYears || 2)), baseDate);
   }
 
   function certificateValidityPresets(baseDate = new Date()) {
@@ -700,7 +701,7 @@
   }
 
   function barangayIdValidityPresets(baseDate = new Date()) {
-    return [1, 2, 3].map((years) => ({
+    return [1, 2, 3, 4, 5].map((years) => ({
       value: addYearsDateInputValue(years, baseDate),
       label: `${years} ${years === 1 ? 'year' : 'years'}`,
       amount: years,
@@ -875,7 +876,7 @@
     }
     if (helpEl) {
       helpEl.textContent = kind === 'barangay_id'
-        ? 'Choose the Barangay ID validity period: 1, 2, or 3 years.'
+        ? 'Choose the Barangay ID validity period: 1 to 5 years.'
         : 'Choose the certificate validity period: 3, 15, 30, 45, or 60 days.';
     }
     return populateValiditySelect(selectEl, kind, selectedValue);
@@ -1370,6 +1371,7 @@
     if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
     if (k === 'completed') return `<span class="badge bg-success">${label}</span>`;
     if (k === 'fee_tagging') return `<span class="badge bg-success">${label}</span>`;
+    if (k === 'for_printing') return `<span class="badge bg-info text-dark">${label}</span>`;
     if (k === 'ready_for_claim' || k === 'payment_verified') return `<span class="badge bg-primary">${label}</span>`;
     if (k === 'for_payment' || k === 'payment_submitted') return `<span class="badge bg-warning text-dark">${label}</span>`;
     return `<span class="badge bg-secondary">${label}</span>`;
@@ -1519,11 +1521,18 @@
         <button class="btn btn-sm btn-primary" data-view-action="mark_ready" data-id="${id}">Ready for Claim</button>
       `;
     }
+    if (stage === 'for_printing') {
+      if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
+      return `
+        ${proofBtn}
+        <button class="btn btn-sm btn-primary" data-view-action="mark_ready" data-id="${id}">Mark Printed / For Claim</button>
+      `;
+    }
     if (stage === 'ready_for_claim') {
       if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
       return `
         ${proofBtn}
-        <button class="btn btn-sm btn-dark w-100" data-view-action="mark_completed" data-id="${id}">For Release</button>
+        <button class="btn btn-sm btn-success w-100" data-view-action="mark_completed" data-id="${id}">Mark as Claimed</button>
       `;
     }
     return proofBtn || '<span class="text-muted small">No actions</span>';
@@ -2992,7 +3001,7 @@
     if (requestNeedsManualIssuedUpload(row)) {
       return ['ready_for_claim', 'completed'].includes(stageKey) && String(row?.issued_file_path || '').trim() !== '';
     }
-    return ['payment_verified', 'ready_for_claim', 'completed'].includes(stageKey);
+    return ['payment_verified', 'for_printing', 'ready_for_claim', 'completed'].includes(stageKey);
   }
 
   function issuedDocumentFileUrl(requestId) {
@@ -4898,8 +4907,10 @@
       alert('Unable to release this Barangay ID because the request ID is missing.');
       return;
     }
+    const requestRow = itemById.get(normalizedRequestId);
+    const printingStage = resolveWorkflowStage(requestRow) === 'for_printing';
     pendingPaymentProofAction = {
-      type: 'mark_completed_confirm',
+      type: printingStage ? 'mark_ready' : 'mark_completed_confirm',
       requestId: normalizedRequestId,
       returnTarget: 'paymentProof'
     };
@@ -4948,10 +4959,10 @@
         break;
       case 'back':
         idPrintProcessStep.textContent = 'Step 2 of 3';
-        idPrintProcessCopy.textContent = 'This is the back side of the Barangay ID. Print it, then release the ID when both sides are ready.';
+        idPrintProcessCopy.textContent = 'This is the back side of the Barangay ID. Print it, then mark the ID ready for claim when both sides are finished.';
         idPrintProcessReturnBtn.textContent = 'Return';
         idPrintProcessReprintBtn.textContent = 'Reprint';
-        idPrintProcessPrimaryBtn.textContent = 'Release ID';
+        idPrintProcessPrimaryBtn.textContent = 'Mark Printed / For Claim';
         idPrintProcessPrimaryBtn.classList.remove('btn-primary');
         idPrintProcessPrimaryBtn.classList.add('btn-success');
         break;
@@ -5633,7 +5644,7 @@
       );
     }
     if (key === 'release') {
-      return stage === 'ready_for_claim' || stage.includes('release');
+      return stage === 'for_printing' || stage === 'ready_for_claim' || stage.includes('release');
     }
     if (key === 'completed') {
       return stage === 'completed';
@@ -6305,9 +6316,9 @@
       inspection_fail: 'Fail Inspection',
       finance_verify: isWalkInFlow ? 'Record Walk-in Payment' : 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
-      mark_ready: 'Mark Ready for Claim',
-      mark_completed_confirm: 'For Release',
-      mark_completed: 'Release Document'
+      mark_ready: isBarangayIdRequest ? 'Mark ID as Printed' : 'Mark Ready for Claim',
+      mark_completed_confirm: isBarangayIdRequest ? 'Confirm ID Claim' : 'For Release',
+      mark_completed: isBarangayIdRequest ? 'Mark as Claimed' : 'Release Document'
     };
     modalTitle.textContent = labels[type] || 'Update Request';
     const docName = normalizeDocumentTypeDisplay(String(row?.document_type || 'document'));
@@ -6332,7 +6343,7 @@
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
       actionPrompt.textContent = isBarangayIdRequest
-        ? 'Please confirm that you thoroughly checked the submitted Barangay ID application. This will approve the request and move it directly to release.'
+        ? 'Please confirm that you thoroughly checked the submitted Barangay ID application. This will approve the request and tag the ID for printing.'
         : (needsFeeTagging
             ? `Please confirm that you thoroughly checked the resident's data. This will save the ${docName} and approve it for ${needsInspection ? 'inspection' : 'payment'}.`
             : `Please confirm that you thoroughly checked the resident's data to ${needsInspection ? `approve the ${docName} for inspection` : `issue a ${docName}`}.`);
@@ -6357,7 +6368,9 @@
       actionValidity.value = existingDocumentValidity;
     }
     if (type === 'mark_completed_confirm' && actionPrompt) {
-      actionPrompt.textContent = 'Are you sure you want to release this document now? This will mark the request as completed.';
+      actionPrompt.textContent = isBarangayIdRequest
+        ? 'Confirm that the resident has claimed the printed Barangay ID. This will mark the request as completed.'
+        : 'Are you sure you want to release this document now? This will mark the request as completed.';
       actionPrompt.classList.remove('d-none');
     }
     if ((type === 'personnel_reject' || type === 'finance_reject') && actionPrompt) {
@@ -6416,7 +6429,7 @@
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
       } else if (type === 'mark_completed_confirm') {
-        actionSubmitBtn.textContent = 'Release Now';
+        actionSubmitBtn.textContent = isBarangayIdRequest ? 'Confirm Claimed' : 'Release Now';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'personnel_reject') {
@@ -6432,7 +6445,7 @@
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
       } else if (type === 'mark_ready') {
-        actionSubmitBtn.textContent = needsManualIssuedUpload ? 'Upload & Mark Ready' : 'Mark Ready';
+        actionSubmitBtn.textContent = isBarangayIdRequest ? 'Mark Printed / For Claim' : (needsManualIssuedUpload ? 'Upload & Mark Ready' : 'Mark Ready');
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
       }
@@ -6504,7 +6517,11 @@
       if (actionIssued) {
         actionIssued.value = '';
       }
-      if (needsManualIssuedUpload) {
+      if (isBarangayIdRequest) {
+        actionIssuedWrap.classList.add('d-none');
+        actionIssued.required = false;
+        actionPrompt.textContent = 'Confirm that the Barangay ID has been printed. The resident will be notified that it is ready for claim.';
+      } else if (needsManualIssuedUpload) {
         actionIssuedWrap.classList.remove('d-none');
         actionIssued.required = true;
         actionPrompt.textContent = 'Upload the prepared issued file to mark this request as ready for claim.';
@@ -6952,15 +6969,15 @@
                 }
                 if (isBarangayIdIssuedDoc) {
                   openBarangayIdCardModal(row, issuedDocUrl, issuedDocumentTitle(row), 'view', {
-                    allowPrint: issuedStageKey === 'ready_for_claim',
-                    releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : '',
+                    allowPrint: ['for_printing', 'ready_for_claim'].includes(issuedStageKey),
+                    releaseRequestId: ['for_printing', 'ready_for_claim'].includes(issuedStageKey) ? String(row.request_id || '') : '',
                     previewState: viewPreviewState
                   });
                   return;
                 }
                 openDocumentModal(issuedDocUrl, issuedDocumentTitle(row), 'view', {
-                  allowPrint: issuedStageKey === 'ready_for_claim',
-                  releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : ''
+                  allowPrint: ['for_printing', 'ready_for_claim'].includes(issuedStageKey),
+                  releaseRequestId: ['for_printing', 'ready_for_claim'].includes(issuedStageKey) ? String(row.request_id || '') : ''
                 });
                 return;
               }
@@ -7542,7 +7559,7 @@
         row = await ensureRowDetails(row);
         if (!row) return;
         const stageKey = resolveWorkflowStage(row);
-        const allowPrint = stageKey === 'ready_for_claim';
+        const allowPrint = stageKey === 'for_printing' || stageKey === 'ready_for_claim';
         const issuedUrl = issuedDocumentUrl(id, row);
         if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
           openBarangayIdCardModal(row, issuedUrl, issuedDocumentTitle(row), '', {

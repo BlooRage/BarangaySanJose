@@ -255,7 +255,9 @@
     const type = ['text', 'image', 'qr', 'signatory', 'cover'].includes(rawType) ? rawType : 'text';
     const rawAlign = String(field.align || 'left').trim().toLowerCase();
     const align = ['left', 'center', 'right'].includes(rawAlign) ? rawAlign : 'left';
-    let fontStyle = String(field.fontStyle || 'B').trim().toUpperCase();
+    // An empty string is the persisted value for Regular. Nullish fallback is
+    // intentional here; using `|| 'B'` turns Regular back into Bold.
+    let fontStyle = String(field.fontStyle ?? 'B').trim().toUpperCase();
     if (!['', 'B', 'I', 'BI', 'IB'].includes(fontStyle)) {
       fontStyle = 'B';
     }
@@ -299,6 +301,7 @@
       uppercase: normalizeBoolean(field.uppercase, type !== 'cover'),
       multiline: normalizeBoolean(field.multiline, false),
       maxLines: normalizeInteger(field.maxLines, normalizeBoolean(field.multiline, false) ? 2 : 1, 1, 12),
+      cornerRadius: normalizeNumber(field.cornerRadius, 0, 0, 50),
       fit
     };
     if (normalized.minFontSize > normalized.fontSize) {
@@ -581,8 +584,9 @@
       const baseClassName = field.type === 'qr' ? 'barangay-id-card__qr' : 'barangay-id-card__photo';
       const className = `${baseClassName}${isSignature ? ' barangay-id-card__signature' : ''}`;
       const objectFit = fitToObjectPosition(field.fit);
+      const cornerRadius = `${Math.max(0, Math.min(50, Number(field.cornerRadius || 0)))}%`;
       if (!imageUrl) {
-        return `<div class="${className} ${baseClassName}--placeholder" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">${esc(placeholderText)}</div>`;
+        return `<div class="${className} ${baseClassName}--placeholder" style="left:${left};top:${top};width:${width};height:${height};border-radius:${cornerRadius};z-index:${field.z};">${esc(placeholderText)}</div>`;
       }
       const fallbackUrl = field.type === 'qr'
         ? String(state.qrFallbackUrl || '').trim()
@@ -590,7 +594,7 @@
           ? ''
           : DEFAULT_IMAGE_PLACEHOLDER;
       return `
-        <div class="${className}" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">
+        <div class="${className}" style="left:${left};top:${top};width:${width};height:${height};border-radius:${cornerRadius};z-index:${field.z};">
           <img src="${esc(imageUrl)}" alt="${esc(field.label || placeholderText)}" data-bid-image-kind="${isSignature ? 'signature' : field.type}" data-bid-fallback="${esc(fallbackUrl)}" style="object-fit:${objectFit};">
         </div>
       `;
@@ -624,7 +628,7 @@
     return `
       <div
         class="barangay-id-card__field${multilineClass}${alignClass}"
-        style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};color:${esc(field.color)};font-weight:${field.fontStyle.includes('B') ? '800' : '500'};font-style:${field.fontStyle.includes('I') ? 'italic' : 'normal'};text-align:${esc(field.align)};line-height:${lineHeight};"
+        style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};color:${esc(field.color)};font-weight:${field.fontStyle.includes('B') ? '800' : '400'};font-style:${field.fontStyle.includes('I') ? 'italic' : 'normal'};text-align:${esc(field.align)};line-height:${lineHeight};"
       ><span
         class="barangay-id-card__field-text"
         data-bid-autofit="1"
@@ -707,7 +711,10 @@
     const cardWidth = card instanceof HTMLElement ? card.clientWidth : 300;
     // The Settings preview is approximately 300 CSS pixels per card. Treat it
     // as scale 1 so issuance/final previews grow from the admin-approved view.
-    const cardScale = Math.max(0.35, Math.min(4, cardWidth / 300));
+    const requestedScale = Number.parseFloat(element.dataset.bidScale || '');
+    const cardScale = Number.isFinite(requestedScale) && requestedScale > 0
+      ? requestedScale
+      : Math.max(0.35, cardWidth / 300);
     const maxFont = (Number.parseFloat(element.dataset.bidMaxFont || '6') || 6) * cardScale;
     const preferredMinFont = (Number.parseFloat(element.dataset.bidMinFont || '4') || 4) * cardScale;
     const hardMinFont = 1.4 * cardScale;
@@ -769,7 +776,10 @@
             };
             const halfSizeLines = wrapAtSize(size);
             const fullSizeLines = wrapAtSize(maxFont);
-            const preservedLines = halfSizeLines.length > 1 ? halfSizeLines : fullSizeLines;
+            // Multiline is a maximum allowance, not a requirement. If the
+            // half-size value fits on one line, keep it on one line instead
+            // of preserving the wrap produced by the oversized font.
+            const preservedLines = halfSizeLines;
             if (preservedLines.length === 2) {
               element.replaceChildren(
                 document.createTextNode(preservedLines[0]),

@@ -19,6 +19,7 @@ const DR_STAGE_PAYMENT_SUBMITTED = 'payment_submitted';
 const DR_STAGE_PAYMENT_REJECTED = 'payment_rejected';
 const DR_STAGE_PAYMENT_VERIFIED = 'payment_verified';
 const DR_STAGE_CANCELLED = 'cancelled';
+const DR_STAGE_FOR_PRINTING = 'for_printing';
 const DR_STAGE_READY_FOR_CLAIM = 'ready_for_claim';
 const DR_STAGE_COMPLETED = 'completed';
 
@@ -1368,7 +1369,8 @@ function dr_stage_label(string $stage): string {
         DR_STAGE_PAYMENT_REJECTED => 'Payment Rejected',
         DR_STAGE_PAYMENT_VERIFIED => 'For Release',
         DR_STAGE_CANCELLED => 'Cancelled',
-        DR_STAGE_READY_FOR_CLAIM => 'For Release',
+        DR_STAGE_FOR_PRINTING => 'For Printing',
+        DR_STAGE_READY_FOR_CLAIM => 'For Claim',
         DR_STAGE_COMPLETED => 'Completed',
     ];
     return $labels[$stage] ?? $stage;
@@ -1388,6 +1390,7 @@ function dr_stage_to_request_status_names(string $stage): array {
         DR_STAGE_PAYMENT_REJECTED => ['PaymentRejected'],
         DR_STAGE_PAYMENT_VERIFIED => ['ForRelease', 'ReadyForClaim', 'PaymentVerified'],
         DR_STAGE_CANCELLED => ['Cancelled', 'AutoCancelled', 'Rejected'],
+        DR_STAGE_FOR_PRINTING => ['ForPrinting', 'Approved'],
         DR_STAGE_READY_FOR_CLAIM => ['ForRelease', 'ReadyForClaim'],
         DR_STAGE_COMPLETED => ['Completed'],
     ];
@@ -1412,6 +1415,7 @@ function dr_status_name_to_stage(string $statusName): ?string {
         'cancelled' => DR_STAGE_CANCELLED,
         'autocancelled' => DR_STAGE_CANCELLED,
         'expired' => DR_STAGE_CANCELLED,
+        'forprinting' => DR_STAGE_FOR_PRINTING,
         'forrelease' => DR_STAGE_READY_FOR_CLAIM,
         'readyforclaim' => DR_STAGE_READY_FOR_CLAIM,
         'completed' => DR_STAGE_COMPLETED,

@@ -14,6 +14,23 @@ $isBarangayIdTemplateSection = $barangayIdSettingsSection === 'template';
 $documentSettingsSuccessMessage = trim((string)($_GET['success'] ?? ''));
 $documentSettingsErrorMessage = trim((string)($_GET['error'] ?? ''));
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_barangay_id_operations') {
+    verifyCsrfToken(false);
+    try {
+        $operationsSave = dms_save_barangay_id_operational_settings($conn, $_POST, trim((string)($_SESSION['user_id'] ?? '')));
+        try {
+            insertUnifiedAuditLog($conn, trim((string)($_SESSION['user_id'] ?? '')) ?: null, trim((string)($_SESSION['role'] ?? 'Official')) ?: 'Official', 'document_settings', 'barangay_id_operations', 'barangay_id', 'update_settings', 'configuration', json_encode($operationsSave['before']), json_encode($operationsSave['after']), 'Updated Digital ID access, capture protection, print/digital signatures, replacement handling, and default validity settings.');
+        } catch (Throwable $auditError) {
+            error_log('Barangay ID operational settings audit log failed: ' . $auditError->getMessage());
+        }
+        header('Location: ' . $documentSettingsActionUrl . '?success=' . rawurlencode('Barangay ID settings saved.'));
+        exit;
+    } catch (Throwable $e) {
+        header('Location: ' . $documentSettingsActionUrl . '?error=' . rawurlencode($e->getMessage()));
+        exit;
+    }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_barangay_id_settings') {
     verifyCsrfToken(false);
 
@@ -66,6 +83,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
 
 $documentSettingsRows = dms_resolve_module_signatories($conn, $documentSettingsModuleKey);
 $barangayIdTemplateSettings = dms_resolve_barangay_id_template_settings($conn);
+$barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
 $punongRow = $documentSettingsRows['punong'] ?? [
     'label' => 'Punong Barangay',
     'source' => 'seat_punong',
@@ -166,11 +184,14 @@ $pagePayload = [
       border-radius: 22px;
       background: var(--bid-panel);
       box-shadow: 0 8px 24px rgba(37, 25, 12, 0.04);
+      overflow: hidden;
+      background-clip: padding-box;
     }
     .bid-section__head {
       padding: 1.15rem 1.2rem;
       border-bottom: 1px solid rgba(140, 102, 64, 0.1);
       background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
+      border-radius: 21px 21px 0 0;
     }
     .bid-section__body {
       padding: 1.2rem;
@@ -188,7 +209,7 @@ $pagePayload = [
     }
     .bid-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1.58fr) minmax(320px, 0.92fr);
+      grid-template-columns: 1fr;
       gap: 1.25rem;
       align-items: start;
     }
@@ -218,6 +239,7 @@ $pagePayload = [
       display: block;
       object-fit: cover;
     }
+    .bid-upload-file-wrap[hidden] { display: none !important; }
     .bid-toolbar {
       display: flex;
       justify-content: space-between;
@@ -259,7 +281,7 @@ $pagePayload = [
     }
     .bid-editor-shell {
       display: grid;
-      grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.72fr);
+      grid-template-columns: 1fr;
       gap: 1rem;
       align-items: start;
     }
@@ -289,7 +311,7 @@ $pagePayload = [
       border-radius: 2px;
       box-shadow: none;
       cursor: move;
-      overflow: hidden;
+      overflow: visible;
       padding: 0;
       font: inherit;
       text-align: left;
@@ -342,6 +364,7 @@ $pagePayload = [
     .bid-editor-field__sample {
       position: absolute;
       inset: 0;
+      z-index: 1;
       padding: 0 2px;
       font-family: Arial, Helvetica, sans-serif;
       font-size: var(--bid-editor-font-size, 10px);
@@ -355,6 +378,7 @@ $pagePayload = [
       white-space: nowrap;
       text-overflow: clip;
       text-transform: var(--bid-editor-text-transform, none);
+      pointer-events: none;
     }
     .bid-editor-field__sample.is-multiline {
       align-items: flex-start;
@@ -415,6 +439,8 @@ $pagePayload = [
       height: 100%;
       display: block;
       object-fit: var(--bid-editor-object-fit, cover);
+      overflow: hidden;
+      border-radius: inherit;
     }
     .bid-editor-field__media.is-signature {
       object-position: center bottom;
@@ -444,6 +470,29 @@ $pagePayload = [
       cursor: nwse-resize;
       opacity: 0;
       transition: opacity 140ms ease;
+    }
+    .bid-editor-field__delete {
+      position: absolute;
+      top: -12px;
+      right: -12px;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid #fff;
+      border-radius: 50%;
+      background: #dc3545;
+      color: #fff;
+      font: 800 15px/1 Arial, sans-serif;
+      box-shadow: 0 3px 9px rgba(88, 20, 28, 0.3);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .bid-editor-field:hover .bid-editor-field__delete,
+    .bid-editor-field.is-selected .bid-editor-field__delete {
+      opacity: 1;
+      pointer-events: auto;
     }
     .bid-editor-field:hover .bid-editor-field__resize,
     .bid-editor-field.is-selected .bid-editor-field__resize {
@@ -566,6 +615,101 @@ $pagePayload = [
       gap: 0.75rem;
       flex-wrap: wrap;
     }
+    .bid-process {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .bid-process__step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border: 1px solid #eadcca;
+      border-radius: 16px;
+      padding: 0.85rem 1rem;
+      background: #fffaf4;
+      color: #725238;
+      font-weight: 800;
+      text-align: left;
+    }
+    .bid-process__step-number {
+      display: grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      flex: 0 0 2rem;
+      border-radius: 50%;
+      background: #f5e4cf;
+      color: #8a4b00;
+    }
+    .bid-process__step.is-active {
+      border-color: var(--bid-accent);
+      background: #fff2df;
+      color: var(--bid-accent-deep);
+      box-shadow: 0 8px 20px rgba(222, 113, 12, 0.12);
+    }
+    .bid-process__step.is-active .bid-process__step-number,
+    .bid-process__step.is-complete .bid-process__step-number {
+      background: var(--bid-accent);
+      color: #fff;
+    }
+    [data-bid-step-panel] { display: none; }
+    #barangayIdSettingsForm[data-bid-active-step="1"] [data-bid-step-panel="1"],
+    #barangayIdSettingsForm[data-bid-active-step="2"] [data-bid-step-panel="2"],
+    #barangayIdSettingsForm[data-bid-active-step="3"] [data-bid-step-panel="3"] { display: block; }
+    #barangayIdSettingsForm[data-bid-active-step="2"] .bid-layout,
+    #barangayIdSettingsForm[data-bid-active-step="3"] .bid-layout { grid-template-columns: 1fr; }
+    #barangayIdSettingsForm[data-bid-active-step="2"] .bid-layout > aside,
+    #barangayIdSettingsForm[data-bid-active-step="3"] .bid-layout > aside { display: none !important; }
+    .bid-view-switch {
+      display: inline-flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .bid-editor-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+    }
+    .bid-editor-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: 40px;
+      padding: 0.35rem 0.65rem;
+      border: 1px solid #eadcca;
+      border-radius: 12px;
+      background: #fff;
+      color: #7a4b00;
+      font-weight: 700;
+    }
+    .bid-editor-control:has(input:disabled),
+    .bid-editor-control.is-disabled { opacity: 0.45; }
+    .bid-editor-control input[type="color"] {
+      width: 34px;
+      height: 28px;
+      padding: 2px;
+      border: 0;
+      background: transparent;
+    }
+    .bid-editor-control input[type="number"] { width: 64px; }
+    .bid-align-tools { display: inline-flex; gap: 0.2rem; }
+    .bid-align-tools button {
+      width: 36px;
+      height: 34px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #7a4b00;
+    }
+    .bid-align-tools button.is-active {
+      background: var(--bid-accent);
+      color: #fff;
+    }
+    [data-bid-editor-view-panel][hidden] { display: none !important; }
+    #barangayIdSideSelector[hidden] { display: none !important; }
     .bid-help {
       margin: 0;
       padding-left: 1.15rem;
@@ -597,6 +741,7 @@ $pagePayload = [
       .bid-toolbar .btn {
         width: 100%;
       }
+      .bid-process { grid-template-columns: 1fr; }
     }
     .bid-landing-shell {
       max-width: var(--admin-table-shell-max-width, 1180px);
@@ -675,6 +820,29 @@ $pagePayload = [
     .bid-function-item__action {
       white-space: nowrap;
     }
+    .bid-btn-orange {
+      --bs-btn-color: #fff;
+      --bs-btn-bg: var(--bid-accent);
+      --bs-btn-border-color: var(--bid-accent);
+      --bs-btn-hover-color: #fff;
+      --bs-btn-hover-bg: var(--bid-accent-deep);
+      --bs-btn-hover-border-color: var(--bid-accent-deep);
+      --bs-btn-focus-shadow-rgb: 222, 113, 12;
+      --bs-btn-active-color: #fff;
+      --bs-btn-active-bg: #874500;
+      --bs-btn-active-border-color: #874500;
+    }
+    .bid-btn-outline-orange {
+      --bs-btn-color: var(--bid-accent);
+      --bs-btn-border-color: var(--bid-accent);
+      --bs-btn-hover-color: #fff;
+      --bs-btn-hover-bg: var(--bid-accent);
+      --bs-btn-hover-border-color: var(--bid-accent);
+      --bs-btn-focus-shadow-rgb: 222, 113, 12;
+      --bs-btn-active-color: #fff;
+      --bs-btn-active-bg: var(--bid-accent-deep);
+      --bs-btn-active-border-color: var(--bid-accent-deep);
+    }
     @media (max-width: 767.98px) {
       .bid-landing-panel,
       .bid-function-item {
@@ -703,19 +871,36 @@ $pagePayload = [
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
           <div>
             <h2 class="bid-page-title">Barangay ID Settings</h2>
-            <p class="mb-0 text-muted">Choose a Barangay ID function before opening its settings.</p>
+            <p class="mb-0 text-muted">Control Digital ID behavior, issuance defaults, and the card design.</p>
           </div>
-          <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($documentSettingsBackUrl, ENT_QUOTES, 'UTF-8') ?>">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to Module
-          </a>
         </div>
         <hr class="mt-0 mb-4">
+
+        <?php if ($documentSettingsSuccessMessage !== ''): ?><div class="alert alert-success" role="alert"><?= htmlspecialchars($documentSettingsSuccessMessage, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+        <?php if ($documentSettingsErrorMessage !== ''): ?><div class="alert alert-danger" role="alert"><?= htmlspecialchars($documentSettingsErrorMessage, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+
+        <form class="bid-landing-panel mb-4" method="post" action="<?= htmlspecialchars($documentSettingsActionUrl, ENT_QUOTES, 'UTF-8') ?>">
+          <?= csrfTokenField() ?>
+          <input type="hidden" name="action" value="save_barangay_id_operations">
+          <div class="bid-landing-panel__head">
+            <div><h3 class="bid-landing-panel__title">Digital ID Controls</h3><p class="bid-landing-panel__copy">Set the system defaults used when Barangay IDs are approved. Validity can still be changed during pre-approval.</p></div>
+          </div>
+          <div class="row g-3 mt-1">
+            <div class="col-lg-4"><div class="bid-function-item h-100"><span class="bid-function-item__icon"><i class="fa-solid fa-mobile-screen"></i></span><span><label class="bid-function-item__title d-block" for="digitalIdEnabled">Digital ID</label><span class="bid-function-item__copy d-block">Allow residents to access an issued digital card.</span></span><div class="form-check form-switch"><input type="hidden" name="digital_id_enabled" value="0"><input class="form-check-input" type="checkbox" role="switch" id="digitalIdEnabled" name="digital_id_enabled" value="1" <?= $barangayIdOperationalSettings['digital_id_enabled'] ? 'checked' : '' ?>></div></div></div>
+            <div class="col-lg-4"><div class="bid-function-item h-100"><span class="bid-function-item__icon"><i class="fa-solid fa-signature"></i></span><span><label class="bid-function-item__title d-block" for="digitalIdSignature">Digital ID Signature</label><span class="bid-function-item__copy d-block">Show the official signature on the resident's Digital ID.</span></span><div class="form-check form-switch"><input type="hidden" name="digital_id_has_signature" value="0"><input class="form-check-input" type="checkbox" role="switch" id="digitalIdSignature" name="digital_id_has_signature" value="1" <?= $barangayIdOperationalSettings['digital_id_has_signature'] ? 'checked' : '' ?>></div></div></div>
+            <div class="col-lg-4"><div class="bid-function-item h-100"><span class="bid-function-item__icon"><i class="fa-solid fa-calendar-check"></i></span><span class="flex-grow-1"><label class="bid-function-item__title d-block mb-2" for="defaultValidityYears">Default Validity</label><select class="form-select" id="defaultValidityYears" name="default_validity_years"><?php for ($year = 1; $year <= 5; $year++): ?><option value="<?= $year ?>" <?= (int)$barangayIdOperationalSettings['default_validity_years'] === $year ? 'selected' : '' ?>><?= $year ?> year<?= $year === 1 ? '' : 's' ?></option><?php endfor; ?></select><span class="bid-function-item__copy d-block">Preselected only; officers may override it.</span></span></div></div>
+            <div class="col-lg-4"><div class="bid-function-item h-100"><span class="bid-function-item__icon"><i class="fa-solid fa-print"></i></span><span><label class="bid-function-item__title d-block" for="printedIdSignature">Printed ID Signature</label><span class="bid-function-item__copy d-block">Include the official signature on printed Barangay IDs.</span></span><div class="form-check form-switch"><input type="hidden" name="printed_id_has_signature" value="0"><input class="form-check-input" type="checkbox" role="switch" id="printedIdSignature" name="printed_id_has_signature" value="1" <?= $barangayIdOperationalSettings['printed_id_has_signature'] ? 'checked' : '' ?>></div></div></div>
+            <div class="col-lg-4"><div class="bid-function-item h-100"><span class="bid-function-item__icon"><i class="fa-solid fa-shield-halved"></i></span><span><label class="bid-function-item__title d-block" for="digitalIdCaptureDisabled">Disable Download / Capture</label><span class="bid-function-item__copy d-block">Blocks printing, right-click, dragging, and common capture shortcuts. OS screenshots cannot be fully prevented.</span></span><div class="form-check form-switch"><input type="hidden" name="digital_id_capture_disabled" value="0"><input class="form-check-input" type="checkbox" role="switch" id="digitalIdCaptureDisabled" name="digital_id_capture_disabled" value="1" <?= $barangayIdOperationalSettings['digital_id_capture_disabled'] ? 'checked' : '' ?>></div></div></div>
+            <div class="col-lg-4"><div class="bid-function-item h-100"><span class="bid-function-item__icon"><i class="fa-solid fa-arrows-rotate"></i></span><span><label class="bid-function-item__title d-block" for="deactivatePreviousDigitalId">Deactivate Previous ID</label><span class="bid-function-item__copy d-block">After replacement, only the newest completed Digital ID remains active.</span></span><div class="form-check form-switch"><input type="hidden" name="deactivate_previous_digital_id" value="0"><input class="form-check-input" type="checkbox" role="switch" id="deactivatePreviousDigitalId" name="deactivate_previous_digital_id" value="1" <?= $barangayIdOperationalSettings['deactivate_previous_digital_id'] ? 'checked' : '' ?>></div></div></div>
+          </div>
+          <div class="d-flex justify-content-end mt-3"><button class="btn bid-btn-orange px-4" type="submit"><i class="fa-solid fa-floppy-disk me-2"></i>Save Settings</button></div>
+        </form>
 
         <section class="bid-landing-panel">
           <div class="bid-landing-panel__head">
             <div>
-              <h3 class="bid-landing-panel__title">Available Functions</h3>
-              <p class="bid-landing-panel__copy">Open the setup area you want to manage. More Barangay ID settings can be added here later.</p>
+              <h3 class="bid-landing-panel__title">ID Design</h3>
+              <p class="bid-landing-panel__copy">Manage the visual template separately from day-to-day issuance defaults.</p>
             </div>
           </div>
 
@@ -723,11 +908,11 @@ $pagePayload = [
             <a class="bid-function-item" href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/BarangayIdSettings.php?section=template'), ENT_QUOTES, 'UTF-8') ?>">
               <span class="bid-function-item__icon"><i class="fa-solid fa-object-group"></i></span>
               <span>
-                <span class="bid-function-item__title">Change Barangay ID Template</span>
+                <span class="bid-function-item__title">Change ID</span>
                 <span class="bid-function-item__copy d-block">Upload the front and back artwork, arrange fields, preview the card, and prepare the Punong Barangay signature.</span>
               </span>
-              <span class="btn btn-warning text-white bid-function-item__action">
-                Open Function <i class="fa-solid fa-arrow-right ms-1"></i>
+              <span class="btn bid-btn-orange bid-function-item__action">
+                Change ID <i class="fa-solid fa-arrow-right ms-1"></i>
               </span>
             </a>
           </div>
@@ -746,16 +931,7 @@ $pagePayload = [
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
           <h2 class="bid-page-title">Barangay ID Settings</h2>
-          <p class="mb-0 text-muted" style="max-width: 860px;">Prepare the Barangay ID front and back template, drag every field into place, preview the finished card, and keep the Punong Barangay signature ready for generated IDs.</p>
-          <div class="bid-quick-stats">
-            <span class="bid-chip"><i class="fa-solid fa-layer-group"></i><?= count((array)($barangayIdTemplateSettings['layout']['fields'] ?? [])) ?> layout fields</span>
-            <span class="bid-chip"><i class="fa-solid fa-clock-rotate-left"></i><?= htmlspecialchars($lastUpdatedLabel, ENT_QUOTES, 'UTF-8') ?></span>
-            <span class="bid-chip"><i class="fa-solid fa-user-pen"></i><?= htmlspecialchars($lastUpdatedBy, ENT_QUOTES, 'UTF-8') ?></span>
-          </div>
         </div>
-        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($documentSettingsBackUrl, ENT_QUOTES, 'UTF-8') ?>">
-          <i class="fa-solid fa-arrow-left me-2"></i>Back to Module
-        </a>
       </div>
 
       <?php if ($documentSettingsSuccessMessage !== ''): ?>
@@ -765,98 +941,180 @@ $pagePayload = [
         <div class="alert alert-danger" role="alert"><?= htmlspecialchars($documentSettingsErrorMessage, ENT_QUOTES, 'UTF-8') ?></div>
       <?php endif; ?>
 
-      <form id="barangayIdSettingsForm" class="bid-shell p-3 p-md-4 p-xl-4" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($documentSettingsActionUrl, ENT_QUOTES, 'UTF-8') ?>">
+      <form id="barangayIdSettingsForm" class="bid-shell p-3 p-md-4 p-xl-4" data-bid-active-step="1" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($documentSettingsActionUrl, ENT_QUOTES, 'UTF-8') ?>">
         <?= csrfTokenField() ?>
         <input type="hidden" name="action" value="save_barangay_id_settings">
         <input type="hidden" name="barangay_id_layout_json" id="barangayIdLayoutJson" value="<?= htmlspecialchars(dms_json_encode_pretty($barangayIdTemplateSettings['layout'] ?? dms_barangay_id_default_layout()), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="barangay_id_sample_json" id="barangayIdSampleJson" value="<?= htmlspecialchars(dms_json_encode_pretty($barangayIdTemplateSettings['sample_data'] ?? dms_barangay_id_default_sample_data()), ENT_QUOTES, 'UTF-8') ?>">
 
+        <nav class="bid-process" aria-label="Barangay ID template setup steps">
+          <button type="button" class="bid-process__step is-active" data-bid-step="1">
+            <span class="bid-process__step-number">1</span><span>Upload Images</span>
+          </button>
+          <button type="button" class="bid-process__step" data-bid-step="2">
+            <span class="bid-process__step-number">2</span><span>Layout Editor</span>
+          </button>
+          <button type="button" class="bid-process__step" data-bid-step="3">
+            <span class="bid-process__step-number">3</span><span>Final ID Preview</span>
+          </button>
+        </nav>
+
         <div class="bid-layout">
           <section class="d-grid gap-3">
-            <div class="bid-section">
+            <div class="bid-section" data-bid-step-panel="1">
               <div class="bid-section__head">
-                <h3 class="bid-section__title">Template Uploads</h3>
-                <p class="bid-section__copy">Upload PNG artwork for the front and back of the Barangay ID. The editor below uses the same assets while you position fields.</p>
+                <h3 class="bid-section__title">Upload Front and Back Images</h3>
               </div>
               <div class="bid-section__body">
                 <div class="bid-upload-grid">
                   <article class="bid-upload-card">
                     <div>
                       <h4 class="h6 mb-1">Front ID Upload</h4>
-                      <p class="bid-muted small mb-0">PNG only. Keep the full card dimensions and final background design here.</p>
                     </div>
                     <div class="bid-upload-preview">
                       <img src="<?= htmlspecialchars($frontTemplateUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Front template preview" id="frontTemplatePreview">
                     </div>
                     <div class="d-grid gap-2">
-                      <label class="form-label fw-semibold mb-0" for="frontTemplateFile">Replace front template</label>
-                      <input class="form-control" type="file" id="frontTemplateFile" name="front_template_file" accept="image/png">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="1" id="removeFrontTemplate" name="remove_front_template">
-                        <label class="form-check-label" for="removeFrontTemplate">Remove custom front upload and use the default template</label>
+                      <label class="form-label fw-semibold mb-0" for="frontTemplateAction">Front template action</label>
+                      <select class="form-select" id="frontTemplateAction" data-bid-upload-action="front">
+                        <option value="keep">Keep current template</option>
+                        <option value="upload">Upload new template</option>
+                        <option value="default">Use default template</option>
+                      </select>
+                      <div class="bid-upload-file-wrap" data-bid-upload-file-wrap="front" hidden>
+                        <label class="form-label fw-semibold mb-1" for="frontTemplateFile">Choose front PNG</label>
+                        <input class="form-control" type="file" id="frontTemplateFile" name="front_template_file" accept="image/png">
                       </div>
+                      <input type="checkbox" value="1" id="removeFrontTemplate" name="remove_front_template" hidden>
                     </div>
                   </article>
 
                   <article class="bid-upload-card">
                     <div>
                       <h4 class="h6 mb-1">Back ID Upload</h4>
-                      <p class="bid-muted small mb-0">PNG only. This should include the final background for emergency details, signatory space, and QR area.</p>
                     </div>
                     <div class="bid-upload-preview">
                       <img src="<?= htmlspecialchars($backTemplateUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Back template preview" id="backTemplatePreview">
                     </div>
                     <div class="d-grid gap-2">
-                      <label class="form-label fw-semibold mb-0" for="backTemplateFile">Replace back template</label>
-                      <input class="form-control" type="file" id="backTemplateFile" name="back_template_file" accept="image/png">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="1" id="removeBackTemplate" name="remove_back_template">
-                        <label class="form-check-label" for="removeBackTemplate">Remove custom back upload and use the default template</label>
+                      <label class="form-label fw-semibold mb-0" for="backTemplateAction">Back template action</label>
+                      <select class="form-select" id="backTemplateAction" data-bid-upload-action="back">
+                        <option value="keep">Keep current template</option>
+                        <option value="upload">Upload new template</option>
+                        <option value="default">Use default template</option>
+                      </select>
+                      <div class="bid-upload-file-wrap" data-bid-upload-file-wrap="back" hidden>
+                        <label class="form-label fw-semibold mb-1" for="backTemplateFile">Choose back PNG</label>
+                        <input class="form-control" type="file" id="backTemplateFile" name="back_template_file" accept="image/png">
                       </div>
+                      <input type="checkbox" value="1" id="removeBackTemplate" name="remove_back_template" hidden>
                     </div>
                   </article>
                 </div>
               </div>
             </div>
 
-            <div class="bid-section">
+            <div class="bid-section" data-bid-step-panel="2">
               <div class="bid-section__head">
                 <div class="bid-toolbar">
                   <div>
-                    <h3 class="bid-section__title">Drag and Drop Field Layout</h3>
-                    <p class="bid-section__copy">Move every text, image, QR, and signature directly on top of the selected card side. Resize from the corner handle and fine-tune values in the inspector.</p>
+                    <h3 class="bid-section__title">Layout Editor</h3>
                   </div>
-                  <div class="bid-segmented" role="tablist" aria-label="Template side selector">
-                    <button type="button" class="is-active" data-bid-side-btn="front">Front Editor</button>
-                    <button type="button" data-bid-side-btn="back">Back Editor / Signature</button>
+                  <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <div class="bid-segmented" role="tablist" aria-label="Editor view selector">
+                      <button type="button" class="is-active" data-bid-editor-view-btn="editor"><i class="fa-solid fa-pen-ruler me-1"></i>Editor View</button>
+                      <button type="button" data-bid-editor-view-btn="layout"><i class="fa-solid fa-eye me-1"></i>Layout View</button>
+                    </div>
+                    <div class="bid-segmented" id="barangayIdSideSelector" role="tablist" aria-label="Template side selector">
+                      <button type="button" class="is-active" data-bid-side-btn="front">Front Editor</button>
+                      <button type="button" data-bid-side-btn="back">Back Editor / Signature</button>
+                    </div>
                   </div>
                 </div>
               </div>
               <div class="bid-section__body d-grid gap-3">
-                <div class="bid-toolbar">
-                  <div class="bid-add-tools">
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="text"><i class="fa-solid fa-font me-1"></i>Add Text</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="image"><i class="fa-solid fa-image me-1"></i>Add Image</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="qr"><i class="fa-solid fa-qrcode me-1"></i>Add QR</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="signature"><i class="fa-solid fa-signature me-1"></i>Add Signature</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="cover"><i class="fa-solid fa-vector-square me-1"></i>Add Cover</button>
+                <div class="d-grid gap-3" data-bid-editor-view-panel="editor">
+                <div class="bid-editor-controls" aria-label="Selected field controls">
+                  <label class="bid-editor-control" for="barangayIdAddFieldSelect">
+                    <i class="fa-solid fa-plus"></i>
+                    <select class="form-select form-select-sm border-0" id="barangayIdAddFieldSelect">
+                      <option value="">Add field</option>
+                      <optgroup label="Resident and ID fields">
+                        <option value="source:cardFullName">Full Name</option>
+                        <option value="source:cardFullAddress">Full Address</option>
+                        <option value="source:cardBirthdate">Birthdate</option>
+                        <option value="source:cardBirthplace">Birthplace</option>
+                        <option value="source:cardSex">Sex</option>
+                        <option value="source:cardContactNumber">Contact Number</option>
+                        <option value="source:cardNumber">Card Number</option>
+                        <option value="source:validUntil">Valid Until</option>
+                        <option value="source:photoUrl">Resident Photo</option>
+                        <option value="source:qrUrl">Verification QR</option>
+                        <option value="source:punongSignatorySignatureUrl">Official Signature</option>
+                      </optgroup>
+                      <optgroup label="Emergency fields">
+                        <option value="source:cardEmergencyName">Emergency Contact Name</option>
+                        <option value="source:cardEmergencyAddress">Emergency Address</option>
+                        <option value="source:cardEmergencyContact">Emergency Contact Number</option>
+                      </optgroup>
+                    </select>
+                  </label>
+
+                  <label class="bid-editor-control" for="barangayIdQuickColor" title="Text color">
+                    <i class="fa-solid fa-palette"></i>
+                    <span>Text Color</span>
+                    <input type="color" id="barangayIdQuickColor" value="#111111">
+                  </label>
+
+                  <label class="bid-editor-control" for="barangayIdQuickFontStyle" title="Font style and weight">
+                    <i class="fa-solid fa-font"></i>
+                    <select class="form-select form-select-sm border-0" id="barangayIdQuickFontStyle" aria-label="Font style and weight">
+                      <option value="">Regular</option>
+                      <option value="I">Italic</option>
+                      <option value="B">Bold</option>
+                      <option value="BI">Bold + Italic</option>
+                    </select>
+                  </label>
+
+                  <div class="bid-editor-control" id="barangayIdQuickAlignment" title="Text alignment">
+                    <i class="fa-solid fa-align-left"></i>
+                    <div class="bid-align-tools">
+                      <button type="button" data-bid-quick-align="left" aria-label="Align left"><i class="fa-solid fa-align-left"></i></button>
+                      <button type="button" data-bid-quick-align="center" aria-label="Align center"><i class="fa-solid fa-align-center"></i></button>
+                      <button type="button" data-bid-quick-align="right" aria-label="Align right"><i class="fa-solid fa-align-right"></i></button>
+                    </div>
                   </div>
-                  <div class="d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-light border" id="restoreBarangayIdDefaults"><i class="fa-solid fa-rotate-left me-1"></i>Restore Default Layout</button>
-                  </div>
+
+                  <label class="bid-editor-control" for="barangayIdQuickUppercase" title="Uppercase text">
+                    <i class="fa-solid fa-a"></i>
+                    <span>Upper Case</span>
+                    <input class="form-check-input mt-0" type="checkbox" id="barangayIdQuickUppercase">
+                  </label>
+
+                  <label class="bid-editor-control" for="barangayIdQuickMaxLines" title="Multiline text">
+                    <i class="fa-solid fa-align-justify"></i>
+                    <span>Multiline</span>
+                    <input class="form-check-input mt-0" type="checkbox" id="barangayIdQuickMultiline">
+                    <input class="form-control form-control-sm" type="number" id="barangayIdQuickMaxLines" min="1" max="3" step="1" value="1">
+                  </label>
+
+                  <label class="bid-editor-control" for="barangayIdQuickCornerRadius" id="barangayIdQuickCornerRadiusWrap" title="Image corner rounding" hidden>
+                    <i class="fa-solid fa-square"></i>
+                    <span>Corner Rounding</span>
+                    <input class="form-control form-control-sm" type="number" id="barangayIdQuickCornerRadius" min="0" max="50" step="1" value="0">
+                    <span>%</span>
+                  </label>
                 </div>
-                <p class="bid-muted small mb-0">Signature placement is edited on the Back Editor. The Signature field contains only the uploaded signature image.</p>
 
                 <div class="bid-editor-shell">
                   <div class="bid-editor-canvas-wrap">
                     <div class="bid-editor-canvas" id="barangayIdEditorCanvas" aria-label="Barangay ID template editor"></div>
                   </div>
-                  <div class="bid-editor-sidebar">
+                  <div class="bid-editor-sidebar" hidden>
                     <div class="bid-preview-card">
                       <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
                         <div>
                           <h4 class="h6 mb-1">Fields on Active Side</h4>
-                          <p class="small text-muted mb-0">Each item below is the real field name. Select one to edit its position, size, and content.</p>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-danger" id="deleteSelectedField"><i class="fa-solid fa-trash me-1"></i>Delete</button>
                       </div>
@@ -864,40 +1122,26 @@ $pagePayload = [
                     </div>
 
                     <div class="bid-preview-card">
-                      <div class="mb-3">
-                        <h4 class="h6 mb-1">Field Name Guide</h4>
-                        <p class="small text-muted mb-0">The template already contains the printed labels, so the editor only keeps the real data fields you need to position.</p>
-                      </div>
-                      <div class="bid-guide-list">
-                        <div class="bid-guide-item">
-                          <strong>Value Field</strong>
-                          The actual resident data shown on the ID like `Resident Name`, `Birthdate`, `Address`, or `Card Number`.
-                        </div>
-                        <div class="bid-guide-item">
-                          <strong>Resident Photo / QR Code / Signatory</strong>
-                          Image-based fields for the photo, verification QR, and Punong Barangay signature block.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="bid-preview-card">
                       <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
                         <div>
                           <h4 class="h6 mb-1">Field Inspector</h4>
-                          <p class="small text-muted mb-0">Fine adjustments here stay in sync with the drag editor.</p>
                         </div>
                       </div>
                       <div class="bid-inspector-grid" id="barangayIdFieldInspector"></div>
                     </div>
                   </div>
                 </div>
+                </div>
+
               </div>
             </div>
 
-            <div class="bid-section">
+            <div class="bid-section" data-bid-step-panel="3">
               <div class="bid-section__head">
-                <h3 class="bid-section__title">Sample Preview</h3>
-                <p class="bid-section__copy">Use sample values to test the layout. The preview below uses the current templates, auto-font fitting, and signatory state.</p>
+                <div class="bid-toolbar">
+                  <h3 class="bid-section__title">Final ID Preview</h3>
+                  <button type="button" class="btn bid-btn-outline-orange" data-bid-go-step="2"><i class="fa-solid fa-pen-ruler me-1"></i>Back to Editor</button>
+                </div>
               </div>
               <div class="bid-section__body">
                 <div class="bid-sample-grid mb-3">
@@ -947,73 +1191,20 @@ $pagePayload = [
             </div>
           </section>
 
-          <aside class="d-grid gap-3">
-            <div class="bid-section">
-              <div class="bid-section__head">
-                <h3 class="bid-section__title">Punong Barangay Signature</h3>
-                <p class="bid-section__copy">The Barangay Secretary does not sign the Barangay ID. Only the Punong Barangay signature is prepared here.</p>
-              </div>
-              <div class="bid-section__body d-grid gap-3">
-                <div class="bid-signature-grid">
-                  <div>
-                    <div class="small text-uppercase fw-bold text-muted mb-1">Signatory Source</div>
-                    <span class="bid-chip"><i class="fa-solid fa-chair"></i>Current Seat Assignment</span>
-                  </div>
-                  <label class="form-label mb-0">
-                    <span class="fw-semibold d-block mb-1">Signatory Name</span>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars((string)($punongRow['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" readonly>
-                  </label>
-                  <label class="form-label mb-0">
-                    <span class="fw-semibold d-block mb-1">Signatory Title</span>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars((string)($punongRow['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" readonly>
-                  </label>
-                  <div>
-                    <label class="form-label fw-semibold" for="signatureFilePunong">Upload Signature</label>
-                    <input class="form-control" type="file" id="signatureFilePunong" name="signature_file_punong" accept="image/png">
-                    <div class="form-text"><?= htmlspecialchars((string)($punongRow['signature_help'] ?? 'Shown on the back of the Barangay ID card.'), ENT_QUOTES, 'UTF-8') ?></div>
-                  </div>
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="1" id="removeSignaturePunong" name="remove_signature_punong">
-                    <label class="form-check-label" for="removeSignaturePunong">Remove the saved signature image</label>
-                  </div>
-                  <div class="bid-signature-preview" id="punongSignaturePreview">
-                    <?php if (!empty($punongRow['signature_path'])): ?>
-                      <img src="<?= htmlspecialchars($appBase . (string)$punongRow['signature_path'], ENT_QUOTES, 'UTF-8') ?>" alt="Punong Barangay signature preview">
-                    <?php else: ?>
-                      <div class="text-center text-muted px-3">No signature uploaded yet.</div>
-                    <?php endif; ?>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="bid-section">
-              <div class="bid-section__head">
-                <h3 class="bid-section__title">Editor Notes</h3>
-                <p class="bid-section__copy">This page is intentionally focused on the template system first so more Barangay ID settings can be added later without changing the route.</p>
-              </div>
-              <div class="bid-section__body">
-                <ul class="bid-help">
-                  <li>Drag inside a field box to move it. Use the corner handle to resize.</li>
-                  <li>Text fields use auto-font fitting in the live preview so long names and addresses stay inside the card.</li>
-                  <li>The saved layout is reused by the generated Barangay ID output, not just the admin settings preview.</li>
-                  <li>Use cover blocks only if you need to hide something already printed on the uploaded template.</li>
-                </ul>
-              </div>
-            </div>
-          </aside>
         </div>
 
         <div class="bid-actions mt-4">
           <a class="btn btn-light border" href="<?= htmlspecialchars($documentSettingsBackUrl, ENT_QUOTES, 'UTF-8') ?>">Cancel</a>
-          <button type="submit" class="btn btn-warning text-white px-4"><i class="fa-solid fa-floppy-disk me-2"></i>Save Barangay ID Settings</button>
+          <button type="button" class="btn btn-outline-secondary" data-bid-step-prev hidden><i class="fa-solid fa-arrow-left me-2"></i>Previous</button>
+          <button type="button" class="btn bid-btn-orange px-4" data-bid-step-next>Continue <i class="fa-solid fa-arrow-right ms-2"></i></button>
+          <button type="submit" class="btn btn-success px-4" data-bid-step-save hidden><i class="fa-solid fa-floppy-disk me-2"></i>Save Barangay ID Settings</button>
         </div>
       </form>
     </main>
   </div>
 
   <script id="barangayIdSettingsPayload" type="application/json"><?= htmlspecialchars(json_encode($pagePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_NOQUOTES, 'UTF-8') ?></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-27'), ENT_QUOTES, 'UTF-8') ?>"></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260718-11'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260718-27'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>

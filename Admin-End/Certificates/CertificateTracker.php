@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/admin_guard.php';
+require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
 
 $certificateLaunchTab = strtolower(trim((string)($_GET['tab'] ?? '')));
 $certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')));
@@ -28,6 +29,7 @@ if ($isIdIssuanceTrackerView) {
   $certificateSettingsLabel = 'Monitoring Settings';
 }
 $barangayIdAdminNavActive = 'applications';
+$barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
 
 if ($certificateLaunchStage === 'release') {
   $barangayIdAdminNavActive = 'release';
@@ -233,42 +235,44 @@ if ($certificateLaunchStage === 'release') {
     #table-certificateTracker {
       table-layout: fixed;
       width: 100%;
-      min-width: 1480px;
+      min-width: 0;
     }
     #table-certificateTracker th,
     #table-certificateTracker td {
       vertical-align: middle;
+      padding: 0.68rem 0.72rem;
+      overflow-wrap: anywhere;
     }
     #table-certificateTracker .col-request-id,
     #table-certificateTracker .col-resident-id {
-      width: 11%;
+      width: 10%;
       white-space: nowrap;
     }
     #table-certificateTracker .col-status {
-      width: 19%;
-      min-width: 260px;
+      width: 13%;
+      min-width: 0;
       white-space: normal;
     }
     #table-certificateTracker .col-submitted {
-      width: 14%;
-      min-width: 180px;
-      white-space: nowrap;
+      width: 13%;
+      min-width: 0;
+      white-space: normal;
     }
     #table-certificateTracker .col-action {
       width: 12%;
-      min-width: 150px;
-      white-space: nowrap;
+      min-width: 0;
+      white-space: normal;
     }
     #table-certificateTracker .col-full-name,
     #table-certificateTracker .col-document,
     #table-certificateTracker .col-purpose {
-      width: 11%;
+      width: 14%;
     }
     #table-certificateTracker .col-document {
-      width: 17%;
+      width: 13%;
     }
     #table-certificateTracker .col-purpose {
-      width: 16%;
+      width: 15%;
     }
     #table-certificateTracker .cell-truncate {
       display: block;
@@ -293,7 +297,7 @@ if ($certificateLaunchStage === 'release') {
     }
     #table-certificateTracker td:last-child {
       text-align: left;
-      white-space: nowrap;
+      white-space: normal;
     }
     #table-certificateTracker td:last-child .btn,
     #table-certificateTracker td:last-child .compact-table-btn {
@@ -301,7 +305,22 @@ if ($certificateLaunchStage === 'release') {
       align-items: center;
       justify-content: center;
       min-width: 0;
-      padding-inline: 0.8rem;
+      padding-inline: 0.55rem;
+      margin-bottom: 0.2rem;
+      white-space: normal;
+      line-height: 1.15;
+    }
+    @media (min-width: 992px) {
+      #docRequestsPanel .compact-admin-table-shell {
+        overflow-x: hidden;
+        padding-bottom: 0;
+        scrollbar-gutter: auto;
+      }
+    }
+    @media (max-width: 991.98px) {
+      #table-certificateTracker {
+        min-width: 900px;
+      }
     }
     #viewModal .modal-dialog {
       width: 75vw;
@@ -2493,9 +2512,11 @@ if ($certificateLaunchStage === 'release') {
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" style="min-width:0;">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
       <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($certificateTrackerHeading, ENT_QUOTES, 'UTF-8') ?></h2>
-      <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($certificateSettingsHref, ENT_QUOTES, 'UTF-8') ?>">
-        <i class="fa-solid fa-gear me-2"></i><?= htmlspecialchars($certificateSettingsLabel, ENT_QUOTES, 'UTF-8') ?>
-      </a>
+      <?php if (!$isIdIssuanceTrackerView): ?>
+        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($certificateSettingsHref, ENT_QUOTES, 'UTF-8') ?>">
+          <i class="fa-solid fa-gear me-2"></i><?= htmlspecialchars($certificateSettingsLabel, ENT_QUOTES, 'UTF-8') ?>
+        </a>
+      <?php endif; ?>
     </div>
     <hr class="mb-4">
 
@@ -2523,7 +2544,7 @@ if ($certificateLaunchStage === 'release') {
         <div class="admin-list-tabs">
           <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter=""><?= $isIdIssuanceTrackerView ? 'ALL' : 'All' ?></button>
           <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending"><?= $isIdIssuanceTrackerView ? 'PENDING' : 'Pending' ?> <span class="tab-count" id="pendingTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release"><?= $isIdIssuanceTrackerView ? 'FOR PRINTING' : 'Release' ?> <span class="tab-count" id="releaseTabCount">0</span></button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release"><?= $isIdIssuanceTrackerView ? 'PRINTING / CLAIM' : 'Release' ?> <span class="tab-count" id="releaseTabCount">0</span></button>
           <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed"><?= $isIdIssuanceTrackerView ? 'COMPLETED' : 'Completed' ?></button>
         </div>
 
@@ -3533,6 +3554,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
+  window.BARANGAY_ID_SETTINGS = <?= json_encode($barangayIdOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
     tableSelector: "#table-certificateTracker",
     modalId: "modalTableColumns",
@@ -3544,7 +3566,7 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-27"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-preview-09"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-workflow-01"></script>
 </body>
 </html>
