@@ -588,7 +588,9 @@
         : '';
       const onError = field.type === 'qr'
         ? "const fallback=this.getAttribute('data-fallback');if(fallback&&this.dataset.fallbackTried!=='1'){this.dataset.fallbackTried='1';this.src=fallback;return;}this.parentElement.remove();"
-        : 'this.src="' + esc(DEFAULT_IMAGE_PLACEHOLDER) + '";this.onerror=null;';
+        : isSignature
+          ? 'this.remove();'
+          : 'this.src="' + esc(DEFAULT_IMAGE_PLACEHOLDER) + '";this.onerror=null;';
       return `
         <div class="${className}" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">
           <img src="${esc(imageUrl)}" alt="${esc(field.label || placeholderText)}"${fallbackAttr} onerror="${onError}" style="object-fit:${objectFit};">

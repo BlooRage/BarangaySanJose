@@ -142,7 +142,10 @@
         backTemplateUrl: String(data?.back_template_url || '').trim(),
         templateVariant: String(data?.template_variant || 'empty').trim() || 'empty',
         layoutConfig: data?.layout && typeof data.layout === 'object' ? data.layout : null,
-        sampleData: data?.sample_data && typeof data.sample_data === 'object' ? data.sample_data : null
+        sampleData: data?.sample_data && typeof data.sample_data === 'object' ? data.sample_data : null,
+        punongSignatoryName: String(data?.punong_signatory_name || '').trim(),
+        punongSignatoryTitle: String(data?.punong_signatory_title || '').trim(),
+        punongSignatorySignatureUrl: String(data?.punong_signatory_signature_url || '').trim()
       };
       return barangayIdTemplateConfigCache;
     })();
@@ -3304,7 +3307,10 @@
         row: {
           ...row,
           qr_code_path: barangayIdQrPreviewUrl(row, payload),
-          sex: sexValue || row?.sex || ''
+          sex: sexValue || row?.sex || '',
+          punong_signatory_name: templateConfig.punongSignatoryName || row?.punong_signatory_name || '',
+          punong_signatory_title: templateConfig.punongSignatoryTitle || row?.punong_signatory_title || '',
+          punong_signatory_signature_path: templateConfig.punongSignatorySignatureUrl || row?.punong_signatory_signature_path || ''
         },
         payload: {
           ...payload,
@@ -5339,10 +5345,12 @@
     `;
     paymentProofModal.show();
 
-    fetchBarangayIdTemplateConfig()
-      .catch(() => null)
-      .then((templateConfig) => {
-        const state = buildBarangayIdCardModalState(row, options, templateConfig);
+    Promise.all([
+      fetchBarangayIdTemplateConfig().catch(() => null),
+      ensureBarangayIdPhotoData(row).catch(() => row)
+    ])
+      .then(([templateConfig, hydratedRow]) => {
+        const state = buildBarangayIdCardModalState(hydratedRow || row, options, templateConfig);
         if (typeof window.BarangayIdDigital.renderInto === 'function') {
           window.BarangayIdDigital.renderInto(paymentProofWrap, state, {
             showIntro: false,
@@ -5955,15 +5963,21 @@
       backTemplateUrl,
       backTemplateFallbackUrl: backTemplateUrl,
       layoutConfig: resolvedConfig.layoutConfig || null,
+      punongSignatoryName: firstNonEmpty([resolvedConfig.punongSignatoryName, previewState?.punongSignatoryName]),
+      punongSignatoryTitle: firstNonEmpty([resolvedConfig.punongSignatoryTitle, previewState?.punongSignatoryTitle]),
+      punongSignatorySignatureUrl: resolvePublicUrl(firstNonEmpty([
+        resolvedConfig.punongSignatorySignatureUrl,
+        previewState?.punongSignatorySignatureUrl
+      ])),
       qrUrl: resolvePublicUrl(firstNonEmpty([qrPreviewUrl, previewState?.qrUrl])),
       photoUrl: firstNonEmpty([
-        previewState?.photoUrl,
         resolvePublicUrl(firstNonEmpty([
           payload.id_picture_url,
           payload.id_picture_path,
           residentProfile.id_picture_url,
           residentProfile.id_picture_path
         ])),
+        previewState?.photoUrl,
         `${appBase}/Images/Profile-Placeholder.png`
       ])
     };
