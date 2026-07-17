@@ -1013,7 +1013,7 @@ $pagePayload = [
   </div>
 
   <script id="barangayIdSettingsPayload" type="application/json"><?= htmlspecialchars(json_encode($pagePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_NOQUOTES, 'UTF-8') ?></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-14'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-15'), ENT_QUOTES, 'UTF-8') ?>"></script>
   <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260718-11'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>

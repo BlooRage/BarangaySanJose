@@ -1341,6 +1341,15 @@
       ? viewPreviewState
       : buildPreviewState({}, {}, {});
     viewDetailsBody.innerHTML = renderDocumentPreview(previewState);
+    if (window.BarangayIdDigital && typeof window.BarangayIdDigital.hydrate === 'function') {
+      const hydrateBarangayId = () => window.BarangayIdDigital.hydrate(viewDetailsBody);
+      hydrateBarangayId();
+      window.requestAnimationFrame(() => {
+        hydrateBarangayId();
+        window.requestAnimationFrame(hydrateBarangayId);
+      });
+      window.setTimeout(hydrateBarangayId, 120);
+    }
     bindPreviewEditHandlers();
   }
 
@@ -5346,7 +5355,7 @@
     paymentProofModal.show();
 
     Promise.all([
-      fetchBarangayIdTemplateConfig().catch(() => null),
+      fetchBarangayIdTemplateConfig({ force: true }).catch(() => null),
       ensureBarangayIdPhotoData(row).catch(() => row)
     ])
       .then(([templateConfig, hydratedRow]) => {
@@ -6802,6 +6811,10 @@
 
           row = await ensureRowDetails(row);
           if (!row) return;
+          if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
+            await fetchBarangayIdTemplateConfig({ force: true }).catch(() => null);
+            row = await ensureBarangayIdPhotoData(row).catch(() => row);
+          }
 
           if (isFinancePaymentsPage) {
           const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};

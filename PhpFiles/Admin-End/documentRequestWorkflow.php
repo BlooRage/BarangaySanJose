@@ -2260,17 +2260,15 @@ function dra_barangay_id_template_assets(): array
             $backDisk = trim((string)($settings['back_template_disk_path'] ?? ''));
             $frontPublic = trim((string)($settings['front_template_path'] ?? $defaultPaths['front']));
             $backPublic = trim((string)($settings['back_template_path'] ?? $defaultPaths['back']));
-            if ($frontDisk !== '' && $backDisk !== '') {
-                $resolved = [
-                    'front' => $frontDisk,
-                    'back' => $backDisk,
-                    'front_public_path' => $frontPublic,
-                    'back_public_path' => $backPublic,
-                    'variant' => trim((string)($settings['template_variant'] ?? 'empty')) ?: 'empty',
-                    'layout' => is_array($settings['layout'] ?? null) ? $settings['layout'] : dms_barangay_id_default_layout(),
-                    'sample_data' => is_array($settings['sample_data'] ?? null) ? $settings['sample_data'] : dms_barangay_id_default_sample_data(),
-                ];
-            }
+            $resolved = [
+                'front' => $frontDisk !== '' ? $frontDisk : (is_file($defaultFront) ? $defaultFront : ''),
+                'back' => $backDisk !== '' ? $backDisk : (is_file($defaultBack) ? $defaultBack : ''),
+                'front_public_path' => $frontPublic !== '' ? $frontPublic : $defaultPaths['front'],
+                'back_public_path' => $backPublic !== '' ? $backPublic : $defaultPaths['back'],
+                'variant' => trim((string)($settings['template_variant'] ?? 'empty')) ?: 'empty',
+                'layout' => is_array($settings['layout'] ?? null) ? $settings['layout'] : dms_barangay_id_default_layout(),
+                'sample_data' => is_array($settings['sample_data'] ?? null) ? $settings['sample_data'] : dms_barangay_id_default_sample_data(),
+            ];
         } catch (Throwable $ignored) {
         }
     }
@@ -2286,7 +2284,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260718bid10';
+    return 'r20260718bid11';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3919,10 +3917,9 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $needsAdaptiveWrap = !empty($field['multiline'])
                         || ($h >= 3.6 && $pdf->GetStringWidth($text) > $w);
                     if ($needsAdaptiveWrap) {
-                        $adaptiveMaxLines = max(
-                            max(1, (int)($field['maxLines'] ?? 1)),
-                            min(12, max(1, (int)floor($h / 1.5)))
-                        );
+                        $configuredLineLimit = max(1, min(12, (int)($field['maxLines'] ?? 1)));
+                        $heightLineCapacity = max(1, min(12, (int)floor($h / 1.5)));
+                        $adaptiveMaxLines = min($configuredLineLimit, $heightLineCapacity);
                         $fitMultiline(
                             $pdf,
                             $text,
@@ -8521,7 +8518,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-14', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-15', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';

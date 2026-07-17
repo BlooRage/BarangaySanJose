@@ -599,7 +599,7 @@
     const configuredMaxLines = Math.max(1, normalizeInteger(field.maxLines, 1, 1, 12));
     const autoLineCapacity = Math.max(1, Math.min(12, Math.floor(Number(field.h || 0) / 2.1) || 1));
     const shouldAutoWrap = String(value).trim().length > 18 && autoLineCapacity > 1;
-    const maxLines = shouldAutoWrap ? Math.max(configuredMaxLines, autoLineCapacity) : configuredMaxLines;
+    const maxLines = Math.max(1, Math.min(configuredMaxLines, autoLineCapacity));
     const isMultiline = field.multiline || shouldAutoWrap;
     const multilineClass = isMultiline ? ' barangay-id-card__text--multiline' : '';
     const alignClass = field.align === 'center'
