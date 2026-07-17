@@ -1083,7 +1083,6 @@ if (!function_exists('dms_barangay_id_default_layout')) {
                     'label' => 'Valid Until',
                     'type' => 'text',
                     'source' => 'validUntil',
-                    'prefix' => 'VALID UNTIL: ',
                     'side' => 'front',
                     'x' => 6.0,
                     'y' => 44.78,
@@ -1238,33 +1237,16 @@ if (!function_exists('dms_barangay_id_default_layout')) {
                     'z' => 2,
                 ],
                 [
-                    'id' => 'back_validity_notice',
-                    'label' => 'Validity Notice',
-                    'type' => 'text',
-                    'source' => 'validityNotice',
-                    'side' => 'back',
-                    'x' => 7.3,
-                    'y' => 36.6,
-                    'w' => 40.5,
-                    'h' => 6.4,
-                    'align' => 'center',
-                    'fontStyle' => 'I',
-                    'fontSize' => 4.2,
-                    'minFontSize' => 3.2,
-                    'uppercase' => false,
-                    'multiline' => true,
-                    'maxLines' => 3,
-                    'z' => 2,
-                ],
-                [
-                    'id' => 'back_signatory',
-                    'label' => 'Punong Barangay Signatory',
-                    'type' => 'signatory',
+                    'id' => 'back_signature',
+                    'label' => 'Signature',
+                    'type' => 'image',
+                    'source' => 'punongSignatorySignatureUrl',
                     'side' => 'back',
                     'x' => 9.1,
                     'y' => 38.2,
                     'w' => 30.8,
-                    'h' => 12.0,
+                    'h' => 8.2,
+                    'fit' => 'contain',
                     'z' => 3,
                 ],
                 [
@@ -1385,6 +1367,14 @@ if (!function_exists('dms_normalize_barangay_id_field')) {
             $fit = 'cover';
         }
 
+        $source = trim((string)($field['source'] ?? ''));
+        $freeSize = in_array($type, ['image', 'qr'], true)
+            || ($type === 'text' && ($source === 'cardNumber' || str_contains($fieldId, 'card_number')));
+        $baseW = dms_normalize_float_range($field['w'] ?? 10, 10.0, 1.2, 85.6);
+        $baseH = dms_normalize_float_range($field['h'] ?? 4, 4.0, 1.0, 54.1);
+        $defaultMaxW = $freeSize ? 85.6 : min(85.6, max($baseW * 1.75, $baseW + 14.0));
+        $defaultMaxH = $freeSize ? 54.1 : min(54.1, max($baseH * 2.4, $baseH + 5.0));
+
         $normalized = [
             'id' => $fieldId,
             'label' => trim((string)($field['label'] ?? 'Field')),
@@ -1392,28 +1382,35 @@ if (!function_exists('dms_normalize_barangay_id_field')) {
             'side' => $side,
             'x' => dms_normalize_float_range($field['x'] ?? 0, 0.0, 0.0, 85.6),
             'y' => dms_normalize_float_range($field['y'] ?? 0, 0.0, 0.0, 54.1),
-            'w' => dms_normalize_float_range($field['w'] ?? 10, 10.0, 1.2, 85.6),
-            'h' => dms_normalize_float_range($field['h'] ?? 4, 4.0, 1.0, 54.1),
+            'w' => $baseW,
+            'h' => $baseH,
+            'maxW' => dms_normalize_float_range($field['maxW'] ?? $defaultMaxW, $defaultMaxW, 1.2, 85.6),
+            'maxH' => dms_normalize_float_range($field['maxH'] ?? $defaultMaxH, $defaultMaxH, 1.0, 54.1),
             'z' => dms_normalize_int_range($field['z'] ?? 2, 2, 1, 20),
-            'source' => trim((string)($field['source'] ?? '')),
+            'source' => $source,
             'fallbackSource' => trim((string)($field['fallbackSource'] ?? '')),
             'prefix' => trim((string)($field['prefix'] ?? '')),
             'text' => trim((string)($field['text'] ?? '')),
             'align' => $align,
             'fontStyle' => $fontStyle,
-            'fontSize' => dms_normalize_float_range($field['fontSize'] ?? 6.0, 6.0, 2.8, 20.0),
-            'minFontSize' => dms_normalize_float_range($field['minFontSize'] ?? 4.2, 4.2, 2.4, 18.0),
+            'fontSize' => dms_normalize_float_range($field['fontSize'] ?? 6.0, 6.0, 2.8, 36.0),
+            'minFontSize' => dms_normalize_float_range($field['minFontSize'] ?? 4.2, 4.2, 2.4, 24.0),
             'color' => $color,
             'backgroundColor' => $backgroundColor,
             'uppercase' => dms_normalize_bool($field['uppercase'] ?? ($type !== 'cover'), $type !== 'cover'),
             'multiline' => dms_normalize_bool($field['multiline'] ?? false, false),
-            'maxLines' => dms_normalize_int_range($field['maxLines'] ?? 2, 2, 1, 5),
+            'maxLines' => dms_normalize_int_range($field['maxLines'] ?? 2, 2, 1, 12),
             'fit' => $fit,
         ];
 
         if ($normalized['minFontSize'] > $normalized['fontSize']) {
             $normalized['minFontSize'] = $normalized['fontSize'];
         }
+        if ((int)$normalized['maxLines'] > 1) {
+            $normalized['multiline'] = true;
+        }
+        $normalized['maxW'] = $freeSize ? 85.6 : max((float)$normalized['w'], (float)$normalized['maxW'], $defaultMaxW);
+        $normalized['maxH'] = $freeSize ? 54.1 : max((float)$normalized['h'], (float)$normalized['maxH'], $defaultMaxH);
 
         if ($normalized['label'] === '') {
             $normalized['label'] = ucfirst(str_replace('_', ' ', $fieldId));
@@ -1438,10 +1435,31 @@ if (!function_exists('dms_normalize_barangay_id_layout')) {
             if (!is_array($field)) {
                 continue;
             }
-            if (strtolower(trim((string)($field['type'] ?? ''))) === 'label') {
+            $fieldId = strtolower(trim((string)($field['id'] ?? '')));
+            $fieldType = strtolower(trim((string)($field['type'] ?? '')));
+            if (in_array($fieldType, ['label', 'signatory'], true)
+                || trim((string)($field['source'] ?? '')) === 'validityNotice'
+                || in_array($fieldId, ['back_validity_notice', 'back_signatory'], true)) {
                 continue;
             }
             $normalizedFields[] = dms_normalize_barangay_id_field($field, (int)$index);
+        }
+
+        $hasSignature = false;
+        foreach ($normalizedFields as $field) {
+            if (($field['id'] ?? '') === 'back_signature'
+                || (($field['type'] ?? '') === 'image' && ($field['source'] ?? '') === 'punongSignatorySignatureUrl')) {
+                $hasSignature = true;
+                break;
+            }
+        }
+        if (!$hasSignature) {
+            foreach ($defaults['fields'] as $index => $field) {
+                if (($field['id'] ?? '') === 'back_signature') {
+                    $normalizedFields[] = dms_normalize_barangay_id_field($field, (int)$index);
+                    break;
+                }
+            }
         }
 
         usort($normalizedFields, static function (array $left, array $right): int {

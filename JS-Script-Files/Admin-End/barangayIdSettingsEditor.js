@@ -41,15 +41,15 @@
     { value: 'cardEmergencyContact', label: 'Emergency Contact Number' },
     { value: 'cardNumber', label: 'Card Number' },
     { value: 'validUntil', label: 'Valid Until' },
-    { value: 'validityNotice', label: 'Validity Notice' },
     { value: 'photoUrl', label: 'Resident Photo' },
+    { value: 'punongSignatorySignatureUrl', label: 'Signature' },
     { value: 'qrUrl', label: 'Verification QR' },
   ];
   const fieldTemplates = {
     text: { type: 'text', label: 'Text Field', source: 'cardFullName', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6.0, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
     image: { type: 'image', label: 'Image Field', source: 'photoUrl', w: 16, h: 16, fit: 'cover' },
     qr: { type: 'qr', label: 'QR Field', source: 'qrUrl', w: 16, h: 16, fit: 'fill' },
-    signatory: { type: 'signatory', label: 'Signatory Block', w: 28, h: 12 },
+    signature: { type: 'image', label: 'Signature', source: 'punongSignatorySignatureUrl', w: 30, h: 8, fit: 'contain' },
     cover: { type: 'cover', label: 'Cover Block', w: 18, h: 8, backgroundColor: '#ffffff' },
   };
 
@@ -123,8 +123,7 @@
       back_emergency_name_value: 'Emergency Contact Name',
       back_emergency_address_value: 'Emergency Address',
       back_emergency_contact_value: 'Emergency Contact Number',
-      back_validity_notice: 'Validity Note',
-      back_signatory: 'Punong Barangay Signatory',
+      back_signature: 'Signature',
       back_qr: 'Verification QR Code'
     };
     const direct = byId[String(field.id || '').trim()];
@@ -152,6 +151,7 @@
       const source = sourceOptions.find((option) => option.value === String(field.source || '').trim());
       return source ? `Uses sample data: ${source.label}` : 'Uses linked text data';
     }
+    if (field.type === 'image' && field.source === 'punongSignatorySignatureUrl') return 'Uses uploaded Punong Barangay signature';
     if (field.type === 'image') return 'Uses resident photo';
     if (field.type === 'qr') return 'Uses verification QR code';
     if (field.type === 'signatory') return 'Uses Punong Barangay signature';
@@ -174,8 +174,7 @@
         cardEmergencyAddress: 'Value: Emergency Address',
         cardEmergencyContact: 'Value: Emergency Contact',
         cardNumber: 'Value: Card No.',
-        validUntil: 'Value: Valid Until',
-        validityNotice: 'Value: Notice'
+        validUntil: 'Value: Valid Until'
       };
       if (valueBySource[source]) {
         return valueBySource[source];
@@ -185,7 +184,7 @@
       front_valid_until_value: 'Value: Valid Until',
       front_card_number_value: 'Value: Card No.',
       back_card_number_value: 'Value: Card No.',
-      back_signatory: 'Signatory',
+      back_signature: 'Signature',
       back_qr: 'QR Code'
     };
     return compactById[String(field?.id || '').trim()] || full;
@@ -199,6 +198,17 @@
     if (!field || typeof field !== 'object') return false;
     if (field.type === 'qr') return true;
     return field.type === 'image' && String(field.source || '').trim() === 'photoUrl';
+  }
+
+  function fieldUsesMaxSize(field) {
+    if (!field || typeof field !== 'object') return true;
+    if (field.type === 'image' || field.type === 'qr') return false;
+    if (field.type === 'text') {
+      const source = String(field.source || '').trim();
+      const id = String(field.id || '').trim();
+      return source !== 'cardNumber' && !id.includes('card_number');
+    }
+    return true;
   }
 
   function fieldMinimumSize(field, axis) {
@@ -220,17 +230,24 @@
       return dimension === 'h' ? 6 : 10;
     }
     if (field.type === 'text') {
-      const source = String(field.source || '').trim();
-      if (source === 'cardFullAddress' || source === 'cardBirthplace' || source === 'validityNotice') {
-        return dimension === 'h' ? 6 : 20;
-      }
-      if (source === 'cardFullName') {
-        return dimension === 'h' ? 6 : 18;
-      }
-      return dimension === 'h' ? 5 : 12;
+      return dimension === 'h' ? 2.2 : 5;
     }
 
-    return dimension === 'h' ? 4.5 : 12;
+    return dimension === 'h' ? 2.2 : 5;
+  }
+
+  function fieldMaximumSize(field, axis) {
+    const dimension = axis === 'h' ? 'h' : 'w';
+    const pageLimit = dimension === 'h' ? pageHeight() : pageWidth();
+    if (!fieldUsesMaxSize(field)) {
+      return pageLimit;
+    }
+    const key = dimension === 'h' ? 'maxH' : 'maxW';
+    const value = Number(field?.[key] || 0);
+    if (Number.isFinite(value) && value > 0) {
+      return Math.max(fieldMinimumSize(field, dimension), Math.min(pageLimit, value));
+    }
+    return pageLimit;
   }
 
   function canvasAlignmentClass(field) {
@@ -303,6 +320,82 @@
     return prefixed || 'Text';
   }
 
+  function cardPixelScale() {
+    const width = canvas?.getBoundingClientRect?.().width || 856;
+    return Math.max(0.55, width / 856);
+  }
+
+  function editorFontPx(field) {
+    const fontSize = Number(field?.fontSize || 6) || 6;
+    return Math.max(6, Number((fontSize * 1.33 * cardPixelScale()).toFixed(2)));
+  }
+
+  function editorLabelFontPx(field, label) {
+    const rect = canvas?.getBoundingClientRect?.();
+    const canvasWidth = rect?.width || 856;
+    const canvasHeight = rect?.height || ((canvasWidth / pageWidth()) * pageHeight());
+    const fieldWidthPx = (Number(field?.w || 0) / pageWidth()) * canvasWidth;
+    const fieldHeightPx = (Number(field?.h || 0) / pageHeight()) * canvasHeight;
+    const textLength = Math.max(8, String(label || '').length);
+    const widthFit = (fieldWidthPx - 12) / (textLength * 0.58);
+    const heightFit = fieldHeightPx * 0.58;
+    return Math.max(7, Math.min(28, Number(Math.min(widthFit, heightFit).toFixed(2))));
+  }
+
+  function fitToObjectPosition(fit) {
+    if (fit === 'contain') return 'contain';
+    if (fit === 'fill') return 'fill';
+    return 'cover';
+  }
+
+  function mediaUrlForField(field) {
+    const currentSampleState = sampleState();
+    if (field.type === 'qr') {
+      return String(currentSampleState.qrUrl || currentSampleState.qrFallbackUrl || '').trim();
+    }
+    if (field.type === 'image') {
+      const source = String(field.source || '').trim() || 'photoUrl';
+      const fallback = source === 'photoUrl' ? currentSampleState.photoUrl : '';
+      return String(currentSampleState?.[source] || fallback || '').trim();
+    }
+    return '';
+  }
+
+  function editorFieldInnerHtml(field, displayName, purpose) {
+    if (field.type === 'image' || field.type === 'qr') {
+      const mediaUrl = mediaUrlForField(field);
+      const label = field.type === 'qr'
+        ? 'QR'
+        : String(field.source || '') === 'punongSignatorySignatureUrl'
+          ? 'Signature'
+          : 'Photo';
+      return `
+        ${mediaUrl ? `<img class="bid-editor-field__media${label === 'Signature' ? ' is-signature' : ''}" src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(displayName)}">` : `<span class="bid-editor-field__placeholder${label === 'Signature' ? ' is-signature' : ''}">${escapeHtml(label)}</span>`}
+        <span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>
+        ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
+        <span class="bid-editor-field__resize" data-bid-resize="1"></span>
+      `;
+    }
+
+    if (field.type === 'signatory') {
+      return `
+        <span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>
+        ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
+        <span class="bid-editor-field__resize" data-bid-resize="1"></span>
+      `;
+    }
+
+    return `
+      <span class="bid-editor-field__tag">${escapeHtml(displayName)}</span>
+      ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
+      <span class="bid-editor-field__resize" data-bid-resize="1"></span>
+    `;
+  }
+
+  function fieldIsMultiline(field) {
+    return !!field?.multiline || Number(field?.maxLines || 1) > 1;
+  }
+
   function renderCanvas() {
     ensureSelection();
     canvas.style.backgroundImage = `url("${state.activeSide === 'front' ? state.frontTemplateUrl : state.backTemplateUrl}")`;
@@ -311,20 +404,25 @@
     activeFields().forEach((field) => {
       const fieldEl = document.createElement('button');
       fieldEl.type = 'button';
-      fieldEl.className = `bid-editor-field${field.id === state.selectedFieldId ? ' is-selected' : ''}`;
+      fieldEl.className = `bid-editor-field${field.type === 'image' || field.type === 'qr' ? ' is-media' : ''}${field.id === state.selectedFieldId ? ' is-selected' : ''}`;
       fieldEl.dataset.fieldId = field.id;
+      fieldEl.title = `${friendlyFieldName(field)} - drag to move, resize from the corner`;
       fieldEl.style.left = mmToPctX(field.x);
       fieldEl.style.top = mmToPctY(field.y);
       fieldEl.style.width = mmToPctX(field.w);
       fieldEl.style.height = mmToPctY(field.h);
       fieldEl.style.zIndex = String(field.z || 2);
+      fieldEl.style.setProperty('--bid-editor-font-size', `${editorFontPx(field)}px`);
+      fieldEl.style.setProperty('--bid-editor-line-height', fieldIsMultiline(field) ? '1.04' : '1.05');
+      fieldEl.style.setProperty('--bid-editor-color', field.color || '#111111');
+      fieldEl.style.setProperty('--bid-editor-font-weight', String(field.fontStyle || '').includes('B') ? '800' : '500');
+      fieldEl.style.setProperty('--bid-editor-font-style', String(field.fontStyle || '').includes('I') ? 'italic' : 'normal');
+      fieldEl.style.setProperty('--bid-editor-text-transform', field.uppercase ? 'uppercase' : 'none');
+      fieldEl.style.setProperty('--bid-editor-object-fit', fitToObjectPosition(field.fit));
       const displayName = compactFieldName(field);
+      fieldEl.style.setProperty('--bid-editor-label-font-size', `${editorLabelFontPx(field, displayName)}px`);
       const purpose = fieldPurposeText(field);
-      fieldEl.innerHTML = `
-        <span class="bid-editor-field__sample${canvasAlignmentClass(field)}">${escapeHtml(displayName).replace(/\n/g, '<br>')}</span>
-        ${purpose ? `<span class="visually-hidden">${escapeHtml(purpose)}</span>` : ''}
-        <span class="bid-editor-field__resize" data-bid-resize="1"></span>
-      `;
+      fieldEl.innerHTML = editorFieldInnerHtml(field, displayName, purpose);
 
       fieldEl.addEventListener('click', () => {
         state.selectedFieldId = field.id;
@@ -431,6 +529,8 @@
 
     const minWidth = fieldMinimumSize(field, 'w');
     const minHeight = fieldMinimumSize(field, 'h');
+    const maxWidth = fieldMaximumSize(field, 'w');
+    const maxHeight = fieldMaximumSize(field, 'h');
 
     const blocks = [
       inputMarkup({ label: 'Field Name', prop: 'label', value: friendlyFieldName(field) }),
@@ -442,14 +542,21 @@
       `,
       inputMarkup({ label: 'X (mm)', prop: 'x', type: 'number', value: field.x, min: '0', max: String(pageWidth()) }),
       inputMarkup({ label: 'Y (mm)', prop: 'y', type: 'number', value: field.y, min: '0', max: String(pageHeight()) }),
-      inputMarkup({ label: 'Width (mm)', prop: 'w', type: 'number', value: field.w, min: String(minWidth), max: String(pageWidth()) }),
-      inputMarkup({ label: 'Height (mm)', prop: 'h', type: 'number', value: field.h, min: String(minHeight), max: String(pageHeight()) }),
+      inputMarkup({ label: 'Width (mm)', prop: 'w', type: 'number', value: field.w, min: String(minWidth), max: String(maxWidth) }),
+      inputMarkup({ label: 'Height (mm)', prop: 'h', type: 'number', value: field.h, min: String(minHeight), max: String(maxHeight) }),
       inputMarkup({ label: 'Layer Order', prop: 'z', type: 'number', value: field.z, min: '1', max: '20', step: '1' }),
     ];
 
+    if (fieldUsesMaxSize(field)) {
+      blocks.splice(6, 0,
+        inputMarkup({ label: 'Max Width (mm)', prop: 'maxW', type: 'number', value: field.maxW || field.w, min: String(minWidth), max: String(pageWidth()) }),
+        inputMarkup({ label: 'Max Height (mm)', prop: 'maxH', type: 'number', value: field.maxH || field.h, min: String(minHeight), max: String(pageHeight()) })
+      );
+    }
+
     if (field.type === 'text') {
-      blocks.push(inputMarkup({ label: 'Font Size', prop: 'fontSize', type: 'number', value: field.fontSize, min: '2.8', max: '20' }));
-      blocks.push(inputMarkup({ label: 'Min Font Size', prop: 'minFontSize', type: 'number', value: field.minFontSize, min: '2.4', max: '18' }));
+      blocks.push(inputMarkup({ label: 'Max Font Size', prop: 'fontSize', type: 'number', value: field.fontSize, min: '2.8', max: '36' }));
+      blocks.push(inputMarkup({ label: 'Min Font Size', prop: 'minFontSize', type: 'number', value: field.minFontSize, min: '2.4', max: '24' }));
       blocks.push(inputMarkup({
         label: 'Alignment',
         prop: 'align',
@@ -487,7 +594,7 @@
       blocks.push(inputMarkup({ label: 'Prefix', prop: 'prefix', value: field.prefix }));
       blocks.push(inputMarkup({ label: 'Uppercase Text', prop: 'uppercase', type: 'checkbox', checked: !!field.uppercase }));
       blocks.push(inputMarkup({ label: 'Multiline Fit', prop: 'multiline', type: 'checkbox', checked: !!field.multiline }));
-      blocks.push(inputMarkup({ label: 'Max Lines', prop: 'maxLines', type: 'number', value: field.maxLines, min: '1', max: '5', step: '1' }));
+      blocks.push(inputMarkup({ label: 'Max Lines', prop: 'maxLines', type: 'number', value: field.maxLines, min: '1', max: '12', step: '1' }));
     }
 
     if (field.type === 'image' || field.type === 'qr') {
@@ -526,7 +633,7 @@
     const previewState = sampleState();
     window.BarangayIdDigital.renderInto(samplePreview, previewState, {
       eyebrow: 'Sample Preview',
-      helper: 'This preview reflects the current uploaded templates, field layout, sample values, and signatory block.',
+      helper: 'This preview reflects the current uploaded templates, field layout, sample values, and signature image.',
       frontLabel: 'Front Card',
       backLabel: 'Back Card'
     });
@@ -556,7 +663,7 @@
     const minWidth = fieldMinimumSize(field, 'w');
     const minHeight = fieldMinimumSize(field, 'h');
 
-    const numericProps = new Set(['x', 'y', 'w', 'h', 'fontSize', 'minFontSize', 'z', 'maxLines']);
+    const numericProps = new Set(['x', 'y', 'w', 'h', 'maxW', 'maxH', 'fontSize', 'minFontSize', 'z', 'maxLines']);
     const booleanProps = new Set(['uppercase', 'multiline']);
 
     if (numericProps.has(prop)) {
@@ -579,20 +686,37 @@
       field.h = squareSize;
     }
 
-    if (prop === 'w') field.w = Math.max(minWidth, Math.min(pageWidth(), Number(field.w || minWidth)));
-    if (prop === 'h') field.h = Math.max(minHeight, Math.min(pageHeight(), Number(field.h || minHeight)));
+    if (prop === 'maxW') field.maxW = Math.max(minWidth, Math.min(pageWidth(), Number(field.maxW || field.w || minWidth)));
+    if (prop === 'maxH') field.maxH = Math.max(minHeight, Math.min(pageHeight(), Number(field.maxH || field.h || minHeight)));
+    const maxWidth = fieldMaximumSize(field, 'w');
+    const maxHeight = fieldMaximumSize(field, 'h');
+    if (prop === 'w' || prop === 'maxW') field.w = Math.max(minWidth, Math.min(maxWidth, Number(field.w || minWidth)));
+    if (prop === 'h' || prop === 'maxH') field.h = Math.max(minHeight, Math.min(maxHeight, Number(field.h || minHeight)));
     if (squareLocked) {
       const minSquare = Math.max(minWidth, minHeight);
-      const maxSquare = Math.max(minSquare, Math.min(pageWidth() - Number(field.x || 0), pageHeight() - Number(field.y || 0)));
+      const maxSquare = Math.max(minSquare, Math.min(
+        fieldMaximumSize(field, 'w'),
+        fieldMaximumSize(field, 'h'),
+        pageWidth() - Number(field.x || 0),
+        pageHeight() - Number(field.y || 0)
+      ));
       const squareSize = Math.max(minSquare, Math.min(maxSquare, Number(field.w || field.h || minSquare)));
       field.w = squareSize;
       field.h = squareSize;
     }
     if (prop === 'x') field.x = Math.max(0, Math.min(pageWidth() - field.w, Number(field.x || 0)));
     if (prop === 'y') field.y = Math.max(0, Math.min(pageHeight() - field.h, Number(field.y || 0)));
-    if (prop === 'fontSize') field.fontSize = Math.max(2.8, Math.min(20, Number(field.fontSize || 2.8)));
-    if (prop === 'minFontSize') field.minFontSize = Math.max(2.4, Math.min(Number(field.fontSize || 18), Number(field.minFontSize || 2.4)));
-    if (prop === 'maxLines') field.maxLines = Math.max(1, Math.min(5, Number(field.maxLines || 1)));
+    if (prop === 'fontSize') field.fontSize = Math.max(2.8, Math.min(36, Number(field.fontSize || 2.8)));
+    if (prop === 'minFontSize') field.minFontSize = Math.max(2.4, Math.min(Number(field.fontSize || 24), Number(field.minFontSize || 2.4)));
+    if (prop === 'maxLines') {
+      field.maxLines = Math.max(1, Math.min(12, Number(field.maxLines || 1)));
+      if (field.maxLines > 1) {
+        field.multiline = true;
+      }
+    }
+    if (prop === 'multiline' && !field.multiline) {
+      field.maxLines = 1;
+    }
     if (prop === 'z') field.z = Math.max(1, Math.min(20, Number(field.z || 1)));
     renderAll();
   }
@@ -657,6 +781,8 @@
     const squareLocked = isSquareLockedField(field);
     const minWidth = fieldMinimumSize(field, 'w');
     const minHeight = fieldMinimumSize(field, 'h');
+    const maxWidth = fieldMaximumSize(field, 'w');
+    const maxHeight = fieldMaximumSize(field, 'h');
 
     const dxPx = event.clientX - state.interaction.startClientX;
     const dyPx = event.clientY - state.interaction.startClientY;
@@ -671,13 +797,13 @@
         const delta = Math.abs(dxMm) >= Math.abs(dyMm) ? dxMm : dyMm;
         const nextSize = Number((state.interaction.startField.w + delta).toFixed(2));
         const minSquare = Math.max(minWidth, minHeight);
-        const maxSquare = Math.max(minSquare, Math.min(pageWidth() - field.x, pageHeight() - field.y));
+        const maxSquare = Math.max(minSquare, Math.min(maxWidth, maxHeight, pageWidth() - field.x, pageHeight() - field.y));
         const clampedSize = Math.max(minSquare, Math.min(maxSquare, nextSize));
         field.w = clampedSize;
         field.h = clampedSize;
       } else {
-        field.w = Math.max(minWidth, Math.min(pageWidth() - field.x, Number((state.interaction.startField.w + dxMm).toFixed(2))));
-        field.h = Math.max(minHeight, Math.min(pageHeight() - field.y, Number((state.interaction.startField.h + dyMm).toFixed(2))));
+        field.w = Math.max(minWidth, Math.min(maxWidth, pageWidth() - field.x, Number((state.interaction.startField.w + dxMm).toFixed(2))));
+        field.h = Math.max(minHeight, Math.min(maxHeight, pageHeight() - field.y, Number((state.interaction.startField.h + dyMm).toFixed(2))));
       }
     }
 

@@ -9,6 +9,8 @@ $documentSettingsModuleKey = 'barangay_id';
 $documentSettingsModuleConfig = dms_get_module_config($documentSettingsModuleKey);
 $documentSettingsActionUrl = appUrl('Admin-End/Certificates/BarangayIdSettings.php');
 $documentSettingsBackUrl = appUrl((string)($documentSettingsModuleConfig['back_href'] ?? 'Admin-End/AdminDashboard.php'));
+$barangayIdSettingsSection = strtolower(trim((string)($_GET['section'] ?? '')));
+$isBarangayIdTemplateSection = $barangayIdSettingsSection === 'template';
 $documentSettingsSuccessMessage = trim((string)($_GET['success'] ?? ''));
 $documentSettingsErrorMessage = trim((string)($_GET['error'] ?? ''));
 
@@ -30,30 +32,34 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
             trim((string)($_SESSION['user_id'] ?? ''))
         );
 
-        insertUnifiedAuditLog(
-            $conn,
-            trim((string)($_SESSION['user_id'] ?? '')) ?: null,
-            trim((string)($_SESSION['role'] ?? 'Official')) ?: 'Official',
-            'document_settings',
-            'barangay_id_template',
-            $documentSettingsModuleKey,
-            'update_template',
-            'template_configuration',
-            json_encode([
-                'template' => $templateSave['before'] ?? [],
-                'signatory' => $signatorySave['before'] ?? [],
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            json_encode([
-                'template' => $templateSave['after'] ?? [],
-                'signatory' => $signatorySave['after'] ?? [],
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'Updated Barangay ID template, preview layout, and signatory settings.'
-        );
+        try {
+            insertUnifiedAuditLog(
+                $conn,
+                trim((string)($_SESSION['user_id'] ?? '')) ?: null,
+                trim((string)($_SESSION['role'] ?? 'Official')) ?: 'Official',
+                'document_settings',
+                'barangay_id_template',
+                $documentSettingsModuleKey,
+                'update_template',
+                'template_configuration',
+                json_encode([
+                    'template' => $templateSave['before'] ?? [],
+                    'signatory' => $signatorySave['before'] ?? [],
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                json_encode([
+                    'template' => $templateSave['after'] ?? [],
+                    'signatory' => $signatorySave['after'] ?? [],
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'Updated Barangay ID template, preview layout, and signature settings.'
+            );
+        } catch (Throwable $auditError) {
+            error_log('Barangay ID settings audit log failed: ' . $auditError->getMessage());
+        }
 
-        header('Location: ' . $documentSettingsActionUrl . '?success=' . rawurlencode('Barangay ID template settings saved.'));
+        header('Location: ' . $documentSettingsActionUrl . '?section=template&success=' . rawurlencode('Barangay ID template settings saved.') . '#barangay-id-settings-top');
         exit;
     } catch (Throwable $e) {
-        header('Location: ' . $documentSettingsActionUrl . '?error=' . rawurlencode($e->getMessage()));
+        header('Location: ' . $documentSettingsActionUrl . '?section=template&error=' . rawurlencode($e->getMessage()) . '#barangay-id-settings-top');
         exit;
     }
 }
@@ -105,7 +111,7 @@ $pagePayload = [
         ['type' => 'text', 'label' => 'Text Field'],
         ['type' => 'image', 'label' => 'Image Field'],
         ['type' => 'qr', 'label' => 'QR Field'],
-        ['type' => 'signatory', 'label' => 'Signatory Block'],
+        ['type' => 'image', 'label' => 'Signature', 'source' => 'punongSignatorySignatureUrl'],
         ['type' => 'cover', 'label' => 'Cover Block'],
     ],
     'signatory' => [
@@ -278,37 +284,56 @@ $pagePayload = [
     }
     .bid-editor-field {
       position: absolute;
-      border: 1.5px solid rgba(222, 113, 12, 0.75);
-      background: rgba(255, 250, 245, 0.5);
-      border-radius: 10px;
-      backdrop-filter: blur(2px);
-      box-shadow: 0 6px 16px rgba(85, 49, 13, 0.08);
+      border: 1px dashed rgba(222, 113, 12, 0.48);
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      box-shadow: none;
       cursor: move;
       overflow: hidden;
+      padding: 0;
+      font: inherit;
+      text-align: left;
     }
     .bid-editor-field.is-selected {
       border-color: #0f766e;
-      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18), 0 8px 18px rgba(15, 118, 110, 0.18);
+      background: rgba(240, 253, 250, 0.16);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
+    }
+    .bid-editor-field.is-media {
+      border-style: solid;
+      background: rgba(255, 255, 255, 0.18);
     }
     .bid-editor-field__tag {
       position: absolute;
-      top: 6px;
-      left: 6px;
+      top: 2px;
+      left: 2px;
       right: auto;
-      max-width: calc(100% - 30px);
-      padding: 0.16rem 0.42rem;
-      border-radius: 999px;
+      max-width: calc(100% - 22px);
+      padding: 0.08rem 0.3rem;
+      border-radius: 4px;
       background: rgba(255, 248, 238, 0.96);
       color: #7a4b00;
       border: 1px solid rgba(222, 113, 12, 0.45);
-      font-size: clamp(0.56rem, 0.18vw + 0.52rem, 0.72rem);
+      font-size: var(--bid-editor-label-font-size, 0.62rem);
       font-weight: 800;
       line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      opacity: 0;
+      opacity: 0.86;
       transition: opacity 140ms ease;
+    }
+    .bid-editor-field:not(.is-media) .bid-editor-field__tag {
+      inset: 0;
+      max-width: none;
+      padding: 0 0.55rem 0.18rem;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      display: flex;
+      align-items: flex-end;
+      color: #7a4b00;
+      text-overflow: ellipsis;
     }
     .bid-editor-field:hover .bid-editor-field__tag,
     .bid-editor-field.is-selected .bid-editor-field__tag {
@@ -316,17 +341,65 @@ $pagePayload = [
     }
     .bid-editor-field__sample {
       position: absolute;
-      left: 8px;
-      right: 8px;
-      top: 14px;
-      bottom: 8px;
-      font-size: clamp(0.88rem, 0.24vw + 0.8rem, 1rem);
-      line-height: 1.15;
-      color: #3f2e18;
+      inset: 0;
+      padding: 0 2px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: var(--bid-editor-font-size, 10px);
+      line-height: var(--bid-editor-line-height, 1.05);
+      color: var(--bid-editor-color, #111111);
+      font-weight: var(--bid-editor-font-weight, 800);
+      font-style: var(--bid-editor-font-style, normal);
       overflow: hidden;
       display: flex;
       align-items: center;
+      white-space: nowrap;
+      text-overflow: clip;
+      text-transform: var(--bid-editor-text-transform, none);
     }
+    .bid-editor-field__sample.is-multiline {
+      align-items: flex-start;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .bid-editor-signatory {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto auto auto;
+      justify-items: center;
+      color: #111;
+      font-family: Arial, Helvetica, sans-serif;
+      pointer-events: none;
+    }
+    .bid-editor-signatory__ink {
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .bid-editor-signatory__ink img {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .bid-editor-signatory__line {
+      width: 100%;
+      border-top: 1px solid currentColor;
+    }
+    .bid-editor-signatory__name,
+    .bid-editor-signatory__title {
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: clip;
+      text-align: center;
+      line-height: 1.05;
+    }
+    .bid-editor-signatory__name { font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .bid-editor-signatory__title { font-size: 8px; }
     .bid-editor-field__sample.is-center {
       justify-content: center;
       text-align: center;
@@ -334,6 +407,32 @@ $pagePayload = [
     .bid-editor-field__sample.is-right {
       justify-content: flex-end;
       text-align: right;
+    }
+    .bid-editor-field__media {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: var(--bid-editor-object-fit, cover);
+    }
+    .bid-editor-field__media.is-signature {
+      object-position: center bottom;
+      background: transparent;
+    }
+    .bid-editor-field__placeholder.is-signature {
+      align-content: end;
+      background: transparent;
+    }
+    .bid-editor-field__placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: rgba(122, 74, 0, 0.82);
+      background: rgba(255, 255, 255, 0.42);
+      font: 700 0.72rem/1.1 Arial, Helvetica, sans-serif;
     }
     .bid-editor-field__resize {
       position: absolute;
@@ -343,6 +442,12 @@ $pagePayload = [
       height: 18px;
       background: linear-gradient(135deg, transparent 46%, var(--bid-accent) 46%);
       cursor: nwse-resize;
+      opacity: 0;
+      transition: opacity 140ms ease;
+    }
+    .bid-editor-field:hover .bid-editor-field__resize,
+    .bid-editor-field.is-selected .bid-editor-field__resize {
+      opacity: 1;
     }
     .bid-editor-sidebar {
       display: grid;
@@ -493,9 +598,147 @@ $pagePayload = [
         width: 100%;
       }
     }
+    .bid-landing-shell {
+      max-width: var(--admin-table-shell-max-width, 1180px);
+      margin: 0 auto;
+    }
+    .bid-landing-panel {
+      border: 1px solid #dee2e6;
+      border-radius: 1rem;
+      background: #fff;
+      box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075);
+      padding: 1.5rem;
+    }
+    .bid-landing-panel__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #edf0f3;
+    }
+    .bid-landing-panel__title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #212529;
+    }
+    .bid-landing-panel__copy {
+      margin: .35rem 0 0;
+      color: #6c757d;
+      max-width: 720px;
+    }
+    .bid-function-list {
+      display: grid;
+      gap: .75rem;
+    }
+    .bid-function-item {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      border: 1px solid #eceff3;
+      border-radius: .75rem;
+      color: #212529;
+      text-decoration: none;
+      transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+    }
+    .bid-function-item:hover,
+    .bid-function-item:focus-visible {
+      color: #212529;
+      border-color: #f1b56d;
+      background: #fffaf4;
+      box-shadow: 0 .25rem .75rem rgba(222, 113, 12, .08);
+    }
+    .bid-function-item__icon {
+      display: inline-grid;
+      width: 2.75rem;
+      height: 2.75rem;
+      place-items: center;
+      border-radius: .75rem;
+      color: #de710c;
+      background: #fff4e8;
+      font-size: 1.1rem;
+    }
+    .bid-function-item__title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .bid-function-item__copy {
+      margin: .25rem 0 0;
+      color: #6c757d;
+      line-height: 1.45;
+    }
+    .bid-function-item__action {
+      white-space: nowrap;
+    }
+    @media (max-width: 767.98px) {
+      .bid-landing-panel,
+      .bid-function-item {
+        padding: 1rem;
+      }
+      .bid-landing-panel__head,
+      .bid-function-item {
+        align-items: stretch;
+      }
+      .bid-function-item {
+        grid-template-columns: 1fr;
+      }
+      .bid-function-item__action {
+        width: 100%;
+      }
+    }
   </style>
 </head>
-<body>
+<?php if (!$isBarangayIdTemplateSection): ?>
+<body id="barangay-id-settings-top">
+  <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
+    <?php include __DIR__ . '/../includes/sidebar.php'; ?>
+
+    <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
+      <div class="bid-landing-shell">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+          <div>
+            <h2 class="bid-page-title">Barangay ID Settings</h2>
+            <p class="mb-0 text-muted">Choose a Barangay ID function before opening its settings.</p>
+          </div>
+          <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($documentSettingsBackUrl, ENT_QUOTES, 'UTF-8') ?>">
+            <i class="fa-solid fa-arrow-left me-2"></i>Back to Module
+          </a>
+        </div>
+        <hr class="mt-0 mb-4">
+
+        <section class="bid-landing-panel">
+          <div class="bid-landing-panel__head">
+            <div>
+              <h3 class="bid-landing-panel__title">Available Functions</h3>
+              <p class="bid-landing-panel__copy">Open the setup area you want to manage. More Barangay ID settings can be added here later.</p>
+            </div>
+          </div>
+
+          <div class="bid-function-list">
+            <a class="bid-function-item" href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/BarangayIdSettings.php?section=template'), ENT_QUOTES, 'UTF-8') ?>">
+              <span class="bid-function-item__icon"><i class="fa-solid fa-object-group"></i></span>
+              <span>
+                <span class="bid-function-item__title">Change Barangay ID Template</span>
+                <span class="bid-function-item__copy d-block">Upload the front and back artwork, arrange fields, preview the card, and prepare the Punong Barangay signature.</span>
+              </span>
+              <span class="btn btn-warning text-white bid-function-item__action">
+                Open Function <i class="fa-solid fa-arrow-right ms-1"></i>
+              </span>
+            </a>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
+<?php exit; endif; ?>
+<body id="barangay-id-settings-top">
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
@@ -581,11 +824,11 @@ $pagePayload = [
                 <div class="bid-toolbar">
                   <div>
                     <h3 class="bid-section__title">Drag and Drop Field Layout</h3>
-                    <p class="bid-section__copy">Move every text, image, QR, and signatory block directly on top of the selected card side. Resize from the corner handle and fine-tune values in the inspector.</p>
+                    <p class="bid-section__copy">Move every text, image, QR, and signature directly on top of the selected card side. Resize from the corner handle and fine-tune values in the inspector.</p>
                   </div>
                   <div class="bid-segmented" role="tablist" aria-label="Template side selector">
                     <button type="button" class="is-active" data-bid-side-btn="front">Front Editor</button>
-                    <button type="button" data-bid-side-btn="back">Back Editor</button>
+                    <button type="button" data-bid-side-btn="back">Back Editor / Signature</button>
                   </div>
                 </div>
               </div>
@@ -595,13 +838,14 @@ $pagePayload = [
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="text"><i class="fa-solid fa-font me-1"></i>Add Text</button>
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="image"><i class="fa-solid fa-image me-1"></i>Add Image</button>
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="qr"><i class="fa-solid fa-qrcode me-1"></i>Add QR</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="signatory"><i class="fa-solid fa-signature me-1"></i>Add Signatory</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="signature"><i class="fa-solid fa-signature me-1"></i>Add Signature</button>
                     <button type="button" class="btn btn-outline-warning btn-sm" data-bid-add-type="cover"><i class="fa-solid fa-vector-square me-1"></i>Add Cover</button>
                   </div>
                   <div class="d-flex gap-2 flex-wrap">
                     <button type="button" class="btn btn-light border" id="restoreBarangayIdDefaults"><i class="fa-solid fa-rotate-left me-1"></i>Restore Default Layout</button>
                   </div>
                 </div>
+                <p class="bid-muted small mb-0">Signature placement is edited on the Back Editor. The Signature field contains only the uploaded signature image.</p>
 
                 <div class="bid-editor-shell">
                   <div class="bid-editor-canvas-wrap">
@@ -725,7 +969,7 @@ $pagePayload = [
                   </label>
                   <div>
                     <label class="form-label fw-semibold" for="signatureFilePunong">Upload Signature</label>
-                    <input class="form-control" type="file" id="signatureFilePunong" name="signature_file_punong" accept="image/png,image/jpeg">
+                    <input class="form-control" type="file" id="signatureFilePunong" name="signature_file_punong" accept="image/png">
                     <div class="form-text"><?= htmlspecialchars((string)($punongRow['signature_help'] ?? 'Shown on the back of the Barangay ID card.'), ENT_QUOTES, 'UTF-8') ?></div>
                   </div>
                   <div class="form-check">
@@ -769,7 +1013,7 @@ $pagePayload = [
   </div>
 
   <script id="barangayIdSettingsPayload" type="application/json"><?= htmlspecialchars(json_encode($pagePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_NOQUOTES, 'UTF-8') ?></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260714-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260714-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-10'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260718-10'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>

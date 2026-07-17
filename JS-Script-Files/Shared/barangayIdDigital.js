@@ -5,6 +5,9 @@
   const DEFAULT_IMAGE_PLACEHOLDER = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><rect width="320" height="320" rx="32" fill="#f8efe4"/><circle cx="160" cy="118" r="54" fill="#e2c8aa"/><path d="M76 262c18-45 56-70 84-70s66 25 84 70" fill="#e2c8aa"/><text x="160" y="300" font-family="Arial" font-size="24" font-weight="700" text-anchor="middle" fill="#8a5c2b">PHOTO</text></svg>'
   );
+  const SAMPLE_SIGNATURE = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="180" viewBox="0 0 640 180"><path d="M42 132c62-10 76-78 112-74 28 3-9 69 17 72 32 4 55-89 86-91 25-2-1 88 29 90 29 2 48-61 73-60 18 1 4 50 28 52 30 3 64-28 103-22 31 5 55 20 108 12" fill="none" stroke="#172033" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M118 151c122 13 279 13 456-3" fill="none" stroke="#172033" stroke-width="5" stroke-linecap="round"/></svg>'
+  );
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (match) => ({
@@ -191,14 +194,13 @@
         { id: 'front_birthdate_value', label: 'Birthdate', type: 'text', source: 'cardBirthdate', side: 'front', x: 32.2, y: 40.78, w: 20.5, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.4, minFontSize: 4.4, uppercase: true, z: 2 },
         { id: 'front_sex_value', label: 'Sex', type: 'text', source: 'cardSex', side: 'front', x: 57.2, y: 40.78, w: 19.5, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.4, minFontSize: 4.4, uppercase: true, z: 2 },
         { id: 'front_birthplace_value', label: 'Birthplace', type: 'text', source: 'cardBirthplace', side: 'front', x: 32.2, y: 46.98, w: 44.8, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 5.5, minFontSize: 4.0, uppercase: true, z: 2 },
-        { id: 'front_valid_until_value', label: 'Valid Until', type: 'text', source: 'validUntil', prefix: 'VALID UNTIL: ', side: 'front', x: 6.0, y: 44.78, w: 28.6, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 4.8, minFontSize: 3.7, uppercase: true, z: 2 },
+        { id: 'front_valid_until_value', label: 'Valid Until', type: 'text', source: 'validUntil', side: 'front', x: 6.0, y: 44.78, w: 28.6, h: 4.2, align: 'left', fontStyle: 'B', fontSize: 4.8, minFontSize: 3.7, uppercase: true, z: 2 },
         { id: 'front_card_number_value', label: 'Card Number', type: 'text', source: 'cardNumber', side: 'front', x: 6.4, y: 49.58, w: 28.4, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.8, minFontSize: 4.4, uppercase: true, color: '#c62828', z: 2 },
         { id: 'back_card_number_value', label: 'Card Number (Back)', type: 'text', source: 'cardNumber', side: 'back', x: 59.5, y: 3.3, w: 21.5, h: 4.6, align: 'right', fontStyle: 'B', fontSize: 7.6, minFontSize: 5.0, uppercase: true, color: '#c62828', z: 2 },
         { id: 'back_emergency_name_value', label: 'Emergency Contact Name', type: 'text', source: 'cardEmergencyName', side: 'back', x: 6.9, y: 19.7, w: 33, h: 4.6, align: 'left', fontStyle: 'B', fontSize: 6.0, minFontSize: 4.3, uppercase: true, z: 2 },
         { id: 'back_emergency_address_value', label: 'Emergency Address', type: 'text', source: 'cardEmergencyAddress', side: 'back', x: 6.9, y: 26.0, w: 39.6, h: 6, align: 'left', fontStyle: 'B', fontSize: 5.0, minFontSize: 3.2, uppercase: true, multiline: true, maxLines: 2, z: 2 },
         { id: 'back_emergency_contact_value', label: 'Emergency Contact Number', type: 'text', source: 'cardEmergencyContact', fallbackSource: 'cardContactNumber', side: 'back', x: 6.9, y: 32.2, w: 22, h: 4.4, align: 'left', fontStyle: 'B', fontSize: 6.0, minFontSize: 4.3, uppercase: true, z: 2 },
-        { id: 'back_validity_notice', label: 'Validity Notice', type: 'text', source: 'validityNotice', side: 'back', x: 7.3, y: 36.6, w: 40.5, h: 6.4, align: 'center', fontStyle: 'I', fontSize: 4.2, minFontSize: 3.2, uppercase: false, multiline: true, maxLines: 3, z: 2 },
-        { id: 'back_signatory', label: 'Punong Barangay Signatory', type: 'signatory', side: 'back', x: 9.1, y: 38.2, w: 30.8, h: 12, z: 3 },
+        { id: 'back_signature', label: 'Signature', type: 'image', source: 'punongSignatorySignatureUrl', side: 'back', x: 9.1, y: 38.2, w: 30.8, h: 8.2, fit: 'contain', z: 3 },
         { id: 'back_qr', label: 'Verification QR', type: 'qr', source: 'qrUrl', side: 'back', x: 49.0, y: 11.5, w: 32.3, h: 31.4, fit: 'fill', z: 2 }
       ]
     };
@@ -209,7 +211,7 @@
       { type: 'text', label: 'Text Field', source: 'cardFullName', side: 'front', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
       { type: 'image', label: 'Image Field', source: 'photoUrl', side: 'front', w: 18, h: 18, fit: 'cover' },
       { type: 'qr', label: 'QR Field', source: 'qrUrl', side: 'back', w: 18, h: 18, fit: 'fill' },
-      { type: 'signatory', label: 'Signatory Block', side: 'back', w: 30, h: 12 },
+      { type: 'image', label: 'Signature', source: 'punongSignatorySignatureUrl', side: 'back', w: 30, h: 8, fit: 'contain' },
       { type: 'cover', label: 'Cover Block', side: 'front', w: 18, h: 8, backgroundColor: '#ffffff' }
     ];
   }
@@ -234,6 +236,19 @@
     return ['1', 'true', 'yes', 'on'].includes(normalized);
   }
 
+  function fieldUsesMaxSize(type, source, id) {
+    if (type === 'image' || type === 'qr') return false;
+    return !(type === 'text' && (source === 'cardNumber' || String(id || '').includes('card_number')));
+  }
+
+  function defaultFieldMaxSize(field, dimension) {
+    const current = dimension === 'h' ? Number(field.h || 4) : Number(field.w || 10);
+    const pageLimit = dimension === 'h' ? PAGE_HEIGHT_MM : PAGE_WIDTH_MM;
+    const extra = dimension === 'h' ? 5 : 14;
+    const multiplier = dimension === 'h' ? 2.4 : 1.75;
+    return Math.min(pageLimit, Math.max(current * multiplier, current + extra));
+  }
+
   function normalizeLayoutField(field = {}, index = 0) {
     const rawType = String(field.type || 'text').trim().toLowerCase();
     const type = ['text', 'image', 'qr', 'signatory', 'cover'].includes(rawType) ? rawType : 'text';
@@ -251,6 +266,13 @@
     const side = String(field.side || 'front').trim().toLowerCase() === 'back' ? 'back' : 'front';
     const rawId = String(field.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
 
+    const source = String(field.source || '').trim();
+    const isFreeSize = !fieldUsesMaxSize(type, source, rawId);
+    const baseW = normalizeNumber(field.w, 10, 1.2, PAGE_WIDTH_MM);
+    const baseH = normalizeNumber(field.h, 4, 1.0, PAGE_HEIGHT_MM);
+    const defaultMaxW = isFreeSize ? PAGE_WIDTH_MM : defaultFieldMaxSize({ w: baseW, h: baseH }, 'w');
+    const defaultMaxH = isFreeSize ? PAGE_HEIGHT_MM : defaultFieldMaxSize({ w: baseW, h: baseH }, 'h');
+
     const normalized = {
       id: rawId || `field_${index + 1}`,
       label: String(field.label || 'Field').trim() || `Field ${index + 1}`,
@@ -258,27 +280,34 @@
       side,
       x: normalizeNumber(field.x, 0, 0, PAGE_WIDTH_MM),
       y: normalizeNumber(field.y, 0, 0, PAGE_HEIGHT_MM),
-      w: normalizeNumber(field.w, 10, 1.2, PAGE_WIDTH_MM),
-      h: normalizeNumber(field.h, 4, 1.0, PAGE_HEIGHT_MM),
+      w: baseW,
+      h: baseH,
+      maxW: normalizeNumber(field.maxW ?? defaultMaxW, defaultMaxW, 1.2, PAGE_WIDTH_MM),
+      maxH: normalizeNumber(field.maxH ?? defaultMaxH, defaultMaxH, 1.0, PAGE_HEIGHT_MM),
       z: normalizeInteger(field.z, 2, 1, 20),
-      source: String(field.source || '').trim(),
+      source,
       fallbackSource: String(field.fallbackSource || '').trim(),
       prefix: String(field.prefix || '').trim(),
       text: String(field.text || '').trim(),
       align,
       fontStyle,
-      fontSize: normalizeNumber(field.fontSize, 6, 2.8, 20),
-      minFontSize: normalizeNumber(field.minFontSize, 4.2, 2.4, 18),
+      fontSize: normalizeNumber(field.fontSize, 6, 2.8, 36),
+      minFontSize: normalizeNumber(field.minFontSize, 4.2, 2.4, 24),
       color,
       backgroundColor,
       uppercase: normalizeBoolean(field.uppercase, type !== 'cover'),
       multiline: normalizeBoolean(field.multiline, false),
-      maxLines: normalizeInteger(field.maxLines, 2, 1, 5),
+      maxLines: normalizeInteger(field.maxLines, 2, 1, 12),
       fit
     };
     if (normalized.minFontSize > normalized.fontSize) {
       normalized.minFontSize = normalized.fontSize;
     }
+    if (normalized.maxLines > 1) {
+      normalized.multiline = true;
+    }
+    normalized.maxW = isFreeSize ? PAGE_WIDTH_MM : Math.max(normalized.w, normalized.maxW, defaultMaxW);
+    normalized.maxH = isFreeSize ? PAGE_HEIGHT_MM : Math.max(normalized.h, normalized.maxH, defaultMaxH);
     return normalized;
   }
 
@@ -288,9 +317,17 @@
     const rawFields = Array.isArray(config.fields) && config.fields.length
       ? config.fields
       : defaults.fields;
+    const legacyRemovedIds = new Set(['back_validity_notice', 'back_signatory']);
     const fields = rawFields
       .map((field, index) => normalizeLayoutField(field, index))
-      .filter((field) => field.type !== 'label');
+      .filter((field) => field.type !== 'label'
+        && field.type !== 'signatory'
+        && field.source !== 'validityNotice'
+        && !legacyRemovedIds.has(field.id));
+    if (!fields.some((field) => field.id === 'back_signature' || (field.type === 'image' && field.source === 'punongSignatorySignatureUrl'))) {
+      const signatureDefault = defaults.fields.find((field) => field.id === 'back_signature');
+      if (signatureDefault) fields.push(normalizeLayoutField(signatureDefault, fields.length));
+    }
     fields.sort((left, right) => {
       const sideCompare = String(left.side || '').localeCompare(String(right.side || ''));
       if (sideCompare !== 0) return sideCompare;
@@ -469,12 +506,16 @@
   }
 
   function createSampleState(options = {}) {
-    return createState({
+    const state = createState({
       ...options,
       sampleData: options.sampleData && typeof options.sampleData === 'object'
         ? options.sampleData
         : defaultSampleData()
     });
+    if (!state.punongSignatorySignatureUrl) {
+      state.punongSignatorySignatureUrl = SAMPLE_SIGNATURE;
+    }
+    return state;
   }
 
   function getStateValue(state, field) {
@@ -492,10 +533,10 @@
     if (!value && field.type === 'qr') {
       value = String(state?.qrUrl || '').trim();
     }
-    if (field.type === 'image' && !value) {
+    if (field.type === 'image' && source === 'photoUrl' && !value) {
       value = String(state?.photoUrl || '').trim();
     }
-    if (value && field.uppercase) {
+    if (value && field.type === 'text' && field.uppercase) {
       value = value.toUpperCase();
     }
     return `${prefix}${value}`.trim();
@@ -534,11 +575,13 @@
 
     if (field.type === 'image' || field.type === 'qr') {
       const imageUrl = getStateValue(state, field);
-      const placeholderText = field.type === 'qr' ? 'QR HERE' : 'IMAGE';
-      const className = field.type === 'qr' ? 'barangay-id-card__qr' : 'barangay-id-card__photo';
+      const isSignature = field.type === 'image' && field.source === 'punongSignatorySignatureUrl';
+      const placeholderText = field.type === 'qr' ? 'QR HERE' : isSignature ? 'SIGNATURE' : 'IMAGE';
+      const baseClassName = field.type === 'qr' ? 'barangay-id-card__qr' : 'barangay-id-card__photo';
+      const className = `${baseClassName}${isSignature ? ' barangay-id-card__signature' : ''}`;
       const objectFit = fitToObjectPosition(field.fit);
       if (!imageUrl) {
-        return `<div class="${className} ${className}--placeholder" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">${esc(placeholderText)}</div>`;
+        return `<div class="${className} ${baseClassName}--placeholder" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">${esc(placeholderText)}</div>`;
       }
       const fallbackAttr = field.type === 'qr' && state.qrFallbackUrl
         ? ` data-fallback="${esc(state.qrFallbackUrl)}"`
@@ -554,23 +597,41 @@
     }
 
     const value = getStateValue(state, field) || '-';
-    const multilineClass = field.multiline ? ' barangay-id-card__text--multiline' : '';
+    const configuredMaxLines = Math.max(1, normalizeInteger(field.maxLines, 1, 1, 12));
+    const autoLineCapacity = Math.max(2, Math.min(12, Math.floor(Number(field.h || 0) / 2.2) || 2));
+    const shouldAutoWrap = String(value).trim().length > 24 && autoLineCapacity > 1;
+    const maxLines = shouldAutoWrap ? Math.max(configuredMaxLines, autoLineCapacity) : configuredMaxLines;
+    const isMultiline = field.multiline || maxLines > 1 || shouldAutoWrap;
+    const multilineClass = isMultiline ? ' barangay-id-card__text--multiline' : '';
     const alignClass = field.align === 'center'
       ? ' barangay-id-card__text--center'
       : field.align === 'right'
         ? ' barangay-id-card__text--right'
         : '';
-    const lineHeight = field.multiline ? 1.04 : 1.05;
+    const lineHeight = isMultiline ? 1.04 : 1.05;
+    const configuredMaxFont = Number(field.fontSize || 6);
+    const heightDrivenFont = isMultiline
+      ? (Number(field.h || 0) / Math.max(1, Math.min(maxLines, 3))) * 4.15
+      : Number(field.h || 0) * 4.15;
+    const effectiveMaxFont = Math.max(2.8, Math.min(36, Math.max(configuredMaxFont, heightDrivenFont || configuredMaxFont)));
+    const effectiveMinFont = Math.min(
+      Number(field.minFontSize || 3.2),
+      Math.max(2.4, effectiveMaxFont * 0.58)
+    );
     return `
       <div
         class="barangay-id-card__field${multilineClass}${alignClass}"
-        data-bid-autofit="1"
-        data-bid-max-font="${esc(field.fontSize)}"
-        data-bid-min-font="${esc(field.minFontSize)}"
-        data-bid-max-lines="${esc(field.maxLines || 1)}"
-        data-bid-multiline="${field.multiline ? '1' : '0'}"
         style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};color:${esc(field.color)};font-weight:${field.fontStyle.includes('B') ? '800' : '500'};font-style:${field.fontStyle.includes('I') ? 'italic' : 'normal'};text-align:${esc(field.align)};line-height:${lineHeight};"
-      >${esc(value)}</div>
+      ><span
+        class="barangay-id-card__field-text"
+        data-bid-autofit="1"
+        data-bid-max-font="${esc(effectiveMaxFont.toFixed(2))}"
+        data-bid-min-font="${esc(effectiveMinFont.toFixed(2))}"
+        data-bid-max-lines="${esc(maxLines)}"
+        data-bid-line-height="${esc(lineHeight)}"
+        data-bid-multiline="${isMultiline ? '1' : '0'}"
+        title="${esc(value)}"
+      >${esc(value)}</span></div>
     `;
   }
 
@@ -601,15 +662,19 @@
       .barangay-id-card__qr { z-index:2; overflow:hidden; }
       .barangay-id-card__field,
       .barangay-id-card__label { font-family:Arial, Helvetica, sans-serif; color:#111; overflow:hidden; }
-      .barangay-id-card__label { white-space:nowrap; text-overflow:ellipsis; }
-      .barangay-id-card__field { letter-spacing:0.01em; }
-      .barangay-id-card__text--multiline { white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+      .barangay-id-card__label { white-space:nowrap; text-overflow:clip; }
+      .barangay-id-card__field { letter-spacing:0.01em; display:flex; align-items:flex-end; }
+      .barangay-id-card__field-text { display:block; width:100%; min-width:0; overflow:hidden; }
+      .barangay-id-card__text--multiline .barangay-id-card__field-text { white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
       .barangay-id-card__text--center { text-align:center; }
       .barangay-id-card__text--right { text-align:right; }
       .barangay-id-card__photo img,
       .barangay-id-card__qr img { width:100%; height:100%; display:block; }
       .barangay-id-card__photo { background:transparent; }
       .barangay-id-card__photo img { object-position:center center; }
+      .barangay-id-card__signature { background:transparent !important; }
+      .barangay-id-card__signature img { object-position:center bottom; background:transparent; }
+      .barangay-id-card__signature.barangay-id-card__photo--placeholder { background:transparent; }
       .barangay-id-card__qr { background:transparent; }
       .barangay-id-card__qr img { image-rendering:pixelated; }
       .barangay-id-card__qr--placeholder,
@@ -628,28 +693,67 @@
   function autoFitElement(element) {
     if (!(element instanceof HTMLElement)) return;
     const maxFont = Number.parseFloat(element.dataset.bidMaxFont || '6') || 6;
-    const minFont = Number.parseFloat(element.dataset.bidMinFont || '4') || 4;
+    const preferredMinFont = Number.parseFloat(element.dataset.bidMinFont || '4') || 4;
+    const hardMinFont = 1.4;
     const isMultiline = element.dataset.bidMultiline === '1';
-    const maxLines = Math.max(1, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1);
-    element.style.fontSize = `${maxFont}px`;
+    const maxLines = Math.max(1, Math.min(12, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1));
+    const lineHeight = Math.max(0.9, Math.min(1.4, Number.parseFloat(element.dataset.bidLineHeight || (isMultiline ? '1.04' : '1.05')) || 1.05));
+    const measureBox = element.parentElement instanceof HTMLElement ? element.parentElement : element;
+    const maxVisibleHeight = (size) => Math.min(measureBox.clientHeight || Infinity, size * lineHeight * maxLines);
+    const applyTextSize = (size) => {
+      element.style.fontSize = `${size}px`;
+      element.style.lineHeight = String(lineHeight);
+      if (isMultiline) {
+        element.style.maxHeight = `${maxVisibleHeight(size)}px`;
+      }
+    };
+    applyTextSize(maxFont);
+    const fitsText = () => {
+      const visibleHeight = isMultiline ? maxVisibleHeight(size) : size * lineHeight;
+      const fitsWidth = isMultiline || element.scrollWidth <= measureBox.clientWidth + 1;
+      const fitsHeight = isMultiline
+        ? element.scrollHeight <= visibleHeight + 1
+        : visibleHeight <= measureBox.clientHeight + 1;
+      return fitsWidth && fitsHeight;
+    };
+
     if (isMultiline) {
-      element.style.display = '-webkit-box';
-      element.style.webkitBoxOrient = 'vertical';
-      element.style.webkitLineClamp = String(maxLines);
+      element.style.display = 'block';
+      element.style.webkitBoxOrient = '';
+      element.style.webkitLineClamp = '';
+      element.style.whiteSpace = 'normal';
+      element.style.textOverflow = 'clip';
     } else {
+      element.style.display = 'block';
+      element.style.webkitBoxOrient = '';
+      element.style.webkitLineClamp = '';
+      element.style.maxHeight = '';
       element.style.whiteSpace = 'nowrap';
-      element.style.textOverflow = 'ellipsis';
+      element.style.textOverflow = 'clip';
     }
 
     let size = maxFont;
-    while (size > minFont) {
-      const fitsWidth = element.scrollWidth <= element.clientWidth + 1;
-      const fitsHeight = element.scrollHeight <= element.clientHeight + 1;
-      if (fitsWidth && fitsHeight) {
+    while (size > preferredMinFont) {
+      if (fitsText()) {
         break;
       }
       size = Number((size - 0.2).toFixed(2));
-      element.style.fontSize = `${size}px`;
+      applyTextSize(size);
+    }
+
+    while (size > hardMinFont) {
+      if (fitsText()) {
+        break;
+      }
+      size = Number((size - 0.2).toFixed(2));
+      applyTextSize(size);
+    }
+
+    if (isMultiline) {
+      element.style.display = 'block';
+      element.style.webkitBoxOrient = '';
+      element.style.webkitLineClamp = '';
+      element.style.maxHeight = `${maxVisibleHeight(size)}px`;
     }
   }
 
