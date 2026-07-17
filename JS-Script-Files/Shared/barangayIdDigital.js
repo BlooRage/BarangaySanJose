@@ -740,33 +740,45 @@
       // Multiline fields use a deterministic half-size step as soon as the
       // configured full-size value would wrap. This keeps both lines readable
       // and prevents the first line from being clipped by the fixed field box.
+      const originalValue = String(element.dataset.bidValue || element.textContent || '').trim();
+      element.textContent = originalValue;
       element.style.whiteSpace = 'nowrap';
       applyTextSize(maxFont);
       if (element.scrollWidth > measureBox.clientWidth + 1) {
         size = maxFont / 2;
-        const originalValue = String(element.dataset.bidValue || element.textContent || '').trim();
         const words = originalValue.split(/\s+/).filter(Boolean);
         if (maxLines === 2 && words.length > 1) {
           const context = document.createElement('canvas').getContext('2d');
           if (context) {
             const computed = window.getComputedStyle(element);
-            context.font = `${computed.fontStyle} ${computed.fontWeight} ${maxFont}px ${computed.fontFamily}`;
-            let bestIndex = 1;
-            let bestWidth = Number.POSITIVE_INFINITY;
-            for (let index = 1; index < words.length; index += 1) {
-              const firstLine = words.slice(0, index).join(' ');
-              const secondLine = words.slice(index).join(' ');
-              const widestLine = Math.max(context.measureText(firstLine).width, context.measureText(secondLine).width);
-              if (widestLine < bestWidth) {
-                bestWidth = widestLine;
-                bestIndex = index;
-              }
+            const wrapAtSize = (fontSize) => {
+              context.font = `${computed.fontStyle} ${computed.fontWeight} ${fontSize}px ${computed.fontFamily}`;
+              const lines = [];
+              let currentLine = '';
+              words.forEach((word) => {
+                const candidate = currentLine ? `${currentLine} ${word}` : word;
+                if (currentLine && context.measureText(candidate).width > measureBox.clientWidth) {
+                  lines.push(currentLine);
+                  currentLine = word;
+                } else {
+                  currentLine = candidate;
+                }
+              });
+              if (currentLine) lines.push(currentLine);
+              return lines;
+            };
+            const halfSizeLines = wrapAtSize(size);
+            const fullSizeLines = wrapAtSize(maxFont);
+            const preservedLines = halfSizeLines.length > 1 ? halfSizeLines : fullSizeLines;
+            if (preservedLines.length === 2) {
+              element.replaceChildren(
+                document.createTextNode(preservedLines[0]),
+                document.createElement('br'),
+                document.createTextNode(preservedLines[1])
+              );
+            } else {
+              element.textContent = originalValue;
             }
-            element.replaceChildren(
-              document.createTextNode(words.slice(0, bestIndex).join(' ')),
-              document.createElement('br'),
-              document.createTextNode(words.slice(bestIndex).join(' '))
-            );
           }
         }
       }

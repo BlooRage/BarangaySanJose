@@ -2284,7 +2284,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260718bid18';
+    return 'r20260718bid19';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3776,29 +3776,14 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $lines = [];
                     $pdf->SetFont('Arial', $style, $maxSize);
                     $fullSizeLines = $wrapTextToWidth($pdf, $text, $w);
-                    if ($maxLines === 2 && count($fullSizeLines) > 1) {
-                        $words = preg_split('/\s+/', trim($text)) ?: [];
-                        if (count($words) > 1) {
-                            $bestIndex = 1;
-                            $bestWidth = INF;
-                            for ($index = 1, $wordCount = count($words); $index < $wordCount; $index++) {
-                                $firstLine = implode(' ', array_slice($words, 0, $index));
-                                $secondLine = implode(' ', array_slice($words, $index));
-                                $widestLine = max($pdf->GetStringWidth($firstLine), $pdf->GetStringWidth($secondLine));
-                                if ($widestLine < $bestWidth) {
-                                    $bestWidth = $widestLine;
-                                    $bestIndex = $index;
-                                }
-                            }
-                            $fullSizeLines = [
-                                implode(' ', array_slice($words, 0, $bestIndex)),
-                                implode(' ', array_slice($words, $bestIndex)),
-                            ];
-                        }
-                    }
                     $preserveFullSizeWrap = $maxLines > 1 && count($fullSizeLines) > 1;
                     if ($preserveFullSizeWrap) {
                         $size = $maxSize / 2;
+                        $pdf->SetFont('Arial', $style, $size);
+                        $halfSizeLines = $wrapTextToWidth($pdf, $text, $w);
+                        if (count($halfSizeLines) > 1 && count($halfSizeLines) <= $maxLines) {
+                            $fullSizeLines = $halfSizeLines;
+                        }
                     }
                     while ($size >= $hardMinSize) {
                         $pdf->SetFont('Arial', $style, $size);
@@ -8547,7 +8532,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-26', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-27', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
