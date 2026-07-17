@@ -298,7 +298,7 @@
       backgroundColor,
       uppercase: normalizeBoolean(field.uppercase, type !== 'cover'),
       multiline: normalizeBoolean(field.multiline, false),
-      maxLines: normalizeInteger(field.maxLines, 2, 1, 12),
+      maxLines: normalizeInteger(field.maxLines, normalizeBoolean(field.multiline, false) ? 2 : 1, 1, 12),
       fit
     };
     if (normalized.minFontSize > normalized.fontSize) {
@@ -600,8 +600,12 @@
     const configuredMaxLines = Math.max(1, normalizeInteger(field.maxLines, 1, 1, 12));
     const autoLineCapacity = Math.max(1, Math.min(12, Math.floor(Number(field.h || 0) / 2.1) || 1));
     const shouldAutoWrap = String(value).trim().length > 18 && autoLineCapacity > 1;
-    const maxLines = Math.max(1, Math.min(configuredMaxLines, autoLineCapacity));
-    const isMultiline = field.multiline || shouldAutoWrap;
+    const isMultiline = field.multiline || configuredMaxLines > 1 || shouldAutoWrap;
+    // Explicit multiline fields (addresses, birthplace, etc.) must use their
+    // configured line allowance before the font fitter starts shrinking text.
+    const maxLines = isMultiline
+      ? configuredMaxLines
+      : Math.max(1, Math.min(configuredMaxLines, autoLineCapacity));
     const multilineClass = isMultiline ? ' barangay-id-card__text--multiline' : '';
     const alignClass = field.align === 'center'
       ? ' barangay-id-card__text--center'

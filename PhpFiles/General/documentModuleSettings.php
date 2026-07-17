@@ -1438,7 +1438,12 @@ if (!function_exists('dms_normalize_barangay_id_field')) {
             'backgroundColor' => $backgroundColor,
             'uppercase' => dms_normalize_bool($field['uppercase'] ?? ($type !== 'cover'), $type !== 'cover'),
             'multiline' => dms_normalize_bool($field['multiline'] ?? false, false),
-            'maxLines' => dms_normalize_int_range($field['maxLines'] ?? 2, 2, 1, 12),
+            'maxLines' => dms_normalize_int_range(
+                $field['maxLines'] ?? (dms_normalize_bool($field['multiline'] ?? false, false) ? 2 : 1),
+                dms_normalize_bool($field['multiline'] ?? false, false) ? 2 : 1,
+                1,
+                12
+            ),
             'fit' => $fit,
         ];
 

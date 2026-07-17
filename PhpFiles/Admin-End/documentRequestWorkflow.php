@@ -2284,7 +2284,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260718bid13';
+    return 'r20260718bid14';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3419,7 +3419,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     }
                     $size = $maxSize;
                     $pdf->SetFont('Arial', $style, $size);
-                    $hardMinSize = 1.8;
+                    $hardMinSize = 1.0;
                     while ($size > $hardMinSize && $pdf->GetStringWidth($text) > $w) {
                         $size -= 0.2;
                         $pdf->SetFont('Arial', $style, $size);
@@ -3783,14 +3783,11 @@ function dra_generate_issued_document(array $requestRow): ?string
                         $size -= 0.2;
                     }
 
-                    if (count($lines) > $maxLines) {
-                        $maxLines = min(12, max($maxLines, count($lines)));
-                    }
-
                     $size = max($hardMinSize, $size);
                     $lineHeight = max(1.2, min(3.0, $h / max(1, count($lines)), ($size * 0.42) + 0.45));
                     $pdf->SetFont('Arial', $style, $size);
-                    $pdf->SetXY($x, $y);
+                    $blockHeight = count($lines) * $lineHeight;
+                    $pdf->SetXY($x, $y + max(0.0, $h - $blockHeight));
                     $pdf->MultiCell($w, $lineHeight, implode("\n", $lines), 0, $align, false);
                 };
                 $resolveLayoutFieldValue = static function (array $field) use ($pdfFieldState, $upperText): string {
@@ -3914,11 +3911,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $fontSize = (float)($field['fontSize'] ?? ($type === 'label' ? 5.0 : 6.0));
                     $minFontSize = (float)($field['minFontSize'] ?? ($type === 'label' ? 4.0 : 4.2));
                     $pdf->SetFont('Arial', $fontStyle, max(1.8, $fontSize));
-                    $needsAdaptiveWrap = $h >= 3.0 && $pdf->GetStringWidth($text) > $w;
+                    $configuredMultiline = !empty($field['multiline']) || (int)($field['maxLines'] ?? 1) > 1;
+                    $needsAdaptiveWrap = $configuredMultiline && $pdf->GetStringWidth($text) > $w;
                     if ($needsAdaptiveWrap) {
                         $configuredLineLimit = max(1, min(12, (int)($field['maxLines'] ?? 1)));
-                        $heightLineCapacity = max(1, min(12, (int)floor($h / 1.5)));
-                        $adaptiveMaxLines = min($configuredLineLimit, $heightLineCapacity);
                         $fitMultiline(
                             $pdf,
                             $text,
@@ -3926,7 +3922,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                             $y,
                             $w,
                             $h,
-                            $adaptiveMaxLines,
+                            $configuredLineLimit,
                             $fontStyle,
                             $fontSize,
                             $minFontSize,
@@ -8517,7 +8513,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-18', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-20', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
