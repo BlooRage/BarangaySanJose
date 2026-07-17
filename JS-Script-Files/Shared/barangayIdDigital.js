@@ -631,6 +631,7 @@
         data-bid-max-lines="${esc(maxLines)}"
         data-bid-line-height="${esc(lineHeight)}"
         data-bid-multiline="${isMultiline ? '1' : '0'}"
+        data-bid-value="${esc(value)}"
         title="${esc(value)}"
       >${esc(value)}</span></div>
     `;
@@ -741,6 +742,31 @@
       applyTextSize(maxFont);
       if (element.scrollWidth > measureBox.clientWidth + 1) {
         size = maxFont / 2;
+        const originalValue = String(element.dataset.bidValue || element.textContent || '').trim();
+        const words = originalValue.split(/\s+/).filter(Boolean);
+        if (maxLines === 2 && words.length > 1) {
+          const context = document.createElement('canvas').getContext('2d');
+          if (context) {
+            const computed = window.getComputedStyle(element);
+            context.font = `${computed.fontStyle} ${computed.fontWeight} ${maxFont}px ${computed.fontFamily}`;
+            let bestIndex = 1;
+            let bestWidth = Number.POSITIVE_INFINITY;
+            for (let index = 1; index < words.length; index += 1) {
+              const firstLine = words.slice(0, index).join(' ');
+              const secondLine = words.slice(index).join(' ');
+              const widestLine = Math.max(context.measureText(firstLine).width, context.measureText(secondLine).width);
+              if (widestLine < bestWidth) {
+                bestWidth = widestLine;
+                bestIndex = index;
+              }
+            }
+            element.replaceChildren(
+              document.createTextNode(words.slice(0, bestIndex).join(' ')),
+              document.createElement('br'),
+              document.createTextNode(words.slice(bestIndex).join(' '))
+            );
+          }
+        }
       }
       element.style.whiteSpace = 'normal';
     }
