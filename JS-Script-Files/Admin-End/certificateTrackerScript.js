@@ -10215,9 +10215,12 @@
       void manualRefreshBarangayIdCameraOptions(manualCurrentBarangayIdCameraDeviceId() || manualBarangayIdSelectedCameraId);
     });
 
-    manualPreviewBtn?.addEventListener('click', () => {
+    manualPreviewBtn?.addEventListener('click', async () => {
       try {
         const bundle = manualPreviewStateBundle();
+        if (normalizePreviewDocKey(bundle?.previewRow?.document_type || bundle?.config?.key || '') === 'barangayid') {
+          await fetchBarangayIdTemplateConfig({ force: true }).catch(() => null);
+        }
         if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
           manualSetAlert('Tag at least one clearance fee first so the manual request can proceed to finance after submission.', 'warning');
         }
@@ -10252,6 +10255,17 @@
           </div>
           ${previewHtml}
         `;
+        if (window.BarangayIdDigital && typeof window.BarangayIdDigital.hydrate === 'function') {
+          const hydrateManualBarangayId = () => window.BarangayIdDigital.hydrate(viewDetailsBody);
+          hydrateManualBarangayId();
+          window.requestAnimationFrame(() => {
+            hydrateManualBarangayId();
+            window.requestAnimationFrame(hydrateManualBarangayId);
+          });
+          window.setTimeout(hydrateManualBarangayId, 120);
+          window.setTimeout(hydrateManualBarangayId, 400);
+          viewModalEl?.addEventListener('shown.bs.modal', hydrateManualBarangayId, { once: true });
+        }
         viewDetailsBody.querySelectorAll('.doc-editable').forEach((editable) => {
           editable.setAttribute('contenteditable', 'false');
           editable.removeAttribute('data-edit-key');
