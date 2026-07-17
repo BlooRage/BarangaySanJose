@@ -614,11 +614,13 @@
         : '';
     const lineHeight = isMultiline ? 1.04 : 1.05;
     const configuredMaxFont = Number(field.fontSize || 6);
+    const isAddressField = field.source === 'cardFullAddress' || field.source === 'cardEmergencyAddress';
+    const addressFontMultiplier = isAddressField ? 3 : 1;
     const heightDrivenFont = isMultiline
       ? (Number(field.h || 0) / Math.max(1, Math.min(maxLines, 3))) * 4.15
       : Number(field.h || 0) * 4.15;
-    const effectiveMaxFont = Math.max(2.8, Math.min(36, Math.max(configuredMaxFont * 1.33, heightDrivenFont || configuredMaxFont)));
-    const effectiveMinFont = Math.max(1.4, Math.min(Number(field.minFontSize || 3.2) * 1.15, effectiveMaxFont));
+    const effectiveMaxFont = Math.max(2.8, Math.min(72, Math.max(configuredMaxFont * 1.33, heightDrivenFont || configuredMaxFont) * addressFontMultiplier));
+    const effectiveMinFont = Math.max(1.4, Math.min(Number(field.minFontSize || 3.2) * 1.15 * addressFontMultiplier, effectiveMaxFont));
     return `
       <div
         class="barangay-id-card__field${multilineClass}${alignClass}"
