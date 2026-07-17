@@ -124,9 +124,9 @@
 
   function formatEmergencyName(payload = {}, residentProfile = {}) {
     return formatCardName(
-      firstNonEmpty([payload.emergency_last, payload.emergency_last_name, residentProfile.emergency_last_name]),
-      firstNonEmpty([payload.emergency_first, payload.emergency_first_name, residentProfile.emergency_first_name]),
-      firstNonEmpty([payload.emergency_middle, payload.emergency_middle_name, residentProfile.emergency_middle_name]),
+      firstNonEmpty([payload.emergency_last, payload.emergency_last_name, residentProfile.emergency_last_name, residentProfile.emergency_last]),
+      firstNonEmpty([payload.emergency_first, payload.emergency_first_name, residentProfile.emergency_first_name, residentProfile.emergency_first]),
+      firstNonEmpty([payload.emergency_middle, payload.emergency_middle_name, residentProfile.emergency_middle_name, residentProfile.emergency_middle]),
       firstNonEmpty([payload.emergency_suffix, residentProfile.emergency_suffix])
     );
   }
@@ -421,10 +421,10 @@
       issuedDate
     );
     const fullName = formatCardName(
-      firstNonEmpty([payload.last_name, payload.lastname, residentProfile.last_name]),
-      firstNonEmpty([payload.first_name, payload.firstname, residentProfile.first_name]),
-      firstNonEmpty([payload.middle_name, payload.middlename, residentProfile.middle_name]),
-      firstNonEmpty([payload.suffix_name, payload.suffix, residentProfile.suffix])
+      firstNonEmpty([payload.last_name, payload.lastname, residentProfile.last_name, residentProfile.lastname, row.last_name, row.lastname]),
+      firstNonEmpty([payload.first_name, payload.firstname, residentProfile.first_name, residentProfile.firstname, row.first_name, row.firstname]),
+      firstNonEmpty([payload.middle_name, payload.middlename, residentProfile.middle_name, residentProfile.middlename, row.middle_name, row.middlename]),
+      firstNonEmpty([payload.suffix_name, payload.suffix, residentProfile.suffix, residentProfile.suffix_name, row.suffix, row.suffix_name])
     ) || upper(firstNonEmpty([payload.resident_name, row.resident_name]), 'RESIDENT');
     const fullAddress = upper(issuedResidenceAddress(firstNonEmpty([
       payload.full_address,
@@ -733,6 +733,17 @@
     }
 
     let size = maxFont;
+    if (isMultiline && maxLines > 1) {
+      // Multiline fields use a deterministic half-size step as soon as the
+      // configured full-size value would wrap. This keeps both lines readable
+      // and prevents the first line from being clipped by the fixed field box.
+      element.style.whiteSpace = 'nowrap';
+      applyTextSize(maxFont);
+      if (element.scrollWidth > measureBox.clientWidth + 1) {
+        size = maxFont / 2;
+      }
+      element.style.whiteSpace = 'normal';
+    }
     applyTextSize(size);
     const fitsText = () => {
       const widthLimit = Math.max(0, measureBox.clientWidth);

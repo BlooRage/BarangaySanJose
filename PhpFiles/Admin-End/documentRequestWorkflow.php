@@ -2284,7 +2284,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260718bid14';
+    return 'r20260718bid16';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3614,6 +3614,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $payload['middle_name'] ?? null,
                     $payload['middlename'] ?? null,
                     $residentProfile['middle_name'] ?? null,
+                    $residentProfile['middlename'] ?? null,
                 ]);
                 $suffixName = dra_manual_first_non_empty([
                     $payload['suffix_name'] ?? null,
@@ -3773,6 +3774,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $hardMinSize = 1.8;
                     $size = $maxSize;
                     $lines = [];
+                    $pdf->SetFont('Arial', $style, $maxSize);
+                    if ($maxLines > 1 && count($wrapTextToWidth($pdf, $text, $w)) > 1) {
+                        $size = $maxSize / 2;
+                    }
                     while ($size >= $hardMinSize) {
                         $pdf->SetFont('Arial', $style, $size);
                         $lines = $wrapTextToWidth($pdf, $text, $w);
@@ -7160,6 +7165,7 @@ function dra_manual_compose_full_name(array $payload, array $residentProfile = [
         $payload['middle_name'] ?? null,
         $payload['middlename'] ?? null,
         $residentProfile['middle_name'] ?? null,
+        $residentProfile['middlename'] ?? null,
     ]);
     $last = dra_manual_first_non_empty([
         $payload['last_name'] ?? null,
@@ -7199,6 +7205,7 @@ function dra_manual_fill_payload_from_resident(array $payload, array $residentPr
         $payload['middle_name'] ?? null,
         $payload['middlename'] ?? null,
         $residentProfile['middle_name'] ?? null,
+        $residentProfile['middlename'] ?? null,
     ]);
     $payload['last_name'] = dra_manual_first_non_empty([
         $payload['last_name'] ?? null,
@@ -8513,7 +8520,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-22', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-24', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
