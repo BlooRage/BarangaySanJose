@@ -701,6 +701,34 @@ if (!function_exists('dms_module_asset_public_path_to_disk')) {
     }
 }
 
+if (!function_exists('dms_restore_template_blob')) {
+    function dms_restore_template_blob(string $publicPath, string $blob): string
+    {
+        if ($blob === '' || strpos(str_replace('\\', '/', $publicPath), '/UnifiedFileAttachment/') === false) {
+            return '';
+        }
+        $baseDir = realpath(__DIR__ . '/../../');
+        if ($baseDir === false) {
+            return '';
+        }
+        $normalized = str_replace('\\', '/', trim($publicPath));
+        $markerPos = strpos($normalized, '/UnifiedFileAttachment/');
+        $relative = $markerPos !== false ? substr($normalized, $markerPos) : '';
+        if ($relative === '' || strtolower(pathinfo($relative, PATHINFO_EXTENSION)) !== 'png') {
+            return '';
+        }
+        $target = $baseDir . $relative;
+        $directory = dirname($target);
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            return '';
+        }
+        if (!is_file($target) && file_put_contents($target, $blob, LOCK_EX) === false) {
+            return '';
+        }
+        return is_file($target) ? $target : '';
+    }
+}
+
 if (!function_exists('dms_json_encode_pretty')) {
     function dms_json_encode_pretty($value): string
     {
@@ -726,6 +754,8 @@ if (!function_exists('dms_ensure_module_template_config_table')) {
                 module_key VARCHAR(32) NOT NULL,
                 template_front_path VARCHAR(255) DEFAULT NULL,
                 template_back_path VARCHAR(255) DEFAULT NULL,
+                template_front_blob LONGBLOB DEFAULT NULL,
+                template_back_blob LONGBLOB DEFAULT NULL,
                 layout_json LONGTEXT DEFAULT NULL,
                 sample_data_json LONGTEXT DEFAULT NULL,
                 updated_by_user_id VARCHAR(12) DEFAULT NULL,
@@ -735,6 +765,13 @@ if (!function_exists('dms_ensure_module_template_config_table')) {
                 KEY idx_document_module_config_updated (updated_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         ");
+
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'template_front_blob')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN template_front_blob LONGBLOB NULL AFTER template_back_path");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'template_back_blob')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN template_back_blob LONGBLOB NULL AFTER template_front_blob");
+        }
 
         $done = true;
     }
@@ -750,6 +787,8 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
                 module_key,
                 template_front_path,
                 template_back_path,
+                template_front_blob,
+                template_back_blob,
                 layout_json,
                 sample_data_json,
                 updated_by_user_id,
@@ -1523,6 +1562,33 @@ if (!function_exists('dms_resolve_barangay_id_template_settings')) {
         $storedBack = trim((string)($stored['template_back_path'] ?? ''));
         $frontResolved = $storedFront !== '' ? $storedFront : $defaultPaths['front'];
         $backResolved = $storedBack !== '' ? $storedBack : $defaultPaths['back'];
+        $frontDiskPath = dms_module_asset_public_path_to_disk($frontResolved);
+        $backDiskPath = dms_module_asset_public_path_to_disk($backResolved);
+        $frontBlob = (string)($stored['template_front_blob'] ?? '');
+        $backBlob = (string)($stored['template_back_blob'] ?? '');
+        if ($frontDiskPath === '' && $storedFront !== '') {
+            $frontDiskPath = dms_restore_template_blob($storedFront, $frontBlob);
+        }
+        if ($backDiskPath === '' && $storedBack !== '') {
+            $backDiskPath = dms_restore_template_blob($storedBack, $backBlob);
+        }
+        $blobBackfillNeeded = false;
+        if ($frontBlob === '' && $storedFront !== '' && $frontDiskPath !== '') {
+            $frontBlob = (string)(file_get_contents($frontDiskPath) ?: '');
+            $blobBackfillNeeded = $frontBlob !== '';
+        }
+        if ($backBlob === '' && $storedBack !== '' && $backDiskPath !== '') {
+            $backBlob = (string)(file_get_contents($backDiskPath) ?: '');
+            $blobBackfillNeeded = $blobBackfillNeeded || $backBlob !== '';
+        }
+        if ($blobBackfillNeeded) {
+            $stmtBlob = $conn->prepare("UPDATE documentmoduleconfigtbl SET template_front_blob = ?, template_back_blob = ? WHERE module_key = 'barangay_id' LIMIT 1");
+            if ($stmtBlob) {
+                $stmtBlob->bind_param('ss', $frontBlob, $backBlob);
+                $stmtBlob->execute();
+                $stmtBlob->close();
+            }
+        }
 
         $layout = dms_normalize_barangay_id_layout(
             dms_decode_json_array((string)($stored['layout_json'] ?? ''))
@@ -1537,8 +1603,8 @@ if (!function_exists('dms_resolve_barangay_id_template_settings')) {
             'back_template_path' => $backResolved,
             'front_template_custom_path' => $storedFront,
             'back_template_custom_path' => $storedBack,
-            'front_template_disk_path' => dms_module_asset_public_path_to_disk($frontResolved),
-            'back_template_disk_path' => dms_module_asset_public_path_to_disk($backResolved),
+            'front_template_disk_path' => $frontDiskPath,
+            'back_template_disk_path' => $backDiskPath,
             'layout' => $layout,
             'sample_data' => $sampleData,
             'updated_at' => trim((string)($stored['updated_at'] ?? '')),
@@ -1554,6 +1620,8 @@ if (!function_exists('dms_upsert_module_template_config')) {
         string $moduleKey,
         string $frontTemplatePath,
         string $backTemplatePath,
+        string $frontTemplateBlob,
+        string $backTemplateBlob,
         array $layout,
         array $sampleData,
         string $updatedByUserId
@@ -1568,13 +1636,17 @@ if (!function_exists('dms_upsert_module_template_config')) {
                 module_key,
                 template_front_path,
                 template_back_path,
+                template_front_blob,
+                template_back_blob,
                 layout_json,
                 sample_data_json,
                 updated_by_user_id
-            ) VALUES (?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 template_front_path = VALUES(template_front_path),
                 template_back_path = VALUES(template_back_path),
+                template_front_blob = VALUES(template_front_blob),
+                template_back_blob = VALUES(template_back_blob),
                 layout_json = VALUES(layout_json),
                 sample_data_json = VALUES(sample_data_json),
                 updated_by_user_id = VALUES(updated_by_user_id),
@@ -1584,7 +1656,7 @@ if (!function_exists('dms_upsert_module_template_config')) {
             throw new RuntimeException('Failed to prepare Barangay ID template settings update.');
         }
 
-        $stmt->bind_param('ssssss', $moduleKey, $frontTemplatePath, $backTemplatePath, $layoutJson, $sampleJson, $updatedByUserId);
+        $stmt->bind_param('ssssssss', $moduleKey, $frontTemplatePath, $backTemplatePath, $frontTemplateBlob, $backTemplateBlob, $layoutJson, $sampleJson, $updatedByUserId);
         $stmt->execute();
         $stmt->close();
     }
@@ -1599,35 +1671,53 @@ if (!function_exists('dms_save_barangay_id_template_settings')) {
         $backStored = trim((string)($stored['template_back_path'] ?? ''));
         $frontTemplatePath = $frontStored;
         $backTemplatePath = $backStored;
+        $frontTemplateBlob = (string)($stored['template_front_blob'] ?? '');
+        $backTemplateBlob = (string)($stored['template_back_blob'] ?? '');
+        if ($frontTemplateBlob === '' && $frontStored !== '') {
+            $frontDisk = dms_module_asset_public_path_to_disk($frontStored);
+            $frontTemplateBlob = $frontDisk !== '' ? (string)(file_get_contents($frontDisk) ?: '') : '';
+        }
+        if ($backTemplateBlob === '' && $backStored !== '') {
+            $backDisk = dms_module_asset_public_path_to_disk($backStored);
+            $backTemplateBlob = $backDisk !== '' ? (string)(file_get_contents($backDisk) ?: '') : '';
+        }
 
         if (!empty($post['remove_front_template'])) {
             dms_delete_module_asset_file($frontStored);
             $frontTemplatePath = '';
+            $frontTemplateBlob = '';
         }
         if (!empty($post['remove_back_template'])) {
             dms_delete_module_asset_file($backStored);
             $backTemplatePath = '';
+            $backTemplateBlob = '';
         }
 
         if (isset($files['front_template_file']) && is_array($files['front_template_file'])) {
             $uploadErrorCode = (int)($files['front_template_file']['error'] ?? UPLOAD_ERR_NO_FILE);
             if ($uploadErrorCode !== UPLOAD_ERR_NO_FILE) {
+                $frontTmpName = trim((string)($files['front_template_file']['tmp_name'] ?? ''));
+                $newFrontBlob = $frontTmpName !== '' ? (string)(file_get_contents($frontTmpName) ?: '') : '';
                 $newFrontPath = dms_store_uploaded_template_png('barangay_id', 'front', $files['front_template_file']);
                 if ($frontStored !== '' && $frontStored !== $newFrontPath) {
                     dms_delete_module_asset_file($frontStored);
                 }
                 $frontTemplatePath = $newFrontPath;
+                $frontTemplateBlob = $newFrontBlob;
             }
         }
 
         if (isset($files['back_template_file']) && is_array($files['back_template_file'])) {
             $uploadErrorCode = (int)($files['back_template_file']['error'] ?? UPLOAD_ERR_NO_FILE);
             if ($uploadErrorCode !== UPLOAD_ERR_NO_FILE) {
+                $backTmpName = trim((string)($files['back_template_file']['tmp_name'] ?? ''));
+                $newBackBlob = $backTmpName !== '' ? (string)(file_get_contents($backTmpName) ?: '') : '';
                 $newBackPath = dms_store_uploaded_template_png('barangay_id', 'back', $files['back_template_file']);
                 if ($backStored !== '' && $backStored !== $newBackPath) {
                     dms_delete_module_asset_file($backStored);
                 }
                 $backTemplatePath = $newBackPath;
+                $backTemplateBlob = $newBackBlob;
             }
         }
 
@@ -1645,6 +1735,8 @@ if (!function_exists('dms_save_barangay_id_template_settings')) {
             'barangay_id',
             $frontTemplatePath,
             $backTemplatePath,
+            $frontTemplateBlob,
+            $backTemplateBlob,
             $layout,
             $sampleData,
             $updatedByUserId

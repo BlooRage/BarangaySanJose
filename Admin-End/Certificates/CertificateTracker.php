@@ -3544,7 +3544,7 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-16"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-preview-06"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-17"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-preview-07"></script>
 </body>
 </html>

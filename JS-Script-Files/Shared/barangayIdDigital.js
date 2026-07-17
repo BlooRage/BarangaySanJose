@@ -610,7 +610,10 @@
         : '';
     const lineHeight = isMultiline ? 1.04 : 1.05;
     const configuredMaxFont = Number(field.fontSize || 6);
-    const effectiveMaxFont = Math.max(2.8, Math.min(36, configuredMaxFont * 1.33));
+    const heightDrivenFont = isMultiline
+      ? (Number(field.h || 0) / Math.max(1, Math.min(maxLines, 3))) * 4.15
+      : Number(field.h || 0) * 4.15;
+    const effectiveMaxFont = Math.max(2.8, Math.min(36, Math.max(configuredMaxFont * 1.33, heightDrivenFont || configuredMaxFont)));
     const effectiveMinFont = Math.max(1.4, Math.min(Number(field.minFontSize || 3.2) * 1.15, effectiveMaxFont));
     return `
       <div
@@ -624,6 +627,10 @@
         data-bid-max-lines="${esc(maxLines)}"
         data-bid-line-height="${esc(lineHeight)}"
         data-bid-multiline="${isMultiline ? '1' : '0'}"
+        data-bid-base-width="${esc(width)}"
+        data-bid-base-height="${esc(height)}"
+        data-bid-max-width="${esc(mmToPct(Math.max(Number(field.w || 0), Number(field.maxW || field.w || 0)), page.width_mm))}"
+        data-bid-max-height="${esc(mmToPct(Math.max(Number(field.h || 0), Number(field.maxH || field.h || 0)), page.height_mm))}"
         title="${esc(value)}"
       >${esc(value)}</span></div>
     `;
@@ -696,6 +703,12 @@
     if (measureBox.clientWidth <= 1 || measureBox.clientHeight <= 1) {
       return;
     }
+    const baseWidth = String(element.dataset.bidBaseWidth || '').trim();
+    const baseHeight = String(element.dataset.bidBaseHeight || '').trim();
+    const maxWidth = String(element.dataset.bidMaxWidth || baseWidth).trim();
+    const maxHeight = String(element.dataset.bidMaxHeight || baseHeight).trim();
+    if (baseWidth) measureBox.style.width = baseWidth;
+    if (baseHeight) measureBox.style.height = baseHeight;
     const applyTextSize = (size) => {
       element.style.fontSize = `${size}px`;
       element.style.lineHeight = String(lineHeight);
@@ -729,6 +742,11 @@
       const renderedLines = Math.max(1, Math.round(element.scrollHeight / Math.max(1, size * lineHeight)));
       return fitsWidth && fitsHeight && (!isMultiline || renderedLines <= maxLines);
     };
+
+    if (!fitsText()) {
+      if (maxWidth) measureBox.style.width = maxWidth;
+      if (isMultiline && maxHeight) measureBox.style.height = maxHeight;
+    }
     while (size > preferredMinFont) {
       if (fitsText()) {
         break;

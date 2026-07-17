@@ -704,7 +704,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-16"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-17"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');
