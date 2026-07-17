@@ -494,9 +494,9 @@
       punongSignatorySignatureUrl: resolvePublicUrl(appBase, firstNonEmpty([row.punong_signatory_signature_path])),
       templateVariant: firstNonEmpty([templateVariant, 'empty']),
       frontTemplateUrl: resolvedFrontTemplateUrl,
-      frontTemplateFallbackUrl: resolvedFrontTemplateUrl,
+      frontTemplateFallbackUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${TEMPLATE_ASSET_VERSION}`,
       backTemplateUrl: resolvedBackTemplateUrl,
-      backTemplateFallbackUrl: resolvedBackTemplateUrl,
+      backTemplateFallbackUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${TEMPLATE_ASSET_VERSION}`,
       layoutConfig: normalizeLayoutConfig(layoutConfig)
     };
 
@@ -583,17 +583,14 @@
       if (!imageUrl) {
         return `<div class="${className} ${baseClassName}--placeholder" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">${esc(placeholderText)}</div>`;
       }
-      const fallbackAttr = field.type === 'qr' && state.qrFallbackUrl
-        ? ` data-fallback="${esc(state.qrFallbackUrl)}"`
-        : '';
-      const onError = field.type === 'qr'
-        ? "const fallback=this.getAttribute('data-fallback');if(fallback&&this.dataset.fallbackTried!=='1'){this.dataset.fallbackTried='1';this.src=fallback;return;}this.parentElement.remove();"
+      const fallbackUrl = field.type === 'qr'
+        ? String(state.qrFallbackUrl || '').trim()
         : isSignature
-          ? 'this.remove();'
-          : 'this.src="' + esc(DEFAULT_IMAGE_PLACEHOLDER) + '";this.onerror=null;';
+          ? ''
+          : DEFAULT_IMAGE_PLACEHOLDER;
       return `
         <div class="${className}" style="left:${left};top:${top};width:${width};height:${height};z-index:${field.z};">
-          <img src="${esc(imageUrl)}" alt="${esc(field.label || placeholderText)}"${fallbackAttr} onerror="${onError}" style="object-fit:${objectFit};">
+          <img src="${esc(imageUrl)}" alt="${esc(field.label || placeholderText)}" data-bid-image-kind="${isSignature ? 'signature' : field.type}" data-bid-fallback="${esc(fallbackUrl)}" style="object-fit:${objectFit};">
         </div>
       `;
     }
@@ -762,6 +759,19 @@
   function hydrate(root) {
     ensureStyles();
     const scope = root instanceof Element ? root : document;
+    scope.querySelectorAll('img[data-bid-fallback], img[data-bid-template-fallback]').forEach((image) => {
+      image.addEventListener('error', () => {
+        const fallback = String(image.dataset.bidFallback || image.dataset.bidTemplateFallback || '').trim();
+        if (fallback && image.dataset.bidFallbackTried !== '1' && image.src !== fallback) {
+          image.dataset.bidFallbackTried = '1';
+          image.src = fallback;
+          return;
+        }
+        if (image.dataset.bidImageKind === 'signature' || image.dataset.bidImageKind === 'qr') {
+          image.remove();
+        }
+      });
+    });
     scope.querySelectorAll('[data-bid-autofit="1"]').forEach((element) => autoFitElement(element));
   }
 
@@ -790,14 +800,14 @@
           <section class="barangay-id-digital__panel">
             <span class="barangay-id-digital__label">${esc(frontLabel)}</span>
             <div class="barangay-id-card">
-              <img class="barangay-id-card__bg" src="${esc(state.frontTemplateUrl || '')}" alt="Barangay ID front template" onerror="this.onerror=null;this.src='${esc(state.frontTemplateFallbackUrl || '')}';">
+              <img class="barangay-id-card__bg" src="${esc(state.frontTemplateUrl || '')}" alt="Barangay ID front template" data-bid-template-fallback="${esc(state.frontTemplateFallbackUrl || '')}">
               ${frontFields}
             </div>
           </section>
           <section class="barangay-id-digital__panel">
             <span class="barangay-id-digital__label">${esc(backLabel)}</span>
             <div class="barangay-id-card">
-              <img class="barangay-id-card__bg" src="${esc(state.backTemplateUrl || '')}" alt="Barangay ID back template" onerror="this.onerror=null;this.src='${esc(state.backTemplateFallbackUrl || '')}';">
+              <img class="barangay-id-card__bg" src="${esc(state.backTemplateUrl || '')}" alt="Barangay ID back template" data-bid-template-fallback="${esc(state.backTemplateFallbackUrl || '')}">
               ${backFields}
             </div>
           </section>

@@ -58,20 +58,22 @@ if ($action === 'barangay_id_template_config') {
     $backDiskPath = trim((string)($templateAssets['back'] ?? ''));
     $frontVersion = $frontDiskPath !== '' && is_file($frontDiskPath) ? (string)@filemtime($frontDiskPath) : '';
     $backVersion = $backDiskPath !== '' && is_file($backDiskPath) ? (string)@filemtime($backDiskPath) : '';
+    $frontPublicUrl = dra_public_asset_path($frontPublicPath);
+    $backPublicUrl = dra_public_asset_path($backPublicPath);
     dr_respond_json(200, [
         'success' => true,
-        'front_template_url' => $frontPublicPath !== ''
-            ? appUrl($frontPublicPath . ($frontVersion !== '' ? '?v=' . rawurlencode($frontVersion) : ''))
+        'front_template_url' => $frontPublicUrl !== ''
+            ? $frontPublicUrl . ($frontVersion !== '' ? '?v=' . rawurlencode($frontVersion) : '')
             : '',
-        'back_template_url' => $backPublicPath !== ''
-            ? appUrl($backPublicPath . ($backVersion !== '' ? '?v=' . rawurlencode($backVersion) : ''))
+        'back_template_url' => $backPublicUrl !== ''
+            ? $backPublicUrl . ($backVersion !== '' ? '?v=' . rawurlencode($backVersion) : '')
             : '',
         'template_variant' => trim((string)($templateAssets['variant'] ?? 'empty')) ?: 'empty',
         'layout' => is_array($templateAssets['layout'] ?? null) ? $templateAssets['layout'] : dms_barangay_id_default_layout(),
         'sample_data' => is_array($templateAssets['sample_data'] ?? null) ? $templateAssets['sample_data'] : dms_barangay_id_default_sample_data(),
         'punong_signatory_name' => trim((string)($punongSignatory['name'] ?? '')),
         'punong_signatory_title' => trim((string)($punongSignatory['title'] ?? '')),
-        'punong_signatory_signature_url' => $punongSignaturePath !== '' ? appUrl($punongSignaturePath) : '',
+        'punong_signatory_signature_url' => $punongSignaturePath !== '' ? dra_public_asset_path($punongSignaturePath) : '',
     ]);
 }
 
@@ -8523,7 +8525,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-12', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-13', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
