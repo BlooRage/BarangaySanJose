@@ -2284,7 +2284,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260718bid12';
+    return 'r20260718bid13';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3915,23 +3915,17 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $minFontSize = (float)($field['minFontSize'] ?? ($type === 'label' ? 4.0 : 4.2));
                     $pdf->SetFont('Arial', $fontStyle, max(1.8, $fontSize));
                     $needsAdaptiveWrap = $h >= 3.0 && $pdf->GetStringWidth($text) > $w;
-                    $fitWidth = $needsAdaptiveWrap
-                        ? min(85.6 - $x, max($w, (float)($field['maxW'] ?? $w)))
-                        : $w;
-                    $fitHeight = $needsAdaptiveWrap
-                        ? min(54.1 - $y, max($h, (float)($field['maxH'] ?? $h)))
-                        : $h;
                     if ($needsAdaptiveWrap) {
                         $configuredLineLimit = max(1, min(12, (int)($field['maxLines'] ?? 1)));
-                        $heightLineCapacity = max(1, min(12, (int)floor($fitHeight / 1.5)));
+                        $heightLineCapacity = max(1, min(12, (int)floor($h / 1.5)));
                         $adaptiveMaxLines = min($configuredLineLimit, $heightLineCapacity);
                         $fitMultiline(
                             $pdf,
                             $text,
                             $x,
                             $y,
-                            $fitWidth,
-                            $fitHeight,
+                            $w,
+                            $h,
                             $adaptiveMaxLines,
                             $fontStyle,
                             $fontSize,
@@ -8523,7 +8517,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-17', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-18', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';

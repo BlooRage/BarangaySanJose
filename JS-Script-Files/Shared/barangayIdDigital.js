@@ -627,10 +627,6 @@
         data-bid-max-lines="${esc(maxLines)}"
         data-bid-line-height="${esc(lineHeight)}"
         data-bid-multiline="${isMultiline ? '1' : '0'}"
-        data-bid-base-width="${esc(width)}"
-        data-bid-base-height="${esc(height)}"
-        data-bid-max-width="${esc(mmToPct(Math.max(Number(field.w || 0), Number(field.maxW || field.w || 0)), page.width_mm))}"
-        data-bid-max-height="${esc(mmToPct(Math.max(Number(field.h || 0), Number(field.maxH || field.h || 0)), page.height_mm))}"
         title="${esc(value)}"
       >${esc(value)}</span></div>
     `;
@@ -703,12 +699,6 @@
     if (measureBox.clientWidth <= 1 || measureBox.clientHeight <= 1) {
       return;
     }
-    const baseWidth = String(element.dataset.bidBaseWidth || '').trim();
-    const baseHeight = String(element.dataset.bidBaseHeight || '').trim();
-    const maxWidth = String(element.dataset.bidMaxWidth || baseWidth).trim();
-    const maxHeight = String(element.dataset.bidMaxHeight || baseHeight).trim();
-    if (baseWidth) measureBox.style.width = baseWidth;
-    if (baseHeight) measureBox.style.height = baseHeight;
     const applyTextSize = (size) => {
       element.style.fontSize = `${size}px`;
       element.style.lineHeight = String(lineHeight);
@@ -743,10 +733,6 @@
       return fitsWidth && fitsHeight && (!isMultiline || renderedLines <= maxLines);
     };
 
-    if (!fitsText()) {
-      if (maxWidth) measureBox.style.width = maxWidth;
-      if (isMultiline && maxHeight) measureBox.style.height = maxHeight;
-    }
     while (size > preferredMinFont) {
       if (fitsText()) {
         break;
