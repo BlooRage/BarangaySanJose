@@ -2286,7 +2286,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260713bid09';
+    return 'r20260718bid10';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3414,23 +3414,17 @@ function dra_generate_issued_document(array $requestRow): ?string
                     float $maxSize = 7.5,
                     float $minSize = 4.5,
                     string $align = 'L'
-                ) use ($safeSubstr): void {
+                ): void {
                     $text = trim($text);
                     if ($text === '') {
                         return;
                     }
                     $size = $maxSize;
                     $pdf->SetFont('Arial', $style, $size);
-                    while ($size > $minSize && $pdf->GetStringWidth($text) > $w) {
+                    $hardMinSize = 1.8;
+                    while ($size > $hardMinSize && $pdf->GetStringWidth($text) > $w) {
                         $size -= 0.2;
                         $pdf->SetFont('Arial', $style, $size);
-                    }
-                    if ($pdf->GetStringWidth($text) > $w) {
-                        $ellipsis = '...';
-                        while ($text !== '' && $pdf->GetStringWidth($text . $ellipsis) > $w) {
-                            $text = rtrim($safeSubstr($text, 0, max(0, $safeLen($text) - 1)));
-                        }
-                        $text = $text === '' ? $ellipsis : ($text . $ellipsis);
                     }
                     $pdf->SetXY($x, $y);
                     $pdf->Cell($w, 3.0, $text, 0, 0, $align, false);
@@ -3496,7 +3490,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     string $style = 'B',
                     float $maxSize = 6.4,
                     float $minSize = 4.0
-                ) use ($safeSubstr, $safeLen, $wrapTextToWidth): void {
+                ) use ($wrapTextToWidth): void {
                     $text = trim($text);
                     if ($text === '') {
                         return;
@@ -3778,31 +3772,26 @@ function dra_generate_issued_document(array $requestRow): ?string
                         return;
                     }
 
-                    $lineHeight = max(1.8, min(3.0, $h / max(1, $maxLines)));
+                    $hardMinSize = 1.8;
                     $size = $maxSize;
                     $lines = [];
-                    while ($size >= $minSize) {
+                    while ($size >= $hardMinSize) {
                         $pdf->SetFont('Arial', $style, $size);
                         $lines = $wrapTextToWidth($pdf, $text, $w);
-                        if (count($lines) <= $maxLines && (count($lines) * $lineHeight) <= ($h + 0.2)) {
+                        $candidateLineHeight = max(1.2, min(3.0, ($size * 0.42) + 0.45));
+                        if (count($lines) <= $maxLines && (count($lines) * $candidateLineHeight) <= ($h + 0.2)) {
                             break;
                         }
                         $size -= 0.2;
                     }
 
                     if (count($lines) > $maxLines) {
-                        $pdf->SetFont('Arial', $style, max($minSize, $size));
-                        $lines = array_slice($lines, 0, $maxLines);
-                        $ellipsis = '...';
-                        $lastIndex = max(0, $maxLines - 1);
-                        $lastLine = trim((string)($lines[$lastIndex] ?? ''));
-                        while ($lastLine !== '' && $pdf->GetStringWidth($lastLine . $ellipsis) > $w) {
-                            $lastLine = rtrim($safeSubstr($lastLine, 0, max(0, $safeLen($lastLine) - 1)));
-                        }
-                        $lines[$lastIndex] = $lastLine === '' ? $ellipsis : ($lastLine . $ellipsis);
+                        $maxLines = min(12, max($maxLines, count($lines)));
                     }
 
-                    $pdf->SetFont('Arial', $style, max($minSize, $size));
+                    $size = max($hardMinSize, $size);
+                    $lineHeight = max(1.2, min(3.0, $h / max(1, count($lines)), ($size * 0.42) + 0.45));
+                    $pdf->SetFont('Arial', $style, $size);
                     $pdf->SetXY($x, $y);
                     $pdf->MultiCell($w, $lineHeight, implode("\n", $lines), 0, $align, false);
                 };
@@ -3926,7 +3915,14 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $fontStyle = trim((string)($field['fontStyle'] ?? ($type === 'label' ? 'I' : 'B')));
                     $fontSize = (float)($field['fontSize'] ?? ($type === 'label' ? 5.0 : 6.0));
                     $minFontSize = (float)($field['minFontSize'] ?? ($type === 'label' ? 4.0 : 4.2));
-                    if (!empty($field['multiline'])) {
+                    $pdf->SetFont('Arial', $fontStyle, max(1.8, $minFontSize));
+                    $needsAdaptiveWrap = !empty($field['multiline'])
+                        || ($h >= 3.6 && $pdf->GetStringWidth($text) > $w);
+                    if ($needsAdaptiveWrap) {
+                        $adaptiveMaxLines = max(
+                            max(1, (int)($field['maxLines'] ?? 1)),
+                            min(12, max(1, (int)floor($h / 1.5)))
+                        );
                         $fitMultiline(
                             $pdf,
                             $text,
@@ -3934,7 +3930,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                             $y,
                             $w,
                             $h,
-                            max(1, (int)($field['maxLines'] ?? 2)),
+                            $adaptiveMaxLines,
                             $fontStyle,
                             $fontSize,
                             $minFontSize,
@@ -8525,7 +8521,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-13', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-14', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';

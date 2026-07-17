@@ -597,10 +597,10 @@
 
     const value = getStateValue(state, field) || '-';
     const configuredMaxLines = Math.max(1, normalizeInteger(field.maxLines, 1, 1, 12));
-    const autoLineCapacity = Math.max(2, Math.min(12, Math.floor(Number(field.h || 0) / 2.2) || 2));
-    const shouldAutoWrap = String(value).trim().length > 24 && autoLineCapacity > 1;
+    const autoLineCapacity = Math.max(1, Math.min(12, Math.floor(Number(field.h || 0) / 2.1) || 1));
+    const shouldAutoWrap = String(value).trim().length > 18 && autoLineCapacity > 1;
     const maxLines = shouldAutoWrap ? Math.max(configuredMaxLines, autoLineCapacity) : configuredMaxLines;
-    const isMultiline = field.multiline || maxLines > 1 || shouldAutoWrap;
+    const isMultiline = field.multiline || shouldAutoWrap;
     const multilineClass = isMultiline ? ' barangay-id-card__text--multiline' : '';
     const alignClass = field.align === 'center'
       ? ' barangay-id-card__text--center'
@@ -609,14 +609,8 @@
         : '';
     const lineHeight = isMultiline ? 1.04 : 1.05;
     const configuredMaxFont = Number(field.fontSize || 6);
-    const heightDrivenFont = isMultiline
-      ? (Number(field.h || 0) / Math.max(1, Math.min(maxLines, 3))) * 4.15
-      : Number(field.h || 0) * 4.15;
-    const effectiveMaxFont = Math.max(2.8, Math.min(36, Math.max(configuredMaxFont, heightDrivenFont || configuredMaxFont)));
-    const effectiveMinFont = Math.min(
-      Number(field.minFontSize || 3.2),
-      Math.max(2.4, effectiveMaxFont * 0.58)
-    );
+    const effectiveMaxFont = Math.max(2.8, Math.min(36, configuredMaxFont * 1.33));
+    const effectiveMinFont = Math.max(1.4, Math.min(Number(field.minFontSize || 3.2) * 1.15, effectiveMaxFont));
     return `
       <div
         class="barangay-id-card__field${multilineClass}${alignClass}"
@@ -698,22 +692,10 @@
     const maxLines = Math.max(1, Math.min(12, Number.parseInt(element.dataset.bidMaxLines || '1', 10) || 1));
     const lineHeight = Math.max(0.9, Math.min(1.4, Number.parseFloat(element.dataset.bidLineHeight || (isMultiline ? '1.04' : '1.05')) || 1.05));
     const measureBox = element.parentElement instanceof HTMLElement ? element.parentElement : element;
-    const maxVisibleHeight = (size) => Math.min(measureBox.clientHeight || Infinity, size * lineHeight * maxLines);
     const applyTextSize = (size) => {
       element.style.fontSize = `${size}px`;
       element.style.lineHeight = String(lineHeight);
-      if (isMultiline) {
-        element.style.maxHeight = `${maxVisibleHeight(size)}px`;
-      }
-    };
-    applyTextSize(maxFont);
-    const fitsText = () => {
-      const visibleHeight = isMultiline ? maxVisibleHeight(size) : size * lineHeight;
-      const fitsWidth = isMultiline || element.scrollWidth <= measureBox.clientWidth + 1;
-      const fitsHeight = isMultiline
-        ? element.scrollHeight <= visibleHeight + 1
-        : visibleHeight <= measureBox.clientHeight + 1;
-      return fitsWidth && fitsHeight;
+      element.style.maxHeight = 'none';
     };
 
     if (isMultiline) {
@@ -722,6 +704,8 @@
       element.style.webkitLineClamp = '';
       element.style.whiteSpace = 'normal';
       element.style.textOverflow = 'clip';
+      element.style.overflowWrap = 'anywhere';
+      element.style.wordBreak = 'normal';
     } else {
       element.style.display = 'block';
       element.style.webkitBoxOrient = '';
@@ -732,6 +716,15 @@
     }
 
     let size = maxFont;
+    applyTextSize(size);
+    const fitsText = () => {
+      const widthLimit = Math.max(0, measureBox.clientWidth);
+      const heightLimit = Math.max(0, measureBox.clientHeight);
+      const fitsWidth = element.scrollWidth <= widthLimit + 1;
+      const fitsHeight = element.scrollHeight <= heightLimit + 1;
+      const renderedLines = Math.max(1, Math.round(element.scrollHeight / Math.max(1, size * lineHeight)));
+      return fitsWidth && fitsHeight && (!isMultiline || renderedLines <= maxLines);
+    };
     while (size > preferredMinFont) {
       if (fitsText()) {
         break;
@@ -749,10 +742,7 @@
     }
 
     if (isMultiline) {
-      element.style.display = 'block';
-      element.style.webkitBoxOrient = '';
-      element.style.webkitLineClamp = '';
-      element.style.maxHeight = `${maxVisibleHeight(size)}px`;
+      element.style.maxHeight = `${measureBox.clientHeight}px`;
     }
   }
 
