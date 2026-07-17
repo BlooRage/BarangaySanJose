@@ -484,7 +484,7 @@
       prop,
       type = 'text',
       value = '',
-      step = '0.1',
+      step = 'any',
       min = '',
       max = '',
       checked = false,
