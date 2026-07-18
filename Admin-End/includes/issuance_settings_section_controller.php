@@ -14,6 +14,7 @@ $sectionActionUrl=appUrl($sectionRoutes[$issuanceSection]);
 $settingsOverviewUrl=appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php');
 $issuanceSettings=dms_resolve_issuance_settings($conn);
 $governmentOfficialRows=dms_list_government_official_dropdown($conn);
+$notificationRecipientOptions=$issuanceSection==='notifications' ? dms_list_notification_recipient_options($conn) : [];
 $successMessage=trim((string)($_GET['success']??''));
 $errorMessage=trim((string)($_GET['error']??''));
 

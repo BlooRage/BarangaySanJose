@@ -122,6 +122,8 @@ if (!function_exists('dms_default_issuance_settings')) {
             'aging_notification_enabled' => true,
             'aging_days' => 3,
             'aging_message' => '{count} certificate request(s) have been pending for at least {days} day(s).',
+            'aging_recipient_mode' => 'module_access',
+            'aging_recipient_user_ids' => [],
             'certificates' => $certificates,
         ];
     }
@@ -181,6 +183,12 @@ if (!function_exists('dms_save_issuance_settings')) {
             $settings['aging_notification_enabled'] = isset($post['aging_notification_enabled']);
             $settings['aging_days'] = max(1, min(90, (int)($post['aging_days'] ?? 3)));
             $settings['aging_message'] = trim((string)($post['aging_message'] ?? $settings['aging_message']));
+            $recipientMode = strtolower(trim((string)($post['aging_recipient_mode'] ?? 'module_access')));
+            $settings['aging_recipient_mode'] = in_array($recipientMode, ['module_access', 'specific'], true) ? $recipientMode : 'module_access';
+            $settings['aging_recipient_user_ids'] = array_values(array_unique(array_slice(array_filter(array_map(
+                static fn($value): string => preg_replace('/[^A-Za-z0-9_-]/', '', trim((string)$value)) ?: '',
+                (array)($post['aging_recipient_user_ids'] ?? [])
+            )), 0, 100)));
             foreach ($settings['resident_notifications'] as $event => &$notification) {
                 $notification['enabled'] = isset($post['notification_enabled'][$event]);
                 $message = trim((string)($post['notification_message'][$event] ?? ''));
@@ -204,6 +212,27 @@ if (!function_exists('dms_save_issuance_settings')) {
         if (!$stmt->execute()) throw new RuntimeException('Unable to save issuance settings.');
         $stmt->close();
         return ['before' => $before, 'after' => dms_resolve_issuance_settings($conn)];
+    }
+}
+
+if (!function_exists('dms_list_notification_recipient_options')) {
+    function dms_list_notification_recipient_options(mysqli $conn): array
+    {
+        if (!dms_db_table_exists($conn, 'officialinformationtbl')) return [];
+        $positionExpr = dms_db_column_exists($conn, 'officialinformationtbl', 'position_access') ? 'COALESCE(position_access, role_access)' : 'role_access';
+        $departmentExpr = dms_db_column_exists($conn, 'officialinformationtbl', 'department') ? 'department' : "''";
+        $result = $conn->query("SELECT user_id, firstname, middlename, lastname, suffix, role_access, {$positionExpr} AS position_access, {$departmentExpr} AS department FROM officialinformationtbl WHERE user_id IS NOT NULL AND TRIM(user_id) <> '' ORDER BY lastname, firstname");
+        $rows = [];
+        if ($result instanceof mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                $row = function_exists('pii_decrypt_official_row') ? (pii_decrypt_official_row($row) ?? $row) : $row;
+                $name = dms_format_official_display_name((string)($row['firstname'] ?? ''), (string)($row['middlename'] ?? ''), (string)($row['lastname'] ?? ''), (string)($row['suffix'] ?? ''));
+                if ($name === '') $name = (string)($row['user_id'] ?? 'Employee');
+                $rows[] = ['user_id'=>(string)$row['user_id'],'name'=>$name,'position'=>(string)($row['position_access']??$row['role_access']??''),'department'=>(string)($row['department']??'')];
+            }
+            $result->free();
+        }
+        return $rows;
     }
 }
 
