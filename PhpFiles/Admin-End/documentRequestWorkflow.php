@@ -2354,6 +2354,58 @@ function dra_barangay_id_generated_number(array $payload, string $requestId, Dat
     return 'A' . $issuedDateObj->format('Y') . '-' . $serial;
 }
 
+function dra_latest_barangay_id_number(mysqli $conn, string $residentId, string $residentUserId): string
+{
+    if (!dr_table_exists($conn, 'documentrequesttbl') || !dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+        return '';
+    }
+    $identityClauses = [];
+    $values = [];
+    $types = '';
+    if ($residentId !== '' && dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+        $identityClauses[] = 'resident_id = ?';
+        $values[] = $residentId;
+        $types .= 's';
+    }
+    if ($residentUserId !== '' && dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
+        $identityClauses[] = 'resident_user_id = ?';
+        $values[] = $residentUserId;
+        $types .= 's';
+    }
+    if (!$identityClauses) {
+        return '';
+    }
+    $sql = "SELECT request_details FROM documentrequesttbl
+            WHERE LOWER(TRIM(document_type)) = 'barangay id'
+              AND (" . implode(' OR ', $identityClauses) . ")
+            ORDER BY request_id DESC LIMIT 50";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return '';
+    }
+    $bindArgs = [$types];
+    foreach ($values as $index => &$value) {
+        $bindArgs[] = &$value;
+    }
+    unset($value);
+    call_user_func_array([$stmt, 'bind_param'], $bindArgs);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $payload = json_decode((string)($row['request_details'] ?? ''), true);
+        if (!is_array($payload)) {
+            continue;
+        }
+        $number = trim((string)($payload['barangay_id_number'] ?? $payload['resident_id_number'] ?? $payload['resident_id_no'] ?? ''));
+        if ($number !== '') {
+            $stmt->close();
+            return strtoupper($number);
+        }
+    }
+    $stmt->close();
+    return '';
+}
+
 function dra_barangay_id_generated_valid_until(array $payload, DateTimeInterface $issuedDateObj, ?string $storedValidity = null): string
 {
     foreach (
@@ -7442,6 +7494,15 @@ if ($action === 'search_manual_residents') {
             e.phone_number AS emergency_contact,
             e.address AS emergency_address,
             (
+                SELECT uf_id.id_number
+                FROM unifiedfileattachmenttbl uf_id
+                WHERE uf_id.source_type = 'ResidentProfiling'
+                  AND uf_id.source_id = r.resident_id
+                  AND TRIM(COALESCE(uf_id.id_number, '')) <> ''
+                ORDER BY uf_id.upload_timestamp DESC, uf_id.attachment_id DESC
+                LIMIT 1
+            ) AS id_number,
+            (
                 SELECT uf.file_path
                 FROM unifiedfileattachmenttbl uf
                 LEFT JOIN documenttypelookuptbl dt
@@ -7529,6 +7590,13 @@ if ($action === 'search_manual_residents') {
             'sector_membership' => (string)($row['sector_membership'] ?? ''),
             'occupation' => $occupation,
             'contact_number' => (string)($row['phone_number'] ?? ''),
+            'id_number' => (string)($row['id_number'] ?? ''),
+            'unit_number' => (string)($row['unit_number'] ?? ''),
+            'street_number' => (string)($row['street_number'] ?? ''),
+            'street_name' => (string)($row['street_name'] ?? ''),
+            'phase_number' => (string)($row['phase_number'] ?? ''),
+            'subdivision' => (string)($row['subdivision'] ?? ''),
+            'area_number' => (string)($row['area_number'] ?? ''),
             'full_address' => dra_compose_resident_full_address([
                 'unit_number' => (string)($row['unit_number'] ?? ''),
                 'street_number' => (string)($row['street_number'] ?? ''),
@@ -7553,7 +7621,7 @@ if ($action === 'search_manual_residents') {
         $items = array_values(array_filter($items, static function (array $item) use ($search): bool {
             return pii_search_match($item, [
                 'resident_id',
-                'resident_user_id',
+                'id_number',
                 'firstname',
                 'middlename',
                 'lastname',
@@ -7566,6 +7634,14 @@ if ($action === 'search_manual_residents') {
         }));
     }
     $items = array_slice($items, 0, 12);
+    foreach ($items as &$item) {
+        $item['existing_barangay_id_number'] = dra_latest_barangay_id_number(
+            $conn,
+            (string)($item['resident_id'] ?? ''),
+            (string)($item['resident_user_id'] ?? '')
+        );
+    }
+    unset($item);
 
     dr_respond_json(200, ['success' => true, 'items' => $items]);
 }
@@ -7648,8 +7724,26 @@ if ($action === 'create_manual_request') {
     }
 
     if (dr_is_barangay_id_document_type($documentType)) {
-        $payload['request_purpose'] = 'Barangay ID Application';
-        $payload['purpose'] = 'Barangay ID Application';
+        $barangayIdRequestType = strtolower(trim((string)($payload['barangay_id_request_type'] ?? 'new')));
+        if (!in_array($barangayIdRequestType, ['new', 'renewal'], true)) {
+            $barangayIdRequestType = 'new';
+        }
+        $payload['barangay_id_request_type'] = $barangayIdRequestType;
+        if ($barangayIdRequestType === 'renewal') {
+            $existingBarangayIdNumber = dra_latest_barangay_id_number($conn, $residentId, $residentUserId);
+            if ($existingBarangayIdNumber === '') {
+                dr_respond_json(422, [
+                    'success' => false,
+                    'message' => 'No previously issued Barangay ID number was found for this resident. Use a new application instead.',
+                ]);
+            }
+            $payload['barangay_id_number'] = $existingBarangayIdNumber;
+            $payload['previous_barangay_id_number'] = $existingBarangayIdNumber;
+        }
+        $payload['request_purpose'] = $barangayIdRequestType === 'renewal'
+            ? 'Barangay ID Renewal / Re-issue'
+            : 'Barangay ID Application';
+        $payload['purpose'] = $payload['request_purpose'];
         $requiredBarangayIdFields = [
             'birthdate' => 'Birthdate is required for Barangay ID.',
             'birthplace' => 'Birthplace is required for Barangay ID.',

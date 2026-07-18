@@ -3760,10 +3760,10 @@
     } else if (isBarangayId) {
       if (window.BarangayIdDigital && typeof window.BarangayIdDigital.render === 'function') {
         return window.BarangayIdDigital.render(state, {
-          eyebrow: 'Barangay ID Preview',
-          helper: 'This preview uses the Barangay ID front and back template that staff will prepare for release.',
-          frontLabel: 'Front Template',
-          backLabel: 'Back Template',
+          eyebrow: 'Initial Barangay ID Preview',
+          helper: 'Review the resident information on the actual front and back ID layout before creating the record.',
+          frontLabel: 'ID Front',
+          backLabel: 'ID Back',
         });
       }
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY ID APPLICATION</div></div>';
@@ -8178,6 +8178,7 @@
 
     const manualResidentModeExisting = document.getElementById('manualResidentModeExisting');
     const manualResidentModeWalkin = document.getElementById('manualResidentModeWalkin');
+    const manualResidentModeRenewal = document.getElementById('manualResidentModeRenewal');
     const manualResidentLookupWrap = document.getElementById('manualResidentLookupWrap');
     const manualResidentSearchInput = document.getElementById('manualResidentSearchInput');
     const manualResidentSearchBtn = document.getElementById('manualResidentSearchBtn');
@@ -8213,11 +8214,27 @@
     const manualValiditySummaryWrap = document.getElementById('manualValiditySummaryWrap');
     const manualValiditySummaryLabel = document.getElementById('manualValiditySummaryLabel');
     const manualValiditySummary = document.getElementById('manualValiditySummary');
+    const manualValidityProcessMount = document.getElementById('manualValidityProcessMount');
+    const manualBarangayIdPhotoStepMount = document.getElementById('manualBarangayIdPhotoStepMount');
+    const manualIdWizardPanels = Array.from(manualForm.querySelectorAll('[data-manual-id-step-panel]'));
+    const manualIdWizardSteps = Array.from(document.querySelectorAll('.manual-id-process-step'));
+    const manualIdWizardBack = document.getElementById('manualIdWizardBack');
+    const manualIdWizardNext = document.getElementById('manualIdWizardNext');
+    const manualIdWizardPosition = document.getElementById('manualIdWizardPosition');
+    const manualIdInlinePreview = document.getElementById('manualIdInlinePreview');
+    let manualIdWizardCurrentStep = 1;
+    if (isIdIssuanceTrackerView && manualValidityProcessMount && manualValidityWrap) {
+      manualValidityWrap.className = 'col-12 d-none';
+      manualValidityProcessMount.appendChild(manualValidityWrap);
+    }
     const manualLastName = document.getElementById('manualLastName');
     const manualFirstName = document.getElementById('manualFirstName');
     const manualMiddleName = document.getElementById('manualMiddleName');
     const manualSuffix = document.getElementById('manualSuffix');
     const manualBirthdate = document.getElementById('manualBirthdate');
+    const manualBirthMonth = document.getElementById('manualBirthMonth');
+    const manualBirthDay = document.getElementById('manualBirthDay');
+    const manualBirthYear = document.getElementById('manualBirthYear');
     const manualSex = document.getElementById('manualSex');
     const manualCivilStatus = document.getElementById('manualCivilStatus');
     const manualContactNumber = document.getElementById('manualContactNumber');
@@ -8225,6 +8242,14 @@
     const manualOccupation = document.getElementById('manualOccupation');
     const manualReligion = document.getElementById('manualReligion');
     const manualFullAddress = document.getElementById('manualFullAddress');
+    const manualAddressLine = document.getElementById('manualAddressLine');
+    const manualAreaNumber = document.getElementById('manualAreaNumber');
+    const manualBarangay = document.getElementById('manualBarangay');
+    const manualCity = document.getElementById('manualCity');
+    const manualProvince = document.getElementById('manualProvince');
+    const manualAreaNumberModalEl = document.getElementById('manualAreaNumberModal');
+    const manualAreaNumberModal = manualAreaNumberModalEl ? getOrCreateModalInstance(manualAreaNumberModalEl) : null;
+    const manualAreaOptions = Array.from(document.querySelectorAll('[data-manual-area-option]'));
     const manualBarangayIdPhotoModalEl = document.getElementById('manualBarangayIdPhotoModal');
     const manualBarangayIdPhotoModal = manualBarangayIdPhotoModalEl ? getOrCreateModalInstance(manualBarangayIdPhotoModalEl) : null;
     const manualBarangayIdPhotoStatus = document.getElementById('manualBarangayIdPhotoStatus');
@@ -8322,8 +8347,147 @@
       manualFormAlert.classList.remove('d-none');
     }
 
+    function manualSyncStructuredAddress() {
+      if (!manualAddressLine || !manualFullAddress) return;
+      const parts = [
+        manualAddressLine.value,
+        manualAreaNumber?.value,
+        manualBarangay?.value ? `Barangay ${manualBarangay.value}` : '',
+        manualCity?.value,
+        manualProvince?.value,
+      ].map((part) => String(part || '').trim()).filter(Boolean);
+      manualFullAddress.value = parts.join(', ');
+    }
+
+    function manualSetAreaNumber(value = '') {
+      if (!manualAreaNumber) return;
+      manualAreaNumber.value = String(value || '').trim();
+      manualAreaOptions.forEach((option) => {
+        option.classList.toggle('is-selected', option.dataset.manualAreaOption === manualAreaNumber.value);
+      });
+      manualSyncStructuredAddress();
+    }
+
+    function manualRefreshBirthDays(preferredDay = '') {
+      if (!manualBirthDay) return;
+      const month = Number(manualBirthMonth?.value || 0);
+      const year = Number(manualBirthYear?.value || new Date().getFullYear());
+      const daysInMonth = month ? new Date(year, month, 0).getDate() : 31;
+      const selectedDay = String(preferredDay || manualBirthDay.value || '').padStart(2, '0');
+      manualBirthDay.innerHTML = '<option value="">Day</option>' + Array.from({ length: daysInMonth }, (_, index) => {
+        const value = String(index + 1).padStart(2, '0');
+        return `<option value="${value}"${value === selectedDay ? ' selected' : ''}>${index + 1}</option>`;
+      }).join('');
+    }
+
+    function manualSyncBirthdateFromDropdowns() {
+      if (!manualBirthdate || !manualBirthMonth || !manualBirthDay || !manualBirthYear) return;
+      manualRefreshBirthDays();
+      const month = manualBirthMonth.value;
+      const day = manualBirthDay.value;
+      const year = manualBirthYear.value;
+      manualBirthdate.value = month && day && year ? `${year}-${month}-${day}` : '';
+      const today = new Date().toISOString().slice(0, 10);
+      manualBirthYear.setCustomValidity(manualBirthdate.value && manualBirthdate.value > today ? 'Birthdate cannot be in the future.' : '');
+    }
+
+    function manualSyncBirthdateDropdownsFromValue() {
+      if (!manualBirthdate || !manualBirthMonth || !manualBirthDay || !manualBirthYear) return;
+      const match = String(manualBirthdate.value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      manualBirthYear.value = match?.[1] || '';
+      manualBirthMonth.value = match?.[2] || '';
+      manualRefreshBirthDays(match?.[3] || '');
+      manualBirthDay.value = match?.[3] || '';
+    }
+
+    function manualShowIdWizardStep(step, scroll = false) {
+      if (!isIdIssuanceTrackerView || !manualIdWizardPanels.length) return;
+      manualIdWizardCurrentStep = Math.max(1, Math.min(5, Number(step) || 1));
+      manualIdWizardPanels.forEach((panel) => {
+        panel.classList.toggle('d-none', Number(panel.dataset.manualIdStepPanel) !== manualIdWizardCurrentStep);
+      });
+      manualIdWizardSteps.forEach((item, index) => {
+        const itemStep = index + 1;
+        item.classList.toggle('is-active', itemStep === manualIdWizardCurrentStep);
+        item.classList.toggle('is-complete', itemStep < manualIdWizardCurrentStep);
+        item.setAttribute('aria-current', itemStep === manualIdWizardCurrentStep ? 'step' : 'false');
+      });
+      if (manualIdWizardBack) manualIdWizardBack.disabled = manualIdWizardCurrentStep === 1;
+      if (manualIdWizardNext) manualIdWizardNext.classList.toggle('d-none', manualIdWizardCurrentStep === 5);
+      if (manualSubmitBtn && isIdIssuanceTrackerView) manualSubmitBtn.classList.toggle('d-none', manualIdWizardCurrentStep !== 5);
+      if (manualIdWizardPosition) manualIdWizardPosition.textContent = `Step ${manualIdWizardCurrentStep} of 5`;
+      manualSetAlert('', 'warning');
+      if (manualIdWizardCurrentStep === 5) void manualRenderIdInlinePreview();
+      if (scroll) manualPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function manualRenderIdInlinePreview() {
+      if (!manualIdInlinePreview) return;
+      manualIdInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing ID preview…</div>';
+      try {
+        const bundle = manualPreviewStateBundle();
+        await fetchBarangayIdTemplateConfig({ force: true }).catch(() => null);
+        manualIdInlinePreview.innerHTML = renderDocumentPreview(
+          buildPreviewState(bundle.previewRow, bundle.payload, bundle.residentProfile, null)
+        );
+        manualIdInlinePreview.querySelectorAll('.doc-editable').forEach((editable) => {
+          editable.setAttribute('contenteditable', 'false');
+          editable.removeAttribute('data-edit-key');
+        });
+        if (window.BarangayIdDigital && typeof window.BarangayIdDigital.hydrate === 'function') {
+          const hydrate = () => window.BarangayIdDigital.hydrate(manualIdInlinePreview);
+          hydrate();
+          requestAnimationFrame(() => requestAnimationFrame(hydrate));
+          window.setTimeout(hydrate, 150);
+        }
+        manualPreviewSignature = bundle.signature;
+        if (manualSubmitBtn) manualSubmitBtn.disabled = false;
+      } catch (error) {
+        manualPreviewSignature = '';
+        if (manualSubmitBtn) manualSubmitBtn.disabled = true;
+        manualIdInlinePreview.innerHTML = `<div class="alert alert-danger mb-0">${esc(error?.message || 'Unable to build the Barangay ID preview.')}</div>`;
+      }
+    }
+
+    function manualValidateIdWizardStep() {
+      if (manualIdWizardCurrentStep === 1 && manualCurrentMode() !== 'walkin' && !manualSelectedResident) {
+        manualSetAlert('Select a registered resident before continuing, or choose Walk-in Resident.', 'warning');
+        manualResidentSearchInput?.focus();
+        return false;
+      }
+      if (manualIdWizardCurrentStep === 1 && manualCurrentMode() === 'renewal' && !manualSelectedResident?.existing_barangay_id_number) {
+        manualSetAlert('This resident has no previously issued Barangay ID number. Choose Registered Resident for a new application.', 'warning');
+        return false;
+      }
+      if (manualIdWizardCurrentStep === 3 && !manualCurrentBarangayIdPhoto().previewUrl) {
+        manualSetAlert('Take or select the resident ID photo before continuing.', 'warning');
+        return false;
+      }
+      if (manualIdWizardCurrentStep === 2 && manualAreaNumber && !manualAreaNumber.value.trim()) {
+        manualSetFieldInvalidState(manualAreaNumber, true);
+        manualSetAlert('Select the resident Area Number before continuing.', 'warning');
+        manualAreaNumber?.focus();
+        return false;
+      }
+      const currentPanels = manualIdWizardPanels.filter(
+        (panel) => Number(panel.dataset.manualIdStepPanel) === manualIdWizardCurrentStep
+      );
+      const invalidField = currentPanels
+        .flatMap((panel) => Array.from(panel.querySelectorAll('input, select, textarea')))
+        .find((field) => !field.disabled && !field.checkValidity());
+      if (invalidField) {
+        manualSetFieldInvalidState(invalidField, true);
+        manualSetAlert('Complete the required information in this step before continuing.', 'warning');
+        invalidField.focus();
+        return false;
+      }
+      return true;
+    }
+
     function manualCurrentMode() {
-      return manualResidentModeWalkin?.checked ? 'walkin' : 'existing';
+      if (manualResidentModeWalkin?.checked) return 'walkin';
+      if (manualResidentModeRenewal?.checked) return 'renewal';
+      return 'existing';
     }
 
     function manualSelectedSectorValues() {
@@ -8732,7 +8896,7 @@
     }
 
     function manualUpdateBarangayIdPhotoField() {
-      const photoField = manualDynamicFields?.querySelector('[data-manual-photo-field="barangay_id"]');
+      const photoField = manualForm?.querySelector('[data-manual-photo-field="barangay_id"]');
       if (!photoField) return;
       const preview = manualCurrentBarangayIdPhoto();
       const previewBox = photoField.querySelector('[data-manual-photo-preview]');
@@ -8763,11 +8927,13 @@
       }
       if (actions) {
         const buttons = [
-          manualBarangayIdPhotoButton(preview.mode === 'custom' ? 'Retake Photo' : 'Take Photo', 'take', 'outline-primary', 'fa-camera'),
+          manualBarangayIdPhotoButton(
+            preview.mode === 'custom' ? 'Retake Photo' : 'Open Camera',
+            'take',
+            preview.previewUrl ? 'outline-primary' : 'primary',
+            'fa-camera'
+          ),
         ];
-        if (preview.previewUrl) {
-          buttons.push(manualBarangayIdPhotoButton('View / Adjust', 'adjust', 'outline-secondary', 'fa-crop-simple'));
-        }
         if (manualBarangayIdHasResidentPhoto() && manualBarangayIdPhotoMode !== 'resident') {
           buttons.push(manualBarangayIdPhotoButton('Use Linked Photo', 'linked', 'outline-secondary', 'fa-id-card'));
         }
@@ -9052,6 +9218,8 @@
       const resident = {
         resident_id: String(firstNonEmpty([record.resident_id])).trim(),
         resident_user_id: String(firstNonEmpty([record.resident_user_id, record.user_id])).trim(),
+        id_number: String(firstNonEmpty([record.id_number, record.barangay_id_number])).trim(),
+        existing_barangay_id_number: String(firstNonEmpty([record.existing_barangay_id_number])).trim(),
         first_name: String(firstNonEmpty([record.firstname, record.first_name])).trim(),
         middle_name: String(firstNonEmpty([record.middlename, record.middle_name])).trim(),
         last_name: String(firstNonEmpty([record.lastname, record.last_name])).trim(),
@@ -9076,6 +9244,9 @@
         phase_number: String(firstNonEmpty([record.phase_number])).trim(),
         subdivision: String(firstNonEmpty([record.subdivision])).trim(),
         area_number: String(firstNonEmpty([record.area_number])).trim(),
+        barangay: String(firstNonEmpty([record.barangay, record.full_barangay])).trim(),
+        municipality_city: String(firstNonEmpty([record.municipality_city, record.city, record.municipality])).trim(),
+        province: String(firstNonEmpty([record.province])).trim(),
         house_ownership: String(firstNonEmpty([record.house_ownership])).trim(),
         house_type: String(firstNonEmpty([record.house_type])).trim(),
         residency_duration: String(firstNonEmpty([record.residency_duration])).trim(),
@@ -9208,21 +9379,23 @@
         .filter(Boolean)
         .join(' ');
 
-      if (manualSelectedResident && mode === 'existing') {
-        manualResidentSummary.textContent = `${manualSelectedResident.full_name || typedName || 'Registered resident'} (${manualSelectedResident.resident_id || 'linked'})`;
-      } else if (typedName) {
-        manualResidentSummary.textContent = mode === 'walkin' ? `Walk-in: ${typedName}` : typedName;
-      } else {
-        manualResidentSummary.textContent = mode === 'walkin' ? 'Walk-in / not linked yet' : 'Registered resident not selected yet';
+      if (manualResidentSummary) {
+        if (manualSelectedResident && mode === 'existing') {
+          manualResidentSummary.textContent = `${manualSelectedResident.full_name || typedName || 'Registered resident'} (${manualSelectedResident.resident_id || 'linked'})`;
+        } else if (typedName) {
+          manualResidentSummary.textContent = mode === 'walkin' ? `Walk-in: ${typedName}` : typedName;
+        } else {
+          manualResidentSummary.textContent = mode === 'walkin' ? 'Walk-in / not linked yet' : 'Registered resident not selected yet';
+        }
       }
 
-      manualDocumentSummary.textContent = config ? config.label : 'Select a manual issuance form';
-      manualNextStageSummary.textContent = manualExpectedStage(config).label;
-      if (manualValidityWrap && manualValidityDate && manualValiditySummaryWrap && manualValiditySummary) {
+      if (manualDocumentSummary) manualDocumentSummary.textContent = config ? config.label : 'Select a manual issuance form';
+      if (manualNextStageSummary) manualNextStageSummary.textContent = manualExpectedStage(config).label;
+      if (manualValidityWrap && manualValidityDate) {
         const validityKind = manualValidityKind(config);
         const showValidity = !!validityKind;
         manualValidityWrap.classList.toggle('d-none', !showValidity);
-        manualValiditySummaryWrap.classList.toggle('d-none', !showValidity);
+        manualValiditySummaryWrap?.classList.toggle('d-none', !showValidity);
         if (showValidity) {
           if (!String(manualValidityDate.value || '').trim()) {
             manualValidityDate.value = configureValidityField(
@@ -9243,13 +9416,17 @@
           if (manualValiditySummaryLabel) {
             manualValiditySummaryLabel.textContent = validityKind === 'barangay_id' ? 'Barangay ID Validity' : 'Certificate Validity';
           }
-          manualValiditySummary.textContent = formatValiditySummary(manualValidityDate.value, validityKind);
+          if (manualValiditySummary) {
+            manualValiditySummary.textContent = formatValiditySummary(manualValidityDate.value, validityKind);
+          }
         } else {
           manualValidityDate.value = '';
           if (manualValiditySummaryLabel) {
             manualValiditySummaryLabel.textContent = 'Selected Validity';
           }
-          manualValiditySummary.textContent = 'Default: 45 days after approval';
+          if (manualValiditySummary) {
+            manualValiditySummary.textContent = 'Default: 45 days after approval';
+          }
         }
       }
     }
@@ -9313,9 +9490,23 @@
             { name: 'emergency_last', label: 'Emergency Last Name', type: 'text', required: true, col: 'col-md-3' },
             { name: 'emergency_first', label: 'Emergency First Name', type: 'text', required: true, col: 'col-md-3' },
             { name: 'emergency_middle', label: 'Emergency Middle Name', type: 'text', col: 'col-md-3' },
-            { name: 'emergency_suffix', label: 'Emergency Suffix', type: 'text', col: 'col-md-3' },
+            { name: 'emergency_suffix', label: 'Emergency Suffix', type: 'select', col: 'col-md-3', options: [
+              { value: 'Jr.', label: 'Jr.' },
+              { value: 'Sr.', label: 'Sr.' },
+              { value: 'II', label: 'II' },
+              { value: 'III', label: 'III' },
+              { value: 'IV', label: 'IV' }
+            ] },
+            { name: 'emergency_relationship', label: 'Relationship', type: 'select', required: true, col: 'col-md-6', options: [
+              { value: 'Parent', label: 'Parent' },
+              { value: 'Spouse', label: 'Spouse' },
+              { value: 'Sibling', label: 'Sibling' },
+              { value: 'Child', label: 'Child' },
+              { value: 'Relative', label: 'Other Relative' },
+              { value: 'Guardian', label: 'Guardian' }
+            ] },
             { name: 'emergency_contact', label: 'Emergency Contact Number', type: 'text', required: true, col: 'col-md-6' },
-            { name: 'emergency_address', label: 'Emergency Address', type: 'textarea', required: true, col: 'col-md-6', rows: 2 },
+            { name: 'emergency_address', label: 'Emergency Address', type: 'textarea', required: true, col: 'col-12', rows: 2 },
             { name: 'barangay_id_photo_capture', label: 'Barangay ID Photo', type: 'photo_capture', required: true, col: 'col-12' }
           ];
         case 'residency':
@@ -9379,23 +9570,26 @@
         return `
           <div class="${col}">
             <div class="manual-photo-field" data-manual-photo-field="barangay_id">
-              <div class="manual-photo-field-header">
-                <div>
-                  <h6>${field.label}</h6>
-                  <p>Take the resident photo using the computer camera, then adjust the square crop before saving it for the Barangay ID.</p>
-                </div>
-                <span class="manual-photo-chip" data-manual-photo-chip><i class="fas fa-camera"></i>Photo required for Barangay ID</span>
-              </div>
-              <div class="d-flex flex-wrap gap-3 align-items-start">
+              <div class="manual-photo-capture-layout">
                 <div class="manual-photo-preview-box" data-manual-photo-preview>
                   <div class="manual-photo-preview-placeholder">No Barangay ID photo saved yet. Take a photo, then crop and save it here.</div>
                 </div>
                 <div class="manual-photo-meta">
+                  <span class="manual-photo-chip" data-manual-photo-chip><i class="fas fa-camera"></i>Required ID photo</span>
+                  <div class="manual-photo-guidance">
+                    <h6>Capture the resident's ID photo</h6>
+                    <p>Use a clear, recent photo with the resident facing forward against a plain background.</p>
+                    <ul>
+                      <li>Keep the full face visible</li>
+                      <li>Use even lighting</li>
+                      <li>Center the face inside the crop guide</li>
+                    </ul>
+                  </div>
                   <div class="manual-photo-actions" data-manual-photo-actions>
-                    ${manualBarangayIdPhotoButton('Take Photo', 'take', 'outline-primary', 'fa-camera')}
+                    ${manualBarangayIdPhotoButton('Open Camera', 'take', 'primary', 'fa-camera')}
                   </div>
                   <p class="manual-photo-note" data-manual-photo-note>
-                    Capture the resident through the webcam, then crop and save a square photo for the Barangay ID.
+                    You can review and crop the image before it is saved.
                   </p>
                 </div>
               </div>
@@ -9537,13 +9731,21 @@
         manualUpdateSummary();
         return;
       }
-      manualSpecificFieldsHint.textContent = config.clearance
-        ? 'Clearance forms can also tag fees here so finance receives the exact walk-in amount.'
-        : 'Complete the extra fields that appear in the chosen handwritten form.';
+      manualSpecificFieldsHint.textContent = config.kind === 'barangay_id'
+        ? 'Record one reachable emergency contact for the resident.'
+        : (config.clearance
+          ? 'Clearance forms can also tag fees here so finance receives the exact walk-in amount.'
+          : 'Complete the extra fields that appear in the chosen handwritten form.');
       if (!fields.length) {
         manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">No additional fields are required beyond the basic information and purpose for this form.</div></div>';
       } else {
         manualDynamicFields.innerHTML = fields.map(manualFieldHtml).join('');
+      }
+      if (config.kind === 'barangay_id' && manualBarangayIdPhotoStepMount) {
+        const photoColumn = manualDynamicFields.querySelector('[data-manual-photo-field="barangay_id"]')?.closest('[class*="col-"]');
+        if (photoColumn) manualBarangayIdPhotoStepMount.replaceChildren(photoColumn);
+      } else if (manualBarangayIdPhotoStepMount) {
+        manualBarangayIdPhotoStepMount.replaceChildren();
       }
       manualApplyResidentDynamicFields();
       manualUpdateBarangayIdPhotoField();
@@ -9586,6 +9788,7 @@
         emergency_first: resident.emergency_first_name,
         emergency_middle: resident.emergency_middle_name,
         emergency_suffix: resident.emergency_suffix,
+        emergency_relationship: resident.emergency_relationship,
         emergency_contact: resident.emergency_contact,
         emergency_address: resident.emergency_address,
       };
@@ -9617,6 +9820,10 @@
         if (!field) return;
         field.value = '';
       });
+      if (manualAddressLine) manualAddressLine.value = '';
+      manualSyncBirthdateDropdownsFromValue();
+      manualSetAreaNumber('');
+      manualSyncStructuredAddress();
 
       if (manualDynamicFields) {
         [
@@ -9659,6 +9866,7 @@
       manualMiddleName.value = resident.middle_name || '';
       manualSuffix.value = resident.suffix || '';
       manualBirthdate.value = resident.birthdate || '';
+      manualSyncBirthdateDropdownsFromValue();
       manualBirthdate.dispatchEvent(new Event('input', { bubbles: true }));
       manualBirthdate.dispatchEvent(new Event('change', { bubbles: true }));
       manualBirthplace.value = resident.birthplace || '';
@@ -9667,13 +9875,27 @@
       manualContactNumber.value = resident.contact_number || '';
       manualOccupation.value = resident.occupation || '';
       manualReligion.value = resident.religion || '';
-      manualFullAddress.value = resident.full_address || '';
+      if (manualAddressLine) {
+        const structuredAddress = [
+          resident.unit_number,
+          resident.house_number,
+          resident.street_name,
+          resident.phase_number,
+          resident.subdivision,
+        ].map((part) => String(part || '').trim()).filter(Boolean).join(', ');
+        manualAddressLine.value = structuredAddress || resident.full_address || '';
+        manualSetAreaNumber(resident.area_number || '');
+        manualSyncStructuredAddress();
+      } else {
+        manualFullAddress.value = resident.full_address || '';
+      }
       manualApplyResidentDynamicFields();
 
       manualSelectedResidentName.textContent = resident.full_name || 'Linked resident';
       manualSelectedResidentMeta.textContent = [
         resident.resident_id ? `Resident ID: ${resident.resident_id}` : '',
-        resident.resident_user_id ? `User ID: ${resident.resident_user_id}` : '',
+        resident.id_number ? `ID Number: ${resident.id_number}` : '',
+        manualCurrentMode() === 'renewal' && resident.existing_barangay_id_number ? `Existing Barangay ID: ${resident.existing_barangay_id_number}` : '',
         resident.full_address || '',
       ].filter(Boolean).join(' • ');
       manualSelectedResidentCard?.classList.remove('d-none');
@@ -9700,7 +9922,7 @@
           <div>
             <div class="manual-resident-result-name">${esc(row.full_name || 'Unnamed Resident')}</div>
             <p class="manual-resident-result-meta">
-              ${esc([row.resident_id ? `Resident ID: ${row.resident_id}` : '', row.resident_user_id ? `User ID: ${row.resident_user_id}` : '', row.contact_number ? `Contact: ${row.contact_number}` : ''].filter(Boolean).join(' • '))}
+              ${esc([row.resident_id ? `Resident ID: ${row.resident_id}` : '', row.existing_barangay_id_number ? `Barangay ID: ${row.existing_barangay_id_number}` : '', row.id_number ? `ID Number: ${row.id_number}` : '', row.contact_number ? `Contact: ${row.contact_number}` : ''].filter(Boolean).join(' • '))}
             </p>
             <p class="manual-resident-result-meta">${esc(row.full_address || '-')}</p>
           </div>
@@ -9714,7 +9936,7 @@
     async function manualSearchResidents() {
       const query = String(manualResidentSearchInput?.value || '').trim();
       if (!query) {
-        manualSetAlert('Enter a resident ID, user ID, or resident name to search the registered resident list.', 'warning');
+        manualSetAlert('Enter a Resident ID, resident name, or ID number to search.', 'warning');
         manualResidentSearchInput?.focus();
         return;
       }
@@ -9770,8 +9992,23 @@
         address: fullAddress,
         sector_membership: manualCurrentSectorValues().join(', '),
       };
+      if (config.kind === 'barangay_id' && manualAddressLine) {
+        payload.address_line = String(manualAddressLine.value || '').trim();
+        payload.area_number = String(manualAreaNumber?.value || '').trim();
+        payload.barangay = String(manualBarangay?.value || '').trim();
+        payload.municipality_city = String(manualCity?.value || '').trim();
+        payload.province = String(manualProvince?.value || '').trim();
+      }
 
       if (config.kind === 'barangay_id') {
+        const requestMode = manualCurrentMode();
+        payload.barangay_id_request_type = requestMode === 'renewal' ? 'renewal' : 'new';
+        payload.request_purpose = requestMode === 'renewal' ? 'Barangay ID Renewal / Re-issue' : 'Barangay ID Application';
+        payload.purpose = payload.request_purpose;
+        if (requestMode === 'renewal' && manualSelectedResident?.existing_barangay_id_number) {
+          payload.barangay_id_number = String(manualSelectedResident.existing_barangay_id_number).trim();
+          payload.previous_barangay_id_number = payload.barangay_id_number;
+        }
         const photo = manualCurrentBarangayIdPhoto();
         if (photo.previewUrl) {
           payload.id_picture_url = photo.previewUrl;
@@ -9787,7 +10024,9 @@
         payload[key] = String(field.value || '').trim();
       });
 
-      const purpose = String(manualPurpose?.value || '').trim() || manualSuggestedPurpose(config);
+      const purpose = config.kind === 'barangay_id' && manualCurrentMode() === 'renewal'
+        ? 'Barangay ID Renewal / Re-issue'
+        : (String(manualPurpose?.value || '').trim() || manualSuggestedPurpose(config));
       if (purpose) {
         payload.request_purpose = purpose;
         payload.purpose = purpose;
@@ -9876,6 +10115,10 @@
     function manualResetForm() {
       manualBarangayIdPhotoModal?.hide();
       manualForm.reset();
+      manualRefreshBirthDays();
+      manualSyncBirthdateFromDropdowns();
+      manualSetAreaNumber('');
+      manualSyncStructuredAddress();
       manualResidentSearchResults = [];
       manualSelectedResident = null;
       manualResidentId.value = '';
@@ -9955,6 +10198,7 @@
 
     manualResidentModeExisting?.addEventListener('change', manualToggleResidentLookup);
     manualResidentModeWalkin?.addEventListener('change', manualToggleResidentLookup);
+    manualResidentModeRenewal?.addEventListener('change', manualToggleResidentLookup);
 
     manualDocumentType?.addEventListener('change', () => {
       manualRenderDynamicFields();
@@ -9983,7 +10227,7 @@
       manualMarkPreviewStale(true);
     });
 
-    manualDynamicFields?.addEventListener('click', (event) => {
+    manualForm?.addEventListener('click', (event) => {
       const trigger = event.target.closest('[data-manual-photo-action]');
       if (!trigger) return;
       const action = String(trigger.getAttribute('data-manual-photo-action') || '').trim();
@@ -10042,6 +10286,32 @@
     manualSectorMembershipWrap?.addEventListener('change', () => {
       manualSyncSectorMembershipUi();
       manualMarkPreviewStale(true);
+    });
+    manualAddressLine?.addEventListener('input', () => {
+      manualSyncStructuredAddress();
+      manualSetFieldInvalidState(manualAddressLine, !manualAddressLine.checkValidity());
+      manualMarkPreviewStale(true);
+    });
+    [manualBirthMonth, manualBirthDay, manualBirthYear].forEach((field) => {
+      field?.addEventListener('change', () => {
+        manualSyncBirthdateFromDropdowns();
+        manualSetFieldInvalidState(field, !field.checkValidity());
+        manualMarkPreviewStale(true);
+      });
+    });
+    const manualOpenAreaGuide = () => {
+      manualAreaNumber?.blur();
+      manualAreaNumberModal?.show();
+    };
+    manualAreaNumber?.addEventListener('click', manualOpenAreaGuide);
+    manualAreaNumber?.addEventListener('focus', manualOpenAreaGuide);
+    manualAreaOptions.forEach((option) => {
+      option.addEventListener('click', () => {
+        manualSetAreaNumber(option.dataset.manualAreaOption || '');
+        manualSetFieldInvalidState(manualAreaNumber, !manualAreaNumber.checkValidity());
+        manualMarkPreviewStale(true);
+        manualAreaNumberModal?.hide();
+      });
     });
     manualValidityDate?.addEventListener('change', () => {
       manualMarkPreviewStale(true);
@@ -10303,7 +10573,7 @@
       const originalSubmitLabel = manualSubmitBtn?.innerHTML || 'Submit Manual Issuance';
       try {
         const bundle = manualPreviewStateBundle();
-        if (manualCurrentMode() === 'existing' && !String(bundle.payload.resident_id || bundle.payload.resident_user_id || '').trim()) {
+        if (manualCurrentMode() !== 'walkin' && !String(bundle.payload.resident_id || bundle.payload.resident_user_id || '').trim()) {
           throw new Error('Search and link a registered resident first, or switch the request to walk-in mode.');
         }
         if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
@@ -10314,8 +10584,8 @@
         }
 
         manualSubmitBtn.disabled = true;
-        manualPreviewBtn.disabled = true;
-        manualResetBtn.disabled = true;
+        if (manualPreviewBtn) manualPreviewBtn.disabled = true;
+        if (manualResetBtn) manualResetBtn.disabled = true;
         manualSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Submitting...';
 
         const body = new FormData();
@@ -10354,20 +10624,30 @@
         if (manualSubmitBtn) {
           manualSubmitBtn.innerHTML = originalSubmitLabel;
         }
-        manualPreviewBtn.disabled = false;
-        manualResetBtn.disabled = false;
-        manualSubmitBtn.disabled = !manualPreviewSignature;
+        if (manualPreviewBtn) manualPreviewBtn.disabled = false;
+        if (manualResetBtn) manualResetBtn.disabled = false;
+        if (manualSubmitBtn) manualSubmitBtn.disabled = !manualPreviewSignature;
       }
     });
 
     manualResetBtn?.addEventListener('click', () => {
       manualResetForm();
+      manualShowIdWizardStep(1, true);
       manualSetAlert('Manual issuance form cleared.', 'info');
+    });
+
+    manualIdWizardBack?.addEventListener('click', () => {
+      manualShowIdWizardStep(manualIdWizardCurrentStep - 1, true);
+    });
+    manualIdWizardNext?.addEventListener('click', () => {
+      if (!manualValidateIdWizardStep()) return;
+      manualShowIdWizardStep(manualIdWizardCurrentStep + 1, true);
     });
 
     manualRenderDocumentOptions();
     manualResetForm();
     manualApplyLaunchSelection();
+    manualShowIdWizardStep(1);
   })();
 
   load();

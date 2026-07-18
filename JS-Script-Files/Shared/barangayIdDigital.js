@@ -83,9 +83,13 @@
       .trim();
   }
 
-  function issuedResidenceAddress(address, locality = 'Barangay San Jose, Rodriguez, Rizal') {
+  function issuedResidenceAddress(address, locality = 'Barangay San Jose, Rodriguez (Montalban), Rizal') {
     const suffix = String(locality || '').trim();
-    const cleaned = stripAreaFromAddress(address);
+    const cleaned = stripAreaFromAddress(address)
+      .replace(/(?:\s*,\s*(?:barangay\s+)?san\s+jose\s*,\s*rodriguez(?:\s*\(\s*montalban\s*\))?\s*,\s*rizal)+\s*$/i, '')
+      .replace(/\s*,\s*montalban\s*,\s*rizal\s*$/i, '')
+      .replace(/^,\s*|\s*,\s*$/g, '')
+      .trim();
     if (cleaned && suffix) {
       const normalizedCleaned = cleaned.toLowerCase();
       const normalizedSuffix = suffix.toLowerCase();

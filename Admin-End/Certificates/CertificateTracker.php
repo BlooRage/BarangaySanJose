@@ -312,9 +312,43 @@ if ($certificateLaunchStage === 'release') {
     }
     @media (min-width: 992px) {
       #docRequestsPanel .compact-admin-table-shell {
-        overflow-x: hidden;
+        overflow-x: hidden !important;
         padding-bottom: 0;
         scrollbar-gutter: auto;
+      }
+      body.id-issuance-view #docRequestsPanel .compact-admin-table-shell {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: clip !important;
+      }
+      body.id-issuance-view #table-certificateTracker {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+      }
+      body.id-issuance-view #table-certificateTracker th,
+      body.id-issuance-view #table-certificateTracker td {
+        min-width: 0 !important;
+        max-width: none !important;
+        white-space: normal;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: clamp(0.78rem, 0.72rem + 0.18vw, 0.95rem);
+      }
+      body.id-issuance-view #table-certificateTracker th:nth-child(1) { width: 16% !important; }
+      body.id-issuance-view #table-certificateTracker th:nth-child(3) { width: 20% !important; }
+      body.id-issuance-view #table-certificateTracker th:nth-child(4) { width: 18% !important; }
+      body.id-issuance-view #table-certificateTracker th:nth-child(6) { width: 15% !important; }
+      body.id-issuance-view #table-certificateTracker th:nth-child(7) { width: 17% !important; }
+      body.id-issuance-view #table-certificateTracker th:nth-child(8) { width: 14% !important; }
+      body.id-issuance-view #table-certificateTracker td:last-child .btn {
+        width: 100%;
+        padding-inline: 0.35rem;
+      }
+      body.id-issuance-view #docRequestsPanel .compact-admin-table-shell::-webkit-scrollbar {
+        display: none;
       }
     }
     @media (max-width: 991.98px) {
@@ -2066,6 +2100,200 @@ if ($certificateLaunchStage === 'release') {
       gap: 16px;
       flex-wrap: wrap;
     }
+    .manual-id-process {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border: 1px solid #fed7aa;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #fffaf5;
+    }
+    .manual-id-process-step {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 68px;
+      padding: 12px 16px;
+      color: #7c2d12;
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .manual-id-process-step:not(:last-child) { border-right: 1px solid #fed7aa; }
+    .manual-id-process-step > i { color: #ea580c; }
+    .manual-id-process-step.is-active { color: #fff; background: #ea580c; }
+    .manual-id-process-step.is-active > i { color: #fff; }
+    .manual-id-process-step.is-active .manual-id-process-number { color: #ea580c; background: #fff; }
+    .manual-id-process-step.is-complete { color: #166534; background: #f0fdf4; }
+    .manual-id-process-step.is-complete > i { color: #16a34a; }
+    .manual-id-process-step.is-complete .manual-id-process-number { background: #16a34a; }
+    .manual-id-process-number {
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 26px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      color: #fff;
+      background: #ea580c;
+      font-size: .75rem;
+    }
+    .manual-id-wizard-controls {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 16px;
+      padding-top: 18px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .manual-id-wizard-controls .btn:first-child { justify-self: start; }
+    .manual-id-wizard-controls .btn:last-child { justify-self: end; }
+    .manual-id-wizard-position { color: #6b7280; font-size: .84rem; font-weight: 700; }
+    .manual-id-inline-preview {
+      min-height: 360px;
+      padding: 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+    .manual-id-inline-preview-loading {
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .manual-id-inline-preview .tracker-doc-highlight { display: none; }
+    .manual-before-approve {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      padding: 4px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+    .manual-before-approve-icon {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      color: #ea580c;
+      background: #fff7ed;
+      font-size: 1rem;
+    }
+    .manual-before-approve h6 { margin: 0 0 4px; color: #111827; font-weight: 800; }
+    .manual-before-approve p { margin: 0 0 12px; color: #6b7280; font-size: .84rem; }
+    .manual-before-approve-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 18px;
+    }
+    .manual-before-approve-list span {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      color: #374151;
+      font-size: .82rem;
+      line-height: 1.4;
+    }
+    .manual-before-approve-list i { margin-top: 3px; color: #16a34a; }
+    .manual-validity-selection {
+      max-width: 760px;
+      padding-top: 20px;
+    }
+    .manual-area-options {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .manual-area-picker-field { position: relative; }
+    .manual-area-picker-field > i:first-child {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      z-index: 2;
+      color: #ea580c;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .manual-area-picker-field .form-control {
+      padding-left: 42px;
+      padding-right: 42px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .manual-area-picker-field .form-control:hover {
+      border-color: #fb923c;
+      background: #fffaf5;
+    }
+    .manual-area-picker-chevron {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      color: #9ca3af;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .manual-area-option {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 72px;
+      padding: 14px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 14px;
+      color: #374151;
+      background: #fff;
+      font-weight: 700;
+      text-align: left;
+    }
+    .manual-area-option > i:first-child { color: #ea580c; }
+    .manual-area-option-copy { display: grid; gap: 3px; }
+    .manual-area-option-copy strong { color: #111827; font-size: .95rem; }
+    .manual-area-option-copy small { color: #6b7280; font-size: .8rem; font-weight: 500; line-height: 1.4; }
+    .manual-area-option-check { visibility: hidden; color: #16a34a; }
+    .manual-area-option:hover { border-color: #fb923c; background: #fff7ed; }
+    .manual-area-option.is-selected {
+      border-color: #22c55e;
+      color: #166534;
+      background: #f0fdf4;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, .1);
+    }
+    .manual-area-option.is-selected .manual-area-option-check { visibility: visible; }
+    .manual-address-default,
+    .manual-address-default:focus {
+      color: #6b7280;
+      background-color: #f3f4f6;
+      border-color: #e5e7eb;
+      box-shadow: none;
+      cursor: default;
+    }
+    .manual-birthdate-dropdowns {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(64px, .7fr) minmax(78px, .9fr);
+      gap: 8px;
+    }
+    .manual-birthdate-dropdowns .form-select {
+      min-width: 0;
+      padding-left: 10px;
+      padding-right: 28px;
+      background-position: right 8px center;
+      font-size: .88rem;
+    }
+    .id-issuance-view #manualDynamicFields > div:has([data-manual-field="emergency_relationship"]),
+    .id-issuance-view #manualDynamicFields > div:has([data-manual-field="emergency_contact"]) {
+      flex: 0 0 auto;
+      width: 50%;
+    }
+    .id-issuance-view #manualDynamicFields > div:has([data-manual-field="emergency_address"]) {
+      flex: 0 0 auto;
+      width: 100%;
+    }
     .manual-issuance-steps {
       display: none !important;
     }
@@ -2126,6 +2354,55 @@ if ($certificateLaunchStage === 'release') {
       border-color: #fb923c;
       color: #9a3412;
       box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.12);
+    }
+    .id-issuance-view .manual-issuance-mode-switch {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: 100%;
+      gap: 16px;
+    }
+    .id-issuance-view .manual-issuance-mode-switch .form-check-label {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      min-height: 118px;
+      padding: 20px;
+      border: 2px solid #e5e7eb;
+      border-radius: 20px;
+      background: #fff;
+    }
+    .id-issuance-view .manual-issuance-mode-switch .form-check-label:hover {
+      border-color: #fdba74;
+      background: #fffaf5;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(154, 52, 18, .08);
+    }
+    .id-issuance-view .manual-issuance-mode-switch .form-check-input:checked + .form-check-label {
+      border-color: #ea580c;
+      background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+      color: #9a3412;
+      box-shadow: 0 0 0 4px rgba(234, 88, 12, .12);
+    }
+    .manual-source-choice-icon {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      color: #9a3412;
+      background: #ffedd5;
+      font-size: 1.25rem;
+    }
+    .manual-source-choice-copy { display: grid; gap: 5px; min-width: 0; }
+    .manual-source-choice-copy strong { color: #111827; font-size: 1rem; }
+    .manual-source-choice-copy small { color: #6b7280; font-size: .82rem; font-weight: 500; line-height: 1.45; }
+    .manual-source-choice-check { color: #ea580c; font-size: 1.25rem; opacity: 0; transition: opacity .18s ease; }
+    .manual-issuance-mode-switch .form-check-input:checked + .form-check-label .manual-source-choice-check { opacity: 1; }
+    .manual-issuance-mode-switch .form-check-input:focus-visible + .form-check-label {
+      outline: 3px solid rgba(37, 99, 235, .3);
+      outline-offset: 3px;
     }
     .manual-resident-results {
       display: grid;
@@ -2254,6 +2531,40 @@ if ($certificateLaunchStage === 'release') {
       background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
       padding: 16px;
     }
+    .id-issuance-view .manual-photo-field {
+      max-width: 940px;
+      margin: 8px auto 0;
+      padding: 28px;
+      border: 1px solid #e5e7eb;
+      background: #f8fafc;
+      box-shadow: none;
+    }
+    .manual-photo-capture-layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+      align-items: center;
+      gap: 34px;
+    }
+    .manual-photo-guidance h6 {
+      margin: 0 0 8px;
+      color: #111827;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .manual-photo-guidance p {
+      margin: 0 0 12px;
+      color: #64748b;
+      font-size: .88rem;
+      line-height: 1.5;
+    }
+    .manual-photo-guidance ul {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding-left: 20px;
+      color: #475569;
+      font-size: .84rem;
+    }
     .manual-photo-field-header {
       display: flex;
       align-items: flex-start;
@@ -2274,7 +2585,7 @@ if ($certificateLaunchStage === 'release') {
       line-height: 1.45;
     }
     .manual-photo-preview-box {
-      width: min(220px, 100%);
+      width: min(300px, 100%);
       aspect-ratio: 1 / 1;
       border-radius: 20px;
       background: #0f172a;
@@ -2462,6 +2773,21 @@ if ($certificateLaunchStage === 'release') {
       background: #fff;
     }
     @media (max-width: 768px) {
+      .manual-birthdate-dropdowns { grid-template-columns: 1fr 1fr 1fr; }
+      .manual-before-approve-list { grid-template-columns: 1fr; }
+      .manual-photo-capture-layout { grid-template-columns: 1fr; gap: 22px; }
+      .id-issuance-view .manual-photo-field { padding: 18px; }
+      .manual-photo-preview-box { width: min(280px, 100%); margin-inline: auto; }
+      .id-issuance-view #manualDynamicFields > div:has([data-manual-field="emergency_relationship"]),
+      .id-issuance-view #manualDynamicFields > div:has([data-manual-field="emergency_contact"]) {
+        width: 100%;
+      }
+      .id-issuance-view .manual-issuance-mode-switch { grid-template-columns: 1fr; }
+      .manual-id-process { grid-template-columns: 1fr; }
+      .manual-id-process-step:not(:last-child) { border-right: 0; border-bottom: 1px solid #fed7aa; }
+      .manual-id-wizard-controls { grid-template-columns: 1fr 1fr; }
+      .manual-id-wizard-position { grid-column: 1 / -1; grid-row: 1; text-align: center; }
+      .manual-area-options { grid-template-columns: 1fr; }
       .certificate-tracker-shell .stage-filter-btn {
         min-width: 0;
       }
@@ -2505,7 +2831,7 @@ if ($certificateLaunchStage === 'release') {
     }
   </style>
 </head>
-<body>
+<body class="<?= $isIdIssuanceTrackerView ? 'id-issuance-view' : '' ?>">
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
@@ -2594,9 +2920,30 @@ if ($certificateLaunchStage === 'release') {
     <div id="manualIssuancePanel" class="d-none bg-white p-4 rounded-4 shadow-sm border certificate-tracker-shell">
       <div class="manual-issuance-header mb-4">
         <div>
-          <h5 class="fw-bold mb-0">Manual / Walk-in Document Issuance</h5>
+          <h5 class="fw-bold mb-1"><?= $isIdIssuanceTrackerView ? 'Barangay ID Manual Issuance' : 'Manual / Walk-in Document Issuance' ?></h5>
+          <?php if ($isIdIssuanceTrackerView): ?>
+            <p class="text-muted mb-0">Complete each stage in order, then review the initial ID preview before approval.</p>
+          <?php endif; ?>
         </div>
       </div>
+
+      <?php if ($isIdIssuanceTrackerView): ?>
+        <nav class="manual-id-process mb-4" aria-label="Barangay ID manual issuance process">
+          <?php foreach ([
+            ['fa-user-magnifying-glass', 'Source Selection'],
+            ['fa-address-card', 'Personal Information'],
+            ['fa-camera', 'ID Photo'],
+            ['fa-circle-check', 'Approval & Validity'],
+            ['fa-id-card', 'Initial ID Preview'],
+          ] as $index => [$icon, $label]): ?>
+            <div class="manual-id-process-step">
+              <span class="manual-id-process-number"><?= $index + 1 ?></span>
+              <i class="fa-solid <?= htmlspecialchars($icon, ENT_QUOTES, 'UTF-8') ?>"></i>
+              <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
+            </div>
+          <?php endforeach; ?>
+        </nav>
+      <?php endif; ?>
 
       <div class="manual-issuance-steps mb-4 d-none">
         <div class="manual-step">
@@ -2632,29 +2979,60 @@ if ($certificateLaunchStage === 'release') {
       </div>
 
       <div class="row g-4">
-        <div class="col-xl-8">
+        <div class="col-12">
           <form id="manualIssuanceForm" novalidate>
             <input type="hidden" id="manualResidentId" name="resident_id">
             <input type="hidden" id="manualResidentUserId" name="resident_user_id">
 
-            <div class="manual-issuance-card">
+            <div class="manual-issuance-card" <?= $isIdIssuanceTrackerView ? 'data-manual-id-step-panel="1"' : '' ?>>
               <div class="manual-issuance-card-title">
-                <h6>Resident Source</h6>
-                <span>Registered residents can be auto-filled, but every field stays editable for this encoded request.</span>
+                <h6><?= $isIdIssuanceTrackerView ? '1. Source Selection' : 'Resident Source' ?></h6>
+                <span>Link an existing resident record or encode only the essential details for a walk-in resident.</span>
               </div>
               <div class="manual-issuance-mode-switch mb-3">
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="manualResidentMode" id="manualResidentModeExisting" value="existing" checked>
                   <label class="form-check-label" for="manualResidentModeExisting">
-                    <i class="fas fa-user-check"></i>Registered Resident
+                    <?php if ($isIdIssuanceTrackerView): ?>
+                      <span class="manual-source-choice-icon"><i class="fas fa-user-check"></i></span>
+                      <span class="manual-source-choice-copy">
+                        <strong>Registered Resident</strong>
+                        <small>Search the masterlist and automatically fill verified resident information.</small>
+                      </span>
+                      <span class="manual-source-choice-check"><i class="fa-solid fa-circle-check"></i></span>
+                    <?php else: ?>
+                      <i class="fas fa-user-check"></i>Registered Resident
+                    <?php endif; ?>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="manualResidentMode" id="manualResidentModeWalkin" value="walkin">
                   <label class="form-check-label" for="manualResidentModeWalkin">
-                    <i class="fas fa-user-pen"></i>Walk-in / Not Registered
+                    <?php if ($isIdIssuanceTrackerView): ?>
+                      <span class="manual-source-choice-icon"><i class="fas fa-user-pen"></i></span>
+                      <span class="manual-source-choice-copy">
+                        <strong>Walk-in Resident</strong>
+                        <small>Encode a new applicant who does not have a registered resident record.</small>
+                      </span>
+                      <span class="manual-source-choice-check"><i class="fa-solid fa-circle-check"></i></span>
+                    <?php else: ?>
+                      <i class="fas fa-user-pen"></i>Walk-in / Not Registered
+                    <?php endif; ?>
                   </label>
                 </div>
+                <?php if ($isIdIssuanceTrackerView): ?>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="manualResidentMode" id="manualResidentModeRenewal" value="renewal">
+                    <label class="form-check-label" for="manualResidentModeRenewal">
+                      <span class="manual-source-choice-icon"><i class="fa-solid fa-id-card-clip"></i></span>
+                      <span class="manual-source-choice-copy">
+                        <strong>ID Renewal / Re-issue</strong>
+                        <small>Link a registered resident to renew an expiring ID or re-issue a replacement card.</small>
+                      </span>
+                      <span class="manual-source-choice-check"><i class="fa-solid fa-circle-check"></i></span>
+                    </label>
+                  </div>
+                <?php endif; ?>
               </div>
 
               <div id="manualResidentLookupWrap">
@@ -2662,7 +3040,7 @@ if ($certificateLaunchStage === 'release') {
                   <div class="col-12">
                     <label class="form-label fw-semibold small">Search Registered Resident</label>
                     <div class="input-group">
-                      <input type="text" id="manualResidentSearchInput" class="form-control" placeholder="Resident ID, user ID, or resident name">
+                      <input type="text" id="manualResidentSearchInput" class="form-control" placeholder="Search by Resident ID, name, or ID number">
                       <button type="button" class="btn btn-outline-secondary" id="manualResidentSearchBtn">
                         <i class="fas fa-search me-1"></i>Search
                       </button>
@@ -2692,7 +3070,7 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card">
+            <div class="manual-issuance-card <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
               <div class="manual-issuance-card-title">
                 <h6>1. Document Setup</h6>
                 <span>Choose the form first. The matching fields and next step summary will update automatically.</span>
@@ -2718,10 +3096,10 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card">
+            <div class="manual-issuance-card" <?= $isIdIssuanceTrackerView ? 'data-manual-id-step-panel="2"' : '' ?>>
               <div class="manual-issuance-card-title">
-                <h6>2. Personal Basic Information</h6>
-                <span>These fields will be saved with the request and used in the generated document preview.</span>
+                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '2. Personal Basic Information' ?></h6>
+                <span><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Collect only details needed for the resident record and printed Barangay ID.' ?></span>
               </div>
               <div class="row g-3">
                 <div class="col-md-6 col-lg-3">
@@ -2738,14 +3116,42 @@ if ($certificateLaunchStage === 'release') {
                 </div>
                 <div class="col-md-6 col-lg-3">
                   <label for="manualSuffix" class="form-label fw-semibold small">Suffix</label>
-                  <input type="text" id="manualSuffix" class="form-control" placeholder="Jr., Sr., III">
+                  <select id="manualSuffix" class="form-select">
+                    <option value="">None</option>
+                    <option value="Jr.">Jr.</option>
+                    <option value="Sr.">Sr.</option>
+                    <option value="II">II</option>
+                    <option value="III">III</option>
+                    <option value="IV">IV</option>
+                  </select>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate</label>
-                  <input type="date" id="manualBirthdate" class="form-control" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar">
+                  <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate<?= $isIdIssuanceTrackerView ? ' <span class="text-danger">*</span>' : '' ?></label>
+                  <?php if ($isIdIssuanceTrackerView): ?>
+                    <div class="manual-birthdate-dropdowns">
+                      <select id="manualBirthMonth" class="form-select" required aria-label="Birth month">
+                        <option value="">Month</option>
+                        <?php foreach (['01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April', '05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August', '09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'] as $monthValue => $monthLabel): ?>
+                          <option value="<?= $monthValue ?>"><?= $monthLabel ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <select id="manualBirthDay" class="form-select" required aria-label="Birth day">
+                        <option value="">Day</option>
+                      </select>
+                      <select id="manualBirthYear" class="form-select" required aria-label="Birth year">
+                        <option value="">Year</option>
+                        <?php for ($birthYear = (int)date('Y'); $birthYear >= (int)date('Y') - 120; $birthYear--): ?>
+                          <option value="<?= $birthYear ?>"><?= $birthYear ?></option>
+                        <?php endfor; ?>
+                      </select>
+                    </div>
+                    <input type="hidden" id="manualBirthdate">
+                  <?php else: ?>
+                    <input type="date" id="manualBirthdate" class="form-control" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar">
+                  <?php endif; ?>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualSex" class="form-label fw-semibold small">Sex</label>
+                  <label for="manualSex" class="form-label fw-semibold small">Sex<?= $isIdIssuanceTrackerView ? ' <span class="text-danger">*</span>' : '' ?></label>
                   <select id="manualSex" class="form-select">
                     <option value="">Select sex</option>
                     <option value="Male">Male</option>
@@ -2754,35 +3160,72 @@ if ($certificateLaunchStage === 'release') {
                 </div>
                 <div class="col-md-6 col-lg-3">
                   <label for="manualCivilStatus" class="form-label fw-semibold small">Civil Status</label>
-                  <input type="text" id="manualCivilStatus" class="form-control" placeholder="Single, Married, etc.">
+                  <select id="manualCivilStatus" class="form-select">
+                    <option value="">Select civil status</option>
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Widowed">Widowed</option>
+                    <option value="Separated">Separated</option>
+                  </select>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number</label>
+                  <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number<?= $isIdIssuanceTrackerView ? ' <span class="text-muted fw-normal">(Optional)</span>' : '' ?></label>
                   <input type="text" id="manualContactNumber" class="form-control" placeholder="09XXXXXXXXX">
                 </div>
-                <div class="col-md-6">
-                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace</label>
+                <div class="<?= $isIdIssuanceTrackerView ? 'col-12' : 'col-md-6' ?>">
+                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace<?= $isIdIssuanceTrackerView ? ' <span class="text-danger">*</span>' : '' ?></label>
                   <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
                   <label for="manualOccupation" class="form-label fw-semibold small">Occupation</label>
                   <input type="text" id="manualOccupation" class="form-control" placeholder="Occupation">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
                   <label for="manualReligion" class="form-label fw-semibold small">Religion</label>
                   <input type="text" id="manualReligion" class="form-control" placeholder="Religion">
                 </div>
-                <div class="col-12">
-                  <label for="manualFullAddress" class="form-label fw-semibold small">Residential Address <span class="text-danger">*</span></label>
-                  <textarea id="manualFullAddress" class="form-control" rows="2" required placeholder="House / street / phase / subdivision / area"></textarea>
-                </div>
+                <?php if ($isIdIssuanceTrackerView): ?>
+                  <div class="col-12">
+                    <label for="manualAddressLine" class="form-label fw-semibold small">Address <span class="text-danger">*</span></label>
+                    <input type="text" id="manualAddressLine" class="form-control" required placeholder="House number, street, phase, or subdivision">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="manualAreaNumber" class="form-label fw-semibold small">Area Number <span class="text-danger">*</span></label>
+                    <div class="manual-area-picker-field">
+                      <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                      <input type="text" id="manualAreaNumber" class="form-control" required readonly placeholder="Choose an area and view covered places" role="button" aria-haspopup="dialog" aria-controls="manualAreaNumberModal">
+                      <i class="fa-solid fa-chevron-right manual-area-picker-chevron" aria-hidden="true"></i>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="manualBarangay" class="form-label fw-semibold small">Barangay</label>
+                    <input type="text" id="manualBarangay" class="form-control manual-address-default" value="San Jose" readonly aria-describedby="manualLocalityDefaultHelp">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="manualCity" class="form-label fw-semibold small">City / Municipality</label>
+                    <input type="text" id="manualCity" class="form-control manual-address-default" value="Rodriguez (Montalban)" readonly aria-describedby="manualLocalityDefaultHelp">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="manualProvince" class="form-label fw-semibold small">Province</label>
+                    <input type="text" id="manualProvince" class="form-control manual-address-default" value="Rizal" readonly aria-describedby="manualLocalityDefaultHelp">
+                  </div>
+                  <div class="col-12">
+                    <div class="form-text mt-0" id="manualLocalityDefaultHelp"><i class="fa-solid fa-lock me-1"></i>Barangay, municipality, and province are system defaults.</div>
+                  </div>
+                  <input type="hidden" id="manualFullAddress" required>
+                <?php else: ?>
+                  <div class="col-12">
+                    <label for="manualFullAddress" class="form-label fw-semibold small">Residential Address <span class="text-danger">*</span></label>
+                    <textarea id="manualFullAddress" class="form-control" rows="2" required placeholder="House / street / phase / subdivision / area"></textarea>
+                  </div>
+                <?php endif; ?>
               </div>
             </div>
 
-            <div class="manual-issuance-card">
+            <div class="manual-issuance-card" <?= $isIdIssuanceTrackerView ? 'data-manual-id-step-panel="2"' : '' ?>>
               <div class="manual-issuance-card-title">
-                <h6>Sector Membership</h6>
-                <span>Tick the applicable sector membership for walk-in residents. Registered residents follow the linked resident record.</span>
+                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Sector Membership' : 'Sector Membership' ?></h6>
+                <span>Select every applicable sector. Linked residents retain the membership recorded in the masterlist.</span>
               </div>
               <div class="row g-2" id="manualSectorMembershipWrap">
                 <?php foreach (['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'] as $sectorOption): ?>
@@ -2804,13 +3247,46 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card">
+            <div class="manual-issuance-card" <?= $isIdIssuanceTrackerView ? 'data-manual-id-step-panel="2"' : '' ?>>
               <div class="manual-issuance-card-title">
-                <h6>3. Document Specific Details</h6>
+                <h6 id="manualSpecificFieldsTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information — Emergency Contact' : '3. Document Specific Details' ?></h6>
                 <span id="manualSpecificFieldsHint">Select a certificate or clearance type to load its manual encoding fields.</span>
               </div>
               <div id="manualDynamicFields" class="row g-3"></div>
             </div>
+
+            <?php if ($isIdIssuanceTrackerView): ?>
+              <div class="manual-issuance-card" data-manual-id-step-panel="3">
+                <div class="manual-issuance-card-title">
+                  <h6>3. ID Photo</h6>
+                  <span>Capture or confirm the square photo that will appear on the Barangay ID.</span>
+                </div>
+                <div id="manualBarangayIdPhotoStepMount"></div>
+              </div>
+
+              <div class="manual-issuance-card" data-manual-id-step-panel="4">
+                <div class="manual-issuance-card-title">
+                  <h6>4. Approval with Validity Selection</h6>
+                  <span>Confirm how long the approved Barangay ID remains valid.</span>
+                </div>
+                <aside class="manual-before-approve" aria-labelledby="manualBeforeApproveTitle">
+                  <div class="manual-before-approve-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+                  <div>
+                    <h6 id="manualBeforeApproveTitle">Before you approve</h6>
+                    <p>Make sure the Barangay ID record is complete and ready for its initial preview.</p>
+                    <div class="manual-before-approve-list">
+                      <span><i class="fa-solid fa-check"></i>Resident identity and address were verified</span>
+                      <span><i class="fa-solid fa-check"></i>Emergency contact details are reachable</span>
+                      <span><i class="fa-solid fa-check"></i>ID photo is clear, centered, and recent</span>
+                      <span><i class="fa-solid fa-check"></i>Selected validity period is correct</span>
+                    </div>
+                  </div>
+                </aside>
+                <div class="manual-validity-selection mt-4">
+                  <div id="manualValidityProcessMount"></div>
+                </div>
+              </div>
+            <?php endif; ?>
 
             <div class="manual-issuance-card d-none" id="manualFeeWrap">
               <div class="manual-issuance-card-title">
@@ -2826,48 +3302,45 @@ if ($certificateLaunchStage === 'release') {
 
             <div id="manualFormAlert" class="alert alert-warning d-none"></div>
 
-            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+            <div class="manual-issuance-card mt-3" <?= $isIdIssuanceTrackerView ? 'data-manual-id-step-panel="5"' : '' ?>>
+              <div class="manual-issuance-card-title">
+                <h6><?= $isIdIssuanceTrackerView ? '5. Initial Barangay ID Preview' : 'Review and Submit' ?></h6>
+                <span><?= $isIdIssuanceTrackerView ? 'Review the actual front and back ID appearance before creating the record.' : 'Preview the latest information before creating the manual issuance record.' ?></span>
+              </div>
+            <?php if ($isIdIssuanceTrackerView): ?>
+              <div class="manual-id-inline-preview" id="manualIdInlinePreview" aria-live="polite">
+                <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing ID preview…</div>
+              </div>
+            <?php else: ?>
+            <div class="d-flex flex-wrap justify-content-end gap-2">
               <button type="button" class="btn btn-outline-secondary" id="manualResetBtn">
                 <i class="fas fa-rotate-left me-1"></i>Reset Form
               </button>
               <button type="button" class="btn btn-outline-primary" id="manualPreviewBtn">
-                <i class="fas fa-eye me-1"></i>Preview Document
+                <i class="fas fa-eye me-1"></i><?= $isIdIssuanceTrackerView ? 'Open ID Initial Preview' : 'Preview Document' ?>
               </button>
               <button type="submit" class="btn btn-primary" id="manualSubmitBtn" disabled>
-                <i class="fas fa-paper-plane me-1"></i>Submit Manual Issuance
+                <i class="fas fa-paper-plane me-1"></i><?= $isIdIssuanceTrackerView ? 'Approve & Create ID Record' : 'Submit Manual Issuance' ?>
               </button>
             </div>
-          </form>
-        </div>
+            <?php endif; ?>
+            </div>
 
-        <div class="col-xl-4">
-          <div class="manual-issuance-card sticky-xl-top" style="top: 1rem;">
-            <div class="manual-issuance-card-title">
-              <h6>Submission Summary</h6>
-              <span>Use this as a quick check before you preview and submit.</span>
-            </div>
-            <div class="manual-issuance-summary mb-3">
-              <div class="manual-summary-item">
-                <p class="manual-summary-item-label">Resident Link</p>
-                <p class="manual-summary-item-value" id="manualResidentSummary">Walk-in / not linked yet</p>
+            <?php if ($isIdIssuanceTrackerView): ?>
+              <div class="manual-id-wizard-controls mt-4">
+                <button type="button" class="btn btn-outline-secondary" id="manualIdWizardBack">
+                  <i class="fa-solid fa-arrow-left me-1"></i>Back
+                </button>
+                <span class="manual-id-wizard-position" id="manualIdWizardPosition">Step 1 of 5</span>
+                <button type="button" class="btn btn-primary" id="manualIdWizardNext">
+                  Continue<i class="fa-solid fa-arrow-right ms-1"></i>
+                </button>
+                <button type="submit" class="btn btn-primary d-none" id="manualSubmitBtn" disabled>
+                  <i class="fas fa-paper-plane me-1"></i>Approve &amp; Create ID Record
+                </button>
               </div>
-              <div class="manual-summary-item">
-                <p class="manual-summary-item-label">Document Type</p>
-                <p class="manual-summary-item-value" id="manualDocumentSummary">Select a manual issuance form</p>
-              </div>
-              <div class="manual-summary-item">
-                <p class="manual-summary-item-label">Next Step After Submit</p>
-                <p class="manual-summary-item-value" id="manualNextStageSummary">Preview the document first to unlock submission.</p>
-              </div>
-              <div class="manual-summary-item d-none" id="manualValiditySummaryWrap">
-                <p class="manual-summary-item-label" id="manualValiditySummaryLabel">Selected Validity</p>
-                <p class="manual-summary-item-value" id="manualValiditySummary">Default: 45 days after approval</p>
-              </div>
-            </div>
-            <p class="manual-summary-note">
-              Registered residents stay linked to their masterlist record, while walk-in residents can still be encoded and issued here without an online account. Paid requests continue to finance; free requests such as Barangay ID move directly to release. Issued files still carry the QR verification flow used by the existing generator.
-            </p>
-          </div>
+            <?php endif; ?>
+          </form>
         </div>
       </div>
     </div>
@@ -3026,6 +3499,47 @@ if ($certificateLaunchStage === 'release') {
     </div>
   </main>
 </div>
+
+<?php if ($isIdIssuanceTrackerView): ?>
+<div class="modal fade" id="manualAreaNumberModal" tabindex="-1" aria-labelledby="manualAreaNumberModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="manualAreaNumberModalLabel">Barangay Area Guide</h5>
+          <p class="text-muted small mb-0">Choose the area that covers the resident's address.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="manual-area-options">
+          <?php foreach ([
+            'Area 01' => 'San Jose Proper',
+            'Area 1A' => 'Litex Village, Abatex Christine Creek, Med. Heights',
+            'Area 02' => 'VFW, Amychelle, Christine Villa Parnshey, Villa Ana, Zaniga Farm',
+            'Area 03' => 'Relocation',
+            'Area 04' => 'Kasiglahan Phase 1-B, Phase 1-C, Phase 1-D, Phase 1-M, Phase 1-A',
+            'Area 05' => 'Kasiglahan Phase 1-K, Phase 1K1, Phase 1K2, Phase 1-E, Phase 1-G',
+            'Area 06' => 'Sub-Urban, Metro Manila Hills',
+          ] as $areaOption => $coveredPlaces): ?>
+            <button type="button" class="manual-area-option" data-manual-area-option="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>">
+              <i class="fa-solid fa-location-dot"></i>
+              <span class="manual-area-option-copy">
+                <strong><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></strong>
+                <small><?= htmlspecialchars($coveredPlaces, ENT_QUOTES, 'UTF-8') ?></small>
+              </span>
+              <i class="fa-solid fa-check manual-area-option-check"></i>
+            </button>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="modal fade manual-photo-modal" id="manualBarangayIdPhotoModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -3566,7 +4080,7 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-workflow-01"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-birthdate-dropdowns-17"></script>
 </body>
 </html>
