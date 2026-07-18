@@ -346,6 +346,12 @@ if ($certificateLaunchStage === 'release') {
       body.id-issuance-view #table-certificateTracker td:last-child .btn {
         width: 100%;
         padding-inline: 0.35rem;
+        margin-right: 0 !important;
+      }
+      body.id-issuance-view #table-certificateTracker th:last-child,
+      body.id-issuance-view #table-certificateTracker td:last-child {
+        overflow: visible;
+        text-overflow: clip;
       }
       body.id-issuance-view #docRequestsPanel .compact-admin-table-shell::-webkit-scrollbar {
         display: none;
