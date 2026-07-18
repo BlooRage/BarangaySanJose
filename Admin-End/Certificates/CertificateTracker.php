@@ -146,7 +146,11 @@ if ($certificateLaunchStage === 'release') {
       box-shadow: none;
     }
     #feeChangeSubTabs .nav-link {
-      color: #0d6efd !important;
+      color: #6b7280 !important;
+      border: 1px solid transparent;
+      border-radius: .65rem;
+      font-weight: 600;
+      padding: .6rem .9rem;
     }
     #feeChangeSubTabs .nav-link.active,
     #feeChangeSubTabs .nav-link.active:focus,
@@ -155,6 +159,60 @@ if ($certificateLaunchStage === 'release') {
     #feeChangeSubTabs .nav-link.active:focus i,
     #feeChangeSubTabs .nav-link.active:hover i {
       color: #fff !important;
+      background: #de710c !important;
+      border-color: #de710c !important;
+    }
+    body.fee-settings-view #feeChangePanel {
+      padding: 0 !important;
+      overflow: hidden;
+    }
+    body.fee-settings-view #feeChangeSubTabs {
+      gap: .4rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0 !important;
+      border-bottom: 1px solid #dee2e6;
+      background: #fff;
+    }
+    body.fee-settings-view #fcrAddPanel,
+    body.fee-settings-view #fcrEditPanel,
+    body.fee-settings-view #fcrListPanel {
+      padding: 1.25rem;
+    }
+    body.fee-settings-view #fcrAddPanel .col-lg-6 {
+      width: 100%;
+      max-width: 680px;
+    }
+    body.fee-settings-view #fcrAddPanel .border,
+    body.fee-settings-view #fcrEditFormWrap {
+      background: #fff !important;
+      border-color: #dee2e6 !important;
+    }
+    body.fee-settings-view #fcrEditFormWrap {
+      max-width: 680px;
+      margin-top: 1rem;
+    }
+    body.fee-settings-view #fcrEditHint {
+      margin: 0 0 1rem !important;
+      padding: .75rem 1rem;
+      border: 1px solid #dee2e6;
+      border-radius: .65rem;
+      background: #f8f9fa;
+      text-align: left !important;
+    }
+    body.fee-settings-view #fcrEditHint i {
+      transform: rotate(-90deg);
+      color: #de710c;
+    }
+    body.fee-settings-view #fcrEditCatalogBody .btn-warning,
+    body.fee-settings-view #fcrEditSubmitBtn {
+      color: #fff;
+      background: #de710c;
+      border-color: #de710c;
+    }
+    body.fee-settings-view #fcrEditCatalogBody .btn-warning:hover,
+    body.fee-settings-view #fcrEditSubmitBtn:hover {
+      background: #a95305;
+      border-color: #a95305;
     }
     .certificate-tracker-shell .admin-list-actions .form-select,
     .certificate-tracker-shell .admin-list-actions .input-group-text,
@@ -3440,7 +3498,7 @@ if ($certificateLaunchStage === 'release') {
       <!-- Sub-panel: Request Price Edit -->
       <div id="fcrEditPanel" class="d-none">
         <div class="row g-4">
-          <div class="col-lg-7">
+          <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <h6 class="fw-semibold mb-0">Current Fee Catalog</h6>
               <button class="btn btn-sm btn-outline-secondary" id="fcrEditRefreshBtn" title="Refresh">
@@ -3463,7 +3521,10 @@ if ($certificateLaunchStage === 'release') {
               </table>
             </div>
           </div>
-          <div class="col-lg-5">
+          <div class="col-12">
+            <div class="text-muted small" id="fcrEditHint">
+              <i class="fas fa-arrow-left me-2"></i>Select a fee type from the table to request a price edit.
+            </div>
             <div class="border rounded-3 p-3 bg-light d-none" id="fcrEditFormWrap">
               <h6 class="fw-semibold mb-3" id="fcrEditFormTitle"><i class="fas fa-pen me-1 text-warning"></i>Request Price Edit</h6>
               <input type="hidden" id="fcrEditFeeTypeId">
@@ -3500,9 +3561,6 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
             <div id="fcrEditSuccess" class="alert alert-success d-none py-2 small mb-3" data-modal-inline="true"></div>
-            <div class="text-muted small text-center mt-4" id="fcrEditHint">
-              <i class="fas fa-arrow-left me-1"></i>Select a fee type from the table to request a price edit
-            </div>
           </div>
         </div>
       </div>

@@ -94,7 +94,14 @@ $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminRecordsActive = in_array($current, $adminRecordsPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isWebsiteSettingsActive = ($current === 'WebsiteSettings.php');
-$isCertificateIssuanceSettingsActive = ($current === 'CertificateIssuanceSettings.php');
+$isCertificateIssuanceSettingsActive = in_array($current, [
+    'CertificateIssuanceSettings.php',
+    'IssuanceGeneralSettings.php',
+    'IssuanceCertificateSettings.php',
+    'IssuanceNotificationSettings.php',
+    'IndigencyRecipientSettings.php',
+    'IssuanceFeeSettings.php',
+], true);
 $isBusinessMonitoringSettingsActive = ($current === 'BusinessMonitoringSettings.php');
 $isBarangayIdSettingsActive = ($current === 'BarangayIdSettings.php');
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);

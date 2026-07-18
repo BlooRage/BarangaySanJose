@@ -159,6 +159,8 @@ if (!function_exists('dms_save_issuance_settings')) {
     function dms_save_issuance_settings(mysqli $conn, array $post, string $updatedByUserId): array
     {
         $before = dms_resolve_issuance_settings($conn);
+        $scope = strtolower(trim((string)($post['settings_scope'] ?? 'all')));
+        if (!in_array($scope, ['all', 'general', 'certificates', 'notifications'], true)) $scope = 'all';
         $allowed = array_values(array_unique(array_filter(array_map('intval', (array)($post['allowed_validity_days'] ?? [])), static fn(int $v): bool => $v >= 1 && $v <= 365)));
         sort($allowed);
         if ($allowed === []) $allowed = [45];
@@ -166,25 +168,33 @@ if (!function_exists('dms_save_issuance_settings')) {
         if (!in_array($defaultValidity, $allowed, true)) $allowed[] = $defaultValidity;
         sort($allowed);
 
-        $settings = dms_default_issuance_settings();
-        foreach (['online_requests_enabled', 'first_time_job_seeker_exempt', 'qr_verification_enabled', 'essential_details_only', 'aging_notification_enabled'] as $key) {
-            $settings[$key] = isset($post[$key]);
+        $settings = array_replace_recursive(dms_default_issuance_settings(), $before);
+        unset($settings['updated_by_user_id'], $settings['updated_at']);
+        if (in_array($scope, ['all', 'general'], true)) {
+            foreach (['online_requests_enabled', 'first_time_job_seeker_exempt', 'qr_verification_enabled', 'essential_details_only'] as $key) {
+                $settings[$key] = isset($post[$key]);
+            }
+            $settings['default_validity_days'] = $defaultValidity;
+            $settings['allowed_validity_days'] = $allowed;
         }
-        $settings['default_validity_days'] = $defaultValidity;
-        $settings['allowed_validity_days'] = $allowed;
-        $settings['aging_days'] = max(1, min(90, (int)($post['aging_days'] ?? 3)));
-        $settings['aging_message'] = trim((string)($post['aging_message'] ?? $settings['aging_message']));
-        foreach ($settings['resident_notifications'] as $event => &$notification) {
-            $notification['enabled'] = isset($post['notification_enabled'][$event]);
-            $message = trim((string)($post['notification_message'][$event] ?? ''));
-            if ($message !== '') $notification['message'] = $message;
+        if (in_array($scope, ['all', 'notifications'], true)) {
+            $settings['aging_notification_enabled'] = isset($post['aging_notification_enabled']);
+            $settings['aging_days'] = max(1, min(90, (int)($post['aging_days'] ?? 3)));
+            $settings['aging_message'] = trim((string)($post['aging_message'] ?? $settings['aging_message']));
+            foreach ($settings['resident_notifications'] as $event => &$notification) {
+                $notification['enabled'] = isset($post['notification_enabled'][$event]);
+                $message = trim((string)($post['notification_message'][$event] ?? ''));
+                if ($message !== '') $notification['message'] = $message;
+            }
+            unset($notification);
         }
-        unset($notification);
-        foreach (dms_issuance_certificate_catalog() as $key => $label) {
-            $settings['certificates'][$key]['enabled'] = isset($post['certificate_enabled'][$key]);
-            $rawOptions = preg_split('/\R/u', (string)($post['purpose_options'][$key] ?? '')) ?: [];
-            $options = array_values(array_unique(array_filter(array_map('trim', $rawOptions), static fn(string $v): bool => $v !== '')));
-            $settings['certificates'][$key]['purpose_options'] = array_slice($options, 0, 50);
+        if (in_array($scope, ['all', 'certificates'], true)) {
+            foreach (dms_issuance_certificate_catalog() as $key => $label) {
+                $settings['certificates'][$key]['enabled'] = isset($post['certificate_enabled'][$key]);
+                $rawOptions = preg_split('/\R/u', (string)($post['purpose_options'][$key] ?? '')) ?: [];
+                $options = array_values(array_unique(array_filter(array_map('trim', $rawOptions), static fn(string $v): bool => $v !== '')));
+                $settings['certificates'][$key]['purpose_options'] = array_slice($options, 0, 50);
+            }
         }
         $json = json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) throw new RuntimeException('Unable to encode issuance settings.');
