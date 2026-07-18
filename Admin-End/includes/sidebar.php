@@ -200,6 +200,7 @@ $isCertificateIssuanceSectionActive = $current === 'CertificateTracker.php'
     && !$isClearanceIssuanceSectionActive
     && !$isBusinessMonitoringActive;
 $isCertificateIssuanceSectionActive = $isCertificateIssuanceSectionActive || $isCertificateIssuanceSettingsActive;
+$isCertificateIssuanceTrackerActive = $isCertificateIssuanceSectionActive && !$isCertificateIssuanceSettingsActive;
 $isCertificateCohabitationActive = $isCertificateIssuanceSectionActive
     && (
         $certificateFilterDocumentToken === '__cert_cohabitation__'
@@ -1316,27 +1317,37 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Issuance</li>
       <?php if ($sbCan('certificate_issuance')): ?>
       <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
-           class="btn btn-toggle sidebar-direct-link sidebar-direct-link--certificate rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
-           data-sidebar-has-badge="<?= $sbCount('certificate_issuance') > 0 ? 'true' : 'false' ?>"
-           style="<?= $isCertificateIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
+        <button type="button"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertificateIssuanceSectionActive ? '' : 'collapsed' ?>"
+           data-sidebar-toggle="collapse"
+           data-sidebar-target="#certificate-issuance-collapse"
+           aria-controls="certificate-issuance-collapse"
+           aria-expanded="<?= $isCertificateIssuanceSectionActive ? 'true' : 'false' ?>"
+           data-sidebar-has-badge="<?= $sbCount('certificate_issuance') > 0 ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-file-circle-check"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('certificate_issuance')) ?>
             <?= $sbRenderAttentionBadge($sbCount('certificate_issuance')) ?>
           </span>
           <span class="sidebar-button-label sidebar-button-label--certificate">Certificate Issuance</span>
-        </a>
-      </li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $isCertificateIssuanceSettingsActive ? 'active' : '' ?>"
-           style="<?= $isCertificateIssuanceSettingsActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-gear"></i>
-          </span>
-          <span class="sidebar-button-label">Issuance Settings</span>
-        </a>
+        </button>
+        <div class="collapse <?= $isCertificateIssuanceSectionActive ? 'show' : '' ?>" id="certificate-issuance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isCertificateIssuanceTrackerActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('certificate_issuance')) ?>
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isCertificateIssuanceSettingsActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Settings</span>
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
       <?php endif; ?>
       <?php if ($sbHasAny($sbIdIssuanceKeys)): ?>

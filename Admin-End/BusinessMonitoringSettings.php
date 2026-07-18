@@ -12,6 +12,9 @@ $documentSettingsBackUrl = appUrl((string)($documentSettingsModuleConfig['back_h
 $documentSettingsSuccessMessage = trim((string)($_GET['success'] ?? ''));
 $documentSettingsErrorMessage = trim((string)($_GET['error'] ?? ''));
 $documentSettingsRows = dms_resolve_module_signatories($conn, $documentSettingsModuleKey);
+$documentSettingsFeeRequestsUrl = appUrl('Admin-End/Certificates/CertificateTracker.php?tab=fees&fee_scope=monitoring&filter_document=__clearances__');
+$documentSettingsFeeRequestsTitle = 'Clearance Fee Change Requests';
+$documentSettingsFeeRequestsDescription = 'Request a new clearance fee type, propose a price update, and review submitted requests.';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_document_module_settings') {
     verifyCsrfToken(false);

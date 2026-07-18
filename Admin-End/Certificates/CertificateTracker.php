@@ -7,13 +7,17 @@ $certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')))
 $certificateLaunchStage = strtolower(trim((string)($_GET['stage'] ?? '')));
 $certificateLaunchEntry = strtolower(trim((string)($_GET['entry'] ?? '')));
 $certificateLaunchFilterDocument = strtolower(trim((string)($_GET['filter_document'] ?? '')));
+$certificateFeeScope = strtolower(trim((string)($_GET['fee_scope'] ?? '')));
+$isFeeSettingsView = $certificateLaunchTab === 'fees';
 $isBarangayIdManualLaunch = $certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barangay_id';
 $isIdIssuanceTrackerView = $certificateLaunchEntry === 'id_issuance' || $isBarangayIdManualLaunch;
 $certificateTrackerHeading = $isIdIssuanceTrackerView
   ? 'Barangay ID Issuance'
-  : ($certificateLaunchFilterDocument === '__clearances__'
+  : ($isFeeSettingsView
+      ? ($certificateFeeScope === 'monitoring' ? 'Clearance Fee Change Requests' : 'Certificate Fee Change Requests')
+      : ($certificateLaunchFilterDocument === '__clearances__'
       ? 'Clearance Issuance'
-      : 'Certificate Issuance');
+      : 'Certificate Issuance'));
 $certificateLaunchFilterToken = strtolower(trim($certificateLaunchFilterDocument));
 $certificateSettingsHref = appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php');
 $certificateSettingsLabel = 'Issuance Settings';
@@ -27,6 +31,12 @@ if ($isIdIssuanceTrackerView) {
 ) {
   $certificateSettingsHref = appUrl('Admin-End/BusinessMonitoringSettings.php');
   $certificateSettingsLabel = 'Monitoring Settings';
+}
+if ($isFeeSettingsView) {
+  $certificateSettingsHref = $certificateFeeScope === 'monitoring'
+    ? appUrl('Admin-End/BusinessMonitoringSettings.php')
+    : appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php');
+  $certificateSettingsLabel = 'Back to Settings';
 }
 $barangayIdAdminNavActive = 'applications';
 $barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
@@ -106,6 +116,9 @@ if ($certificateLaunchStage === 'release') {
     #manualIssuancePanel,
     #feeChangePanel {
       border-top-left-radius: 0 !important;
+    }
+    body.fee-settings-view #feeChangePanel {
+      border-top-left-radius: 1rem !important;
     }
     .certificate-tracker-shell .stage-filter-btn {
       border-radius: 10px;
@@ -2861,7 +2874,7 @@ if ($certificateLaunchStage === 'release') {
     }
   </style>
 </head>
-<body class="<?= $isIdIssuanceTrackerView ? 'id-issuance-view' : '' ?>">
+<body class="<?= trim(($isIdIssuanceTrackerView ? 'id-issuance-view ' : '') . ($isFeeSettingsView ? 'fee-settings-view' : '')) ?>">
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
@@ -2877,7 +2890,7 @@ if ($certificateLaunchStage === 'release') {
     <hr class="mb-4">
 
     <!-- Page-level navigation -->
-    <ul class="nav nav-tabs mb-0" id="certTrackerPageTabs" style="border-bottom:0">
+    <ul class="nav nav-tabs mb-0 <?= $isFeeSettingsView ? 'd-none' : '' ?>" id="certTrackerPageTabs" style="border-bottom:0">
       <li class="nav-item">
         <button class="nav-link active fw-semibold" id="tabDocRequests" type="button">
           <i class="fas fa-file-alt me-1"></i>Document Requests
@@ -2886,11 +2899,6 @@ if ($certificateLaunchStage === 'release') {
       <li class="nav-item">
         <button class="nav-link fw-semibold" id="tabManualIssuance" type="button">
           <i class="fas fa-pen-to-square me-1"></i>Manual Issuance
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link fw-semibold" id="tabFeeRequests" type="button">
-          <i class="fas fa-tags me-1"></i>Fee Change Requests
         </button>
       </li>
     </ul>
@@ -4111,6 +4119,6 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-id-birthdate-dropdowns-17"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260718-fee-settings-18"></script>
 </body>
 </html>

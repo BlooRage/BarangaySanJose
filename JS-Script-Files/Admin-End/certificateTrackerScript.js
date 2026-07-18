@@ -10661,7 +10661,7 @@
     const docRequestsPanel = document.getElementById('docRequestsPanel');
     const manualIssuancePanel = document.getElementById('manualIssuancePanel');
     const feeChangePanel   = document.getElementById('feeChangePanel');
-    if (!tabDocRequests || !tabFeeRequests) return; // not on certificate tracker page with tabs
+    if (!tabDocRequests || !feeChangePanel) return; // not on the certificate tracker page
 
     const API = (function () {
       const base = window.location.pathname.replace(/\/[^/]*$/, '');
@@ -10677,7 +10677,7 @@
     function showDocTab() {
       tabDocRequests.classList.add('active');
       tabManualIssuance?.classList.remove('active');
-      tabFeeRequests.classList.remove('active');
+      tabFeeRequests?.classList.remove('active');
       docRequestsPanel.classList.remove('d-none');
       manualIssuancePanel?.classList.add('d-none');
       feeChangePanel.classList.add('d-none');
@@ -10685,13 +10685,13 @@
     function showManualTab() {
       tabManualIssuance?.classList.add('active');
       tabDocRequests.classList.remove('active');
-      tabFeeRequests.classList.remove('active');
+      tabFeeRequests?.classList.remove('active');
       manualIssuancePanel?.classList.remove('d-none');
       docRequestsPanel.classList.add('d-none');
       feeChangePanel.classList.add('d-none');
     }
     function showFeeTab() {
-      tabFeeRequests.classList.add('active');
+      tabFeeRequests?.classList.add('active');
       tabManualIssuance?.classList.remove('active');
       tabDocRequests.classList.remove('active');
       feeChangePanel.classList.remove('d-none');
@@ -10701,15 +10701,7 @@
     }
     tabDocRequests.addEventListener('click', showDocTab);
     tabManualIssuance?.addEventListener('click', showManualTab);
-    tabFeeRequests.addEventListener('click', showFeeTab);
-
-    if (launchTab === 'manual') {
-      showManualTab();
-    } else if (launchTab === 'fees') {
-      showFeeTab();
-    } else {
-      showDocTab();
-    }
+    tabFeeRequests?.addEventListener('click', showFeeTab);
 
     // ── Sub-tab switching ───────────────────────────────────────────────────
     const subTabAddFeeType  = document.getElementById('subTabAddFeeType');
@@ -10745,7 +10737,23 @@
       if (activeSubTab === 'list') loadFcrList();
     }
 
+    const feeSettingsScope = String(launchParams.get('fee_scope') || '').toLowerCase();
+    if (feeSettingsScope === 'issuance') {
+      subTabAddFeeType.classList.add('d-none');
+      setSubTab('edit');
+    }
+
+    if (launchTab === 'manual') {
+      showManualTab();
+    } else if (launchTab === 'fees') {
+      showFeeTab();
+    } else {
+      showDocTab();
+    }
+
     function getFeeCatalogSource() {
+      if (feeSettingsScope === 'issuance') return 'general';
+      if (feeSettingsScope === 'monitoring') return 'clearance';
       const activeDocumentFilter = isIdIssuanceTrackerView && !isFinancePaymentsPage
         ? 'Barangay ID'
         : currentDocumentTypeFilter;

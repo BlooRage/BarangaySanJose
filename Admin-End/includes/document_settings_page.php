@@ -350,6 +350,23 @@ $documentSettingsUpdatedByLabel = $documentSettingsUpdatedByLabel !== '' ? $docu
           </section>
 
           <aside class="d-grid gap-3">
+            <?php if (!empty($documentSettingsFeeRequestsUrl)): ?>
+              <section class="document-settings-card">
+                <div class="d-flex align-items-start gap-3">
+                  <span class="document-settings-source-badge is-manual" aria-hidden="true">
+                    <i class="fa-solid fa-tags"></i>
+                  </span>
+                  <div class="flex-grow-1">
+                    <h3 class="h6 mb-2"><?= htmlspecialchars((string)($documentSettingsFeeRequestsTitle ?? 'Fee Change Requests'), ENT_QUOTES, 'UTF-8') ?></h3>
+                    <p class="text-muted small mb-3"><?= htmlspecialchars((string)($documentSettingsFeeRequestsDescription ?? 'Manage fee change requests for this module.'), ENT_QUOTES, 'UTF-8') ?></p>
+                    <a class="btn btn-outline-primary w-100" href="<?= htmlspecialchars((string)$documentSettingsFeeRequestsUrl, ENT_QUOTES, 'UTF-8') ?>">
+                      <i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Open Fee Requests
+                    </a>
+                  </div>
+                </div>
+              </section>
+            <?php endif; ?>
+
             <section class="document-settings-card">
               <h3 class="h6 mb-3">Module Summary</h3>
               <div class="document-settings-stat mb-3">
