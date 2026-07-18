@@ -19,6 +19,7 @@ $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
@@ -47,45 +48,7 @@ $governmentOfficialGroups = [
 ];
 
 if (isset($conn) && $conn instanceof mysqli) {
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS governmentofficialdropdowntbl (
-            government_official_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            official_name VARCHAR(255) NOT NULL,
-            position_name VARCHAR(255) NOT NULL,
-            jurisdiction_location VARCHAR(255) NOT NULL,
-            group_key VARCHAR(100) NOT NULL DEFAULT 'municipal_officials',
-            display_order INT NOT NULL DEFAULT 0,
-            is_active TINYINT(1) NOT NULL DEFAULT 1,
-            UNIQUE KEY uq_government_official_dropdown (official_name, position_name, jurisdiction_location)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-    ");
-
-    $seedOfficials = [
-        ['PRESIDENT FERDINAND "BONGBONG" MARCOS JR.', 'President of the Philippines', 'Republic of the Philippines', 'president', 1],
-        ['VICE PRESIDENT SARA Z. DUTERTE', 'Vice President of the Philippines', 'Republic of the Philippines', 'vice_president', 2],
-        ['SENATE PRESIDENT FRANCIS "CHIZ" ESCUDERO', 'Senate President', 'Senate of the Philippines', 'senate', 3],
-        ['HON. GENERAL RONNIE S. EVANGELISTA (RET.)', 'Mayor', 'Rodriguez, Rizal', 'municipal_officials', 4],
-    ];
-    $stmtSeedOfficial = $conn->prepare("
-        INSERT INTO governmentofficialdropdowntbl (official_name, position_name, jurisdiction_location, group_key, display_order, is_active)
-        SELECT ?, ?, ?, ?, ?, 1
-        FROM DUAL
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM governmentofficialdropdowntbl
-            WHERE official_name = ?
-              AND position_name = ?
-              AND jurisdiction_location = ?
-            LIMIT 1
-        )
-    ");
-    if ($stmtSeedOfficial) {
-        foreach ($seedOfficials as [$name, $positionName, $locationName, $groupKey, $order]) {
-            $stmtSeedOfficial->bind_param('ssssisss', $name, $positionName, $locationName, $groupKey, $order, $name, $positionName, $locationName);
-            $stmtSeedOfficial->execute();
-        }
-        $stmtSeedOfficial->close();
-    }
+    dms_ensure_government_official_dropdown_table($conn);
 
     $positionRes = $conn->query("
         SELECT DISTINCT position_name

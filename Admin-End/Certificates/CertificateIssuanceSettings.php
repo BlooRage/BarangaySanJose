@@ -16,6 +16,32 @@ $issuanceSettings = dms_resolve_issuance_settings($conn);
 $documentSettingsFeeRequestsUrl = appUrl('Admin-End/Certificates/CertificateTracker.php?tab=fees&fee_scope=issuance&filter_document=__certificates__');
 $documentSettingsFeeRequestsTitle = 'Certificate Fee Change Requests';
 $documentSettingsFeeRequestsDescription = 'Request an update to the fee assigned to a certificate type and review submitted requests.';
+$governmentOfficialRows = dms_list_government_official_dropdown($conn);
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST['action'] ?? ''), ['save_indigency_government_official', 'delete_indigency_government_official'], true)) {
+    verifyCsrfToken(false);
+    $officialAction = (string)$_POST['action'];
+    try {
+        if ($officialAction === 'delete_indigency_government_official') {
+            $officialId = (int)($_POST['government_official_id'] ?? 0);
+            if (!dms_delete_government_official_dropdown($conn, $officialId)) throw new RuntimeException('Government official was not found or could not be deleted.');
+            $auditAfter = null;
+            $message = 'Government official deleted.';
+            $auditAction = 'delete_dropdown_official';
+        } else {
+            $auditAfter = dms_save_government_official_dropdown($conn, $_POST);
+            $officialId = (int)($auditAfter['id'] ?? 0);
+            $message = (int)($_POST['government_official_id'] ?? 0) > 0 ? 'Government official updated.' : 'Government official added.';
+            $auditAction = (int)($_POST['government_official_id'] ?? 0) > 0 ? 'update_dropdown_official' : 'add_dropdown_official';
+        }
+        insertUnifiedAuditLog($conn, trim((string)($_SESSION['user_id'] ?? '')) ?: null, trim((string)($_SESSION['role'] ?? 'Official')) ?: 'Official', 'document_settings', 'indigency_government_official', (string)$officialId, $auditAction, 'dropdown_configuration', null, $auditAfter === null ? null : json_encode($auditAfter, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $message);
+        header('Location: ' . $documentSettingsActionUrl . '?success=' . rawurlencode($message) . '#indigency-officials');
+        exit;
+    } catch (Throwable $e) {
+        header('Location: ' . $documentSettingsActionUrl . '?error=' . rawurlencode($e->getMessage()) . '#indigency-officials');
+        exit;
+    }
+}
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST['action'] ?? ''), ['save_document_module_settings', 'save_issuance_settings'], true)) {
     verifyCsrfToken(false);

@@ -197,6 +197,79 @@ if (!function_exists('dms_save_issuance_settings')) {
     }
 }
 
+if (!function_exists('dms_ensure_government_official_dropdown_table')) {
+    function dms_ensure_government_official_dropdown_table(mysqli $conn): void
+    {
+        $conn->query("CREATE TABLE IF NOT EXISTS governmentofficialdropdowntbl (
+            government_official_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            official_name VARCHAR(255) NOT NULL,
+            position_name VARCHAR(255) NOT NULL,
+            jurisdiction_location VARCHAR(255) NOT NULL,
+            group_key VARCHAR(100) NOT NULL DEFAULT 'municipal_officials',
+            display_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            UNIQUE KEY uq_government_official_dropdown (official_name, position_name, jurisdiction_location)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+    }
+}
+
+if (!function_exists('dms_list_government_official_dropdown')) {
+    function dms_list_government_official_dropdown(mysqli $conn): array
+    {
+        dms_ensure_government_official_dropdown_table($conn);
+        $rows = [];
+        $result = $conn->query("SELECT government_official_id, official_name, position_name, jurisdiction_location, group_key, display_order, is_active FROM governmentofficialdropdowntbl ORDER BY display_order ASC, official_name ASC");
+        if ($result instanceof mysqli_result) {
+            while ($row = $result->fetch_assoc()) $rows[] = $row;
+            $result->free();
+        }
+        return $rows;
+    }
+}
+
+if (!function_exists('dms_save_government_official_dropdown')) {
+    function dms_save_government_official_dropdown(mysqli $conn, array $post): array
+    {
+        dms_ensure_government_official_dropdown_table($conn);
+        $id = max(0, (int)($post['government_official_id'] ?? 0));
+        $name = trim((string)($post['official_name'] ?? ''));
+        $position = trim((string)($post['position_name'] ?? ''));
+        $location = trim((string)($post['jurisdiction_location'] ?? ''));
+        $group = strtolower(trim((string)($post['group_key'] ?? 'municipal_officials')));
+        $group = preg_replace('/[^a-z0-9_]+/', '_', $group) ?: 'municipal_officials';
+        $order = max(0, min(9999, (int)($post['display_order'] ?? 0)));
+        $active = isset($post['is_active']) ? 1 : 0;
+        if ($name === '' || $position === '' || $location === '') throw new InvalidArgumentException('Name, position, and office/jurisdiction are required.');
+        if ($id > 0) {
+            $stmt = $conn->prepare("UPDATE governmentofficialdropdowntbl SET official_name=?, position_name=?, jurisdiction_location=?, group_key=?, display_order=?, is_active=? WHERE government_official_id=? LIMIT 1");
+            if (!$stmt) throw new RuntimeException('Unable to prepare official update.');
+            $stmt->bind_param('ssssiii', $name, $position, $location, $group, $order, $active, $id);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO governmentofficialdropdowntbl (official_name, position_name, jurisdiction_location, group_key, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?)");
+            if (!$stmt) throw new RuntimeException('Unable to prepare official creation.');
+            $stmt->bind_param('ssssii', $name, $position, $location, $group, $order, $active);
+        }
+        if (!$stmt->execute()) throw new RuntimeException($stmt->errno === 1062 ? 'That official, position, and office combination already exists.' : 'Unable to save the government official.');
+        $savedId = $id > 0 ? $id : (int)$stmt->insert_id;
+        $stmt->close();
+        return ['id' => $savedId, 'name' => $name, 'position' => $position, 'location' => $location, 'group' => $group, 'order' => $order, 'active' => $active];
+    }
+}
+
+if (!function_exists('dms_delete_government_official_dropdown')) {
+    function dms_delete_government_official_dropdown(mysqli $conn, int $id): bool
+    {
+        if ($id <= 0) return false;
+        dms_ensure_government_official_dropdown_table($conn);
+        $stmt = $conn->prepare("DELETE FROM governmentofficialdropdowntbl WHERE government_official_id=? LIMIT 1");
+        if (!$stmt) return false;
+        $stmt->bind_param('i', $id);
+        $ok = $stmt->execute() && $stmt->affected_rows > 0;
+        $stmt->close();
+        return $ok;
+    }
+}
+
 if (!function_exists('dms_db_table_exists')) {
     function dms_db_table_exists(mysqli $conn, string $table): bool
     {
