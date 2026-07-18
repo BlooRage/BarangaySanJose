@@ -159,7 +159,8 @@ if ($certificateLaunchStage === 'release') {
       #docRequestsPanel .admin-list-toolbar {
         flex-wrap: nowrap;
         gap: 10px;
-        overflow-x: auto;
+        overflow: visible;
+        padding-top: 8px;
       }
       #docRequestsPanel .admin-list-tabs {
         flex: 0 0 auto;
