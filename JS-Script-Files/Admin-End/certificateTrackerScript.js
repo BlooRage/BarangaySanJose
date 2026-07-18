@@ -683,7 +683,8 @@
   }
 
   function certificateDefaultValidityDate(baseDate = new Date()) {
-    return addDaysDateInputValue(45, baseDate);
+    const configuredDays = Number.parseInt(String(window.ISSUANCE_SETTINGS?.default_validity_days || '45'), 10);
+    return addDaysDateInputValue(Math.max(1, Math.min(365, configuredDays || 45)), baseDate);
   }
 
   function barangayIdDefaultValidityDate(baseDate = new Date()) {
@@ -692,7 +693,11 @@
   }
 
   function certificateValidityPresets(baseDate = new Date()) {
-    return [3, 15, 30, 45, 60].map((days) => ({
+    const configured = Array.isArray(window.ISSUANCE_SETTINGS?.allowed_validity_days)
+      ? window.ISSUANCE_SETTINGS.allowed_validity_days.map(Number).filter((days) => Number.isInteger(days) && days > 0 && days <= 365)
+      : [];
+    const daysList = configured.length ? [...new Set(configured)] : [3, 15, 30, 45, 60];
+    return daysList.map((days) => ({
       value: addDaysDateInputValue(days, baseDate),
       label: `${days} days`,
       amount: days,
@@ -877,7 +882,7 @@
     if (helpEl) {
       helpEl.textContent = kind === 'barangay_id'
         ? 'Choose the Barangay ID validity period: 1 to 5 years.'
-        : 'Choose the certificate validity period: 3, 15, 30, 45, or 60 days.';
+        : `Choose the certificate validity period: ${certificateValidityPresets().map((item) => item.amount).join(', ')} days.`;
     }
     return populateValiditySelect(selectEl, kind, selectedValue);
   }

@@ -416,6 +416,7 @@ function dra_normalize_validity_selection_input(?string $rawValue, ?string $base
 
 function dra_default_certificate_validity_datetime(?string $baseDateTime = null): string
 {
+    global $conn;
     try {
         $base = $baseDateTime !== null && trim($baseDateTime) !== ''
             ? new DateTimeImmutable($baseDateTime)
@@ -424,7 +425,11 @@ function dra_default_certificate_validity_datetime(?string $baseDateTime = null)
         $base = new DateTimeImmutable(dr_now());
     }
 
-    return $base->modify('+45 days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+    $days = 45;
+    if ($conn instanceof mysqli) {
+        try { $days = max(1, min(365, (int)(dms_resolve_issuance_settings($conn)['default_validity_days'] ?? 45))); } catch (Throwable $e) {}
+    }
+    return $base->modify('+' . $days . ' days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
 }
 
 function dra_default_barangay_id_validity_datetime(?string $baseDateTime = null): string
@@ -659,6 +664,28 @@ function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string
 
 function dra_send_notification_deferred(mysqli $conn, array $request, string $subject, string $message): void
 {
+    try {
+        $settings = dms_resolve_issuance_settings($conn);
+        $subjectToken = strtolower($subject);
+        $stage = strtolower(trim((string)($request['stage'] ?? '')));
+        $event = str_contains($subjectToken, 'reject') || str_contains($stage, 'rejected') || str_contains($stage, 'failed')
+            ? 'rejected'
+            : ((str_contains($subjectToken, 'ready') || $stage === DR_STAGE_READY_FOR_CLAIM)
+                ? 'ready_for_claim'
+                : ((str_contains($subjectToken, 'released') || $stage === DR_STAGE_COMPLETED) ? 'released' : 'approved'));
+        $notification = $settings['resident_notifications'][$event] ?? [];
+        if (empty($notification['enabled'])) return;
+        $configured = trim((string)($notification['message'] ?? ''));
+        if ($configured !== '') {
+            $message = strtr($configured, [
+                '{request_id}' => trim((string)($request['request_id'] ?? '')),
+                '{document_type}' => dra_humanize_document_type((string)($request['document_type'] ?? 'Document')),
+                '{reason}' => trim((string)($request['status_reason'] ?? $request['status_remarks'] ?? '')),
+            ]);
+        }
+    } catch (Throwable $e) {
+        error_log('[documentRequestWorkflow][notification settings] ' . $e->getMessage());
+    }
     register_shutdown_function(static function () use ($conn, $request, $subject, $message): void {
         // Flush response first when supported, then send notifications outside request hot path.
         if (function_exists('session_write_close')) {
@@ -6345,6 +6372,15 @@ function dra_generate_issued_document(array $requestRow): ?string
 
 function dra_generate_issued_document_safe(array $requestRow): ?string
 {
+    global $conn;
+    if ($conn instanceof mysqli) {
+        try {
+            if (empty(dms_resolve_issuance_settings($conn)['qr_verification_enabled'])) {
+                $requestRow['verification_code'] = '';
+                $requestRow['qr_code_path'] = '';
+            }
+        } catch (Throwable $e) {}
+    }
     $bufferLevel = ob_get_level();
     ob_start();
     try {

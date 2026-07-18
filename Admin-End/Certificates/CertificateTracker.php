@@ -40,6 +40,7 @@ if ($isFeeSettingsView) {
 }
 $barangayIdAdminNavActive = 'applications';
 $barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
+$issuanceOperationalSettings = dms_resolve_issuance_settings($conn);
 
 if ($certificateLaunchStage === 'release') {
   $barangayIdAdminNavActive = 'release';
@@ -4107,6 +4108,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
   window.BARANGAY_ID_SETTINGS = <?= json_encode($barangayIdOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  window.ISSUANCE_SETTINGS = <?= json_encode($issuanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
     tableSelector: "#table-certificateTracker",
     modalId: "modalTableColumns",

@@ -72,6 +72,131 @@ if (!function_exists('dms_get_module_config')) {
     }
 }
 
+if (!function_exists('dms_issuance_certificate_catalog')) {
+    function dms_issuance_certificate_catalog(): array
+    {
+        return [
+            'indigency' => 'Certificate of Indigency',
+            'residency' => 'Certificate of Residency',
+            'good_moral' => 'Certificate of Good Moral',
+            'cohabitation' => 'Certificate of Cohabitation',
+            'jail_visitation' => 'Certificate for Jail Visitation',
+            'first_time_job_seeker' => 'First-Time Job Seeker Certificate',
+        ];
+    }
+}
+
+if (!function_exists('dms_default_issuance_settings')) {
+    function dms_default_issuance_settings(): array
+    {
+        $purposes = [
+            'indigency' => ['Financial Assistance', 'Medical Assistance', 'Educational Assistance', 'Burial Assistance', 'Other'],
+            'residency' => ['Employment', 'School Requirement', 'Government Transaction', 'Proof of Address', 'Other'],
+            'good_moral' => ['Employment', 'Government Aid / Programs', 'Business Permit Application', 'School Requirement', 'Scholarship', 'Board Examination', 'Other'],
+            'cohabitation' => ['Legal Requirement', 'Government Transaction', 'Benefit Application', 'Other'],
+            'jail_visitation' => ['Jail Visitation', 'Conjugal Visit', 'Other'],
+            'first_time_job_seeker' => ['First-Time Job Seeker Application'],
+        ];
+        $certificates = [];
+        foreach (dms_issuance_certificate_catalog() as $key => $label) {
+            $certificates[$key] = [
+                'label' => $label,
+                'enabled' => true,
+                'purpose_options' => $purposes[$key] ?? ['Other'],
+            ];
+        }
+        return [
+            'online_requests_enabled' => true,
+            'default_validity_days' => 45,
+            'allowed_validity_days' => [3, 15, 30, 45, 60],
+            'first_time_job_seeker_exempt' => true,
+            'qr_verification_enabled' => true,
+            'essential_details_only' => true,
+            'resident_notifications' => [
+                'submitted' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been submitted and is awaiting review.'],
+                'approved' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been approved.'],
+                'rejected' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) was rejected. Reason: {reason}'],
+                'ready_for_claim' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) is ready for claim.'],
+                'released' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been released.'],
+            ],
+            'aging_notification_enabled' => true,
+            'aging_days' => 3,
+            'aging_message' => '{count} certificate request(s) have been pending for at least {days} day(s).',
+            'certificates' => $certificates,
+        ];
+    }
+}
+
+if (!function_exists('dms_ensure_issuance_settings_table')) {
+    function dms_ensure_issuance_settings_table(mysqli $conn): void
+    {
+        $conn->query("CREATE TABLE IF NOT EXISTS documentissuancesettingstbl (
+            setting_id TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            settings_json LONGTEXT NOT NULL,
+            updated_by_user_id VARCHAR(64) DEFAULT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (setting_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+}
+
+if (!function_exists('dms_resolve_issuance_settings')) {
+    function dms_resolve_issuance_settings(mysqli $conn): array
+    {
+        dms_ensure_issuance_settings_table($conn);
+        $defaults = dms_default_issuance_settings();
+        $result = $conn->query("SELECT settings_json, updated_by_user_id, updated_at FROM documentissuancesettingstbl WHERE setting_id = 1 LIMIT 1");
+        $row = $result instanceof mysqli_result ? $result->fetch_assoc() : null;
+        $stored = $row ? json_decode((string)($row['settings_json'] ?? ''), true) : null;
+        $settings = is_array($stored) ? array_replace_recursive($defaults, $stored) : $defaults;
+        $settings['updated_by_user_id'] = (string)($row['updated_by_user_id'] ?? '');
+        $settings['updated_at'] = (string)($row['updated_at'] ?? '');
+        return $settings;
+    }
+}
+
+if (!function_exists('dms_save_issuance_settings')) {
+    function dms_save_issuance_settings(mysqli $conn, array $post, string $updatedByUserId): array
+    {
+        $before = dms_resolve_issuance_settings($conn);
+        $allowed = array_values(array_unique(array_filter(array_map('intval', (array)($post['allowed_validity_days'] ?? [])), static fn(int $v): bool => $v >= 1 && $v <= 365)));
+        sort($allowed);
+        if ($allowed === []) $allowed = [45];
+        $defaultValidity = max(1, min(365, (int)($post['default_validity_days'] ?? 45)));
+        if (!in_array($defaultValidity, $allowed, true)) $allowed[] = $defaultValidity;
+        sort($allowed);
+
+        $settings = dms_default_issuance_settings();
+        foreach (['online_requests_enabled', 'first_time_job_seeker_exempt', 'qr_verification_enabled', 'essential_details_only', 'aging_notification_enabled'] as $key) {
+            $settings[$key] = isset($post[$key]);
+        }
+        $settings['default_validity_days'] = $defaultValidity;
+        $settings['allowed_validity_days'] = $allowed;
+        $settings['aging_days'] = max(1, min(90, (int)($post['aging_days'] ?? 3)));
+        $settings['aging_message'] = trim((string)($post['aging_message'] ?? $settings['aging_message']));
+        foreach ($settings['resident_notifications'] as $event => &$notification) {
+            $notification['enabled'] = isset($post['notification_enabled'][$event]);
+            $message = trim((string)($post['notification_message'][$event] ?? ''));
+            if ($message !== '') $notification['message'] = $message;
+        }
+        unset($notification);
+        foreach (dms_issuance_certificate_catalog() as $key => $label) {
+            $settings['certificates'][$key]['enabled'] = isset($post['certificate_enabled'][$key]);
+            $rawOptions = preg_split('/\R/u', (string)($post['purpose_options'][$key] ?? '')) ?: [];
+            $options = array_values(array_unique(array_filter(array_map('trim', $rawOptions), static fn(string $v): bool => $v !== '')));
+            $settings['certificates'][$key]['purpose_options'] = array_slice($options, 0, 50);
+        }
+        $json = json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) throw new RuntimeException('Unable to encode issuance settings.');
+        $stmt = $conn->prepare("INSERT INTO documentissuancesettingstbl (setting_id, settings_json, updated_by_user_id) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE settings_json = VALUES(settings_json), updated_by_user_id = VALUES(updated_by_user_id), updated_at = CURRENT_TIMESTAMP");
+        if (!$stmt) throw new RuntimeException('Unable to prepare issuance settings save.');
+        $stmt->bind_param('ss', $json, $updatedByUserId);
+        if (!$stmt->execute()) throw new RuntimeException('Unable to save issuance settings.');
+        $stmt->close();
+        return ['before' => $before, 'after' => dms_resolve_issuance_settings($conn)];
+    }
+}
+
 if (!function_exists('dms_db_table_exists')) {
     function dms_db_table_exists(mysqli $conn, string $table): bool
     {

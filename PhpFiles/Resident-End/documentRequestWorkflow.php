@@ -5,6 +5,7 @@ require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
+require_once __DIR__ . '/../General/documentModuleSettings.php';
 
 requireRoleSession(['Resident'], true);
 
@@ -1128,6 +1129,25 @@ if ($action === 'submit_request') {
     if ($documentType === '') {
         $documentType = 'Certificate Request';
     }
+    $issuanceSettings = dms_resolve_issuance_settings($conn);
+    $issuanceToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
+    $issuanceCertificateKey = match (true) {
+        str_contains($issuanceToken, 'indigency') => 'indigency',
+        str_contains($issuanceToken, 'residency'), str_contains($issuanceToken, 'residence') => 'residency',
+        str_contains($issuanceToken, 'goodmoral') => 'good_moral',
+        str_contains($issuanceToken, 'jail'), str_contains($issuanceToken, 'visitation') => 'jail_visitation',
+        str_contains($issuanceToken, 'cohabitation') => 'cohabitation',
+        str_contains($issuanceToken, 'firsttimejobseeker') => 'first_time_job_seeker',
+        default => '',
+    };
+    if ($issuanceCertificateKey !== '') {
+        if (empty($issuanceSettings['online_requests_enabled'])) {
+            dr_respond_json(503, ['success' => false, 'message' => 'Online certificate requests are temporarily suspended. Please contact the barangay office.']);
+        }
+        if (empty($issuanceSettings['certificates'][$issuanceCertificateKey]['enabled'])) {
+            dr_respond_json(422, ['success' => false, 'message' => 'This certificate is currently unavailable for online requests.']);
+        }
+    }
     $documentTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
 
     $purpose = trim((string)($_POST['request_purpose'] ?? $_POST['purpose'] ?? ''));
@@ -1916,7 +1936,9 @@ if ($action === 'submit_request') {
     $requestDetailsToken = dr_request_details_token($documentTypeRaw, $documentType);
     $requestDetailsJsonRequired = dr_request_details_requires_json($conn);
     $requestDetailsValue = $payloadJson;
-    $defaultValidity = date('Y-m-d H:i:s', strtotime('+2 years'));
+    $defaultValidity = $isBarangayIdRequest
+        ? date('Y-m-d H:i:s', strtotime('+2 years'))
+        : date('Y-m-d H:i:s', strtotime('+' . max(1, min(365, (int)($issuanceSettings['default_validity_days'] ?? 45))) . ' days'));
 
     $setIfColumn = function (string $column, string $type, $value) use (&$values, &$types, &$params, $conn) {
         if (!dr_has_column($conn, 'documentrequesttbl', $column)) {
@@ -2081,6 +2103,15 @@ if ($action === 'submit_request') {
     $row = dr_fetch_request($conn, $requestId);
     if ($row) {
         dr_sync_transaction($conn, $row);
+        $notification = $issuanceSettings['resident_notifications']['submitted'] ?? [];
+        if ($issuanceCertificateKey !== '' && !empty($notification['enabled'])) {
+            $message = strtr((string)($notification['message'] ?? ''), [
+                '{request_id}' => $requestId,
+                '{document_type}' => $documentType,
+                '{reason}' => '',
+            ]);
+            if (trim($message) !== '') dr_send_notification($conn, $row, 'Document Request Submitted', $message);
+        }
     }
 
     if (dr_wants_html_redirect()) {
