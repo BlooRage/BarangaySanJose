@@ -155,6 +155,29 @@ if ($certificateLaunchStage === 'release') {
       min-width: 300px;
       max-width: 360px;
     }
+    @media (min-width: 992px) {
+      #docRequestsPanel .admin-list-toolbar {
+        flex-wrap: nowrap;
+        gap: 10px;
+        overflow-x: auto;
+      }
+      #docRequestsPanel .admin-list-tabs {
+        flex: 0 0 auto;
+        gap: 8px;
+      }
+      #docRequestsPanel .admin-list-actions {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin-left: auto;
+        justify-content: flex-end;
+      }
+      #docRequestsPanel .admin-search {
+        flex: 0 1 280px;
+        width: clamp(210px, 20vw, 280px);
+        min-width: 210px;
+        max-width: 280px;
+      }
+    }
     .certificate-tracker-shell .table-responsive {
       width: 100%;
       max-width: 100%;
