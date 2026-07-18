@@ -17,6 +17,10 @@ $documentSettingsFeeRequestsUrl = appUrl('Admin-End/Certificates/CertificateTrac
 $documentSettingsFeeRequestsTitle = 'Certificate Fee Change Requests';
 $documentSettingsFeeRequestsDescription = 'Request an update to the fee assigned to a certificate type and review submitted requests.';
 $governmentOfficialRows = dms_list_government_official_dropdown($conn);
+$issuanceSettingsView = strtolower(trim((string)($_GET['view'] ?? 'landing')));
+if (!in_array($issuanceSettingsView, ['landing', 'manage'], true)) {
+    $issuanceSettingsView = 'landing';
+}
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST['action'] ?? ''), ['save_indigency_government_official', 'delete_indigency_government_official'], true)) {
     verifyCsrfToken(false);
@@ -35,10 +39,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
             $auditAction = (int)($_POST['government_official_id'] ?? 0) > 0 ? 'update_dropdown_official' : 'add_dropdown_official';
         }
         insertUnifiedAuditLog($conn, trim((string)($_SESSION['user_id'] ?? '')) ?: null, trim((string)($_SESSION['role'] ?? 'Official')) ?: 'Official', 'document_settings', 'indigency_government_official', (string)$officialId, $auditAction, 'dropdown_configuration', null, $auditAfter === null ? null : json_encode($auditAfter, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $message);
-        header('Location: ' . $documentSettingsActionUrl . '?success=' . rawurlencode($message) . '#indigency-officials');
+        header('Location: ' . $documentSettingsActionUrl . '?view=manage&success=' . rawurlencode($message) . '#indigency-officials');
         exit;
     } catch (Throwable $e) {
-        header('Location: ' . $documentSettingsActionUrl . '?error=' . rawurlencode($e->getMessage()) . '#indigency-officials');
+        header('Location: ' . $documentSettingsActionUrl . '?view=manage&error=' . rawurlencode($e->getMessage()) . '#indigency-officials');
         exit;
     }
 }
@@ -66,12 +70,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
             $isOperationalSave ? 'Updated Barangay Issuance operational, certificate, notification, and dropdown settings.' : 'Updated Barangay Issuance signatory settings.'
         );
 
-        header('Location: ' . $documentSettingsActionUrl . '?success=' . rawurlencode($isOperationalSave ? 'Barangay Issuance settings saved.' : 'Barangay Issuance signatory settings saved.'));
+        header('Location: ' . $documentSettingsActionUrl . '?view=manage&success=' . rawurlencode($isOperationalSave ? 'Barangay Issuance settings saved.' : 'Barangay Issuance signatory settings saved.'));
         exit;
     } catch (Throwable $e) {
-        header('Location: ' . $documentSettingsActionUrl . '?error=' . rawurlencode($e->getMessage()));
+        header('Location: ' . $documentSettingsActionUrl . '?view=manage&error=' . rawurlencode($e->getMessage()));
         exit;
     }
 }
 
-include __DIR__ . '/../includes/issuance_settings_page.php';
+include $issuanceSettingsView === 'manage'
+    ? __DIR__ . '/../includes/issuance_settings_page.php'
+    : __DIR__ . '/../includes/issuance_settings_landing.php';

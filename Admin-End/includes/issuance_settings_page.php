@@ -27,7 +27,7 @@
 </head>
 <body><div class="d-flex flex-column flex-md-row" style="min-height:100vh"><?php include __DIR__.'/sidebar.php'; ?>
 <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display"><div class="is-page">
-  <header class="is-hero"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div><h1 class="is-title mb-2">Barangay Issuance Settings</h1><p class="is-lead mb-0">Manage certificate availability, validity, verification, resident messages, and request choices.</p></div><div class="is-hero-actions"><a class="btn btn-outline-secondary" href="<?= htmlspecialchars($documentSettingsBackUrl) ?>"><i class="fa-solid fa-arrow-left me-2"></i>Back to Module</a></div></div></header>
+  <header class="is-hero"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div><h1 class="is-title mb-2">Manage Issuance Settings</h1><p class="is-lead mb-0">Manage certificate availability, validity, verification, resident messages, and request choices.</p></div><div class="is-hero-actions"><a class="btn btn-outline-secondary" href="<?= htmlspecialchars($documentSettingsActionUrl) ?>"><i class="fa-solid fa-arrow-left me-2"></i>Settings Overview</a></div></div></header>
   <hr class="mt-3 mb-4">
   <?php if ($documentSettingsSuccessMessage !== ''): ?><div class="alert alert-success mt-3 mb-0"><i class="fa-solid fa-circle-check me-2"></i><?= htmlspecialchars($documentSettingsSuccessMessage) ?></div><?php endif; ?>
   <?php if ($documentSettingsErrorMessage !== ''): ?><div class="alert alert-danger mt-3 mb-0"><i class="fa-solid fa-triangle-exclamation me-2"></i><?= htmlspecialchars($documentSettingsErrorMessage) ?></div><?php endif; ?>
