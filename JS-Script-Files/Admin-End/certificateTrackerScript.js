@@ -8241,6 +8241,7 @@
     const manualMiddleName = document.getElementById('manualMiddleName');
     const manualSuffix = document.getElementById('manualSuffix');
     const manualBirthdate = document.getElementById('manualBirthdate');
+    const manualBirthdateRequiredMark = document.getElementById('manualBirthdateRequiredMark');
     const manualBirthMonth = document.getElementById('manualBirthMonth');
     const manualBirthDay = document.getElementById('manualBirthDay');
     const manualBirthYear = document.getElementById('manualBirthYear');
@@ -8248,6 +8249,7 @@
     const manualCivilStatus = document.getElementById('manualCivilStatus');
     const manualContactNumber = document.getElementById('manualContactNumber');
     const manualBirthplace = document.getElementById('manualBirthplace');
+    const manualBirthplaceRequiredMark = document.getElementById('manualBirthplaceRequiredMark');
     const manualOccupation = document.getElementById('manualOccupation');
     const manualReligion = document.getElementById('manualReligion');
     const manualFullAddress = document.getElementById('manualFullAddress');
@@ -8415,7 +8417,7 @@
 
     function manualShowIdWizardStep(step, scroll = false) {
       if (!manualIdWizardPanels.length) return;
-      const totalSteps = isIdIssuanceTrackerView ? 5 : 6;
+      const totalSteps = 5;
       manualIdWizardCurrentStep = Math.max(1, Math.min(totalSteps, Number(step) || 1));
       manualIdWizardPanels.forEach((panel) => {
         const matchesStep = manualPanelStep(panel) === manualIdWizardCurrentStep;
@@ -8479,7 +8481,7 @@
         manualSetAlert('Take or select the resident ID photo before continuing.', 'warning');
         return false;
       }
-      if (manualIdWizardCurrentStep === (isIdIssuanceTrackerView ? 2 : 3) && manualAreaNumber && !manualAreaNumber.value.trim()) {
+      if (manualIdWizardCurrentStep === 2 && manualAreaNumber && !manualAreaNumber.value.trim()) {
         manualSetFieldInvalidState(manualAreaNumber, true);
         manualSetAlert('Select the resident Area Number before continuing.', 'warning');
         manualAreaNumber?.focus();
@@ -8554,6 +8556,7 @@
         : [];
       return [
         manualDocumentType,
+        manualPurpose,
         manualLastName,
         manualFirstName,
         manualBirthdate,
@@ -8561,6 +8564,7 @@
         manualContactNumber,
         manualBirthplace,
         manualFullAddress,
+        manualAreaNumber,
         ...dynamicFields
       ].filter(Boolean);
     }
@@ -9450,10 +9454,13 @@
 
     function manualApplyCommonFieldRequirements(config) {
       const isBarangayId = config?.kind === 'barangay_id';
-      if (manualBirthdate) manualBirthdate.required = isBarangayId;
+      const needsBirthDetails = isBarangayId || ['residency', 'identity', 'cohabitation'].includes(config?.kind);
+      if (manualBirthdate) manualBirthdate.required = needsBirthDetails;
+      manualBirthdateRequiredMark?.classList.toggle('d-none', !needsBirthDetails);
       if (manualSex) manualSex.required = isBarangayId;
       if (manualContactNumber) manualContactNumber.required = false;
-      if (manualBirthplace) manualBirthplace.required = isBarangayId;
+      if (manualBirthplace) manualBirthplace.required = isBarangayId || ['residency', 'identity'].includes(config?.kind);
+      manualBirthplaceRequiredMark?.classList.toggle('d-none', !(isBarangayId || ['residency', 'identity'].includes(config?.kind)));
     }
 
     function manualMarkPreviewStale(silent = false) {
@@ -9554,7 +9561,9 @@
             { name: 'cohabitant_last', label: 'Partner Last Name', type: 'text', required: true, col: 'col-md-3' },
             { name: 'cohabitant_suffix', label: 'Partner Suffix', type: 'text', col: 'col-md-3' },
             { name: 'cohabitant_birthdate', label: 'Partner Birthdate', type: 'date', required: true, col: 'col-md-6' },
-            { name: 'cohabitation_start_date', label: 'Living Together Since', type: 'date', required: true, col: 'col-md-6' }
+            { name: 'cohabitation_start_date', label: 'Living Together Since', type: 'date', required: true, col: 'col-md-6' },
+            { name: 'cohabitant_full_address', label: 'Partner Residential Address', type: 'textarea', required: true, col: 'col-12', rows: 2 },
+            { name: 'cohabitation_full_address', label: 'Current Cohabitation Address', type: 'textarea', required: true, col: 'col-12', rows: 2 }
           ];
         case 'jail_visit':
           return [
@@ -9580,8 +9589,8 @@
               { value: 'No', label: 'No' },
               { value: 'Yes', label: 'Yes' }
             ] },
-            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', col: 'col-md-6' },
-            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', col: 'col-md-6' }
+            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', required: true, col: 'col-md-6' },
+            { name: 'months_of_residency', label: 'Additional Months of Residency', type: 'number', min: '0', required: true, col: 'col-md-6' }
           ];
         default:
           return [];
@@ -9694,7 +9703,7 @@
       }
 
       const previous = new Map(manualCurrentFeeRows().map((row) => [String(row.fee_name || '').toLowerCase(), row]));
-      manualFeeWrap.classList.toggle('d-none', !isIdIssuanceTrackerView && manualIdWizardCurrentStep !== 4);
+      manualFeeWrap.classList.toggle('d-none', !isIdIssuanceTrackerView && manualIdWizardCurrentStep !== 3);
       manualFeeList.innerHTML = `
         <div class="manual-search-empty">
           <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading fee catalog...

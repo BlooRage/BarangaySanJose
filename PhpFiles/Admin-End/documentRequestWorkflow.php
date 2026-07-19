@@ -7759,7 +7759,99 @@ if ($action === 'create_manual_request') {
         $payload['purpose'] = $purpose;
     }
 
-    if (dr_is_barangay_id_document_type($documentType)) {
+    $documentToken = strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $documentType));
+    $isBarangayIdDocument = dr_is_barangay_id_document_type($documentType);
+    $requireManualPayloadFields = static function (array $requiredFields) use ($payload): void {
+        foreach ($requiredFields as $field => $label) {
+            if (trim((string)($payload[$field] ?? '')) === '') {
+                dr_respond_json(422, [
+                    'success' => false,
+                    'message' => $label . ' is required for this document.',
+                ]);
+            }
+        }
+    };
+
+    $requireManualPayloadFields([
+        'area_number' => 'Area Number',
+    ]);
+    if (!$isBarangayIdDocument) {
+        $requireManualPayloadFields([
+            'request_purpose' => 'Purpose / Request For',
+        ]);
+    }
+
+    if (str_contains($documentToken, 'businesspermit')) {
+        $requireManualPayloadFields([
+            'application_type' => 'Application Type',
+            'business_name' => 'Business Name',
+            'business_type' => 'Business Type',
+            'business_approval_type' => 'Approval Type',
+            'business_full_address' => 'Business Address',
+        ]);
+    } elseif (str_contains($documentToken, 'tricycle')) {
+        $requireManualPayloadFields([
+            'application_type' => 'Application Type',
+            'location_of_toda_poda' => 'TODA/PODA Location',
+            'vehicle_make' => 'Type of Vehicle',
+            'cr_number' => 'Registration Number',
+            'plate_number' => 'Plate Number',
+            'body_number' => 'Body Number',
+        ]);
+    } elseif (
+        str_contains($documentToken, 'electricalpermit')
+        || str_contains($documentToken, 'waterpermit')
+        || str_contains($documentToken, 'residentialpermit')
+        || str_contains($documentToken, 'residentialbuildingpermit')
+        || str_contains($documentToken, 'commercialpermit')
+        || str_contains($documentToken, 'commercialbuildingpermit')
+    ) {
+        $requireManualPayloadFields([
+            'location' => 'Project / Permit Location',
+            'remarks' => 'Remarks',
+        ]);
+    } elseif (str_contains($documentToken, 'residency') || str_contains($documentToken, 'identity')) {
+        $requireManualPayloadFields([
+            'birthdate' => 'Birthdate',
+            'birthplace' => 'Birthplace',
+            'remarks' => 'Remarks',
+        ]);
+    } elseif (str_contains($documentToken, 'indigency')) {
+        $requireManualPayloadFields([
+            'request_officer_line1' => 'Addressed To - Line 1',
+            'request_officer_line2' => 'Addressed To - Line 2',
+            'request_officer_line3' => 'Addressed To - Line 3',
+        ]);
+    } elseif (str_contains($documentToken, 'cohabitation')) {
+        $cohabitationVariant = strtolower(trim((string)($payload['cohabitation_variant'] ?? 'standard')));
+        if (in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true)) {
+            $requireManualPayloadFields([
+                'cohabitant_first' => 'Detainee First Name',
+                'cohabitant_last' => 'Detainee Last Name',
+                'cohabitant_relationship' => 'Relationship to Detainee',
+                'detention_facility' => 'Detention Facility',
+            ]);
+        } else {
+            $requireManualPayloadFields([
+                'birthdate' => 'Applicant Birthdate',
+                'cohabitant_first' => 'Partner First Name',
+                'cohabitant_last' => 'Partner Last Name',
+                'cohabitant_birthdate' => 'Partner Birthdate',
+                'cohabitation_start_date' => 'Living Together Since',
+                'cohabitant_full_address' => 'Partner Residential Address',
+                'cohabitation_full_address' => 'Current Cohabitation Address',
+            ]);
+        }
+    } elseif (str_contains($documentToken, 'firsttimejobseeker')) {
+        $requireManualPayloadFields([
+            'educational_attainment' => 'Educational Attainment',
+            'jobstart_beneficiary' => 'Prior First-Time Job Seeker Benefit Status',
+            'years_of_residency' => 'Years of Residency',
+            'months_of_residency' => 'Additional Months of Residency',
+        ]);
+    }
+
+    if ($isBarangayIdDocument) {
         $barangayIdRequestType = strtolower(trim((string)($payload['barangay_id_request_type'] ?? 'new')));
         if (!in_array($barangayIdRequestType, ['new', 'renewal'], true)) {
             $barangayIdRequestType = 'new';
@@ -7786,6 +7878,7 @@ if ($action === 'create_manual_request') {
             'sex' => 'Sex is required for Barangay ID.',
             'emergency_last' => 'Emergency contact last name is required for Barangay ID.',
             'emergency_first' => 'Emergency contact first name is required for Barangay ID.',
+            'emergency_relationship' => 'Emergency contact relationship is required for Barangay ID.',
             'emergency_contact' => 'Emergency contact number is required for Barangay ID.',
             'emergency_address' => 'Emergency contact address is required for Barangay ID.',
         ];
@@ -7793,6 +7886,15 @@ if ($action === 'create_manual_request') {
             if (trim((string)($payload[$field] ?? '')) === '') {
                 dr_respond_json(422, ['success' => false, 'message' => $message]);
             }
+        }
+        $manualIdPhoto = dra_manual_first_non_empty([
+            $_POST['id_picture_data_url'] ?? null,
+            $payload['id_picture_path'] ?? null,
+            $payload['id_picture_url'] ?? null,
+            $residentProfile['id_picture_path'] ?? null,
+        ]);
+        if ($manualIdPhoto === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'A saved resident photo is required for Barangay ID.']);
         }
     }
     $birthdateValidationMessage = dr_validate_birthdate_payload_fields($payload);

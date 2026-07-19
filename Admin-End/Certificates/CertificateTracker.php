@@ -3039,7 +3039,7 @@ if ($certificateLaunchStage === 'release') {
         </div>
       </div>
 
-        <nav class="manual-id-process mb-4" style="--manual-process-step-count: <?= $isIdIssuanceTrackerView ? 5 : 6 ?>" aria-label="Manual issuance process">
+        <nav class="manual-id-process mb-4" style="--manual-process-step-count: 5" aria-label="Manual issuance process">
           <?php foreach ($isIdIssuanceTrackerView ? [
             ['fa-user-magnifying-glass', 'Source Selection'],
             ['fa-address-card', 'Personal Information'],
@@ -3047,8 +3047,7 @@ if ($certificateLaunchStage === 'release') {
             ['fa-circle-check', 'Approval & Validity'],
             ['fa-id-card', 'Initial ID Preview'],
           ] : [
-            ['fa-user-magnifying-glass', 'Source'],
-            ['fa-file-circle-check', 'Document Setup'],
+            ['fa-user-magnifying-glass', 'Source & Document Setup'],
             ['fa-address-card', 'Personal Information'],
             ['fa-list-check', 'Document Details'],
             ['fa-circle-check', 'Confirm & Validity'],
@@ -3187,9 +3186,9 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>" <?= !$isIdIssuanceTrackerView ? 'data-manual-step-panel="2"' : '' ?>>
+            <div class="manual-issuance-card <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>" <?= !$isIdIssuanceTrackerView ? 'data-manual-step-panel="1"' : '' ?>>
               <div class="manual-issuance-card-title">
-                <h6>2. Document Setup</h6>
+                <h6>Document Setup</h6>
                 <span>Choose the form first. The matching fields and next step summary will update automatically.</span>
               </div>
               <div class="row g-3">
@@ -3209,9 +3208,9 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card" data-manual-step-panel="<?= $isIdIssuanceTrackerView ? '2' : '3' ?>">
+            <div class="manual-issuance-card" data-manual-step-panel="2">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '3. Personal Basic Information' ?></h6>
+                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '2. Personal Basic Information' ?></h6>
                 <span><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Enter the resident details exactly as they should appear on the certificate.' ?></span>
               </div>
               <div class="row g-3">
@@ -3239,7 +3238,7 @@ if ($certificateLaunchStage === 'release') {
                   </select>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate<?= $isIdIssuanceTrackerView ? ' <span class="text-danger">*</span>' : '' ?></label>
+                  <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate <span class="text-danger <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" id="manualBirthdateRequiredMark">*</span></label>
                   <?php if ($isIdIssuanceTrackerView): ?>
                     <div class="manual-birthdate-dropdowns">
                       <select id="manualBirthMonth" class="form-select" required aria-label="Birth month">
@@ -3286,7 +3285,7 @@ if ($certificateLaunchStage === 'release') {
                   <input type="text" id="manualContactNumber" class="form-control" placeholder="09XXXXXXXXX">
                 </div>
                 <div class="<?= $isIdIssuanceTrackerView ? 'col-12' : 'col-md-6' ?>">
-                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace<?= $isIdIssuanceTrackerView ? ' <span class="text-danger">*</span>' : '' ?></label>
+                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace <span class="text-danger <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" id="manualBirthplaceRequiredMark">*</span></label>
                   <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
                 </div>
                 <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
@@ -3328,9 +3327,9 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card" data-manual-step-panel="<?= $isIdIssuanceTrackerView ? '2' : '3' ?>">
+            <div class="manual-issuance-card" data-manual-step-panel="2">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Sector Membership' : '3. Sector Membership' ?></h6>
+                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Sector Membership' : '2. Sector Membership' ?></h6>
                 <span>Select every applicable sector. Linked residents retain the membership recorded in the masterlist.</span>
               </div>
               <div class="row g-2" id="manualSectorMembershipWrap">
@@ -3353,11 +3352,19 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card" data-manual-step-panel="<?= $isIdIssuanceTrackerView ? '2' : '4' ?>">
+            <div class="manual-issuance-card" data-manual-step-panel="<?= $isIdIssuanceTrackerView ? '2' : '3' ?>">
               <div class="manual-issuance-card-title">
-                <h6 id="manualSpecificFieldsTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information — Emergency Contact' : '4. Document Specific Details' ?></h6>
+                <h6 id="manualSpecificFieldsTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information — Emergency Contact' : '3. Document Specific Details' ?></h6>
                 <span id="manualSpecificFieldsHint">Select a certificate or clearance type to load its manual encoding fields.</span>
               </div>
+              <?php if (!$isIdIssuanceTrackerView): ?>
+                <div class="row g-3 mb-3">
+                  <div class="col-12">
+                    <label for="manualPurpose" class="form-label fw-semibold small">Purpose / Request For <span class="text-danger">*</span></label>
+                    <input type="text" id="manualPurpose" class="form-control" required placeholder="State the exact purpose shown on the issued document">
+                  </div>
+                </div>
+              <?php endif; ?>
               <div id="manualDynamicFields" class="row g-3"></div>
             </div>
 
@@ -3395,9 +3402,9 @@ if ($certificateLaunchStage === 'release') {
             <?php endif; ?>
 
             <?php if (!$isIdIssuanceTrackerView): ?>
-              <div class="manual-issuance-card" data-manual-step-panel="5">
+              <div class="manual-issuance-card" data-manual-step-panel="4">
                 <div class="manual-issuance-card-title">
-                  <h6>5. Before You Approve</h6>
+                  <h6>4. Before You Approve</h6>
                   <span>Confirm the encoded details and choose the certificate validity before previewing.</span>
                 </div>
                 <aside class="manual-before-approve" aria-labelledby="manualCertificateBeforeApproveTitle">
@@ -3416,7 +3423,7 @@ if ($certificateLaunchStage === 'release') {
               </div>
             <?php endif; ?>
 
-            <div class="manual-issuance-card d-none" id="manualFeeWrap" <?= !$isIdIssuanceTrackerView ? 'data-manual-step-panel="4" data-manual-optional-panel="clearance"' : '' ?>>
+            <div class="manual-issuance-card d-none" id="manualFeeWrap" <?= !$isIdIssuanceTrackerView ? 'data-manual-step-panel="3" data-manual-optional-panel="clearance"' : '' ?>>
               <div class="manual-issuance-card-title">
                 <h6>Tagged Clearance Fees</h6>
                 <span>Tagged fees are only used for paid requests that continue to the finance step for walk-in payment recording.</span>
@@ -3430,9 +3437,9 @@ if ($certificateLaunchStage === 'release') {
 
             <div id="manualFormAlert" class="alert alert-warning d-none"></div>
 
-            <div class="manual-issuance-card mt-3" data-manual-step-panel="<?= $isIdIssuanceTrackerView ? '5' : '6' ?>">
+            <div class="manual-issuance-card mt-3" data-manual-step-panel="5">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '5. Initial Barangay ID Preview' : '6. Editable Document Preview' ?></h6>
+                <h6><?= $isIdIssuanceTrackerView ? '5. Initial Barangay ID Preview' : '5. Editable Document Preview' ?></h6>
                 <span><?= $isIdIssuanceTrackerView ? 'Review the actual front and back ID appearance before creating the record.' : 'Preview the document, edit its highlighted fields if needed, then approve.' ?></span>
               </div>
             <?php if ($isIdIssuanceTrackerView): ?>
@@ -3470,7 +3477,7 @@ if ($certificateLaunchStage === 'release') {
             <?php else: ?>
               <div class="manual-id-wizard-controls mt-4">
                 <button type="button" class="btn btn-outline-secondary" id="manualIdWizardBack"><i class="fa-solid fa-arrow-left me-1"></i>Back</button>
-                <span class="manual-id-wizard-position" id="manualIdWizardPosition">Step 1 of 6</span>
+                <span class="manual-id-wizard-position" id="manualIdWizardPosition">Step 1 of 5</span>
                 <button type="button" class="btn btn-primary" id="manualIdWizardNext">Continue<i class="fa-solid fa-arrow-right ms-1"></i></button>
               </div>
             <?php endif; ?>
@@ -3634,7 +3641,6 @@ if ($certificateLaunchStage === 'release') {
   </main>
 </div>
 
-<?php if ($isIdIssuanceTrackerView): ?>
 <div class="modal fade" id="manualAreaNumberModal" tabindex="-1" aria-labelledby="manualAreaNumberModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -3673,7 +3679,6 @@ if ($certificateLaunchStage === 'release') {
     </div>
   </div>
 </div>
-<?php endif; ?>
 
 <div class="modal fade manual-photo-modal" id="manualBarangayIdPhotoModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -4216,6 +4221,6 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260719-certificate-manual-wizard-1"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260719-certificate-manual-wizard-3"></script>
 </body>
 </html>
