@@ -8220,8 +8220,9 @@
     const manualValiditySummaryLabel = document.getElementById('manualValiditySummaryLabel');
     const manualValiditySummary = document.getElementById('manualValiditySummary');
     const manualValidityProcessMount = document.getElementById('manualValidityProcessMount');
+    const manualCertificateValidityMount = document.getElementById('manualCertificateValidityMount');
     const manualBarangayIdPhotoStepMount = document.getElementById('manualBarangayIdPhotoStepMount');
-    const manualIdWizardPanels = Array.from(manualForm.querySelectorAll('[data-manual-id-step-panel]'));
+    const manualIdWizardPanels = Array.from(manualForm.querySelectorAll('[data-manual-step-panel], [data-manual-id-step-panel]'));
     const manualIdWizardSteps = Array.from(document.querySelectorAll('.manual-id-process-step'));
     const manualIdWizardBack = document.getElementById('manualIdWizardBack');
     const manualIdWizardNext = document.getElementById('manualIdWizardNext');
@@ -8231,6 +8232,9 @@
     if (isIdIssuanceTrackerView && manualValidityProcessMount && manualValidityWrap) {
       manualValidityWrap.className = 'col-12 d-none';
       manualValidityProcessMount.appendChild(manualValidityWrap);
+    } else if (!isIdIssuanceTrackerView && manualCertificateValidityMount && manualValidityWrap) {
+      manualValidityWrap.className = 'col-12 d-none';
+      manualCertificateValidityMount.appendChild(manualValidityWrap);
     }
     const manualLastName = document.getElementById('manualLastName');
     const manualFirstName = document.getElementById('manualFirstName');
@@ -8405,11 +8409,18 @@
       manualBirthDay.value = match?.[3] || '';
     }
 
+    function manualPanelStep(panel) {
+      return Number(panel?.dataset?.manualStepPanel || panel?.dataset?.manualIdStepPanel || 0);
+    }
+
     function manualShowIdWizardStep(step, scroll = false) {
-      if (!isIdIssuanceTrackerView || !manualIdWizardPanels.length) return;
-      manualIdWizardCurrentStep = Math.max(1, Math.min(5, Number(step) || 1));
+      if (!manualIdWizardPanels.length) return;
+      const totalSteps = isIdIssuanceTrackerView ? 5 : 6;
+      manualIdWizardCurrentStep = Math.max(1, Math.min(totalSteps, Number(step) || 1));
       manualIdWizardPanels.forEach((panel) => {
-        panel.classList.toggle('d-none', Number(panel.dataset.manualIdStepPanel) !== manualIdWizardCurrentStep);
+        const matchesStep = manualPanelStep(panel) === manualIdWizardCurrentStep;
+        const optionalClearance = panel.dataset.manualOptionalPanel === 'clearance';
+        panel.classList.toggle('d-none', !matchesStep || (optionalClearance && !manualCurrentConfig()?.clearance));
       });
       manualIdWizardSteps.forEach((item, index) => {
         const itemStep = index + 1;
@@ -8418,11 +8429,11 @@
         item.setAttribute('aria-current', itemStep === manualIdWizardCurrentStep ? 'step' : 'false');
       });
       if (manualIdWizardBack) manualIdWizardBack.disabled = manualIdWizardCurrentStep === 1;
-      if (manualIdWizardNext) manualIdWizardNext.classList.toggle('d-none', manualIdWizardCurrentStep === 5);
+      if (manualIdWizardNext) manualIdWizardNext.classList.toggle('d-none', manualIdWizardCurrentStep === totalSteps);
       if (manualSubmitBtn && isIdIssuanceTrackerView) manualSubmitBtn.classList.toggle('d-none', manualIdWizardCurrentStep !== 5);
-      if (manualIdWizardPosition) manualIdWizardPosition.textContent = `Step ${manualIdWizardCurrentStep} of 5`;
+      if (manualIdWizardPosition) manualIdWizardPosition.textContent = `Step ${manualIdWizardCurrentStep} of ${totalSteps}`;
       manualSetAlert('', 'warning');
-      if (manualIdWizardCurrentStep === 5) void manualRenderIdInlinePreview();
+      if (isIdIssuanceTrackerView && manualIdWizardCurrentStep === 5) void manualRenderIdInlinePreview();
       if (scroll) manualPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -8464,18 +8475,18 @@
         manualSetAlert('This resident has no previously issued Barangay ID number. Choose Registered Resident for a new application.', 'warning');
         return false;
       }
-      if (manualIdWizardCurrentStep === 3 && !manualCurrentBarangayIdPhoto().previewUrl) {
+      if (isIdIssuanceTrackerView && manualIdWizardCurrentStep === 3 && !manualCurrentBarangayIdPhoto().previewUrl) {
         manualSetAlert('Take or select the resident ID photo before continuing.', 'warning');
         return false;
       }
-      if (manualIdWizardCurrentStep === 2 && manualAreaNumber && !manualAreaNumber.value.trim()) {
+      if (manualIdWizardCurrentStep === (isIdIssuanceTrackerView ? 2 : 3) && manualAreaNumber && !manualAreaNumber.value.trim()) {
         manualSetFieldInvalidState(manualAreaNumber, true);
         manualSetAlert('Select the resident Area Number before continuing.', 'warning');
         manualAreaNumber?.focus();
         return false;
       }
       const currentPanels = manualIdWizardPanels.filter(
-        (panel) => Number(panel.dataset.manualIdStepPanel) === manualIdWizardCurrentStep
+        (panel) => manualPanelStep(panel) === manualIdWizardCurrentStep
       );
       const invalidField = currentPanels
         .flatMap((panel) => Array.from(panel.querySelectorAll('input, select, textarea')))
@@ -8539,7 +8550,7 @@
 
     function manualValidationTargets() {
       const dynamicFields = manualDynamicFields
-        ? Array.from(manualDynamicFields.querySelectorAll('[data-manual-field]'))
+        ? Array.from(manualDynamicFields.querySelectorAll('[data-manual-field], [data-manual-other-for]'))
         : [];
       return [
         manualDocumentType,
@@ -9298,6 +9309,7 @@
     }
 
     function manualApplySuggestedPurpose() {
+      if (!manualPurpose) return;
       const config = manualCurrentConfig();
       const suggested = manualSuggestedPurpose(config);
       const currentValue = String(manualPurpose?.value || '').trim();
@@ -9313,7 +9325,7 @@
     }
 
     function manualCurrentFeeRows() {
-      if (!manualFeeList || manualFeeWrap?.classList.contains('d-none')) return [];
+      if (!manualFeeList) return [];
       return Array.from(manualFeeList.querySelectorAll('.manual-fee-item')).map((item) => {
         const checkbox = item.querySelector('[data-manual-fee-check]');
         const amountInput = item.querySelector('[data-manual-fee-amount]');
@@ -9470,7 +9482,12 @@
               { value: 'Renewal', label: 'Renewal' }
             ] },
             { name: 'business_name', label: 'Business Name', type: 'text', required: true, col: 'col-md-8' },
-            { name: 'business_type', label: 'Business Type', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'business_type', label: 'Business Type', type: 'select', required: true, allowOther: true, col: 'col-md-6', options: [
+              { value: 'Retail', label: 'Retail' },
+              { value: 'Food and Beverage', label: 'Food and Beverage' },
+              { value: 'Services', label: 'Services' },
+              { value: 'Manufacturing', label: 'Manufacturing' }
+            ] },
             { name: 'business_approval_type', label: 'Approval Type', type: 'select', required: true, col: 'col-md-6', options: [
               { value: 'not_banned', label: 'Not among banned business activities' },
               { value: 'no_objection', label: 'Interposes no objection' },
@@ -9545,12 +9562,20 @@
             { name: 'cohabitant_middle', label: 'Detainee Middle Name', type: 'text', col: 'col-md-3' },
             { name: 'cohabitant_last', label: 'Detainee Last Name', type: 'text', required: true, col: 'col-md-3' },
             { name: 'cohabitant_suffix', label: 'Detainee Suffix', type: 'text', col: 'col-md-3' },
-            { name: 'cohabitant_relationship', label: 'Relationship to Detainee', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'cohabitant_relationship', label: 'Relationship to Detainee', type: 'select', required: true, allowOther: true, col: 'col-md-6', options: [
+              { value: 'Parent', label: 'Parent' }, { value: 'Spouse', label: 'Spouse' },
+              { value: 'Sibling', label: 'Sibling' }, { value: 'Child', label: 'Child' },
+              { value: 'Relative', label: 'Relative' }, { value: 'Guardian', label: 'Guardian' }
+            ] },
             { name: 'detention_facility', label: 'Detention Facility', type: 'text', required: true, col: 'col-md-6' }
           ];
         case 'first_time_job_seeker':
           return [
-            { name: 'educational_attainment', label: 'Educational Attainment', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'educational_attainment', label: 'Educational Attainment', type: 'select', required: true, allowOther: true, col: 'col-md-6', options: [
+              { value: 'Elementary', label: 'Elementary' }, { value: 'High School', label: 'High School' },
+              { value: 'Senior High School', label: 'Senior High School' }, { value: 'Vocational', label: 'Vocational' },
+              { value: 'College', label: 'College' }, { value: 'Postgraduate', label: 'Postgraduate' }
+            ] },
             { name: 'jobstart_beneficiary', label: 'Has Availed Before?', type: 'select', required: true, col: 'col-md-6', options: [
               { value: 'No', label: 'No' },
               { value: 'Yes', label: 'Yes' }
@@ -9622,7 +9647,9 @@
             <select class="form-select" data-manual-field="${manualEscapeAttr(field.name)}" ${required}>
               <option value="">Select ${esc(field.label.toLowerCase())}</option>
               ${options}
+              ${field.allowOther ? '<option value="__other__">Other</option>' : ''}
             </select>
+            ${field.allowOther ? `<input type="text" class="form-control mt-2 d-none" data-manual-other-for="${manualEscapeAttr(field.name)}" placeholder="Please specify ${manualEscapeAttr(field.label.toLowerCase())}">` : ''}
           </div>
         `;
       }
@@ -9667,7 +9694,7 @@
       }
 
       const previous = new Map(manualCurrentFeeRows().map((row) => [String(row.fee_name || '').toLowerCase(), row]));
-      manualFeeWrap.classList.remove('d-none');
+      manualFeeWrap.classList.toggle('d-none', !isIdIssuanceTrackerView && manualIdWizardCurrentStep !== 4);
       manualFeeList.innerHTML = `
         <div class="manual-search-empty">
           <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading fee catalog...
@@ -9997,7 +10024,7 @@
         address: fullAddress,
         sector_membership: manualCurrentSectorValues().join(', '),
       };
-      if (config.kind === 'barangay_id' && manualAddressLine) {
+      if (manualAddressLine) {
         payload.address_line = String(manualAddressLine.value || '').trim();
         payload.area_number = String(manualAreaNumber?.value || '').trim();
         payload.barangay = String(manualBarangay?.value || '').trim();
@@ -10026,7 +10053,9 @@
       manualDynamicFields?.querySelectorAll('[data-manual-field]').forEach((field) => {
         const key = String(field.getAttribute('data-manual-field') || '').trim();
         if (!key) return;
-        payload[key] = String(field.value || '').trim();
+        const value = String(field.value || '').trim();
+        const otherField = manualDynamicFields.querySelector(`[data-manual-other-for="${key}"]`);
+        payload[key] = value === '__other__' ? String(otherField?.value || '').trim() : value;
       });
 
       const purpose = config.kind === 'barangay_id' && manualCurrentMode() === 'renewal'
@@ -10146,7 +10175,7 @@
       manualFeeTotal.textContent = 'PHP 0.00';
       manualSetSelectedSectorValues([]);
       manualSyncSectorMembershipUi();
-      manualPurpose.dataset.auto = '1';
+      if (manualPurpose) manualPurpose.dataset.auto = '1';
       manualApplyContextDocumentSelection();
       manualSetAlert('', 'warning');
       manualToggleResidentLookup();
@@ -10218,7 +10247,7 @@
     });
 
     manualDynamicFields?.addEventListener('input', (event) => {
-      const field = event.target.closest('[data-manual-field]');
+      const field = event.target.closest('[data-manual-field], [data-manual-other-for]');
       if (!field) return;
       manualMarkPreviewStale(true);
     });
@@ -10226,7 +10255,16 @@
     manualDynamicFields?.addEventListener('change', (event) => {
       const field = event.target.closest('[data-manual-field]');
       if (!field) return;
-      if (String(field.getAttribute('data-manual-field') || '') === 'application_type') {
+      const key = String(field.getAttribute('data-manual-field') || '');
+      const otherField = manualDynamicFields.querySelector(`[data-manual-other-for="${key}"]`);
+      if (otherField) {
+        const showOther = String(field.value || '') === '__other__';
+        otherField.classList.toggle('d-none', !showOther);
+        otherField.required = showOther;
+        if (!showOther) otherField.value = '';
+        if (showOther) otherField.focus();
+      }
+      if (key === 'application_type') {
         manualApplySuggestedPurpose();
       }
       manualMarkPreviewStale(true);
@@ -10559,14 +10597,37 @@
           viewModalEl?.addEventListener('shown.bs.modal', hydrateManualBarangayId, { once: true });
         }
         viewDetailsBody.querySelectorAll('.doc-editable').forEach((editable) => {
-          editable.setAttribute('contenteditable', 'false');
-          editable.removeAttribute('data-edit-key');
+          const editKey = String(editable.getAttribute('data-edit-key') || '');
+          const editableKeys = ['fullAddress', 'location', 'businessAddress', 'operatorAddress'];
+          if (isIdIssuanceTrackerView || !editableKeys.includes(editKey)) {
+            editable.setAttribute('contenteditable', 'false');
+            editable.removeAttribute('data-edit-key');
+            return;
+          }
+          editable.setAttribute('title', 'Click to edit this field before approval');
+          editable.addEventListener('input', () => {
+            const value = String(editable.textContent || '').trim();
+            if (editKey === 'fullAddress' || editKey === 'operatorAddress') {
+              manualFullAddress.value = value;
+            } else {
+              const payloadKey = editKey === 'businessAddress' ? 'business_full_address' : 'location';
+              const target = manualDynamicFields?.querySelector(`[data-manual-field="${payloadKey}"]`);
+              if (target) target.value = value;
+            }
+            try {
+              manualPreviewSignature = manualPreviewStateBundle().signature;
+              if (manualSubmitBtn) manualSubmitBtn.disabled = false;
+            } catch (_) {
+              manualPreviewSignature = '';
+              if (manualSubmitBtn) manualSubmitBtn.disabled = true;
+            }
+          });
         });
         manualPreviewSignature = bundle.signature;
         if (manualSubmitBtn) {
           manualSubmitBtn.disabled = false;
         }
-        manualSetAlert('Preview confirmed. You can submit this manual issuance request now.', 'success');
+        manualSetAlert('Preview ready. Edit any highlighted field if needed, then approve the certificate.', 'success');
         viewModal?.show();
       } catch (error) {
         manualSetAlert(error?.message || 'Unable to build the manual document preview.', 'danger');
