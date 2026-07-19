@@ -2249,6 +2249,21 @@ if ($certificateLaunchStage === 'release') {
     }
     .manual-id-wizard-controls .btn:first-child { justify-self: start; }
     .manual-id-wizard-controls .btn:last-child { justify-self: end; }
+    .manual-id-wizard-controls .btn-primary {
+      --bs-btn-color: #fff;
+      --bs-btn-bg: #ea580c;
+      --bs-btn-border-color: #ea580c;
+      --bs-btn-hover-color: #fff;
+      --bs-btn-hover-bg: #c2410c;
+      --bs-btn-hover-border-color: #c2410c;
+      --bs-btn-focus-shadow-rgb: 234, 88, 12;
+      --bs-btn-active-color: #fff;
+      --bs-btn-active-bg: #9a3412;
+      --bs-btn-active-border-color: #9a3412;
+      --bs-btn-disabled-color: #fff;
+      --bs-btn-disabled-bg: #fdba74;
+      --bs-btn-disabled-border-color: #fdba74;
+    }
     .manual-id-wizard-position { color: #6b7280; font-size: .84rem; font-weight: 700; }
     .manual-id-inline-preview {
       min-height: 360px;
