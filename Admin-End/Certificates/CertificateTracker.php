@@ -2204,7 +2204,7 @@ if ($certificateLaunchStage === 'release') {
     }
     .manual-id-process {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(var(--manual-process-step-count, 5), minmax(0, 1fr));
       border: 1px solid #fed7aa;
       border-radius: 20px;
       overflow: hidden;
@@ -3024,7 +3024,7 @@ if ($certificateLaunchStage === 'release') {
         </div>
       </div>
 
-        <nav class="manual-id-process mb-4" aria-label="Manual issuance process">
+        <nav class="manual-id-process mb-4" style="--manual-process-step-count: <?= $isIdIssuanceTrackerView ? 5 : 6 ?>" aria-label="Manual issuance process">
           <?php foreach ($isIdIssuanceTrackerView ? [
             ['fa-user-magnifying-glass', 'Source Selection'],
             ['fa-address-card', 'Personal Information'],
