@@ -3472,7 +3472,7 @@ if ($certificateLaunchStage === 'release') {
                 <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing ID preview…</div>
               </div>
             <?php else: ?>
-            <div class="manual-id-inline-preview mb-3" id="manualDocumentInlinePreview" aria-live="polite">
+            <div class="manual-id-inline-preview mb-3 d-none" id="manualDocumentInlinePreview" aria-live="polite">
               <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Document preview will appear here automatically on this step.</div>
             </div>
             <div class="d-flex flex-wrap justify-content-end gap-2">
