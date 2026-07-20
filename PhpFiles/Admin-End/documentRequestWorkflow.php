@@ -2819,6 +2819,36 @@ function dra_generate_issued_document(array $requestRow): ?string
         ? dms_resolve_document_field_visibility($conn, $moduleSettingsKey)
         : array_fill_keys(array_keys(dms_document_field_catalog()), true);
     $fieldVisible = static fn(string $key): bool => !array_key_exists($key, $documentFieldVisibility) || !empty($documentFieldVisibility[$key]);
+    $renderFixedMetaRows = static function (
+        object $pdf,
+        string $fontFamily,
+        float $startY,
+        float $labelX,
+        float $labelW,
+        float $lineX1,
+        float $lineX2,
+        float $rowStep,
+        array $rows
+    ) use ($fieldVisible): void {
+        $currentY = $startY;
+        foreach ($rows as $row) {
+            $key = (string)($row['key'] ?? '');
+            if ($key !== '' && !$fieldVisible($key)) {
+                continue;
+            }
+            $pdf->SetFont($fontFamily, 'B', 12);
+            $pdf->SetXY($labelX, $currentY);
+            $pdf->Cell($labelW, 6, (string)($row['label'] ?? ''), 0, 0, 'L');
+            $pdf->Line($lineX1, $currentY + 5, $lineX2, $currentY + 5);
+            $value = trim((string)($row['value'] ?? ''));
+            if ($value !== '') {
+                $pdf->SetXY($lineX1, $currentY);
+                $pdf->SetFont($fontFamily, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $value, 0, 0, 'L');
+            }
+            $currentY += $rowStep;
+        }
+    };
     $printHeaderEnabled = !($conn instanceof mysqli) || dms_resolve_module_print_header_setting($conn, $moduleSettingsKey);
     $maskPreprintedLetterhead = static function (object $pdf, float $pageWidth) use ($printHeaderEnabled): void {
         if ($printHeaderEnabled) return;
@@ -6026,206 +6056,33 @@ function dra_generate_issued_document(array $requestRow): ?string
         );
 
         if ($isGoodMoral) {
-            $metaY = 186.0;
-            $labelX = 18.0;
-            $labelW = 34.0;
-            $lineX1 = 52.0;
-            $lineX2 = 70.0;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 8;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedAtFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
-            }
-            $metaY += 8;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedOnFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
-            }
-            $metaY += 8;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($orNo !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
-            }
+            $renderFixedMetaRows($pdf, $indigencyFont, 186.0, 18.0, 34.0, 52.0, 70.0, 8.0, [
+                ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
+                ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
+                ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
+                ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
+            ]);
         } elseif ($isResidency) {
-            $metaY = 196.0;
-            $labelX = 18.0;
-            $labelW = 34.0;
-            $lineX1 = 52.0;
-            $lineX2 = 70.0;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedAtFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedOnFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($orNo !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
-            }
+            $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 34.0, 52.0, 70.0, 7.0, [
+                ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
+                ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
+                ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
+                ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
+            ]);
         } elseif ($isRelationshipJailVisit) {
-            $metaY = min(max($pdf->GetY() + 4.0, 170.0), 186.0);
-            $labelX = 18.0;
-            $labelW = 34.0;
-            $lineX1 = 52.0;
-            $lineX2 = 70.0;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedAtFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedOnFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($orNo !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
-            }
-        } elseif ($isCohabitation && !$cohabitationHasChildren) {
-            $metaY = 196.0;
-            $labelX = 18.0;
-            $labelW = 34.0;
-            $lineX1 = 52.0;
-            $lineX2 = 70.0;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedAtFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedOnFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($orNo !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
-            }
-        } elseif ($isCohabitation && $cohabitationHasChildren) {
-            $metaY = 196.0;
-            $labelX = 18.0;
-            $labelW = 34.0;
-            $lineX1 = 52.0;
-            $lineX2 = 70.0;
-            $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedAtFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($issuedOnFooter !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
-            }
-            $metaY += 7;
-            $pdf->SetXY($labelX, $metaY);
-            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            if ($orNo !== '') {
-                $pdf->SetXY($lineX1, $metaY);
-                $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
-            }
-        }
-
-        // Special-certificate layouts use fixed metadata rows. Mask disabled rows after
-        // rendering so both their labels and values are absent from the final PDF.
-        if (($isGoodMoral || $isResidency || $isRelationshipJailVisit || $isCohabitation) && isset($metaY)) {
-            $specialMetaStep = $isGoodMoral ? 8.0 : 7.0;
-            $specialMetaStart = (float)$metaY - (3.0 * $specialMetaStep);
-            $specialMetaKeys = ['ctc', 'issued_at', 'issued_on', 'or_number'];
-            $pdf->SetFillColor(255, 255, 255);
-            foreach ($specialMetaKeys as $specialMetaIndex => $specialMetaKey) {
-                if (!$fieldVisible($specialMetaKey)) {
-                    $pdf->Rect(17.0, $specialMetaStart + ($specialMetaIndex * $specialMetaStep) - 0.8, 55.0, $specialMetaStep, 'F');
-                }
-            }
+            $renderFixedMetaRows($pdf, $indigencyFont, min(max($pdf->GetY() + 4.0, 170.0), 186.0), 18.0, 34.0, 52.0, 70.0, 7.0, [
+                ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
+                ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
+                ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
+                ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
+            ]);
+        } elseif ($isCohabitation) {
+            $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 34.0, 52.0, 70.0, 7.0, [
+                ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
+                ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
+                ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
+                ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
+            ]);
         }
 
         if ($isFirstTimeJobSeeker) {
