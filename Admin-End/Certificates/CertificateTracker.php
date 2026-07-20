@@ -2947,9 +2947,9 @@ if ($certificateLaunchStage === 'release') {
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="release" data-stage-filter="release">&nbsp;&nbsp;Printing / Claim&nbsp;&nbsp;<span class="tab-count" id="releaseTabCount">0</span></button>
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="pending" data-stage-filter="pending">&nbsp;&nbsp;Pending&nbsp;&nbsp;<span class="tab-count" id="pendingTabCount">0</span></button>
           <?php else: ?>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="pending" data-stage-filter="pending">&nbsp;&nbsp;Pending&nbsp;&nbsp;<span class="tab-count" id="pendingTabCount">0</span></button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="release" data-stage-filter="release">&nbsp;&nbsp;Release&nbsp;&nbsp;<span class="tab-count" id="releaseTabCount">0</span></button>
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="completed" data-stage-filter="completed">&nbsp;&nbsp;Completed&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="release" data-stage-filter="release">&nbsp;&nbsp;Release&nbsp;&nbsp;<span class="tab-count" id="releaseTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="pending" data-stage-filter="pending">&nbsp;&nbsp;Pending&nbsp;&nbsp;<span class="tab-count" id="pendingTabCount">0</span></button>
           <?php endif; ?>
         </div>
 
