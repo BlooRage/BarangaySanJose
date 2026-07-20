@@ -113,6 +113,8 @@ if (!function_exists('dms_default_issuance_settings')) {
             'qr_verification_enabled' => true,
             'essential_details_only' => true,
             'copy_has_signature' => true,
+            'print_header_enabled' => true,
+            'document_field_visibility' => array_fill_keys(array_keys(dms_document_field_catalog()), true),
             'resident_notifications' => [
                 'submitted' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been submitted and is awaiting review.'],
                 'approved' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been approved.'],
@@ -153,6 +155,8 @@ if (!function_exists('dms_resolve_issuance_settings')) {
         $stored = $row ? json_decode((string)($row['settings_json'] ?? ''), true) : null;
         $settings = is_array($stored) ? array_replace_recursive($defaults, $stored) : $defaults;
         $settings['copy_has_signature'] = dms_resolve_module_copy_signature_setting($conn, 'issuance');
+        $settings['print_header_enabled'] = dms_resolve_module_print_header_setting($conn, 'issuance');
+        $settings['document_field_visibility'] = dms_resolve_document_field_visibility($conn, 'issuance');
         $settings['updated_by_user_id'] = (string)($row['updated_by_user_id'] ?? '');
         $settings['updated_at'] = (string)($row['updated_at'] ?? '');
         return $settings;
@@ -179,6 +183,10 @@ if (!function_exists('dms_save_issuance_settings')) {
                 $settings[$key] = isset($post[$key]);
             }
             $settings['copy_has_signature'] = isset($post['copy_has_signature']);
+            $settings['print_header_enabled'] = isset($post['print_header_enabled']);
+            foreach (dms_document_field_catalog('issuance') as $key => $_label) {
+                $settings['document_field_visibility'][$key] = isset($post['document_field_visible'][$key]);
+            }
             $settings['default_validity_days'] = $defaultValidity;
             $settings['allowed_validity_days'] = $allowed;
         }
@@ -216,6 +224,8 @@ if (!function_exists('dms_save_issuance_settings')) {
         $stmt->close();
         if (in_array($scope, ['all', 'general'], true)) {
             dms_save_module_copy_signature_setting($conn, 'issuance', !empty($settings['copy_has_signature']), $updatedByUserId);
+            dms_save_module_print_header_setting($conn, 'issuance', !empty($settings['print_header_enabled']), $updatedByUserId);
+            dms_save_document_field_visibility($conn, 'issuance', $post, $updatedByUserId);
         }
         return ['before' => $before, 'after' => dms_resolve_issuance_settings($conn)];
     }
@@ -1036,6 +1046,12 @@ if (!function_exists('dms_ensure_module_template_config_table')) {
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'deactivate_previous_digital_id')) {
             $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN deactivate_previous_digital_id TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_capture_disabled");
         }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'document_field_visibility_json')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN document_field_visibility_json LONGTEXT NULL AFTER copy_has_signature");
+        }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'print_header_enabled')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN print_header_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER copy_has_signature");
+        }
 
         $done = true;
     }
@@ -1059,6 +1075,8 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
                 digital_id_has_signature,
                 printed_id_has_signature,
                 copy_has_signature,
+                print_header_enabled,
+                document_field_visibility_json,
                 digital_id_capture_disabled,
                 deactivate_previous_digital_id,
                 default_validity_years,
@@ -1079,6 +1097,47 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
         $stmt->close();
 
         return is_array($row) ? $row : [];
+    }
+}
+
+if (!function_exists('dms_document_field_catalog')) {
+    function dms_document_field_catalog(?string $moduleKey = null): array
+    {
+        $all = ['clearance_no'=>'Clearance No.','receipt_no'=>'Receipt No.','amount'=>'Amount','ctc'=>'CTC','issued_at'=>'Issued At','issued_on'=>'Issued On','or_number'=>'OR Number'];
+        $moduleKey = strtolower(trim((string)$moduleKey));
+        if ($moduleKey === 'issuance') {
+            return array_intersect_key($all, array_flip(['ctc', 'issued_at', 'issued_on', 'or_number']));
+        }
+        return $all;
+    }
+}
+
+if (!function_exists('dms_resolve_document_field_visibility')) {
+    function dms_resolve_document_field_visibility(mysqli $conn, string $moduleKey): array
+    {
+        $visibility = array_fill_keys(array_keys(dms_document_field_catalog()), true);
+        $stored = dms_fetch_module_template_config_row($conn, $moduleKey);
+        $decoded = json_decode((string)($stored['document_field_visibility_json'] ?? ''), true);
+        if (is_array($decoded)) foreach ($visibility as $key => $_) if (array_key_exists($key, $decoded)) $visibility[$key] = (bool)$decoded[$key];
+        return $visibility;
+    }
+}
+
+if (!function_exists('dms_save_document_field_visibility')) {
+    function dms_save_document_field_visibility(mysqli $conn, string $moduleKey, array $post, string $updatedByUserId): array
+    {
+        dms_ensure_module_template_config_table($conn);
+        $before = dms_resolve_document_field_visibility($conn, $moduleKey);
+        $visibility = [];
+        foreach (dms_document_field_catalog($moduleKey) as $key => $_label) $visibility[$key] = isset($post['document_field_visible'][$key]);
+        $json = json_encode($visibility, JSON_UNESCAPED_SLASHES);
+        if ($json === false) throw new RuntimeException('Unable to encode document field visibility settings.');
+        $stmt = $conn->prepare("INSERT INTO documentmoduleconfigtbl (module_key, document_field_visibility_json, updated_by_user_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE document_field_visibility_json = VALUES(document_field_visibility_json), updated_by_user_id = VALUES(updated_by_user_id), updated_at = CURRENT_TIMESTAMP");
+        if (!$stmt) throw new RuntimeException('Failed to prepare document field visibility update.');
+        $stmt->bind_param('sss', $moduleKey, $json, $updatedByUserId);
+        if (!$stmt->execute()) throw new RuntimeException('Unable to save document field visibility settings.');
+        $stmt->close();
+        return ['before'=>$before,'after'=>dms_resolve_document_field_visibility($conn, $moduleKey)];
     }
 }
 
@@ -1134,6 +1193,29 @@ if (!function_exists('dms_save_module_copy_signature_setting')) {
             'before' => $before,
             'after' => ['copy_has_signature' => dms_resolve_module_copy_signature_setting($conn, $moduleKey)],
         ];
+    }
+}
+
+if (!function_exists('dms_resolve_module_print_header_setting')) {
+    function dms_resolve_module_print_header_setting(mysqli $conn, string $moduleKey): bool
+    {
+        $stored = dms_fetch_module_template_config_row($conn, $moduleKey);
+        return !array_key_exists('print_header_enabled', $stored) || (int)$stored['print_header_enabled'] === 1;
+    }
+}
+
+if (!function_exists('dms_save_module_print_header_setting')) {
+    function dms_save_module_print_header_setting(mysqli $conn, string $moduleKey, bool $enabled, string $updatedByUserId): array
+    {
+        dms_ensure_module_template_config_table($conn);
+        $before = ['print_header_enabled' => dms_resolve_module_print_header_setting($conn, $moduleKey)];
+        $value = $enabled ? 1 : 0;
+        $stmt = $conn->prepare("INSERT INTO documentmoduleconfigtbl (module_key, print_header_enabled, updated_by_user_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE print_header_enabled = VALUES(print_header_enabled), updated_by_user_id = VALUES(updated_by_user_id), updated_at = CURRENT_TIMESTAMP");
+        if (!$stmt) throw new RuntimeException('Failed to prepare print header setting update.');
+        $stmt->bind_param('sis', $moduleKey, $value, $updatedByUserId);
+        if (!$stmt->execute()) throw new RuntimeException('Unable to save print header setting.');
+        $stmt->close();
+        return ['before'=>$before,'after'=>['print_header_enabled'=>dms_resolve_module_print_header_setting($conn, $moduleKey)]];
     }
 }
 

@@ -14,6 +14,10 @@ $documentSettingsErrorMessage = trim((string)($_GET['error'] ?? ''));
 $documentSettingsRows = dms_resolve_module_signatories($conn, $documentSettingsModuleKey);
 $documentSettingsCopySignatureEnabled = dms_resolve_module_copy_signature_setting($conn, $documentSettingsModuleKey);
 $documentSettingsShowCopySignatureToggle = true;
+$documentSettingsFieldVisibility = dms_resolve_document_field_visibility($conn, $documentSettingsModuleKey);
+$documentSettingsShowFieldVisibility = true;
+$documentSettingsPrintHeaderEnabled = dms_resolve_module_print_header_setting($conn, $documentSettingsModuleKey);
+$documentSettingsShowPrintHeaderToggle = true;
 $documentSettingsFeeRequestsUrl = appUrl('Admin-End/Certificates/CertificateTracker.php?tab=fees&fee_scope=monitoring&filter_document=__clearances__');
 $documentSettingsFeeRequestsTitle = 'Clearance Fee Change Requests';
 $documentSettingsFeeRequestsDescription = 'Request a new clearance fee type, propose a price update, and review submitted requests.';
@@ -35,14 +39,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
             !empty($_POST['copy_has_signature']),
             trim((string)($_SESSION['user_id'] ?? ''))
         );
+        $fieldVisibilitySave = dms_save_document_field_visibility($conn, $documentSettingsModuleKey, $_POST, trim((string)($_SESSION['user_id'] ?? '')));
+        $printHeaderSave = dms_save_module_print_header_setting($conn, $documentSettingsModuleKey, !empty($_POST['print_header_enabled']), trim((string)($_SESSION['user_id'] ?? '')));
         $saveResult = [
             'before' => [
                 'signatories' => $signatorySave['before'] ?? [],
                 'copy_settings' => $copySettingSave['before'] ?? [],
+                'field_visibility' => $fieldVisibilitySave['before'] ?? [],
+                'print_header' => $printHeaderSave['before'] ?? [],
             ],
             'after' => [
                 'signatories' => $signatorySave['after'] ?? [],
                 'copy_settings' => $copySettingSave['after'] ?? [],
+                'field_visibility' => $fieldVisibilitySave['after'] ?? [],
+                'print_header' => $printHeaderSave['after'] ?? [],
             ],
         ];
 

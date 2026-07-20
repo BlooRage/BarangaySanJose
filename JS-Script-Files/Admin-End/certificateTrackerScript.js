@@ -3251,7 +3251,12 @@
       childLines.push(`${childName}${childAge ? `, ${childAge} y/o` : ''}`.trim());
     }
     const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
-    const requestedDocKey = normalizePreviewDocKey(requestedDocType);
+    const requestedTemplateDocType = firstNonEmpty([
+      payload.other_document_template_document_type,
+      payload.template_document_type,
+      requestedDocType
+    ]);
+    const requestedDocKey = normalizePreviewDocKey(requestedTemplateDocType);
     const isBarangayIdDocument = requestedDocKey === 'barangayid';
     const documentValidityDate = isBarangayIdDocument
       ? resolveBarangayIdValidityDate(
@@ -3272,7 +3277,7 @@
               certificateDefaultValidityDate()
             )
           : '');
-    const generalPermitPurpose = generalClearancePurposeFromDocType(requestedDocType);
+    const generalPermitPurpose = generalClearancePurposeFromDocType(requestedTemplateDocType);
     const generalPermitLocation = buildGeneralPermitLocation(
       payload,
       firstNonEmpty([
@@ -3285,11 +3290,17 @@
     const generalPermitRemarks = firstNonEmpty([payload.remarks, payload.remark]);
     const knownPayloadKeys = new Set([
       'action', 'csrf_token', 'redirect', 'document_type',
+      'custom_document_title', 'other_document_fee', 'other_document_template_id', 'other_document_template_document_type',
+      'other_document_template_kind', 'other_document_template_label', 'template_document_type',
       'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
       'contact_number', 'phone_number', 'full_address', 'full_address_display', 'address', 'complete_address',
       'birthdate', 'date_of_birth', 'child_dob', 'age', 'sex', 'gender', 'child_sex',
       'civil_status', 'religion', 'occupation',
       'purpose', 'request_purpose', 'request_officer',
+      'submission_target_type', 'government_official_id', 'government_position_group', 'government_position_other',
+      'government_position_detail', 'government_official_other', 'government_office', 'government_position', 'government_official',
+      'institution_name', 'institution_person', 'institution_position',
+      'request_officer_line1', 'request_officer_line2', 'request_officer_line3',
       'document_validity', 'barangay_id_valid_until', 'valid_until', 'barangay_id_validity_years',
       'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
       '_preview_business_approval_type', 'business_approval_type', 'businessApprovalType',
@@ -3416,9 +3427,13 @@
 
     return {
       ...barangayIdDigitalState,
+      templateDocType: normalizeDocumentTypeDisplay(requestedTemplateDocType),
+      documentTitleOverride: upperText(firstNonEmpty([payload.custom_document_title]), ''),
       docType: inferredBusinessClearance
         ? 'Barangay Clearance for Business Permit'
-        : normalizeDocumentTypeDisplay(requestedDocType),
+        : (firstNonEmpty([payload.custom_document_title])
+          ? String(payload.custom_document_title).trim()
+          : normalizeDocumentTypeDisplay(requestedDocType)),
       fullName: upperText(
         formatPersonNameFnMiLn(
           getPersonal('First Name', ''),
@@ -3573,7 +3588,9 @@
       return '<div class="text-muted">No document preview available.</div>';
     }
     const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
-    const docKey = normalizePreviewDocKey(docType);
+    const templateDocType = String(state.templateDocType || docType).trim() || docType;
+    const customDocumentTitle = String(state.documentTitleOverride || '').trim();
+    const docKey = normalizePreviewDocKey(templateDocType);
     const isIndigency = docKey === 'indigency';
     const isBarangayId = docKey === 'barangayid';
     const isGeneralPermitClearance = docKey === 'generalpermitclearance';
@@ -4095,6 +4112,28 @@
         </p>
         ${residencyRows}
       `;
+    }
+
+    if (
+      customDocumentTitle
+      && !isBarangayId
+      && !isGeneralPermitClearance
+      && !isBusinessPermitClearance
+      && !isTricyclePermitClearance
+    ) {
+      if (isIndigency) {
+        titleHtml = `<div class="doc-preview-title doc-preview-title--indigency"><div class="office">TANGGAPAN NG PUNONG BARANGAY</div><div class="certificate">${esc(customDocumentTitle)}</div></div>`;
+      } else if (isFirstTimeJobSeeker) {
+        titleHtml = `
+          <div class="doc-preview-goodmoral-office doc-preview-ftjs-office">
+            <div>TANGGAPAN NG PUNONG BARANGAY</div>
+            <div>${esc(customDocumentTitle)}</div>
+            <div class="doc-preview-ftjs-subtitle">(First Time Jobseekers Act-RA 11261)</div>
+          </div>
+        `;
+      } else {
+        titleHtml = `<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>${esc(customDocumentTitle)}</div></div>`;
+      }
     }
 
     const paperClass = isIndigency
@@ -8201,6 +8240,12 @@
     const manualResidentId = document.getElementById('manualResidentId');
     const manualResidentUserId = document.getElementById('manualResidentUserId');
     const manualDocumentType = document.getElementById('manualDocumentType');
+    const manualOtherDocumentWrap = document.getElementById('manualOtherDocumentWrap');
+    const manualOtherDocumentTitle = document.getElementById('manualOtherDocumentTitle');
+    const manualOtherDocumentFee = document.getElementById('manualOtherDocumentFee');
+    const manualOtherDocumentTemplate = document.getElementById('manualOtherDocumentTemplate');
+    const manualPurposePresetWrap = document.getElementById('manualPurposePresetWrap');
+    const manualPurposePreset = document.getElementById('manualPurposePreset');
     const manualPurpose = document.getElementById('manualPurpose');
     const manualDynamicFields = document.getElementById('manualDynamicFields');
     const manualSpecificFieldsHint = document.getElementById('manualSpecificFieldsHint');
@@ -8232,6 +8277,7 @@
     const manualIdWizardNext = document.getElementById('manualIdWizardNext');
     const manualIdWizardPosition = document.getElementById('manualIdWizardPosition');
     const manualIdInlinePreview = document.getElementById('manualIdInlinePreview');
+    const manualDocumentInlinePreview = document.getElementById('manualDocumentInlinePreview');
     let manualIdWizardCurrentStep = 1;
     if (isIdIssuanceTrackerView && manualValidityProcessMount && manualValidityWrap) {
       manualValidityWrap.className = 'col-12 d-none';
@@ -8285,11 +8331,18 @@
     const manualBarangayIdRetakePhotoBtn = document.getElementById('manualBarangayIdRetakePhotoBtn');
     const manualBarangayIdCapturePhotoBtn = document.getElementById('manualBarangayIdCapturePhotoBtn');
     const manualBarangayIdSavePhotoBtn = document.getElementById('manualBarangayIdSavePhotoBtn');
+    const manualIndigencyGovernmentDirectory = window.MANUAL_INDIGENCY_GOVERNMENT_DIRECTORY || {
+      groups: [],
+      positions: [],
+      officials: [],
+    };
+    const manualDropdownOtherValue = '__other__';
 
     const manualDocumentConfigs = [
       { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id', free: true },
       { id: 'good_moral', group: 'Certificates', label: 'Certificate of Good Moral', documentType: 'Certificate of Good Moral', kind: 'good_moral' },
       { id: 'residency', group: 'Certificates', label: 'Certificate of Residency', documentType: 'Certificate of Residency', kind: 'residency' },
+      { id: 'general_certification', group: 'Certificates', label: 'General Certification', documentType: 'Certificate of Residency', kind: 'general_certification' },
       { id: 'identity', group: 'Certificates', label: 'Certificate of Identity', documentType: 'Certificate of Identity', kind: 'identity' },
       { id: 'indigency', group: 'Certificates', label: 'Certificate of Indigency', documentType: 'CertificateOfIndigency', kind: 'indigency', free: true },
       { id: 'cohabitation', group: 'Certificates', label: 'Certificate of Cohabitation', documentType: 'Certificate of Cohabitation', kind: 'cohabitation' },
@@ -8304,6 +8357,17 @@
       { id: 'business_clearance', group: 'Clearances', label: 'Barangay Clearance for Business Permit', documentType: 'Barangay Clearance for Business Permit', kind: 'business_clearance', clearance: true },
       { id: 'tricycle_clearance', group: 'Clearances', label: 'Barangay Clearance for Tricycle Permit', documentType: 'Barangay Clearance for Tricycle Permit', kind: 'tricycle_clearance', clearance: true }
     ];
+    const manualGeneralCertificationPurposes = new Set([
+      'Local Employment',
+      'Loan Application',
+      'Bailbond',
+      'Postal ID Requirement',
+      'Tesda Requirement',
+      'Personal Collection',
+      'School Requirement',
+      'Bank Requirement (open account)',
+      '__other__'
+    ]);
     const manualContextFilter = isIdIssuanceTrackerView
       ? '__barangay_id__'
       : canonicalDocumentFilterValue(launchFilterDocument);
@@ -8440,6 +8504,7 @@
       if (manualIdWizardPosition) manualIdWizardPosition.textContent = `Step ${manualIdWizardCurrentStep} of ${totalSteps}`;
       manualSetAlert('', 'warning');
       if (isIdIssuanceTrackerView && manualIdWizardCurrentStep === 5) void manualRenderIdInlinePreview();
+      if (!isIdIssuanceTrackerView && manualIdWizardCurrentStep === 5) void manualRenderInlineDocumentPreview();
       if (scroll) manualPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -8468,6 +8533,68 @@
         manualPreviewSignature = '';
         if (manualSubmitBtn) manualSubmitBtn.disabled = true;
         manualIdInlinePreview.innerHTML = `<div class="alert alert-danger mb-0">${esc(error?.message || 'Unable to build the Barangay ID preview.')}</div>`;
+      }
+    }
+
+    function manualBindPreviewEditableFields(container) {
+      if (!container) return;
+      container.querySelectorAll('.doc-editable').forEach((editable) => {
+        const editKey = String(editable.getAttribute('data-edit-key') || '');
+        const editableKeys = ['fullAddress', 'location', 'businessAddress', 'operatorAddress'];
+        if (isIdIssuanceTrackerView || !editableKeys.includes(editKey)) {
+          editable.setAttribute('contenteditable', 'false');
+          editable.removeAttribute('data-edit-key');
+          return;
+        }
+        editable.setAttribute('title', 'Click to edit this field before approval');
+        editable.addEventListener('input', () => {
+          const value = String(editable.textContent || '').trim();
+          if (editKey === 'fullAddress' || editKey === 'operatorAddress') {
+            manualFullAddress.value = value;
+          } else {
+            const payloadKey = editKey === 'businessAddress' ? 'business_full_address' : 'location';
+            const target = manualDynamicFields?.querySelector(`[data-manual-field="${payloadKey}"]`);
+            if (target) target.value = value;
+          }
+          try {
+            manualPreviewSignature = manualPreviewStateBundle().signature;
+            if (manualSubmitBtn) manualSubmitBtn.disabled = false;
+          } catch (_) {
+            manualPreviewSignature = '';
+            if (manualSubmitBtn) manualSubmitBtn.disabled = true;
+          }
+        });
+      });
+    }
+
+    async function manualRenderInlineDocumentPreview() {
+      if (isIdIssuanceTrackerView || !manualDocumentInlinePreview) return;
+      manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing document preview...</div>';
+      try {
+        const bundle = manualPreviewStateBundle();
+        const previewHtml = renderDocumentPreview(
+          buildPreviewState(bundle.previewRow, bundle.payload, bundle.residentProfile, null)
+        );
+        manualDocumentInlinePreview.innerHTML = `
+          <div class="tracker-doc-highlight">
+            Preview ready for ${esc(bundle.displayTitle || bundle.config.label)}. Edit any highlighted field below if needed, then approve.
+          </div>
+          ${previewHtml}
+        `;
+        if (window.BarangayIdDigital && typeof window.BarangayIdDigital.hydrate === 'function') {
+          const hydrate = () => window.BarangayIdDigital.hydrate(manualDocumentInlinePreview);
+          hydrate();
+          requestAnimationFrame(() => requestAnimationFrame(hydrate));
+          window.setTimeout(hydrate, 120);
+        }
+        manualBindPreviewEditableFields(manualDocumentInlinePreview);
+        manualPreviewSignature = bundle.signature;
+        if (manualSubmitBtn) manualSubmitBtn.disabled = false;
+        manualSetAlert('Preview ready. Edit any highlighted field if needed, then approve the certificate.', 'success');
+      } catch (error) {
+        manualPreviewSignature = '';
+        if (manualSubmitBtn) manualSubmitBtn.disabled = true;
+        manualDocumentInlinePreview.innerHTML = `<div class="alert alert-danger mb-0">${esc(error?.message || 'Unable to build the manual document preview.')}</div>`;
       }
     }
 
@@ -8560,6 +8687,10 @@
         : [];
       return [
         manualDocumentType,
+        manualPurposePreset,
+        manualOtherDocumentTitle,
+        manualOtherDocumentFee,
+        manualOtherDocumentTemplate,
         manualPurpose,
         manualLastName,
         manualFirstName,
@@ -8598,14 +8729,120 @@
       return true;
     }
 
-    function manualCurrentConfig() {
+    function manualCurrentRawConfig() {
       const key = String(manualDocumentType?.value || '').trim();
       return manualDocumentConfigs.find((config) => config.id === key) || null;
+    }
+
+    function manualUsesPurposePreset(config = manualCurrentConfig()) {
+      return !!config && config.kind === 'general_certification';
+    }
+
+    function manualSyncPurposePreset() {
+      const config = manualCurrentConfig();
+      const usesPreset = manualUsesPurposePreset(config);
+      const presetValue = String(manualPurposePreset?.value || '').trim();
+
+      manualPurposePresetWrap?.classList.toggle('d-none', !usesPreset);
+      if (manualPurposePreset) {
+        manualPurposePreset.required = usesPreset;
+        if (!usesPreset) {
+          manualPurposePreset.value = '';
+        }
+      }
+      if (!manualPurpose) return;
+      if (!usesPreset) {
+        manualPurpose.classList.remove('d-none');
+        manualPurpose.required = true;
+        manualPurpose.placeholder = 'State the exact purpose shown on the issued document';
+        return;
+      }
+
+      const isOther = presetValue === '__other__';
+      manualPurpose.classList.toggle('d-none', !isOther);
+      manualPurpose.placeholder = 'State the exact purpose shown on the issued document';
+      manualPurpose.required = isOther || usesPreset;
+
+      if (!isOther) {
+        manualPurpose.value = presetValue;
+      } else if (manualGeneralCertificationPurposes.has(String(manualPurpose.value || '').trim())) {
+        manualPurpose.value = '';
+      }
+    }
+
+    function manualIsOtherDocumentSelection(config = manualCurrentRawConfig()) {
+      return !!config && config.kind === 'other_document';
+    }
+
+    function manualOtherDocumentTemplateConfigs() {
+      return manualDocumentConfigs.filter((config) => (
+        config.group === 'Certificates'
+        && config.kind !== 'barangay_id'
+        && config.kind !== 'other_document'
+        && !config.clearance
+      ));
+    }
+
+    function manualSelectedOtherTemplateConfig() {
+      const key = String(manualOtherDocumentTemplate?.value || '').trim();
+      return manualOtherDocumentTemplateConfigs().find((config) => config.id === key) || null;
+    }
+
+    function manualCurrentConfig() {
+      return manualCurrentRawConfig();
+    }
+
+    function manualResolvedDocumentLabel(rawConfig = manualCurrentRawConfig(), effectiveConfig = manualCurrentConfig()) {
+      return rawConfig?.label || effectiveConfig?.label || 'Select a manual issuance form';
+    }
+
+    function manualResolvedDocumentFee() {
+      const rawConfig = manualCurrentRawConfig();
+      if (!manualIsOtherDocumentSelection(rawConfig)) {
+        return null;
+      }
+      const parsed = Number.parseFloat(String(manualOtherDocumentFee?.value || '').trim());
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+    }
+
+    function manualRenderOtherDocumentTemplateOptions() {
+      if (!manualOtherDocumentTemplate) return;
+      const options = manualOtherDocumentTemplateConfigs();
+      const previousValue = String(manualOtherDocumentTemplate.value || '').trim();
+      let html = '<option value="">Select a certificate template</option>';
+      html += options.map((config) => `<option value="${manualEscapeAttr(config.id)}">${esc(config.label)}</option>`).join('');
+      manualOtherDocumentTemplate.innerHTML = html;
+      if (previousValue && options.some((config) => config.id === previousValue)) {
+        manualOtherDocumentTemplate.value = previousValue;
+      }
+    }
+
+    function manualSyncOtherDocumentSetup() {
+      const rawConfig = manualCurrentRawConfig();
+      const showOther = manualIsOtherDocumentSelection(rawConfig);
+      manualOtherDocumentWrap?.classList.toggle('d-none', !showOther);
+      if (manualOtherDocumentTitle) manualOtherDocumentTitle.required = showOther;
+      if (manualOtherDocumentFee) manualOtherDocumentFee.required = showOther;
+      if (manualOtherDocumentTemplate) manualOtherDocumentTemplate.required = showOther;
+      if (showOther) {
+        manualRenderOtherDocumentTemplateOptions();
+      }
     }
 
     function manualConfigMatchesContext(config, contextFilter = manualContextFilter) {
       const activeFilter = String(contextFilter || '').trim().toLowerCase();
       if (!activeFilter) {
+        return true;
+      }
+      if (config.id === 'other_document') {
+        if (
+          activeFilter === '__barangay_id__'
+          || activeFilter === '__clearances__'
+          || activeFilter === '__business__'
+          || activeFilter.startsWith('__clr_')
+        ) {
+          return false;
+        }
         return true;
       }
       if (activeFilter === '__barangay_id__') {
@@ -8686,6 +8923,127 @@
 
     function manualEscapeAttr(value) {
       return String(value ?? '').replace(/"/g, '&quot;');
+    }
+
+    function manualIndigencyField(name) {
+      return manualDynamicFields?.querySelector(`[data-manual-field="${name}"]`) || null;
+    }
+
+    function manualSetFieldRequirement(field, required = false, enabled = true, clear = false) {
+      if (!field) return;
+      field.disabled = !enabled;
+      field.required = !!required && !!enabled;
+      if (clear) field.value = '';
+    }
+
+    function manualIndigencyOfficialById(officialId) {
+      const id = String(officialId || '').trim();
+      return (Array.isArray(manualIndigencyGovernmentDirectory.officials)
+        ? manualIndigencyGovernmentDirectory.officials
+        : []
+      ).find((item) => String(item?.id || '').trim() === id) || null;
+    }
+
+    function manualSyncIndigencyRecipientFields() {
+      const config = manualCurrentConfig();
+      if (config?.kind !== 'indigency' || !manualDynamicFields) return;
+
+      const targetField = manualIndigencyField('submission_target_type');
+      const groupField = manualIndigencyField('government_position_group');
+      const groupOtherField = manualIndigencyField('government_position_other');
+      const positionField = manualIndigencyField('government_position_detail');
+      const officialField = manualIndigencyField('government_official_id');
+      const officialOtherField = manualIndigencyField('government_official_other');
+      const institutionNameField = manualIndigencyField('institution_name');
+      const institutionPersonField = manualIndigencyField('institution_person');
+      const institutionPositionField = manualIndigencyField('institution_position');
+      const requestOfficerLine1Field = manualIndigencyField('request_officer_line1');
+      const requestOfficerLine2Field = manualIndigencyField('request_officer_line2');
+      const requestOfficerLine3Field = manualIndigencyField('request_officer_line3');
+      const requestOfficerField = manualIndigencyField('request_officer');
+      const governmentOfficeField = manualIndigencyField('government_office');
+      const governmentPositionField = manualIndigencyField('government_position');
+      const governmentOfficialField = manualIndigencyField('government_official');
+      const governmentWrap = manualDynamicFields.querySelector('[data-manual-indigency-government]');
+      const institutionWrap = manualDynamicFields.querySelector('[data-manual-indigency-institution]');
+      const emptyState = manualDynamicFields.querySelector('[data-manual-indigency-empty-state]');
+
+      const targetValue = String(targetField?.value || '').trim();
+      const isGovernment = targetValue === 'government_official';
+      const isInstitution = targetValue === 'institution';
+      const groupValue = String(groupField?.value || '').trim();
+      const officialValue = String(officialField?.value || '').trim();
+      const isOtherGroup = groupValue === manualDropdownOtherValue;
+      const isOtherOfficial = officialValue === manualDropdownOtherValue || isOtherGroup;
+
+      governmentWrap?.classList.toggle('d-none', !isGovernment);
+      institutionWrap?.classList.toggle('d-none', !isInstitution);
+
+      manualSetFieldRequirement(groupField, isGovernment, isGovernment, !isGovernment);
+      manualSetFieldRequirement(groupOtherField, isGovernment && isOtherGroup, isGovernment && isOtherGroup, !isGovernment || !isOtherGroup);
+      groupOtherField?.classList.toggle('d-none', !(isGovernment && isOtherGroup));
+
+      manualSetFieldRequirement(positionField, isGovernment, isGovernment, !isGovernment);
+
+      manualSetFieldRequirement(officialField, isGovernment && !isOtherGroup, isGovernment && groupValue !== '', !isGovernment || groupValue === '');
+      manualSetFieldRequirement(officialOtherField, isGovernment && isOtherOfficial, isGovernment && isOtherOfficial, !isGovernment || !isOtherOfficial);
+      officialOtherField?.classList.toggle('d-none', !(isGovernment && isOtherOfficial));
+
+      manualSetFieldRequirement(institutionPersonField, isInstitution, isInstitution, !isInstitution);
+      manualSetFieldRequirement(institutionPositionField, isInstitution, isInstitution, !isInstitution);
+      manualSetFieldRequirement(institutionNameField, isInstitution, isInstitution, !isInstitution);
+
+      if (officialField) {
+        const selectedCategory = isOtherGroup ? '' : groupValue;
+        Array.from(officialField.options).forEach((option, index) => {
+          if (index === 0 || String(option.value || '').trim() === manualDropdownOtherValue) {
+            option.hidden = false;
+            return;
+          }
+          const optionCategory = String(option.getAttribute('data-category') || '').trim();
+          option.hidden = !!selectedCategory && optionCategory !== selectedCategory;
+        });
+        const activeOption = officialField.selectedOptions?.[0] || null;
+        if (activeOption?.hidden) {
+          officialField.value = '';
+        }
+      }
+      if (emptyState) {
+        emptyState.textContent = groupValue
+          ? (isOtherGroup ? 'Enter the recipient name manually.' : 'Choose the recipient name from the filtered dropdown.')
+          : 'Choose a recipient address first.';
+      }
+
+      const official = manualIndigencyOfficialById(officialValue);
+      if (isGovernment && positionField && official && !isOtherOfficial && !String(positionField.value || '').trim()) {
+        positionField.value = String(official.position_name || '').trim();
+      }
+
+      let line1 = '';
+      let line2 = '';
+      let line3 = '';
+
+      if (isGovernment) {
+        line1 = isOtherOfficial
+          ? String(officialOtherField?.value || '').trim()
+          : String(official?.name || '').trim();
+        line2 = String(positionField?.value || official?.position_name || '').trim();
+        line3 = isOtherGroup
+          ? String(groupOtherField?.value || '').trim()
+          : String(official?.jurisdiction_location || '').trim();
+      } else if (isInstitution) {
+        line1 = String(institutionPersonField?.value || '').trim();
+        line2 = String(institutionPositionField?.value || '').trim();
+        line3 = String(institutionNameField?.value || '').trim();
+      }
+
+      if (requestOfficerLine1Field) requestOfficerLine1Field.value = line1;
+      if (requestOfficerLine2Field) requestOfficerLine2Field.value = line2;
+      if (requestOfficerLine3Field) requestOfficerLine3Field.value = line3;
+      if (requestOfficerField) requestOfficerField.value = [line1, line2, line3].filter(Boolean).join(' - ');
+      if (governmentOfficeField) governmentOfficeField.value = line3;
+      if (governmentPositionField) governmentPositionField.value = line2;
+      if (governmentOfficialField) governmentOfficialField.value = line1;
     }
 
     function manualBarangayIdPhotoButton(label, action, tone = 'outline-primary', icon = 'fa-camera') {
@@ -9297,6 +9655,10 @@
 
     function manualSuggestedPurpose(config) {
       if (!config) return '';
+      if (manualUsesPurposePreset(config)) {
+        const presetValue = String(manualPurposePreset?.value || '').trim();
+        return presetValue && presetValue !== '__other__' ? presetValue : '';
+      }
       if (config.kind === 'general_clearance') {
         return generalClearancePurposeFromDocType(config.documentType);
       }
@@ -9319,6 +9681,7 @@
     function manualApplySuggestedPurpose() {
       if (!manualPurpose) return;
       const config = manualCurrentConfig();
+      manualSyncPurposePreset();
       const suggested = manualSuggestedPurpose(config);
       const currentValue = String(manualPurpose?.value || '').trim();
       const wasAuto = String(manualPurpose?.dataset.auto || '0') === '1';
@@ -9347,6 +9710,7 @@
     }
 
     function manualExpectedStage(config = manualCurrentConfig(), feeRows = manualCurrentFeeRows()) {
+      const rawConfig = manualCurrentRawConfig();
       if (!config) {
         return {
           key: '',
@@ -9384,6 +9748,15 @@
           label: 'After submit: Ready for Release'
         };
       }
+      if (manualIsOtherDocumentSelection(rawConfig)) {
+        const customFee = manualResolvedDocumentFee();
+        if (customFee !== null && customFee <= 0) {
+          return {
+            key: 'ready_for_claim',
+            label: 'After submit: Ready for Release'
+          };
+        }
+      }
       if (config.kind === 'barangay_id') {
         return {
           key: 'ready_for_claim',
@@ -9398,6 +9771,7 @@
 
     function manualUpdateSummary() {
       const config = manualCurrentConfig();
+      const rawConfig = manualCurrentRawConfig();
       const mode = manualCurrentMode();
       const typedName = [manualFirstName?.value, manualMiddleName?.value, manualLastName?.value, manualSuffix?.value]
         .map((part) => String(part || '').trim())
@@ -9414,7 +9788,11 @@
         }
       }
 
-      if (manualDocumentSummary) manualDocumentSummary.textContent = config ? config.label : 'Select a manual issuance form';
+      if (manualDocumentSummary) {
+        manualDocumentSummary.textContent = config
+          ? manualResolvedDocumentLabel(rawConfig, config)
+          : 'Select a manual issuance form';
+      }
       if (manualNextStageSummary) manualNextStageSummary.textContent = manualExpectedStage(config).label;
       if (manualValidityWrap && manualValidityDate) {
         const validityKind = manualValidityKind(config);
@@ -9458,19 +9836,24 @@
 
     function manualApplyCommonFieldRequirements(config) {
       const isBarangayId = config?.kind === 'barangay_id';
-      const needsBirthDetails = isBarangayId || ['residency', 'identity', 'cohabitation'].includes(config?.kind);
-      if (manualBirthdate) manualBirthdate.required = needsBirthDetails;
-      manualBirthdateRequiredMark?.classList.toggle('d-none', !needsBirthDetails);
-      if (manualSex) manualSex.required = isBarangayId;
-      if (manualContactNumber) manualContactNumber.required = false;
-      if (manualBirthplace) manualBirthplace.required = isBarangayId || ['residency', 'identity'].includes(config?.kind);
-      manualBirthplaceRequiredMark?.classList.toggle('d-none', !(isBarangayId || ['residency', 'identity'].includes(config?.kind)));
+      if (manualBirthdate) manualBirthdate.required = true;
+      manualBirthdateRequiredMark?.classList.remove('d-none');
+      if (manualSex) manualSex.required = true;
+      if (manualCivilStatus) manualCivilStatus.required = true;
+      if (manualContactNumber) manualContactNumber.required = true;
+      if (manualBirthplace) manualBirthplace.required = true;
+      manualBirthplaceRequiredMark?.classList.remove('d-none');
+      if (manualOccupation) manualOccupation.required = !isBarangayId;
+      if (manualReligion) manualReligion.required = !isBarangayId;
     }
 
     function manualMarkPreviewStale(silent = false) {
       manualPreviewSignature = '';
       if (manualSubmitBtn) {
         manualSubmitBtn.disabled = true;
+      }
+      if (!isIdIssuanceTrackerView && manualDocumentInlinePreview) {
+        manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preview will refresh here after you open Step 5 again or press Refresh Preview.</div>';
       }
       if (!silent && manualCurrentConfig()) {
         manualSetAlert('Preview the latest changes before submitting this manual issuance request.', 'info');
@@ -9484,7 +9867,7 @@
         case 'general_clearance':
           return [
             { name: 'location', label: 'Project / Permit Location', type: 'text', required: true, col: 'col-md-6' },
-            { name: 'remarks', label: 'Remarks', type: 'text', required: true, col: 'col-md-6' }
+            { name: 'remarks', label: 'Remarks', type: 'text', col: 'col-md-6' }
           ];
         case 'business_clearance':
           return [
@@ -9543,20 +9926,19 @@
             { name: 'barangay_id_photo_capture', label: 'Barangay ID Photo', type: 'photo_capture', required: true, col: 'col-12' }
           ];
         case 'residency':
+        case 'general_certification':
           return [
-            { name: 'remarks', label: 'Remarks', type: 'text', required: true, col: 'col-md-6' }
+            { name: 'remarks', label: 'Remarks', type: 'text', col: 'col-md-6' }
           ];
         case 'identity':
           return [
-            { name: 'remarks', label: 'Remarks', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'remarks', label: 'Remarks', type: 'text', col: 'col-md-6' },
             { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', col: 'col-md-3' },
             { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', col: 'col-md-3' }
           ];
         case 'indigency':
           return [
-            { name: 'request_officer_line1', label: 'Addressed To - Line 1', type: 'text', required: true, col: 'col-12' },
-            { name: 'request_officer_line2', label: 'Addressed To - Line 2', type: 'text', required: true, col: 'col-md-6' },
-            { name: 'request_officer_line3', label: 'Addressed To - Line 3', type: 'text', required: true, col: 'col-md-6' }
+            { name: 'indigency_recipient', label: 'Recipient Details', type: 'indigency_recipient', required: true, col: 'col-12' }
           ];
         case 'cohabitation':
           return [
@@ -9608,6 +9990,101 @@
       const placeholder = field.placeholder ? `placeholder="${manualEscapeAttr(field.placeholder)}"` : '';
       const valueAttr = field.value ? `value="${manualEscapeAttr(field.value)}"` : '';
       const label = `${esc(field.label)}${field.required ? ' <span class="text-danger">*</span>' : ''}`;
+
+      if (field.type === 'indigency_recipient') {
+        const groupOptions = Array.isArray(manualIndigencyGovernmentDirectory.groups)
+          ? manualIndigencyGovernmentDirectory.groups.map((group) => `
+              <option value="${manualEscapeAttr(group.id)}">${esc(group.name)}</option>
+            `).join('')
+          : '';
+        const positionOptions = Array.isArray(manualIndigencyGovernmentDirectory.positions)
+          ? manualIndigencyGovernmentDirectory.positions.map((position) => `
+              <option value="${manualEscapeAttr(position)}">${esc(position)}</option>
+            `).join('')
+          : '';
+        const officialOptions = Array.isArray(manualIndigencyGovernmentDirectory.officials)
+          ? manualIndigencyGovernmentDirectory.officials.map((official) => {
+              const labelText = [
+                String(official?.name || '').trim(),
+                String(official?.position_name || '').trim(),
+                String(official?.jurisdiction_location || '').trim(),
+              ].filter(Boolean).join(' - ');
+              return `
+                <option
+                  value="${manualEscapeAttr(official?.id || '')}"
+                  data-category="${manualEscapeAttr(official?.group_key || '')}"
+                  data-position="${manualEscapeAttr(official?.position_name || '')}"
+                  data-location="${manualEscapeAttr(official?.jurisdiction_location || '')}"
+                  data-name="${manualEscapeAttr(official?.name || '')}"
+                >
+                  ${esc(labelText)}
+                </option>
+              `;
+            }).join('')
+          : '';
+        return `
+          <div class="${col}">
+            <label class="form-label fw-semibold small">Recipient Type <span class="text-danger">*</span></label>
+            <select class="form-select" data-manual-field="submission_target_type" data-manual-indigency-trigger="target">
+              <option value="">Select recipient type</option>
+              <option value="government_official">Government Official</option>
+              <option value="institution">Institution / Office</option>
+            </select>
+
+            <div class="row g-3 mt-1 d-none" data-manual-indigency-government>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Recipient Address <span class="text-danger">*</span></label>
+                <select class="form-select" data-manual-field="government_position_group" data-manual-indigency-trigger="group">
+                  <option value="">Select office group</option>
+                  ${groupOptions}
+                  <option value="${manualDropdownOtherValue}">Other</option>
+                </select>
+                <input type="text" class="form-control mt-2 d-none" data-manual-field="government_position_other" placeholder="Enter recipient address">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Recipient Position <span class="text-danger">*</span></label>
+                <select class="form-select" data-manual-field="government_position_detail">
+                  <option value="">Select position</option>
+                  ${positionOptions}
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold small">Recipient Name <span class="text-danger">*</span></label>
+                <select class="form-select" data-manual-field="government_official_id" data-manual-indigency-trigger="official" disabled>
+                  <option value="">Select official</option>
+                  ${officialOptions}
+                  <option value="${manualDropdownOtherValue}">Other</option>
+                </select>
+                <input type="text" class="form-control mt-2 d-none" data-manual-field="government_official_other" placeholder="Enter recipient name">
+                <div class="form-text" data-manual-indigency-empty-state>Choose a recipient address first.</div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1 d-none" data-manual-indigency-institution>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Recipient Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" data-manual-field="institution_person" placeholder="Enter recipient name">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Recipient Position <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" data-manual-field="institution_position" placeholder="Enter recipient position">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Recipient Address <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" data-manual-field="institution_name" placeholder="Enter recipient address">
+              </div>
+            </div>
+
+            <input type="hidden" data-manual-field="request_officer_line1">
+            <input type="hidden" data-manual-field="request_officer_line2">
+            <input type="hidden" data-manual-field="request_officer_line3">
+            <input type="hidden" data-manual-field="request_officer">
+            <input type="hidden" data-manual-field="government_office">
+            <input type="hidden" data-manual-field="government_position">
+            <input type="hidden" data-manual-field="government_official">
+          </div>
+        `;
+      }
 
       if (field.type === 'photo_capture') {
         return `
@@ -9764,28 +10241,38 @@
     }
 
     function manualRenderDynamicFields() {
+      const rawConfig = manualCurrentRawConfig();
       const config = manualCurrentConfig();
       const fields = manualFieldDefinitions(config);
       if (!manualDynamicFields || !manualSpecificFieldsHint) return;
       manualClearValidationState();
+      manualSyncOtherDocumentSetup();
       manualApplyCommonFieldRequirements(config);
+      manualSyncPurposePreset();
       if (!config) {
         manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">Select a certificate or clearance type to load its matching manual encoding fields.</div></div>';
-        manualSpecificFieldsHint.textContent = 'Select a certificate or clearance type to load its manual encoding fields.';
+        manualSpecificFieldsHint.textContent = manualIsOtherDocumentSelection(rawConfig)
+          ? 'Select the base certificate template for this Other Document to load the matching fields.'
+          : 'Select a certificate or clearance type to load its manual encoding fields.';
         manualRenderFeeCatalog();
         manualUpdateSummary();
         return;
       }
-      manualSpecificFieldsHint.textContent = config.kind === 'barangay_id'
-        ? 'Record one reachable emergency contact for the resident.'
-        : (config.clearance
-          ? 'Clearance forms can also tag fees here so finance receives the exact walk-in amount.'
-          : 'Complete the extra fields that appear in the chosen handwritten form.');
+      manualSpecificFieldsHint.textContent = manualIsOtherDocumentSelection(rawConfig)
+        ? `This Other Document uses the ${config.label} template for its required fields and preview layout.`
+        : (config.kind === 'general_certification'
+          ? 'This manual document uses the residency certification layout, while the purpose is selected from the guided list.'
+        : (config.kind === 'barangay_id'
+          ? 'Record one reachable emergency contact for the resident.'
+          : (config.clearance
+            ? 'Clearance forms can also tag fees here so finance receives the exact walk-in amount.'
+            : 'Complete the extra fields that appear in the chosen handwritten form.')));
       if (!fields.length) {
         manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">No additional fields are required beyond the basic information and purpose for this form.</div></div>';
       } else {
         manualDynamicFields.innerHTML = fields.map(manualFieldHtml).join('');
       }
+      manualSyncIndigencyRecipientFields();
       if (config.kind === 'barangay_id' && manualBarangayIdPhotoStepMount) {
         const photoColumn = manualDynamicFields.querySelector('[data-manual-photo-field="barangay_id"]')?.closest('[class*="col-"]');
         if (photoColumn) manualBarangayIdPhotoStepMount.replaceChildren(photoColumn);
@@ -10008,6 +10495,7 @@
     }
 
     function manualBuildPayload() {
+      const rawConfig = manualCurrentRawConfig();
       const config = manualCurrentConfig();
       if (!config) return null;
 
@@ -10037,6 +10525,18 @@
         address: fullAddress,
         sector_membership: manualCurrentSectorValues().join(', '),
       };
+      if (config.kind === 'general_certification') {
+        payload.manual_document_variant = config.label;
+      }
+      if (manualIsOtherDocumentSelection(rawConfig)) {
+        payload.custom_document_title = String(manualOtherDocumentTitle?.value || '').trim();
+        payload.other_document_fee = String(manualOtherDocumentFee?.value || '').trim();
+        payload.other_document_template_id = String(config.id || '').trim();
+        payload.other_document_template_document_type = String(config.documentType || '').trim();
+        payload.other_document_template_kind = String(config.kind || '').trim();
+        payload.other_document_template_label = String(config.label || '').trim();
+        payload.template_document_type = String(config.documentType || '').trim();
+      }
       if (manualAddressLine) {
         payload.address_line = String(manualAddressLine.value || '').trim();
         payload.area_number = String(manualAreaNumber?.value || '').trim();
@@ -10103,9 +10603,14 @@
     }
 
     function manualPreviewStateBundle() {
+      const rawConfig = manualCurrentRawConfig();
       const config = manualCurrentConfig();
       if (!config) {
         manualSetFieldInvalidState(manualDocumentType, true);
+        if (manualIsOtherDocumentSelection(rawConfig)) {
+          manualSetFieldInvalidState(manualOtherDocumentTemplate, true);
+          throw new Error('Select the base certificate template for this Other Document first.');
+        }
         throw new Error('Select a certificate or clearance type first.');
       }
       manualClearValidationState();
@@ -10123,8 +10628,9 @@
         : '';
       const feeRows = manualCurrentFeeRows();
       const expectedStage = manualExpectedStage(config, feeRows);
+      const displayTitle = manualResolvedDocumentLabel(rawConfig, config);
       const previewRow = {
-        document_type: config.documentType,
+        document_type: displayTitle,
         purpose: String(payload?.request_purpose || payload?.purpose || '').trim(),
         resident_name: String(payload?.resident_name || '').trim(),
         resident_id: String(payload?.resident_id || '').trim(),
@@ -10133,7 +10639,7 @@
         stage: expectedStage.key,
         fee_amount: config.clearance && feeRows.length
           ? feeRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
-          : null,
+          : (manualIsOtherDocumentSelection(rawConfig) ? manualResolvedDocumentFee() : null),
         submitted_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
       };
       const residentProfile = manualSelectedResident ? { ...manualSelectedResident } : {};
@@ -10142,14 +10648,17 @@
         feeRows,
         resident_id: previewRow.resident_id,
         resident_user_id: previewRow.resident_user_id,
-        document_type: config.documentType,
+        document_type: displayTitle,
+        template_document_type: config.documentType,
         photo_key: photo.mode === 'custom'
           ? photoDataUrl
           : `${photo.mode}:${String(photo.path || photo.previewUrl || '').trim()}`
       });
 
       return {
+        rawConfig,
         config,
+        displayTitle,
         payload,
         feeRows,
         previewRow,
@@ -10177,6 +10686,9 @@
       manualResidentSearchHint?.classList.remove('d-none');
       manualSelectedResidentCard?.classList.add('d-none');
       manualPreviewSignature = '';
+      if (!isIdIssuanceTrackerView && manualDocumentInlinePreview) {
+        manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Document preview will appear here automatically on this step.</div>';
+      }
       manualResetBarangayIdPhotoState();
       manualClearValidationState();
       if (manualSubmitBtn) {
@@ -10250,8 +10762,28 @@
     manualDocumentType?.addEventListener('change', () => {
       manualRenderDynamicFields();
       manualApplySuggestedPurpose();
+      manualSyncPurposePreset();
       manualMarkPreviewStale(true);
       manualSetAlert('Document form updated. Review the fields, then preview the document again before submitting.', 'info');
+    });
+
+    manualOtherDocumentTemplate?.addEventListener('change', () => {
+      manualRenderDynamicFields();
+      manualApplySuggestedPurpose();
+      manualMarkPreviewStale(true);
+    });
+    manualOtherDocumentTitle?.addEventListener('input', () => {
+      manualMarkPreviewStale(true);
+      manualUpdateSummary();
+    });
+    manualOtherDocumentFee?.addEventListener('input', () => {
+      manualMarkPreviewStale(true);
+      manualUpdateSummary();
+    });
+    manualPurposePreset?.addEventListener('change', () => {
+      manualSyncPurposePreset();
+      manualApplySuggestedPurpose();
+      manualMarkPreviewStale(true);
     });
 
     manualPurpose?.addEventListener('input', () => {
@@ -10262,6 +10794,7 @@
     manualDynamicFields?.addEventListener('input', (event) => {
       const field = event.target.closest('[data-manual-field], [data-manual-other-for]');
       if (!field) return;
+      manualSyncIndigencyRecipientFields();
       manualMarkPreviewStale(true);
     });
 
@@ -10280,6 +10813,7 @@
       if (key === 'application_type') {
         manualApplySuggestedPurpose();
       }
+      manualSyncIndigencyRecipientFields();
       manualMarkPreviewStale(true);
     });
 
@@ -10559,9 +11093,13 @@
     });
 
     manualPreviewBtn?.addEventListener('click', async () => {
+      if (!isIdIssuanceTrackerView && manualDocumentInlinePreview) {
+        await manualRenderInlineDocumentPreview();
+        return;
+      }
       try {
         const bundle = manualPreviewStateBundle();
-        if (normalizePreviewDocKey(bundle?.previewRow?.document_type || bundle?.config?.key || '') === 'barangayid') {
+        if (normalizePreviewDocKey(bundle?.config?.documentType || bundle?.previewRow?.document_type || '') === 'barangayid') {
           await fetchBarangayIdTemplateConfig({ force: true }).catch(() => null);
         }
         if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
@@ -10594,7 +11132,7 @@
         );
         viewDetailsBody.innerHTML = `
           <div class="tracker-doc-highlight">
-            Manual preview for ${esc(bundle.config.label)}. If something is off, close this preview, update the form, and preview again before submitting.
+            Manual preview for ${esc(bundle.displayTitle || bundle.config.label)}. If something is off, close this preview, update the form, and preview again before submitting.
           </div>
           ${previewHtml}
         `;
@@ -10609,33 +11147,7 @@
           window.setTimeout(hydrateManualBarangayId, 400);
           viewModalEl?.addEventListener('shown.bs.modal', hydrateManualBarangayId, { once: true });
         }
-        viewDetailsBody.querySelectorAll('.doc-editable').forEach((editable) => {
-          const editKey = String(editable.getAttribute('data-edit-key') || '');
-          const editableKeys = ['fullAddress', 'location', 'businessAddress', 'operatorAddress'];
-          if (isIdIssuanceTrackerView || !editableKeys.includes(editKey)) {
-            editable.setAttribute('contenteditable', 'false');
-            editable.removeAttribute('data-edit-key');
-            return;
-          }
-          editable.setAttribute('title', 'Click to edit this field before approval');
-          editable.addEventListener('input', () => {
-            const value = String(editable.textContent || '').trim();
-            if (editKey === 'fullAddress' || editKey === 'operatorAddress') {
-              manualFullAddress.value = value;
-            } else {
-              const payloadKey = editKey === 'businessAddress' ? 'business_full_address' : 'location';
-              const target = manualDynamicFields?.querySelector(`[data-manual-field="${payloadKey}"]`);
-              if (target) target.value = value;
-            }
-            try {
-              manualPreviewSignature = manualPreviewStateBundle().signature;
-              if (manualSubmitBtn) manualSubmitBtn.disabled = false;
-            } catch (_) {
-              manualPreviewSignature = '';
-              if (manualSubmitBtn) manualSubmitBtn.disabled = true;
-            }
-          });
-        });
+        manualBindPreviewEditableFields(viewDetailsBody);
         manualPreviewSignature = bundle.signature;
         if (manualSubmitBtn) {
           manualSubmitBtn.disabled = false;

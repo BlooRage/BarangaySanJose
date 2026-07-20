@@ -2815,6 +2815,16 @@ function dra_generate_issued_document(array $requestRow): ?string
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
     $isBarangayId = dr_is_barangay_id_document_type($docType);
     $moduleSettingsKey = dms_module_key_for_document_type($docType);
+    $documentFieldVisibility = ($conn instanceof mysqli)
+        ? dms_resolve_document_field_visibility($conn, $moduleSettingsKey)
+        : array_fill_keys(array_keys(dms_document_field_catalog()), true);
+    $fieldVisible = static fn(string $key): bool => !array_key_exists($key, $documentFieldVisibility) || !empty($documentFieldVisibility[$key]);
+    $printHeaderEnabled = !($conn instanceof mysqli) || dms_resolve_module_print_header_setting($conn, $moduleSettingsKey);
+    $maskPreprintedLetterhead = static function (object $pdf, float $pageWidth) use ($printHeaderEnabled): void {
+        if ($printHeaderEnabled) return;
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->Rect(0.0, 0.0, $pageWidth, 43.0, 'F');
+    };
     $moduleSettings = ($conn instanceof mysqli)
         ? dms_resolve_module_signatories($conn, $moduleSettingsKey)
         : [];
@@ -3036,6 +3046,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     $generalPermitPurpose = dra_general_clearance_purpose_from_document_type($docType);
     $isGeneralPermitClearance = ($generalPermitPurpose !== '');
     $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
+    $customDocumentTitle = trim((string)($payload['custom_document_title'] ?? ''));
 
     // DOCX template workflow removed: force all issuance through pure-PHP renderer below.
     $isTemplateBasedCertificate = false;
@@ -4115,6 +4126,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
                 $pdf->useTemplate($tpl);
+                $maskPreprintedLetterhead($pdf, $pageWidth);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(0, 0, 0);
@@ -4374,12 +4386,13 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pdf->Rect($footerBlockX, $footerBlockY, $footerBlockW, $footerBlockH, 'F');
 
                 $footerRows = [
-                    ['label' => 'CTC No.', 'value' => $clearanceNumber],
-                    ['label' => 'Issued at', 'value' => $issuedAtFooter],
-                    ['label' => 'Issued On', 'value' => $issuedOnFooter],
-                    ['label' => 'Amount', 'value' => $amountText],
-                    ['label' => 'OR No.', 'value' => $orNumberText],
+                    ['key' => 'ctc', 'label' => 'CTC No.', 'value' => $clearanceNumber],
+                    ['key' => 'issued_at', 'label' => 'Issued at', 'value' => $issuedAtFooter],
+                    ['key' => 'issued_on', 'label' => 'Issued On', 'value' => $issuedOnFooter],
+                    ['key' => 'amount', 'label' => 'Amount', 'value' => $amountText],
+                    ['key' => 'or_number', 'label' => 'OR No.', 'value' => $orNumberText],
                 ];
+                $footerRows = array_values(array_filter($footerRows, static fn(array $row): bool => $fieldVisible((string)$row['key'])));
                 $footerLabelX = 16.5;
                 $footerColonX = 41.5;
                 $footerLineX1 = 47.2;
@@ -4486,6 +4499,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
                 $pdf->useTemplate($tpl);
+                $maskPreprintedLetterhead($pdf, $pageWidth);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(0, 0, 0);
@@ -4704,10 +4718,11 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pdf->Rect($metaBlockX, $metaBlockY, $metaBlockW, $metaBlockH, 'F');
 
                 $metaRows = [
-                    ['label' => 'Clearance No.', 'value' => $clearanceNumber !== '' ? $clearanceNumber : $requestId],
-                    ['label' => 'Receipt No.', 'value' => $receiptNumber],
-                    ['label' => 'Amount', 'value' => $amountText],
+                    ['key' => 'clearance_no', 'label' => 'Clearance No.', 'value' => $clearanceNumber !== '' ? $clearanceNumber : $requestId],
+                    ['key' => 'receipt_no', 'label' => 'Receipt No.', 'value' => $receiptNumber],
+                    ['key' => 'amount', 'label' => 'Amount', 'value' => $amountText],
                 ];
+                $metaRows = array_values(array_filter($metaRows, static fn(array $row): bool => $fieldVisible((string)$row['key'])));
                 $metaLabelX = 22.2;
                 $metaColonX = 55.2;
                 $metaValueX = 60.2;
@@ -4832,6 +4847,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
                 $pdf->useTemplate($tpl);
+                $maskPreprintedLetterhead($pdf, $pageWidth);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(20, 20, 20);
@@ -4942,12 +4958,13 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $metaMaskH = 33.0;
                 $pdf->Rect($metaMaskX, $metaMaskY, $metaMaskW, $metaMaskH, 'F');
                 $metaRows = [
-                    ['label' => 'O.R No.', 'value' => $orNo],
-                    ['label' => 'Amount', 'value' => $amountText],
+                    ['key' => 'or_number', 'label' => 'O.R No.', 'value' => $orNo],
+                    ['key' => 'amount', 'label' => 'Amount', 'value' => $amountText],
                     ['label' => 'Plate No.', 'value' => $plateNumber],
                     ['label' => 'Date Issued', 'value' => $issuedAt],
                     ['label' => 'Place Issued', 'value' => 'Barangay San Jose'],
                 ];
+                $metaRows = array_values(array_filter($metaRows, static fn(array $row): bool => !isset($row['key']) || $fieldVisible((string)$row['key'])));
                 $labelX = 18.5;
                 $colonX = 46.0;
                 $lineX1 = 52.5;
@@ -5045,6 +5062,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
                 $pdf->useTemplate($tpl);
+                $maskPreprintedLetterhead($pdf, $pageWidth);
                 $pdf->SetAutoPageBreak(false);
 
                 $pdf->SetFillColor(255, 255, 255);
@@ -5101,58 +5119,60 @@ function dra_generate_issued_document(array $requestRow): ?string
     $pdf->SetAutoPageBreak(false);
 
     $leftLogo = $baseDir . '/Images/San_Jose_LOGO.jpg';
-    if (is_file($leftLogo)) {
+    if ($printHeaderEnabled && is_file($leftLogo)) {
         $pdf->Image($leftLogo, 18, 14, 26, 26);
     }
     $rightLogo = $baseDir . '/Images/Montalban_Logo.png';
-    if (is_file($rightLogo)) {
+    if ($printHeaderEnabled && is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
     $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker;
     $fontFace = 'Arial';
     $indigencyFont = 'Arial';
 
+    $pdf->SetTextColor($printHeaderEnabled ? 0 : 255, $printHeaderEnabled ? 0 : 255, $printHeaderEnabled ? 0 : 255);
     $pdf->SetFont($fontFace, 'B', 11);
-    $pdf->Cell(0, 5, 'REPUBLIKA NG PILIPINAS', 0, 1, 'C');
+    $pdf->Cell(0, 5, $printHeaderEnabled ? 'REPUBLIKA NG PILIPINAS' : '', 0, 1, 'C');
     $pdf->SetFont($fontFace, '', 10);
-    $pdf->Cell(0, 5, 'LALAWIGAN NG RIZAL', 0, 1, 'C');
-    $pdf->Cell(0, 5, 'BAYAN NG RODRIGUEZ', 0, 1, 'C');
+    $pdf->Cell(0, 5, $printHeaderEnabled ? 'LALAWIGAN NG RIZAL' : '', 0, 1, 'C');
+    $pdf->Cell(0, 5, $printHeaderEnabled ? 'BAYAN NG RODRIGUEZ' : '', 0, 1, 'C');
     $pdf->Ln(1);
     $pdf->SetFont($fontFace, 'B', 14);
-    $pdf->Cell(0, 7, 'BARANGAY SAN JOSE', 0, 1, 'C');
+    $pdf->Cell(0, 7, $printHeaderEnabled ? 'BARANGAY SAN JOSE' : '', 0, 1, 'C');
+    $pdf->SetTextColor(0, 0, 0);
     if ($isSpecialCertificate) {
         $pdf->Ln(1);
-        $pdf->Line(18, $pdf->GetY(), 192, $pdf->GetY());
+        if ($printHeaderEnabled) $pdf->Line(18, $pdf->GetY(), 192, $pdf->GetY());
         $pdf->Ln(4);
         if ($isIndigency) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'CERTIFICATE OF INDIGENCY'), 0, 1, 'C');
             $pdf->Ln(4);
         } elseif ($isResidency) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, 'CERTIFICATE OF RESIDENCY', 0, 1, 'C');
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'CERTIFICATE OF RESIDENCY'), 0, 1, 'C');
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'BARANGAY CERTIFICATION'), 0, 1, 'C');
             $pdf->Ln(4);
         } elseif ($isCohabitation) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, 'CERTIFICATE OF COHABITATION', 0, 1, 'C');
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'CERTIFICATE OF COHABITATION'), 0, 1, 'C');
             $pdf->Ln(4);
         } elseif ($isFirstTimeJobSeeker) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'BARANGAY CERTIFICATION'), 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 9);
             $pdf->Cell(0, 5, '(First Time Jobseekers Act-RA 11261)', 0, 1, 'C');
             $pdf->Ln(3);
@@ -5160,7 +5180,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'BARANGAY CERTIFICATION'), 0, 1, 'C');
             $pdf->Ln(4);
         }
     } else {
@@ -6191,6 +6211,20 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pdf->SetXY($lineX1, $metaY);
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
+            }
+        }
+
+        // Special-certificate layouts use fixed metadata rows. Mask disabled rows after
+        // rendering so both their labels and values are absent from the final PDF.
+        if (($isGoodMoral || $isResidency || $isRelationshipJailVisit || $isCohabitation) && isset($metaY)) {
+            $specialMetaStep = $isGoodMoral ? 8.0 : 7.0;
+            $specialMetaStart = (float)$metaY - (3.0 * $specialMetaStep);
+            $specialMetaKeys = ['ctc', 'issued_at', 'issued_on', 'or_number'];
+            $pdf->SetFillColor(255, 255, 255);
+            foreach ($specialMetaKeys as $specialMetaIndex => $specialMetaKey) {
+                if (!$fieldVisible($specialMetaKey)) {
+                    $pdf->Rect(17.0, $specialMetaStart + ($specialMetaIndex * $specialMetaStep) - 0.8, 55.0, $specialMetaStep, 'F');
+                }
             }
         }
 
@@ -7747,6 +7781,25 @@ if ($action === 'create_manual_request') {
     ]);
     $payload['resident_name'] = $fullName;
 
+    $customDocumentTitle = trim((string)($payload['custom_document_title'] ?? ''));
+    $otherDocumentTemplateType = trim((string)($payload['other_document_template_document_type'] ?? ''));
+    $otherDocumentFeeRaw = trim((string)($payload['other_document_fee'] ?? ''));
+    $isOtherDocumentRequest = $customDocumentTitle !== '' || $otherDocumentTemplateType !== '' || $otherDocumentFeeRaw !== '';
+    if ($isOtherDocumentRequest) {
+        if ($customDocumentTitle === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Specific document title is required for Other Document.']);
+        }
+        if ($otherDocumentTemplateType === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Select the base certificate template for Other Document.']);
+        }
+        if ($otherDocumentFeeRaw === '' || !is_numeric($otherDocumentFeeRaw) || (float)$otherDocumentFeeRaw < 0) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Enter a valid document fee for Other Document.']);
+        }
+        $payload['custom_document_title'] = $customDocumentTitle;
+        $payload['other_document_template_document_type'] = $otherDocumentTemplateType;
+        $payload['other_document_fee'] = number_format((float)$otherDocumentFeeRaw, 2, '.', '');
+    }
+
     $generalPermitPurpose = dra_general_clearance_purpose_from_document_type($documentType);
     $purpose = dra_manual_first_non_empty([
         $payload['request_purpose'] ?? null,
@@ -7772,8 +7825,21 @@ if ($action === 'create_manual_request') {
     };
 
     $requireManualPayloadFields([
+        'last_name' => 'Last Name',
+        'first_name' => 'First Name',
+        'birthdate' => 'Birthdate',
+        'sex' => 'Sex',
+        'civil_status' => 'Civil Status',
+        'contact_number' => 'Contact Number',
+        'birthplace' => 'Birthplace',
         'area_number' => 'Area Number',
     ]);
+    if (!$isBarangayIdDocument) {
+        $requireManualPayloadFields([
+            'occupation' => 'Occupation',
+            'religion' => 'Religion',
+        ]);
+    }
     if (!$isBarangayIdDocument) {
         $requireManualPayloadFields([
             'request_purpose' => 'Purpose / Request For',
@@ -7807,19 +7873,12 @@ if ($action === 'create_manual_request') {
     ) {
         $requireManualPayloadFields([
             'location' => 'Project / Permit Location',
-            'remarks' => 'Remarks',
-        ]);
-    } elseif (str_contains($documentToken, 'residency') || str_contains($documentToken, 'identity')) {
-        $requireManualPayloadFields([
-            'birthdate' => 'Birthdate',
-            'birthplace' => 'Birthplace',
-            'remarks' => 'Remarks',
         ]);
     } elseif (str_contains($documentToken, 'indigency')) {
         $requireManualPayloadFields([
-            'request_officer_line1' => 'Addressed To - Line 1',
-            'request_officer_line2' => 'Addressed To - Line 2',
-            'request_officer_line3' => 'Addressed To - Line 3',
+            'request_officer_line1' => 'Recipient Name',
+            'request_officer_line2' => 'Recipient Position',
+            'request_officer_line3' => 'Recipient Address',
         ]);
     } elseif (str_contains($documentToken, 'cohabitation')) {
         $cohabitationVariant = strtolower(trim((string)($payload['cohabitation_variant'] ?? 'standard')));
@@ -7916,6 +7975,9 @@ if ($action === 'create_manual_request') {
         'resident_id' => $residentId,
         'resident_user_id' => $residentUserId,
     ]);
+    if ($isOtherDocumentRequest) {
+        $defaultFee = max(0.0, (float)$payload['other_document_fee']);
+    }
     if ($isFirstTimeJobSeeker || $hasManualSectorExemption) {
         $defaultFee = 0.0;
     }
@@ -8153,7 +8215,8 @@ if ($action === 'create_manual_request') {
     }
 
     $channelLabel = ($residentId !== '' || $residentUserId !== '') ? 'registered resident' : 'walk-in resident';
-    $auditNotes = $channelLabel . ' | ' . $documentType . ' | next stage: ' . $initialStage;
+    $auditDocumentLabel = $customDocumentTitle !== '' ? ($customDocumentTitle . ' [template: ' . $documentType . ']') : $documentType;
+    $auditNotes = $channelLabel . ' | ' . $auditDocumentLabel . ' | next stage: ' . $initialStage;
     try {
         insertUnifiedAuditLog(
             $conn,
@@ -8454,6 +8517,10 @@ if ($action === 'list') {
                     $row['purpose'] = $payloadPurpose;
                 }
             }
+            $customOtherFee = trim((string)($payload['other_document_fee'] ?? ''));
+            if ($customOtherFee !== '' && is_numeric($customOtherFee)) {
+                $row['fee_amount'] = (float)$customOtherFee;
+            }
         }
         dr_hydrate_request_delivery_fields($row, $row['payload']);
         dra_hydrate_request_resident_name($conn, $row, $row['payload']);
@@ -8505,6 +8572,10 @@ if ($action === 'list') {
                 ? (float)$row['fee_amount']
                 : null;
             $row['fee_amount'] = dr_get_effective_document_fee_amount($conn, $docTypeForFee, $row, $baseFee);
+            $customOtherFee = trim((string)($row['payload']['other_document_fee'] ?? ''));
+            if ($customOtherFee !== '' && is_numeric($customOtherFee)) {
+                $row['fee_amount'] = (float)$customOtherFee;
+            }
             unset($row['_doc_type_for_fee']);
         }
         unset($row);
@@ -8590,6 +8661,10 @@ if ($action === 'get_request') {
     } else {
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
     }
+    $customOtherFee = trim((string)($row['payload']['other_document_fee'] ?? ''));
+    if ($customOtherFee !== '' && is_numeric($customOtherFee)) {
+        $row['fee_amount'] = (float)$customOtherFee;
+    }
     $row['fee_amount'] = dr_get_effective_document_fee_amount(
         $conn,
         (string)($row['document_type'] ?? ''),
@@ -8598,6 +8673,9 @@ if ($action === 'get_request') {
             ? (float)$row['fee_amount']
             : null
     );
+    if ($customOtherFee !== '' && is_numeric($customOtherFee)) {
+        $row['fee_amount'] = (float)$customOtherFee;
+    }
 
     dr_respond_json(200, ['success' => true, 'item' => $row]);
 }

@@ -21,6 +21,10 @@ $documentSettingsUpdatedByLabel = trim((string)($documentSettingsMeta['updated_b
 $documentSettingsUpdatedByLabel = $documentSettingsUpdatedByLabel !== '' ? $documentSettingsUpdatedByLabel : 'Not recorded yet';
 $documentSettingsShowCopySignatureToggle = !empty($documentSettingsShowCopySignatureToggle);
 $documentSettingsCopySignatureEnabled = !isset($documentSettingsCopySignatureEnabled) || !empty($documentSettingsCopySignatureEnabled);
+$documentSettingsShowFieldVisibility = !empty($documentSettingsShowFieldVisibility);
+$documentSettingsFieldVisibility = isset($documentSettingsFieldVisibility) && is_array($documentSettingsFieldVisibility) ? $documentSettingsFieldVisibility : [];
+$documentSettingsShowPrintHeaderToggle = !empty($documentSettingsShowPrintHeaderToggle);
+$documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled) || !empty($documentSettingsPrintHeaderEnabled);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -272,6 +276,24 @@ $documentSettingsCopySignatureEnabled = !isset($documentSettingsCopySignatureEna
                     <input class="form-check-input" type="checkbox" name="copy_has_signature" value="1" <?= $documentSettingsCopySignatureEnabled ? 'checked' : '' ?>>
                     <span class="ms-2 fw-semibold">Show signatures on the released copy</span>
                   </label>
+                </section>
+              <?php endif; ?>
+
+              <?php if ($documentSettingsShowFieldVisibility): ?>
+                <section class="document-settings-signatory">
+                  <div><h4 class="document-settings-signatory-title">Generated Document Fields</h4><p class="document-settings-signatory-subcopy">Turn each field on or off on generated documents and PDFs.</p></div>
+                  <div class="row g-3">
+                    <?php foreach (dms_document_field_catalog((string)($documentSettingsModuleConfig['key'] ?? '')) as $fieldKey => $fieldLabel): ?>
+                      <div class="col-sm-6"><label class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="document_field_visible[<?= htmlspecialchars($fieldKey, ENT_QUOTES, 'UTF-8') ?>]" value="1" <?= !empty($documentSettingsFieldVisibility[$fieldKey]) ? 'checked' : '' ?>><span class="ms-2 fw-semibold">Show <?= htmlspecialchars($fieldLabel, ENT_QUOTES, 'UTF-8') ?></span></label></div>
+                    <?php endforeach; ?>
+                  </div>
+                </section>
+              <?php endif; ?>
+
+              <?php if ($documentSettingsShowPrintHeaderToggle): ?>
+                <section class="document-settings-signatory">
+                  <div><h4 class="document-settings-signatory-title">Printing Header</h4><p class="document-settings-signatory-subcopy">Turn this off when printing on bond paper that already has the barangay letterhead.</p></div>
+                  <label class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" name="print_header_enabled" value="1" <?= $documentSettingsPrintHeaderEnabled ? 'checked' : '' ?>><span class="ms-2 fw-semibold">Add barangay header when printed</span></label>
                 </section>
               <?php endif; ?>
 

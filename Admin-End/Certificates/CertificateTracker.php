@@ -41,6 +41,48 @@ if ($isFeeSettingsView) {
 $barangayIdAdminNavActive = 'applications';
 $barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
 $issuanceOperationalSettings = dms_resolve_issuance_settings($conn);
+$manualGovernmentPositionOptions = [];
+$manualGovernmentOfficials = [];
+$manualGovernmentOfficialGroups = [
+  ['id' => 'president', 'name' => 'President'],
+  ['id' => 'vice_president', 'name' => 'Vice President'],
+  ['id' => 'senate', 'name' => 'Senate'],
+  ['id' => 'rizal_officials', 'name' => 'Rizal Officials'],
+  ['id' => 'municipal_officials', 'name' => 'Rodriguez Municipal Officials'],
+];
+if (isset($conn) && $conn instanceof mysqli) {
+  dms_ensure_government_official_dropdown_table($conn);
+  $positionRes = $conn->query("
+    SELECT DISTINCT position_name
+    FROM governmentofficialdropdowntbl
+    WHERE is_active = 1
+    ORDER BY position_name ASC
+  ");
+  if ($positionRes instanceof mysqli_result) {
+    while ($row = $positionRes->fetch_assoc()) {
+      $manualGovernmentPositionOptions[] = (string)($row['position_name'] ?? '');
+    }
+    $positionRes->free();
+  }
+  $officialRes = $conn->query("
+    SELECT government_official_id, official_name, position_name, jurisdiction_location, group_key
+    FROM governmentofficialdropdowntbl
+    WHERE is_active = 1
+    ORDER BY display_order ASC, official_name ASC
+  ");
+  if ($officialRes instanceof mysqli_result) {
+    while ($row = $officialRes->fetch_assoc()) {
+      $manualGovernmentOfficials[] = [
+        'id' => (string)($row['government_official_id'] ?? ''),
+        'name' => (string)($row['official_name'] ?? ''),
+        'position_name' => (string)($row['position_name'] ?? ''),
+        'jurisdiction_location' => (string)($row['jurisdiction_location'] ?? ''),
+        'group_key' => (string)($row['group_key'] ?? ''),
+      ];
+    }
+    $officialRes->free();
+  }
+}
 
 if ($certificateLaunchStage === 'release') {
   $barangayIdAdminNavActive = 'release';
@@ -3231,7 +3273,7 @@ if ($certificateLaunchStage === 'release') {
                   <?php endif; ?>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualSex" class="form-label fw-semibold small">Sex<?= $isIdIssuanceTrackerView ? ' <span class="text-danger">*</span>' : '' ?></label>
+                  <label for="manualSex" class="form-label fw-semibold small">Sex <span class="text-danger">*</span></label>
                   <select id="manualSex" class="form-select">
                     <option value="">Select sex</option>
                     <option value="Male">Male</option>
@@ -3239,7 +3281,7 @@ if ($certificateLaunchStage === 'release') {
                   </select>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualCivilStatus" class="form-label fw-semibold small">Civil Status</label>
+                  <label for="manualCivilStatus" class="form-label fw-semibold small">Civil Status <span class="text-danger">*</span></label>
                   <select id="manualCivilStatus" class="form-select">
                     <option value="">Select civil status</option>
                     <option value="Single">Single</option>
@@ -3249,19 +3291,19 @@ if ($certificateLaunchStage === 'release') {
                   </select>
                 </div>
                 <div class="col-md-6 col-lg-3">
-                  <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number<?= $isIdIssuanceTrackerView ? ' <span class="text-muted fw-normal">(Optional)</span>' : '' ?></label>
+                  <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number <span class="text-danger">*</span></label>
                   <input type="text" id="manualContactNumber" class="form-control" placeholder="09XXXXXXXXX">
                 </div>
                 <div class="<?= $isIdIssuanceTrackerView ? 'col-12' : 'col-md-6' ?>">
-                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace <span class="text-danger <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" id="manualBirthplaceRequiredMark">*</span></label>
+                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace <span class="text-danger" id="manualBirthplaceRequiredMark">*</span></label>
                   <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
                 </div>
                 <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
-                  <label for="manualOccupation" class="form-label fw-semibold small">Occupation</label>
+                  <label for="manualOccupation" class="form-label fw-semibold small">Occupation <span class="text-danger">*</span></label>
                   <input type="text" id="manualOccupation" class="form-control" placeholder="Occupation">
                 </div>
                 <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
-                  <label for="manualReligion" class="form-label fw-semibold small">Religion</label>
+                  <label for="manualReligion" class="form-label fw-semibold small">Religion <span class="text-danger">*</span></label>
                   <input type="text" id="manualReligion" class="form-control" placeholder="Religion">
                 </div>
                   <div class="col-12">
@@ -3329,6 +3371,21 @@ if ($certificateLaunchStage === 'release') {
                 <div class="row g-3 mb-3">
                   <div class="col-12">
                     <label for="manualPurpose" class="form-label fw-semibold small">Purpose / Request For <span class="text-danger">*</span></label>
+                    <div class="d-none mb-2" id="manualPurposePresetWrap">
+                      <select id="manualPurposePreset" class="form-select">
+                        <option value="">Select purpose</option>
+                        <option value="Local Employment">Local Employment</option>
+                        <option value="Loan Application">Loan Application</option>
+                        <option value="Bailbond">Bailbond</option>
+                        <option value="Postal ID Requirement">Postal ID Requirement</option>
+                        <option value="Tesda Requirement">Tesda Requirement</option>
+                        <option value="Personal Collection">Personal Collection</option>
+                        <option value="School Requirement">School Requirement</option>
+                        <option value="Bank Requirement (open account)">Bank Requirement (open account)</option>
+                        <option value="__other__">Other</option>
+                      </select>
+                      <div class="form-text">This manual document uses the residency certification layout. Only the purpose changes.</div>
+                    </div>
                     <input type="text" id="manualPurpose" class="form-control" required placeholder="State the exact purpose shown on the issued document">
                   </div>
                 </div>
@@ -3415,12 +3472,15 @@ if ($certificateLaunchStage === 'release') {
                 <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing ID preview…</div>
               </div>
             <?php else: ?>
+            <div class="manual-id-inline-preview mb-3" id="manualDocumentInlinePreview" aria-live="polite">
+              <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Document preview will appear here automatically on this step.</div>
+            </div>
             <div class="d-flex flex-wrap justify-content-end gap-2">
               <button type="button" class="btn btn-outline-secondary" id="manualResetBtn">
                 <i class="fas fa-rotate-left me-1"></i>Reset Form
               </button>
               <button type="button" class="btn btn-outline-primary" id="manualPreviewBtn">
-                <i class="fas fa-eye me-1"></i><?= $isIdIssuanceTrackerView ? 'Open ID Initial Preview' : 'Preview Document' ?>
+                <i class="fas fa-eye me-1"></i><?= $isIdIssuanceTrackerView ? 'Open ID Initial Preview' : 'Refresh Preview' ?>
               </button>
               <button type="submit" class="btn btn-primary" id="manualSubmitBtn" disabled>
                 <i class="fas fa-paper-plane me-1"></i><?= $isIdIssuanceTrackerView ? 'Approve & Create ID Record' : 'Approve Certificate' ?>
@@ -4177,6 +4237,11 @@ if ($certificateLaunchStage === 'release') {
 <script>
   window.BARANGAY_ID_SETTINGS = <?= json_encode($barangayIdOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.ISSUANCE_SETTINGS = <?= json_encode($issuanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  window.MANUAL_INDIGENCY_GOVERNMENT_DIRECTORY = <?= json_encode([
+    'groups' => $manualGovernmentOfficialGroups,
+    'positions' => $manualGovernmentPositionOptions,
+    'officials' => $manualGovernmentOfficials,
+  ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
     tableSelector: "#table-certificateTracker",
     modalId: "modalTableColumns",

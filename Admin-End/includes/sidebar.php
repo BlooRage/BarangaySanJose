@@ -94,6 +94,14 @@ $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminRecordsActive = in_array($current, $adminRecordsPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isWebsiteSettingsActive = ($current === 'WebsiteSettings.php');
+$sidebarCertificateTab = strtolower(trim((string)($_GET['tab'] ?? '')));
+$sidebarFeeScope = strtolower(trim((string)($_GET['fee_scope'] ?? '')));
+$isCertificateFeeSettingsRoute = $current === 'CertificateTracker.php'
+    && $sidebarCertificateTab === 'fees'
+    && $sidebarFeeScope === 'issuance';
+$isMonitoringFeeSettingsRoute = $current === 'CertificateTracker.php'
+    && $sidebarCertificateTab === 'fees'
+    && $sidebarFeeScope === 'monitoring';
 $isCertificateIssuanceSettingsActive = in_array($current, [
     'CertificateIssuanceSettings.php',
     'IssuanceGeneralSettings.php',
@@ -101,8 +109,8 @@ $isCertificateIssuanceSettingsActive = in_array($current, [
     'IssuanceNotificationSettings.php',
     'IndigencyRecipientSettings.php',
     'IssuanceFeeSettings.php',
-], true);
-$isBusinessMonitoringSettingsActive = ($current === 'BusinessMonitoringSettings.php');
+], true) || $isCertificateFeeSettingsRoute;
+$isBusinessMonitoringSettingsActive = ($current === 'BusinessMonitoringSettings.php') || $isMonitoringFeeSettingsRoute;
 $isBarangayIdSettingsActive = ($current === 'BarangayIdSettings.php');
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
 $isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);
