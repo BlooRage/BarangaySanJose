@@ -8572,6 +8572,9 @@
       manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing document preview...</div>';
       try {
         const bundle = manualPreviewStateBundle();
+        if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
+          manualSetAlert('Tag at least one clearance fee first so the manual request can proceed to finance after submission.', 'warning');
+        }
         const previewHtml = renderDocumentPreview(
           buildPreviewState(bundle.previewRow, bundle.payload, bundle.residentProfile, null)
         );
@@ -9853,7 +9856,14 @@
         manualSubmitBtn.disabled = true;
       }
       if (!isIdIssuanceTrackerView && manualDocumentInlinePreview) {
-        manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preview will refresh here after you open Step 5 again or press Refresh Preview.</div>';
+        if (manualIdWizardCurrentStep === 5) {
+          manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Refreshing document preview...</div>';
+          queueMicrotask(() => {
+            if (manualIdWizardCurrentStep === 5) void manualRenderInlineDocumentPreview();
+          });
+        } else {
+          manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Document preview will appear here automatically on Step 5.</div>';
+        }
       }
       if (!silent && manualCurrentConfig()) {
         manualSetAlert('Preview the latest changes before submitting this manual issuance request.', 'info');
@@ -11096,66 +11106,6 @@
       if (!isIdIssuanceTrackerView && manualDocumentInlinePreview) {
         await manualRenderInlineDocumentPreview();
         return;
-      }
-      try {
-        const bundle = manualPreviewStateBundle();
-        if (normalizePreviewDocKey(bundle?.config?.documentType || bundle?.previewRow?.document_type || '') === 'barangayid') {
-          await fetchBarangayIdTemplateConfig({ force: true }).catch(() => null);
-        }
-        if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
-          manualSetAlert('Tag at least one clearance fee first so the manual request can proceed to finance after submission.', 'warning');
-        }
-        if (viewModalTitle) {
-          viewModalTitle.textContent = 'Manual Issuance Preview';
-        }
-        if (viewModalActions) {
-          viewModalActions.innerHTML = '';
-        }
-        if (viewModalBackBtn) {
-          viewModalBackBtn.classList.add('d-none');
-        }
-        if (viewModalNextBtn) {
-          viewModalNextBtn.classList.add('d-none');
-          viewModalNextBtn.disabled = true;
-        }
-        if (viewModalWalkInBtn) {
-          viewModalWalkInBtn.classList.add('d-none');
-          viewModalWalkInBtn.removeAttribute('data-id');
-        }
-        if (viewModalDocBtn) {
-          viewModalDocBtn.classList.add('d-none');
-          viewModalDocBtn.textContent = 'View Document';
-          viewModalDocBtn.onclick = null;
-        }
-        const previewHtml = renderDocumentPreview(
-          buildPreviewState(bundle.previewRow, bundle.payload, bundle.residentProfile, null)
-        );
-        viewDetailsBody.innerHTML = `
-          <div class="tracker-doc-highlight">
-            Manual preview for ${esc(bundle.displayTitle || bundle.config.label)}. If something is off, close this preview, update the form, and preview again before submitting.
-          </div>
-          ${previewHtml}
-        `;
-        if (window.BarangayIdDigital && typeof window.BarangayIdDigital.hydrate === 'function') {
-          const hydrateManualBarangayId = () => window.BarangayIdDigital.hydrate(viewDetailsBody);
-          hydrateManualBarangayId();
-          window.requestAnimationFrame(() => {
-            hydrateManualBarangayId();
-            window.requestAnimationFrame(hydrateManualBarangayId);
-          });
-          window.setTimeout(hydrateManualBarangayId, 120);
-          window.setTimeout(hydrateManualBarangayId, 400);
-          viewModalEl?.addEventListener('shown.bs.modal', hydrateManualBarangayId, { once: true });
-        }
-        manualBindPreviewEditableFields(viewDetailsBody);
-        manualPreviewSignature = bundle.signature;
-        if (manualSubmitBtn) {
-          manualSubmitBtn.disabled = false;
-        }
-        manualSetAlert('Preview ready. Edit any highlighted field if needed, then approve the certificate.', 'success');
-        viewModal?.show();
-      } catch (error) {
-        manualSetAlert(error?.message || 'Unable to build the manual document preview.', 'danger');
       }
     });
 
