@@ -3476,12 +3476,6 @@ if ($certificateLaunchStage === 'release') {
               <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Document preview will appear here automatically on this step.</div>
             </div>
             <div class="d-flex flex-wrap justify-content-end gap-2">
-              <button type="button" class="btn btn-outline-secondary" id="manualResetBtn">
-                <i class="fas fa-rotate-left me-1"></i>Reset Form
-              </button>
-              <button type="button" class="btn btn-outline-primary" id="manualPreviewBtn">
-                <i class="fas fa-eye me-1"></i><?= $isIdIssuanceTrackerView ? 'Open ID Initial Preview' : 'Refresh Preview' ?>
-              </button>
               <button type="submit" class="btn btn-primary" id="manualSubmitBtn" disabled>
                 <i class="fas fa-paper-plane me-1"></i><?= $isIdIssuanceTrackerView ? 'Approve & Create ID Record' : 'Approve Certificate' ?>
               </button>

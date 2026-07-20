@@ -3373,7 +3373,11 @@
     })();
 
     const basePurposeText = generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '']);
-    const residencyPurposeText = requestedDocKey === 'residency'
+    const isGeneralCertificationVariant = String(firstNonEmpty([
+      payload.manual_document_variant,
+      requestedDocType
+    ]) || '').trim().toLowerCase() === 'general certification';
+    const residencyPurposeText = requestedDocKey === 'residency' && !isGeneralCertificationVariant
       ? buildResidencyPurposeText(
           basePurposeText,
           firstNonEmpty([payload.barangay_residency, residentProfile.barangay_residency]),
@@ -8536,11 +8540,94 @@
       }
     }
 
+    function manualNormalizePreviewEditableDate(value) {
+      const parsed = parseFlexibleDate(String(value || '').trim());
+      return parsed ? formatDateInputValue(parsed) : '';
+    }
+
+    function manualApplyPreviewEditableFullName(value) {
+      const suffixes = new Set(['JR', 'JR.', 'SR', 'SR.', 'II', 'III', 'IV', 'V']);
+      const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return;
+      let suffix = '';
+      if (parts.length > 1 && suffixes.has(String(parts[parts.length - 1] || '').toUpperCase())) {
+        suffix = parts.pop() || '';
+      }
+      const first = parts.shift() || '';
+      const last = parts.length ? (parts.pop() || '') : '';
+      const middle = parts.join(' ');
+      if (manualFirstName) manualFirstName.value = first;
+      if (manualMiddleName) manualMiddleName.value = middle;
+      if (manualLastName) manualLastName.value = last;
+      if (manualSuffix) manualSuffix.value = suffix;
+    }
+
+    function manualApplyPreviewEditableValue(editKey, value) {
+      const target = (fieldName) => manualDynamicFields?.querySelector(`[data-manual-field="${fieldName}"]`);
+      switch (editKey) {
+        case 'fullName':
+          manualApplyPreviewEditableFullName(value);
+          return true;
+        case 'fullAddress':
+        case 'operatorAddress':
+          if (manualFullAddress) manualFullAddress.value = value;
+          return true;
+        case 'birthdate': {
+          const normalizedDate = manualNormalizePreviewEditableDate(value);
+          if (manualBirthdate && normalizedDate) {
+            manualBirthdate.value = normalizedDate;
+            return true;
+          }
+          return false;
+        }
+        case 'birthplace':
+          if (manualBirthplace) manualBirthplace.value = value;
+          return true;
+        case 'purpose':
+          if (manualPurpose) manualPurpose.value = value;
+          return true;
+        case 'remarks': {
+          const remarksField = target('remarks');
+          if (remarksField) {
+            remarksField.value = value;
+            return true;
+          }
+          return false;
+        }
+        case 'location': {
+          const locationField = target('location') || target('location_of_toda_poda');
+          if (locationField) {
+            locationField.value = value;
+            return true;
+          }
+          return false;
+        }
+        case 'businessAddress': {
+          const businessAddressField = target('business_full_address');
+          if (businessAddressField) {
+            businessAddressField.value = value;
+            return true;
+          }
+          return false;
+        }
+        case 'businessName': {
+          const businessNameField = target('business_name');
+          if (businessNameField) {
+            businessNameField.value = value;
+            return true;
+          }
+          return false;
+        }
+        default:
+          return false;
+      }
+    }
+
     function manualBindPreviewEditableFields(container) {
       if (!container) return;
       container.querySelectorAll('.doc-editable').forEach((editable) => {
         const editKey = String(editable.getAttribute('data-edit-key') || '');
-        const editableKeys = ['fullAddress', 'location', 'businessAddress', 'operatorAddress'];
+        const editableKeys = ['fullName', 'fullAddress', 'birthdate', 'birthplace', 'remarks', 'purpose', 'location', 'businessAddress', 'businessName', 'operatorAddress'];
         if (isIdIssuanceTrackerView || !editableKeys.includes(editKey)) {
           editable.setAttribute('contenteditable', 'false');
           editable.removeAttribute('data-edit-key');
@@ -8549,16 +8636,11 @@
         editable.setAttribute('title', 'Click to edit this field before approval');
         editable.addEventListener('input', () => {
           const value = String(editable.textContent || '').trim();
-          if (editKey === 'fullAddress' || editKey === 'operatorAddress') {
-            manualFullAddress.value = value;
-          } else {
-            const payloadKey = editKey === 'businessAddress' ? 'business_full_address' : 'location';
-            const target = manualDynamicFields?.querySelector(`[data-manual-field="${payloadKey}"]`);
-            if (target) target.value = value;
-          }
+          manualApplyPreviewEditableValue(editKey, value);
           try {
             manualPreviewSignature = manualPreviewStateBundle().signature;
             if (manualSubmitBtn) manualSubmitBtn.disabled = false;
+            manualUpdateSummary();
           } catch (_) {
             manualPreviewSignature = '';
             if (manualSubmitBtn) manualSubmitBtn.disabled = true;
@@ -10514,8 +10596,11 @@
         .filter(Boolean)
         .join(' ');
       const fullAddress = String(manualFullAddress?.value || '').trim();
+      const resolvedDocumentType = config.kind === 'general_certification'
+        ? manualResolvedDocumentLabel(rawConfig, config)
+        : config.documentType;
       const payload = {
-        document_type: config.documentType,
+        document_type: resolvedDocumentType,
         resident_id: String(manualResidentId?.value || '').trim(),
         resident_user_id: String(manualResidentUserId?.value || '').trim(),
         resident_name: residentFullName,
@@ -10537,6 +10622,7 @@
       };
       if (config.kind === 'general_certification') {
         payload.manual_document_variant = config.label;
+        payload.template_document_type = String(config.documentType || '').trim();
       }
       if (manualIsOtherDocumentSelection(rawConfig)) {
         payload.custom_document_title = String(manualOtherDocumentTitle?.value || '').trim();
