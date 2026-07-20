@@ -8342,7 +8342,7 @@
       { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id', free: true },
       { id: 'good_moral', group: 'Certificates', label: 'Certificate of Good Moral', documentType: 'Certificate of Good Moral', kind: 'good_moral' },
       { id: 'residency', group: 'Certificates', label: 'Certificate of Residency', documentType: 'Certificate of Residency', kind: 'residency' },
-      { id: 'general_certification', group: 'Certificates', label: 'General Certification', documentType: 'Certificate of Residency', kind: 'general_certification' },
+      { id: 'general_certification', group: 'Other Certification', label: 'General Certification', documentType: 'Certificate of Residency', kind: 'general_certification' },
       { id: 'identity', group: 'Certificates', label: 'Certificate of Identity', documentType: 'Certificate of Identity', kind: 'identity' },
       { id: 'indigency', group: 'Certificates', label: 'Certificate of Indigency', documentType: 'CertificateOfIndigency', kind: 'indigency', free: true },
       { id: 'cohabitation', group: 'Certificates', label: 'Certificate of Cohabitation', documentType: 'Certificate of Cohabitation', kind: 'cohabitation' },
