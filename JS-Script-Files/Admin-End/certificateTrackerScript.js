@@ -1379,7 +1379,7 @@
     if (k === 'fee_tagging') return statusPill('approved');
     if (k === 'for_printing') return statusPill('info');
     if (k === 'ready_for_claim' || k === 'payment_verified') return statusPill('info');
-    if (k === 'pending_verification' || k === 'for_payment' || k === 'payment_submitted') return statusPill('pending');
+    if (k === 'submitted' || k === 'pending_verification' || k === 'for_payment' || k === 'payment_submitted') return statusPill('pending');
     return statusPill('archived');
   }
 
