@@ -566,7 +566,7 @@ if ($financeSection === 'fees') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/barangayIdAdminNav.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260720-tracker-toolbar-consistency">
   <style>
     .finance-fee-shell {
       max-width: var(--admin-table-shell-max-width);
@@ -672,20 +672,7 @@ if ($financeSection === 'fees') {
       max-width: var(--admin-table-shell-max-width);
       margin: 0 auto;
     }
-    .certificate-tracker-shell .admin-list-toolbar {
-      overflow-x: visible;
-      overflow-y: visible;
-      flex-wrap: wrap;
-      row-gap: 12px;
-    }
-    .certificate-tracker-shell .admin-list-tabs {
-      gap: 12px;
-      overflow: visible;
-    }
     .certificate-tracker-shell .stage-filter-btn {
-      border-radius: 10px;
-      border-width: 1px;
-      min-width: 140px;
       position: relative;
     }
     .certificate-tracker-shell .stage-filter-btn .tab-count {
@@ -705,28 +692,6 @@ if ($financeSection === 'fees') {
       justify-content: center;
       line-height: 1;
       box-shadow: none;
-    }
-    .certificate-tracker-shell .status-filter-btn[data-status-filter="all"] {
-      border-color: #0d6efd;
-      color: #0d6efd;
-    }
-    .certificate-tracker-shell .status-filter-btn[data-status-filter="all"].active {
-      background: #0d6efd;
-      border-color: #0d6efd;
-      color: #fff;
-    }
-    .certificate-tracker-shell .status-filter-btn:not([data-status-filter="all"]).active {
-      background: #fff3e4;
-      border-color: #fe993c;
-      color: #a04f00;
-    }
-    .certificate-tracker-shell .admin-list-actions .input-group-text,
-    .certificate-tracker-shell .admin-list-actions .form-control {
-      height: 38px;
-    }
-    .certificate-tracker-shell .admin-search {
-      min-width: 300px;
-      max-width: 360px;
     }
     .certificate-tracker-shell .table-responsive {
       overflow-x: auto;
@@ -927,11 +892,6 @@ if ($financeSection === 'fees') {
       #viewModal .submitted-docs-grid { grid-template-columns: 1fr; }
       #viewModal .submitted-docs-preview__body iframe,
       #viewModal .submitted-docs-preview__body img { height: 45vh; }
-    }
-    @media (max-width: 767px) {
-      .certificate-tracker-shell .stage-filter-btn {
-        min-width: 118px;
-      }
     }
     #paymentsPanel,
     #generalFeesPanel,
@@ -1409,12 +1369,12 @@ if ($financeSection === 'fees') {
 
     <?php else: ?>
       <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
-        <div class="admin-list-toolbar mb-3">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
-            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-status-filter="all">All</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="verified">Verified</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="unpaid">Unpaid <span class="tab-count" id="unpaidTabCount">0</span></button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="pending_verification">Pending Verification <span class="tab-count" id="pendingVerificationTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-filter="" data-status-filter="all">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="verified" data-status-filter="verified">&nbsp;&nbsp;Verified&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="unpaid" data-status-filter="unpaid">&nbsp;&nbsp;Unpaid&nbsp;&nbsp;<span class="tab-count" id="unpaidTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="pending_verification" data-status-filter="pending_verification">&nbsp;&nbsp;Pending Verification&nbsp;&nbsp;<span class="tab-count" id="pendingVerificationTabCount">0</span></button>
           </div>
 
           <div class="admin-list-actions">

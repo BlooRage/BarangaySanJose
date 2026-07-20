@@ -13,7 +13,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous" defer></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
+    <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260720-tracker-toolbar-consistency">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
     <style>
         .complaint-tracker-shell {
@@ -75,62 +75,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         .complaint-tracker-shell .btn:disabled,
         #complaintTrackerPageTabs .nav-link:disabled {
             cursor: wait;
-        }
-
-        .complaint-tracker-shell .admin-list-toolbar {
-            overflow-x: visible;
-            overflow-y: visible;
-            flex-wrap: wrap;
-            row-gap: 14px;
-            align-items: center;
-        }
-
-        .complaint-tracker-shell .admin-list-actions .input-group-text,
-        .complaint-tracker-shell .admin-list-actions .form-control {
-            height: 38px;
-        }
-
-        .complaint-tracker-shell .admin-search {
-            min-width: 320px;
-            max-width: 420px;
-        }
-
-        .complaint-subtabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin: 0 0 1.5rem;
-        }
-
-        .complaint-subtab-btn {
-            min-width: 180px;
-            padding: 0.7rem 1.5rem;
-            border: 2px solid #59606a;
-            border-radius: 999px;
-            background: #ffffff;
-            color: #4e565f;
-            font-size: 1rem;
-            font-weight: 800;
-            line-height: 1.15;
-            text-align: center;
-            transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
-        }
-
-        .complaint-subtab-btn:hover,
-        .complaint-subtab-btn:focus-visible {
-            background: #f6f7f9;
-            color: #394049;
-            transform: translateY(-1px);
-            outline: none;
-        }
-
-        .complaint-subtab-btn.active,
-        .complaint-subtab-btn.active:hover,
-        .complaint-subtab-btn.active:focus-visible {
-            border-color: #545b65;
-            background: #545b65;
-            color: #ffffff;
-            transform: none;
         }
 
         #viewModal .modal-content {
@@ -687,22 +631,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 width: 100%;
             }
 
-            .complaint-tracker-shell .admin-search {
-                min-width: 0;
-                max-width: none;
-                width: 100%;
-            }
-
-            .complaint-subtabs {
-                gap: 0.75rem;
-                margin-bottom: 1rem;
-            }
-
-            .complaint-subtab-btn {
-                width: 100%;
-                min-width: 0;
-            }
-
             #viewModal .complaint-action-dropdown .dropdown-menu {
                 width: calc(100vw - 1.5rem);
                 margin-top: 0.55rem;
@@ -759,9 +687,9 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         </ul>
 
         <div id="complaintTrackerPanel" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell resident-masterlist-shell">
-            <div class="complaint-subtabs" id="complaintSubtabs"></div>
-
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+                <div class="admin-list-tabs" id="complaintSubtabs"></div>
+
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
                         <input type="text" id="searchInput" class="form-control" placeholder="Complaint ID, complainant, subject, complaint type">
@@ -1030,6 +958,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260704-complaint-top-tabs-exact"></script>
+<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260720-shared-toolbar-buttons"></script>
 </body>
 </html>

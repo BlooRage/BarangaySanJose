@@ -1466,7 +1466,10 @@
       }
       return viewBtn;
     }
-    return `${viewBtn}${viewIssuedBtn}`;
+    const buttons = `${viewBtn}${viewIssuedBtn}`;
+    return isIdIssuanceTrackerView
+      ? `<div class="id-issuance-table-actions">${buttons}</div>`
+      : buttons;
   }
 
   function viewModalActionButtons(row) {

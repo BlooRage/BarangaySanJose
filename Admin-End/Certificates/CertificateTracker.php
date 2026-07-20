@@ -58,7 +58,7 @@ if ($certificateLaunchStage === 'release') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/barangayIdAdminNav.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260720-tracker-toolbar-consistency">
   <style>
     .certificate-tracker-shell {
       max-width: var(--admin-table-shell-max-width);
@@ -103,16 +103,6 @@ if ($certificateLaunchStage === 'release') {
       border-bottom-color: #ffffff;
       box-shadow: none;
     }
-    .certificate-tracker-shell .admin-list-toolbar {
-      overflow-x: visible;
-      overflow-y: visible;
-      flex-wrap: wrap;
-      row-gap: 12px;
-    }
-    .certificate-tracker-shell .admin-list-tabs {
-      gap: 12px;
-      overflow: visible;
-    }
     #docRequestsPanel,
     #manualIssuancePanel,
     #feeChangePanel {
@@ -122,9 +112,6 @@ if ($certificateLaunchStage === 'release') {
       border-top-left-radius: 1rem !important;
     }
     .certificate-tracker-shell .stage-filter-btn {
-      border-radius: 10px;
-      border-width: 1px;
-      min-width: 104px;
       position: relative;
     }
     .certificate-tracker-shell .stage-filter-btn .tab-count {
@@ -214,42 +201,9 @@ if ($certificateLaunchStage === 'release') {
       background: #a95305;
       border-color: #a95305;
     }
-    .certificate-tracker-shell .admin-list-actions .form-select,
-    .certificate-tracker-shell .admin-list-actions .input-group-text,
-    .certificate-tracker-shell .admin-list-actions .form-control {
-      height: 38px;
-    }
     .certificate-tracker-shell .tracker-doc-filter {
       min-width: 220px;
       max-width: 240px;
-    }
-    .certificate-tracker-shell .admin-search {
-      min-width: 300px;
-      max-width: 360px;
-    }
-    @media (min-width: 992px) {
-      #docRequestsPanel .admin-list-toolbar {
-        flex-wrap: nowrap;
-        gap: 10px;
-        overflow: visible;
-        padding-top: 8px;
-      }
-      #docRequestsPanel .admin-list-tabs {
-        flex: 0 0 auto;
-        gap: 8px;
-      }
-      #docRequestsPanel .admin-list-actions {
-        flex: 1 1 auto;
-        min-width: 0;
-        margin-left: auto;
-        justify-content: flex-end;
-      }
-      #docRequestsPanel .admin-search {
-        flex: 0 1 280px;
-        width: clamp(210px, 20vw, 280px);
-        min-width: 210px;
-        max-width: 280px;
-      }
     }
     .certificate-tracker-shell .table-responsive {
       width: 100%;
@@ -406,6 +360,17 @@ if ($certificateLaunchStage === 'release') {
       white-space: normal;
       line-height: 1.15;
     }
+    body.id-issuance-view #table-certificateTracker .id-issuance-table-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.35rem;
+    }
+    body.id-issuance-view #table-certificateTracker .id-issuance-table-actions .btn {
+      width: auto;
+      margin: 0 !important;
+      white-space: nowrap;
+    }
     @media (min-width: 992px) {
       #docRequestsPanel .compact-admin-table-shell {
         overflow-x: hidden !important;
@@ -439,11 +404,6 @@ if ($certificateLaunchStage === 'release') {
       body.id-issuance-view #table-certificateTracker th:nth-child(6) { width: 15% !important; }
       body.id-issuance-view #table-certificateTracker th:nth-child(7) { width: 17% !important; }
       body.id-issuance-view #table-certificateTracker th:nth-child(8) { width: 14% !important; }
-      body.id-issuance-view #table-certificateTracker td:last-child .btn {
-        width: 100%;
-        padding-inline: 0.35rem;
-        margin-right: 0 !important;
-      }
       body.id-issuance-view #table-certificateTracker th:last-child,
       body.id-issuance-view #table-certificateTracker td:last-child {
         overflow: visible;
@@ -2978,12 +2938,18 @@ if ($certificateLaunchStage === 'release') {
     </ul>
 
     <div id="docRequestsPanel" class="bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
-      <div class="admin-list-toolbar mb-3">
+      <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
         <div class="admin-list-tabs">
-          <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter=""><?= $isIdIssuanceTrackerView ? 'ALL' : 'All' ?></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending"><?= $isIdIssuanceTrackerView ? 'PENDING' : 'Pending' ?> <span class="tab-count" id="pendingTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release"><?= $isIdIssuanceTrackerView ? 'PRINTING / CLAIM' : 'Release' ?> <span class="tab-count" id="releaseTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed"><?= $isIdIssuanceTrackerView ? 'COMPLETED' : 'Completed' ?></button>
+          <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-filter="" data-stage-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+          <?php if ($isIdIssuanceTrackerView): ?>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="completed" data-stage-filter="completed">&nbsp;&nbsp;Completed&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="release" data-stage-filter="release">&nbsp;&nbsp;Printing / Claim&nbsp;&nbsp;<span class="tab-count" id="releaseTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="pending" data-stage-filter="pending">&nbsp;&nbsp;Pending&nbsp;&nbsp;<span class="tab-count" id="pendingTabCount">0</span></button>
+          <?php else: ?>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="pending" data-stage-filter="pending">&nbsp;&nbsp;Pending&nbsp;&nbsp;<span class="tab-count" id="pendingTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="release" data-stage-filter="release">&nbsp;&nbsp;Release&nbsp;&nbsp;<span class="tab-count" id="releaseTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-filter="completed" data-stage-filter="completed">&nbsp;&nbsp;Completed&nbsp;&nbsp;</button>
+          <?php endif; ?>
         </div>
 
         <div class="admin-list-actions">
@@ -4221,6 +4187,6 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260719-certificate-manual-wizard-3"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260720-id-action-button-size"></script>
 </body>
 </html>

@@ -259,9 +259,10 @@
         complaintSubtabsEl.innerHTML = options.map((option) => `
             <button
                 type="button"
-                class="complaint-subtab-btn${option.value === activeSubStatus ? " active" : ""}"
+                class="btn btn-outline-secondary btn-sm status-filter-btn complaint-subtab-btn fw-semibold${option.value === activeSubStatus ? " active" : ""}"
+                data-filter="${esc(option.value)}"
                 data-sub-status="${esc(option.value)}"
-            >${esc(option.label)}</button>
+            >&nbsp;&nbsp;${esc(option.label)}&nbsp;&nbsp;</button>
         `).join("");
 
         complaintSubtabsEl.querySelectorAll("[data-sub-status]").forEach((button) => {
