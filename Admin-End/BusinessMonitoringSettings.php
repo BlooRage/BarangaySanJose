@@ -12,6 +12,8 @@ $documentSettingsBackUrl = appUrl((string)($documentSettingsModuleConfig['back_h
 $documentSettingsSuccessMessage = trim((string)($_GET['success'] ?? ''));
 $documentSettingsErrorMessage = trim((string)($_GET['error'] ?? ''));
 $documentSettingsRows = dms_resolve_module_signatories($conn, $documentSettingsModuleKey);
+$documentSettingsCopySignatureEnabled = dms_resolve_module_copy_signature_setting($conn, $documentSettingsModuleKey);
+$documentSettingsShowCopySignatureToggle = true;
 $documentSettingsFeeRequestsUrl = appUrl('Admin-End/Certificates/CertificateTracker.php?tab=fees&fee_scope=monitoring&filter_document=__clearances__');
 $documentSettingsFeeRequestsTitle = 'Clearance Fee Change Requests';
 $documentSettingsFeeRequestsDescription = 'Request a new clearance fee type, propose a price update, and review submitted requests.';
@@ -20,13 +22,29 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
     verifyCsrfToken(false);
 
     try {
-        $saveResult = dms_save_module_signatories(
+        $signatorySave = dms_save_module_signatories(
             $conn,
             $documentSettingsModuleKey,
             $_POST,
             $_FILES,
             trim((string)($_SESSION['user_id'] ?? ''))
         );
+        $copySettingSave = dms_save_module_copy_signature_setting(
+            $conn,
+            $documentSettingsModuleKey,
+            !empty($_POST['copy_has_signature']),
+            trim((string)($_SESSION['user_id'] ?? ''))
+        );
+        $saveResult = [
+            'before' => [
+                'signatories' => $signatorySave['before'] ?? [],
+                'copy_settings' => $copySettingSave['before'] ?? [],
+            ],
+            'after' => [
+                'signatories' => $signatorySave['after'] ?? [],
+                'copy_settings' => $copySettingSave['after'] ?? [],
+            ],
+        ];
 
         insertUnifiedAuditLog(
             $conn,
@@ -39,7 +57,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
             'signatory_configuration',
             json_encode($saveResult['before'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             json_encode($saveResult['after'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'Updated Barangay Monitoring signatory settings.'
+            'Updated Barangay Monitoring signatory settings and resident copy signature visibility.'
         );
 
         header('Location: ' . $documentSettingsActionUrl . '?success=' . rawurlencode('Barangay Monitoring signatory settings saved.'));

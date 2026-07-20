@@ -112,6 +112,7 @@ if (!function_exists('dms_default_issuance_settings')) {
             'first_time_job_seeker_exempt' => true,
             'qr_verification_enabled' => true,
             'essential_details_only' => true,
+            'copy_has_signature' => true,
             'resident_notifications' => [
                 'submitted' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been submitted and is awaiting review.'],
                 'approved' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been approved.'],
@@ -151,6 +152,7 @@ if (!function_exists('dms_resolve_issuance_settings')) {
         $row = $result instanceof mysqli_result ? $result->fetch_assoc() : null;
         $stored = $row ? json_decode((string)($row['settings_json'] ?? ''), true) : null;
         $settings = is_array($stored) ? array_replace_recursive($defaults, $stored) : $defaults;
+        $settings['copy_has_signature'] = dms_resolve_module_copy_signature_setting($conn, 'issuance');
         $settings['updated_by_user_id'] = (string)($row['updated_by_user_id'] ?? '');
         $settings['updated_at'] = (string)($row['updated_at'] ?? '');
         return $settings;
@@ -176,6 +178,7 @@ if (!function_exists('dms_save_issuance_settings')) {
             foreach (['online_requests_enabled', 'first_time_job_seeker_exempt', 'qr_verification_enabled', 'essential_details_only'] as $key) {
                 $settings[$key] = isset($post[$key]);
             }
+            $settings['copy_has_signature'] = isset($post['copy_has_signature']);
             $settings['default_validity_days'] = $defaultValidity;
             $settings['allowed_validity_days'] = $allowed;
         }
@@ -211,6 +214,9 @@ if (!function_exists('dms_save_issuance_settings')) {
         $stmt->bind_param('ss', $json, $updatedByUserId);
         if (!$stmt->execute()) throw new RuntimeException('Unable to save issuance settings.');
         $stmt->close();
+        if (in_array($scope, ['all', 'general'], true)) {
+            dms_save_module_copy_signature_setting($conn, 'issuance', !empty($settings['copy_has_signature']), $updatedByUserId);
+        }
         return ['before' => $before, 'after' => dms_resolve_issuance_settings($conn)];
     }
 }
@@ -1021,8 +1027,11 @@ if (!function_exists('dms_ensure_module_template_config_table')) {
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'printed_id_has_signature')) {
             $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN printed_id_has_signature TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_has_signature");
         }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'copy_has_signature')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN copy_has_signature TINYINT(1) NOT NULL DEFAULT 1 AFTER printed_id_has_signature");
+        }
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'digital_id_capture_disabled')) {
-            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_capture_disabled TINYINT(1) NOT NULL DEFAULT 0 AFTER printed_id_has_signature");
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_capture_disabled TINYINT(1) NOT NULL DEFAULT 0 AFTER copy_has_signature");
         }
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'deactivate_previous_digital_id')) {
             $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN deactivate_previous_digital_id TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_capture_disabled");
@@ -1049,6 +1058,7 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
                 digital_id_enabled,
                 digital_id_has_signature,
                 printed_id_has_signature,
+                copy_has_signature,
                 digital_id_capture_disabled,
                 deactivate_previous_digital_id,
                 default_validity_years,
@@ -1083,6 +1093,46 @@ if (!function_exists('dms_resolve_barangay_id_operational_settings')) {
             'digital_id_capture_disabled' => array_key_exists('digital_id_capture_disabled', $stored) && (int)$stored['digital_id_capture_disabled'] === 1,
             'deactivate_previous_digital_id' => !array_key_exists('deactivate_previous_digital_id', $stored) || (int)$stored['deactivate_previous_digital_id'] === 1,
             'default_validity_years' => max(1, min(5, (int)($stored['default_validity_years'] ?? 2))),
+        ];
+    }
+}
+
+if (!function_exists('dms_resolve_module_copy_signature_setting')) {
+    function dms_resolve_module_copy_signature_setting(mysqli $conn, string $moduleKey): bool
+    {
+        if ($moduleKey === 'barangay_id') {
+            return dms_resolve_barangay_id_operational_settings($conn)['printed_id_has_signature'];
+        }
+
+        $stored = dms_fetch_module_template_config_row($conn, $moduleKey);
+        return !array_key_exists('copy_has_signature', $stored) || (int)$stored['copy_has_signature'] === 1;
+    }
+}
+
+if (!function_exists('dms_save_module_copy_signature_setting')) {
+    function dms_save_module_copy_signature_setting(mysqli $conn, string $moduleKey, bool $enabled, string $updatedByUserId): array
+    {
+        dms_ensure_module_template_config_table($conn);
+        $before = ['copy_has_signature' => dms_resolve_module_copy_signature_setting($conn, $moduleKey)];
+        $copyHasSignature = $enabled ? 1 : 0;
+        $stmt = $conn->prepare("
+            INSERT INTO documentmoduleconfigtbl (module_key, copy_has_signature, updated_by_user_id)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                copy_has_signature = VALUES(copy_has_signature),
+                updated_by_user_id = VALUES(updated_by_user_id),
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to prepare copy signature settings update.');
+        }
+        $stmt->bind_param('sis', $moduleKey, $copyHasSignature, $updatedByUserId);
+        $stmt->execute();
+        $stmt->close();
+
+        return [
+            'before' => $before,
+            'after' => ['copy_has_signature' => dms_resolve_module_copy_signature_setting($conn, $moduleKey)],
         ];
     }
 }

@@ -2280,7 +2280,8 @@ if ($certificateLaunchStage === 'release') {
     }
     .manual-before-approve-list i { margin-top: 3px; color: #16a34a; }
     .manual-validity-selection {
-      max-width: 760px;
+      width: 100%;
+      max-width: none;
       padding-top: 20px;
     }
     .manual-area-options {
@@ -3159,13 +3160,13 @@ if ($certificateLaunchStage === 'release') {
                 <span>Choose the form first. The matching fields and next step summary will update automatically.</span>
               </div>
               <div class="row g-3">
-                <div class="col-lg-7">
+                <div class="col-12">
                   <label for="manualDocumentType" class="form-label fw-semibold small">Certificate / Clearance Type <span class="text-danger">*</span></label>
                   <select id="manualDocumentType" class="form-select" required>
                     <option value="">Select a manual issuance form</option>
                   </select>
                 </div>
-                <div class="col-lg-5 d-none" id="manualValidityWrap">
+                <div class="col-12 d-none" id="manualValidityWrap">
                   <label for="manualValidityDate" class="form-label fw-semibold small" id="manualValidityLabel">Validity Period</label>
                   <select id="manualValidityDate" class="form-select">
                     <option value="">Select validity period</option>

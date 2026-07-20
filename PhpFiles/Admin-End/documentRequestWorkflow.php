@@ -2822,15 +2822,14 @@ function dra_generate_issued_document(array $requestRow): ?string
         ? dms_resolve_module_signatories($conn, 'monitoring')
         : [];
     $punongSignaturePath = trim((string)($moduleSettings['punong']['signature_path'] ?? ''));
-    if ($isBarangayId && $conn instanceof mysqli) {
-        $idOperations = dms_resolve_barangay_id_operational_settings($conn);
-        if (!$idOperations['printed_id_has_signature']) {
-            $punongSignaturePath = '';
-        }
+    if ($conn instanceof mysqli && !dms_resolve_module_copy_signature_setting($conn, $moduleSettingsKey)) {
+        $punongSignaturePath = '';
     }
     $monitoringSignatoryName = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
     $monitoringSignatoryTitle = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
-    $monitoringSignaturePath = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
+    $monitoringSignaturePath = dms_resolve_module_copy_signature_setting($conn, 'monitoring')
+        ? trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''))
+        : '';
     $stripTemplateTokens = static function (string $value): string {
         $value = trim($value);
         if ($value === '') {
@@ -8381,15 +8380,16 @@ if ($action === 'list') {
             ? $barangayIdSettings
             : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
         $row['document_settings_module_key'] = $moduleSettingsKey;
-        $showBarangayIdSignature = $moduleSettingsKey !== 'barangay_id'
-            || dms_resolve_barangay_id_operational_settings($conn)['printed_id_has_signature'];
-        $row['punong_signatory_signature_path'] = $showBarangayIdSignature
+        $showCopySignature = dms_resolve_module_copy_signature_setting($conn, $moduleSettingsKey);
+        $row['punong_signatory_signature_path'] = $showCopySignature
             ? trim((string)($moduleSettings['punong']['signature_path'] ?? ''))
             : '';
         $row['secretary_signatory_signature_path'] = '';
         $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
         $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
-        $row['monitoring_signatory_signature_path'] = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
+        $row['monitoring_signatory_signature_path'] = dms_resolve_module_copy_signature_setting($conn, 'monitoring')
+            ? trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''))
+            : '';
         $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
         if ($isBarangayIdDocument) {
             $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
@@ -8572,15 +8572,16 @@ if ($action === 'get_request') {
         ? $barangayIdSettings
         : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
     $row['document_settings_module_key'] = $moduleSettingsKey;
-    $showBarangayIdSignature = $moduleSettingsKey !== 'barangay_id'
-        || dms_resolve_barangay_id_operational_settings($conn)['printed_id_has_signature'];
-    $row['punong_signatory_signature_path'] = $showBarangayIdSignature
+    $showCopySignature = dms_resolve_module_copy_signature_setting($conn, $moduleSettingsKey);
+    $row['punong_signatory_signature_path'] = $showCopySignature
         ? trim((string)($moduleSettings['punong']['signature_path'] ?? ''))
         : '';
     $row['secretary_signatory_signature_path'] = '';
     $row['monitoring_signatory_name'] = trim((string)($monitoringSettings['monitoring_head']['name'] ?? 'MR. JOSEPH C. PATRICIO'));
     $row['monitoring_signatory_title'] = trim((string)($monitoringSettings['monitoring_head']['title'] ?? 'Head, Monitoring & Collection Dept.'));
-    $row['monitoring_signatory_signature_path'] = trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''));
+    $row['monitoring_signatory_signature_path'] = dms_resolve_module_copy_signature_setting($conn, 'monitoring')
+        ? trim((string)($monitoringSettings['monitoring_head']['signature_path'] ?? ''))
+        : '';
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     dr_hydrate_request_delivery_fields($row, $row['payload']);
     $storedFeeAmount = $row['fee_amount'] ?? null;

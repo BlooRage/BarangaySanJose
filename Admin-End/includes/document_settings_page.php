@@ -19,6 +19,8 @@ if ($documentSettingsUpdatedAt !== '') {
 }
 $documentSettingsUpdatedByLabel = trim((string)($documentSettingsMeta['updated_by_user_id'] ?? ''));
 $documentSettingsUpdatedByLabel = $documentSettingsUpdatedByLabel !== '' ? $documentSettingsUpdatedByLabel : 'Not recorded yet';
+$documentSettingsShowCopySignatureToggle = !empty($documentSettingsShowCopySignatureToggle);
+$documentSettingsCopySignatureEnabled = !isset($documentSettingsCopySignatureEnabled) || !empty($documentSettingsCopySignatureEnabled);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -257,6 +259,21 @@ $documentSettingsUpdatedByLabel = $documentSettingsUpdatedByLabel !== '' ? $docu
             <form class="document-settings-panel-body" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($documentSettingsActionUrl, ENT_QUOTES, 'UTF-8') ?>">
               <?= csrfTokenField() ?>
               <input type="hidden" name="action" value="save_document_module_settings">
+
+              <?php if ($documentSettingsShowCopySignatureToggle): ?>
+                <section class="document-settings-signatory">
+                  <div class="document-settings-signatory-top">
+                    <div>
+                      <h4 class="document-settings-signatory-title">Resident Copy Signature</h4>
+                      <p class="document-settings-signatory-subcopy">Choose whether the uploaded signatures should appear on the resident or released copy for this module.</p>
+                    </div>
+                  </div>
+                  <label class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" name="copy_has_signature" value="1" <?= $documentSettingsCopySignatureEnabled ? 'checked' : '' ?>>
+                    <span class="ms-2 fw-semibold">Show signatures on the released copy</span>
+                  </label>
+                </section>
+              <?php endif; ?>
 
               <?php foreach ((array)$documentSettingsRows as $signatoryRow): ?>
                 <?php
