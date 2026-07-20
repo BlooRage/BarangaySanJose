@@ -8504,11 +8504,7 @@
       if (manualIdWizardPosition) manualIdWizardPosition.textContent = `Step ${manualIdWizardCurrentStep} of ${totalSteps}`;
       manualSetAlert('', 'warning');
       if (isIdIssuanceTrackerView && manualIdWizardCurrentStep === 5) void manualRenderIdInlinePreview();
-      if (!isIdIssuanceTrackerView && manualIdWizardCurrentStep === 5) {
-        window.setTimeout(() => {
-          manualPreviewBtn?.click();
-        }, 0);
-      }
+      if (!isIdIssuanceTrackerView && manualIdWizardCurrentStep === 5) void manualRenderInlineDocumentPreview();
       if (scroll) manualPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -11097,6 +11093,10 @@
     });
 
     manualPreviewBtn?.addEventListener('click', async () => {
+      if (!isIdIssuanceTrackerView && manualDocumentInlinePreview) {
+        await manualRenderInlineDocumentPreview();
+        return;
+      }
       try {
         const bundle = manualPreviewStateBundle();
         if (normalizePreviewDocKey(bundle?.config?.documentType || bundle?.previewRow?.document_type || '') === 'barangayid') {
