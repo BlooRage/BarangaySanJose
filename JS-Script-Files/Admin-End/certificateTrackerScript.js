@@ -1363,23 +1363,24 @@
   }
 
   function badge(stage, label) {
+    const statusPill = (tone) => `<span class="status-pill ${tone}">${label}</span>`;
     if (isFinancePaymentsPage) {
       const bucket = String(stage || '').toLowerCase();
-      if (bucket === 'verified') return `<span class="badge bg-success">${label}</span>`;
-      if (bucket === 'pending_verification') return `<span class="badge bg-warning text-dark">${label}</span>`;
-      if (bucket === 'unpaid') return `<span class="badge bg-secondary">${label}</span>`;
-      if (bucket === 'rejected') return `<span class="badge bg-danger">${label}</span>`;
-      if (bucket === 'cancelled') return `<span class="badge bg-dark">${label}</span>`;
-      return `<span class="badge bg-secondary">${label}</span>`;
+      if (bucket === 'verified') return statusPill('approved');
+      if (bucket === 'pending_verification') return statusPill('pending');
+      if (bucket === 'unpaid') return statusPill('archived');
+      if (bucket === 'rejected') return statusPill('denied');
+      if (bucket === 'cancelled') return statusPill('archived');
+      return statusPill('archived');
     }
     const k = String(stage || '').toLowerCase();
-    if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
-    if (k === 'completed') return `<span class="badge bg-success">${label}</span>`;
-    if (k === 'fee_tagging') return `<span class="badge bg-success">${label}</span>`;
-    if (k === 'for_printing') return `<span class="badge bg-info text-dark">${label}</span>`;
-    if (k === 'ready_for_claim' || k === 'payment_verified') return `<span class="badge bg-primary">${label}</span>`;
-    if (k === 'for_payment' || k === 'payment_submitted') return `<span class="badge bg-warning text-dark">${label}</span>`;
-    return `<span class="badge bg-secondary">${label}</span>`;
+    if (k.includes('rejected')) return statusPill('denied');
+    if (k === 'completed') return statusPill('approved');
+    if (k === 'fee_tagging') return statusPill('approved');
+    if (k === 'for_printing') return statusPill('info');
+    if (k === 'ready_for_claim' || k === 'payment_verified') return statusPill('info');
+    if (k === 'pending_verification' || k === 'for_payment' || k === 'payment_submitted') return statusPill('pending');
+    return statusPill('archived');
   }
 
   function requestDeliveryNote(row) {

@@ -424,6 +424,12 @@ html, body {
     border: 2px solid #d5dbe1;
 }
 
+.status-pill.info {
+    color: #2049b3;
+    background: #d6e2f2;
+    border: 2px solid #c0d1e8;
+}
+
 .sector-apps-shell #table-sectorApps {
     table-layout: fixed;
     min-width: 980px;

@@ -58,7 +58,7 @@ if ($certificateLaunchStage === 'release') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/barangayIdAdminNav.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260720-tracker-toolbar-consistency">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260720-status-pill-consistency">
   <style>
     .certificate-tracker-shell {
       max-width: var(--admin-table-shell-max-width);
@@ -362,8 +362,9 @@ if ($certificateLaunchStage === 'release') {
     }
     body.id-issuance-view #table-certificateTracker .id-issuance-table-actions {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: nowrap;
       gap: 0.35rem;
     }
     body.id-issuance-view #table-certificateTracker .id-issuance-table-actions .btn {
@@ -4187,6 +4188,6 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260720-id-action-button-size"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260720-pending-verification-pill"></script>
 </body>
 </html>
