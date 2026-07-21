@@ -8911,6 +8911,55 @@ if ($requestId !== '' && !$row) {
     dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
 }
 
+if ($action === 'regenerate_issued_document') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        dr_respond_json(405, ['success' => false, 'message' => 'Document regeneration requires POST.']);
+    }
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($currentStage !== DR_STAGE_READY_FOR_CLAIM) {
+        dr_respond_json(422, [
+            'success' => false,
+            'message' => 'Regeneration is only available while the request is For Release.',
+        ]);
+    }
+    $generatedPath = trim((string)(dra_generate_issued_document_safe((array)$row) ?? ''));
+    if ($generatedPath === '') {
+        $baseDir = realpath(__DIR__ . '/../../') ?: dirname(__DIR__, 2);
+        dr_respond_json(500, [
+            'success' => false,
+            'message' => 'Unable to regenerate the issued document. ' . dra_issued_document_diagnostics($baseDir, (array)$row),
+        ]);
+    }
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
+        'issued_file_path' => $generatedPath,
+    ]);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'The document was generated but its request record could not be updated.']);
+    }
+    try {
+        insertUnifiedAuditLog(
+            $conn,
+            $currentUserId,
+            $currentUserRole,
+            'Document Requests',
+            'document_request',
+            $requestId,
+            'Regenerate Issued Document',
+            'issued_file_path',
+            (string)($row['issued_file_path'] ?? ''),
+            $generatedPath,
+            'Regenerated from current admin settings while request was For Release.'
+        );
+    } catch (Throwable $__e) {
+    }
+    dr_respond_json(200, [
+        'success' => true,
+        'message' => 'Issued document regenerated successfully.',
+        'request_id' => $requestId,
+        'issued_file_path' => $generatedPath,
+    ]);
+}
+
 if ($action === 'personnel_approve') {
     $editedPreview = [];
     $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));

@@ -1544,7 +1544,8 @@
       if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
       return `
         ${proofBtn}
-        <button class="btn btn-sm btn-success w-100" data-view-action="mark_completed" data-id="${id}">Mark as Claimed</button>
+        <button class="btn btn-sm btn-warning" data-view-action="regenerate_document" data-id="${id}"><i class="fas fa-rotate me-1"></i>Regenerate Document</button>
+        <button class="btn btn-sm btn-success" data-view-action="mark_completed" data-id="${id}">Mark as Claimed</button>
       `;
     }
     return proofBtn || '<span class="text-muted small">No actions</span>';
@@ -7518,6 +7519,32 @@
           actionBtn.addEventListener('click', () => {
             const action = String(actionBtn.getAttribute('data-view-action') || '').trim();
             const actionId = String(actionBtn.getAttribute('data-id') || '').trim();
+            if (action === 'regenerate_document') {
+              void (async () => {
+                if (!window.confirm('Regenerate this issued document using the current admin settings? The current generated file will be replaced.')) {
+                  return;
+                }
+                const originalHtml = actionBtn.innerHTML;
+                actionBtn.disabled = true;
+                actionBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regenerating...';
+                try {
+                  const body = new FormData();
+                  body.append('action', 'regenerate_issued_document');
+                  body.append('request_id', actionId);
+                  const data = await fetchJson(endpoint, { method: 'POST', body });
+                  cachedAllItems = null;
+                  alert(data?.message || 'Issued document regenerated successfully.');
+                  viewModal?.hide();
+                  await load({ force: true });
+                } catch (error) {
+                  alert(error?.message || 'Unable to regenerate the issued document.');
+                } finally {
+                  actionBtn.disabled = false;
+                  actionBtn.innerHTML = originalHtml;
+                }
+              })();
+              return;
+            }
             if (action === 'mark_completed') {
               openActionModal('mark_completed_confirm', actionId);
               return;
