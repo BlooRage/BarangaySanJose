@@ -3519,6 +3519,55 @@ function dr_ensure_general_fees_table(mysqli $conn): void {
     }
     }
 
+    // Keep every manual General Certificate choice available in General Fees,
+    // even when the catalog was already initialized before these types existed.
+    $generalCertificateDocNames = [
+        'General Certificate - Local Employment',
+        'General Certificate - Loan Application',
+        'General Certificate - Bailbond',
+        'General Certificate - Postal ID Requirement',
+        'General Certificate - Tesda Requirement',
+        'General Certificate - Personal Collection',
+        'General Certificate - School Requirement',
+        'General Certificate - Bank Requirement (open account)',
+        'General Certificate - Other',
+    ];
+    $generalCertificateDefaultAmount = 50.00;
+    $residencyId = dr_get_or_create_document_type_id($conn, 'Certificate of Residency', 'DocumentRequest');
+    if ($residencyId) {
+        $amountLookup = $conn->prepare('SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1');
+        if ($amountLookup) {
+            $amountLookup->bind_param('i', $residencyId);
+            $amountLookup->execute();
+            $amountLookup->bind_result($configuredResidencyAmount);
+            if ($amountLookup->fetch()) {
+                $generalCertificateDefaultAmount = max(0.0, (float)$configuredResidencyAmount);
+            }
+            $amountLookup->close();
+        }
+    }
+    $generalCertificateInsert = $conn->prepare(
+        'INSERT IGNORE INTO generalfeestbl (document_type_id, amount) VALUES (?, ?)'
+    );
+    if ($generalCertificateInsert) {
+        foreach ($generalCertificateDocNames as $generalCertificateDocName) {
+            $generalCertificateDocTypeId = dr_get_or_create_document_type_id(
+                $conn,
+                $generalCertificateDocName,
+                'DocumentRequest'
+            );
+            if ($generalCertificateDocTypeId) {
+                $generalCertificateInsert->bind_param(
+                    'id',
+                    $generalCertificateDocTypeId,
+                    $generalCertificateDefaultAmount
+                );
+                $generalCertificateInsert->execute();
+            }
+        }
+        $generalCertificateInsert->close();
+    }
+
     $done = true;
 }
 

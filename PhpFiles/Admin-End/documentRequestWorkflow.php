@@ -2485,6 +2485,10 @@ function dra_update_request_payload_fields(mysqli $conn, string $requestId, arra
     }
 
     $payload = dra_decode_request_payload($requestRow);
+    $renderedDocumentTitle = $docType;
+    if (strcasecmp(trim((string)($payload['manual_document_variant'] ?? '')), 'General Certificate - Other') === 0) {
+        $renderedDocumentTitle = 'General Certificate - Other';
+    }
     foreach ($fields as $key => $value) {
         $normalizedKey = trim((string)$key);
         if ($normalizedKey === '') {
@@ -5220,7 +5224,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         $pdf->Line(18, $pdf->GetY(), 192, $pdf->GetY());
         $pdf->Ln(8);
         $pdf->SetFont($fontFace, 'B', 14);
-        $pdf->Cell(0, 8, strtoupper($docType), 0, 1, 'C');
+        $pdf->Cell(0, 8, strtoupper($renderedDocumentTitle), 0, 1, 'C');
         $pdf->Ln(6);
     }
 

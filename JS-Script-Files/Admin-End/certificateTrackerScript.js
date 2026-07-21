@@ -1006,6 +1006,9 @@
 
   function requestTypeLabel(row) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    if (String(payload.manual_document_variant || '').trim().toLowerCase() === 'general certificate - other') {
+      return 'General Certificate - Other';
+    }
     const previewKey = normalizePreviewDocKey(row?.document_type || '');
     if (previewKey === 'cohabitation') {
       const variant = String(payload?.cohabitation_variant || '').trim().toLowerCase();
@@ -1859,8 +1862,16 @@
   }
 
   function documentTypeBadgeBlue(row) {
-    const doc = normalizeDocumentTypeDisplay(firstNonEmpty([row.document_type, '-']));
+    const doc = trackerDocumentTypeDisplay(row);
     return `<span style="display:inline-block;padding:4px 10px;border-radius:8px;background:#dbeafe;color:#1e40af;font-weight:700;">${esc(doc)}</span>`;
+  }
+
+  function trackerDocumentTypeDisplay(row) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    if (String(payload.manual_document_variant || '').trim().toLowerCase() === 'general certificate - other') {
+      return 'General Certificate - Other';
+    }
+    return normalizeDocumentTypeDisplay(firstNonEmpty([row?.document_type, '-']));
   }
 
   function normalizeDocumentTypeDisplay(value) {
@@ -6068,7 +6079,7 @@
   }
 
   function renderQuickRequestSummary(row) {
-    const docName = normalizeDocumentTypeDisplay(String(row?.document_type || '-'));
+    const docName = trackerDocumentTypeDisplay(row);
     const statusLabel = String(row?.stage_label || row?.stage || '-').trim() || '-';
     const residentName = fullNameFromRow(row) || String(row?.resident_name || '-').trim() || '-';
     const submittedAt = firstNonEmpty([row?.submitted_at, row?.request_timestamp, '-']);
