@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../PhpFiles/General/uniqueIDGenerate.php';
 
 $financeBaseUrl = appUrl('/Admin-End/Certificates/FinancePayments.php');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
-if (!in_array($financeSection, ['tracker', 'fees', 'create'], true)) {
+if (!in_array($financeSection, ['tracker', 'fees', 'create', 'transactions'], true)) {
   $financeSection = 'tracker';
 }
 
@@ -303,7 +303,7 @@ if ($financeSection === 'fees' || $_SERVER['REQUEST_METHOD'] === 'POST') {
   fp_ensure_general_fees_table($conn);
 }
 
-if ($financeSection === 'create' || trim((string)($_POST['action'] ?? '')) === 'create_manual_transaction') {
+if ($financeSection === 'create' || $financeSection === 'transactions' || trim((string)($_POST['action'] ?? '')) === 'create_manual_transaction') {
   fp_ensure_manual_transactions_table($conn);
 }
 
@@ -550,7 +550,7 @@ if ($financeSection === 'fees') {
       }
     }
   }
-} elseif ($financeSection === 'create') {
+} elseif ($financeSection === 'create' || $financeSection === 'transactions') {
   $manualDepartmentOptions = fp_fetch_department_options($conn);
   $manualTransactionRows = fp_fetch_manual_transactions($conn, 25);
 }
@@ -998,7 +998,7 @@ if ($financeSection === 'fees') {
       <?php include __DIR__ . '/includes/barangay_id_admin_nav.php'; ?>
     <?php endif; ?>
 
-    <?php if ($financeSection === 'create' || $financeSection === 'tracker'): ?>
+    <?php if ($financeSection === 'create' || $financeSection === 'transactions'): ?>
       <ul class="nav nav-tabs mb-0" id="transactionTabs">
         <li class="nav-item">
           <a class="nav-link <?= $financeSection === 'create' ? 'active' : '' ?>"
@@ -1007,9 +1007,9 @@ if ($financeSection === 'fees') {
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link <?= $financeSection === 'tracker' ? 'active' : '' ?>"
-             href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>">
-            <i class="fas fa-list-check me-1"></i>Transaction Tracker
+          <a class="nav-link <?= $financeSection === 'transactions' ? 'active' : '' ?>"
+             href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=transactions">
+            <i class="fas fa-list-check me-1"></i>Transactions
           </a>
         </li>
       </ul>
@@ -1297,7 +1297,7 @@ if ($financeSection === 'fees') {
         </div>
       </div>
 
-    <?php elseif ($financeSection === 'create'): ?>
+    <?php elseif ($financeSection === 'create' || $financeSection === 'transactions'): ?>
       <div class="finance-fee-shell">
         <?php if ($pageFlash): ?>
           <div class="alert alert-<?= htmlspecialchars((string)($pageFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
@@ -1306,6 +1306,7 @@ if ($financeSection === 'fees') {
         <?php endif; ?>
 
         <div class="row g-4 finance-fee-card transaction-tab-panel p-4 mx-0 mt-0">
+          <?php if ($financeSection === 'create'): ?>
           <div class="col-12 col-lg-5">
             <div class="finance-fee-editor">
               <h5 class="fw-bold mb-3">New Finance Transaction</h5>
@@ -1366,8 +1367,10 @@ if ($financeSection === 'fees') {
               </form>
             </div>
           </div>
+          <?php endif; ?>
 
-          <div class="col-12 col-lg-7">
+          <?php if ($financeSection === 'transactions'): ?>
+          <div class="col-12">
             <div class="h-100">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
@@ -1443,6 +1446,7 @@ if ($financeSection === 'fees') {
               <?php endif; ?>
             </div>
           </div>
+          <?php endif; ?>
         </div>
       </div>
 
