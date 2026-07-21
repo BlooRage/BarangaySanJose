@@ -8346,7 +8346,15 @@
       { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id', free: true },
       { id: 'good_moral', group: 'Certificates', label: 'Certificate of Good Moral', documentType: 'Certificate of Good Moral', kind: 'good_moral' },
       { id: 'residency', group: 'Certificates', label: 'Certificate of Residency', documentType: 'Certificate of Residency', kind: 'residency' },
-      { id: 'general_certification', group: 'Other Certification', label: 'General Certification', documentType: 'Certificate of Residency', kind: 'general_certification' },
+      { id: 'general_certificate_local_employment', group: 'General Certificates', label: 'General Certificate - Local Employment', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Local Employment' },
+      { id: 'general_certificate_loan_application', group: 'General Certificates', label: 'General Certificate - Loan Application', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Loan Application' },
+      { id: 'general_certificate_bailbond', group: 'General Certificates', label: 'General Certificate - Bailbond', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Bailbond' },
+      { id: 'general_certificate_postal_id', group: 'General Certificates', label: 'General Certificate - Postal ID Requirement', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Postal ID Requirement' },
+      { id: 'general_certificate_tesda', group: 'General Certificates', label: 'General Certificate - Tesda Requirement', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Tesda Requirement' },
+      { id: 'general_certificate_personal_collection', group: 'General Certificates', label: 'General Certificate - Personal Collection', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Personal Collection' },
+      { id: 'general_certificate_school', group: 'General Certificates', label: 'General Certificate - School Requirement', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'School Requirement' },
+      { id: 'general_certificate_bank', group: 'General Certificates', label: 'General Certificate - Bank Requirement (open account)', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: 'Bank Requirement (open account)' },
+      { id: 'general_certificate_other', group: 'General Certificates', label: 'General Certificate - Other', documentType: 'Certificate of Residency', kind: 'general_certification', purpose: '__other__' },
       { id: 'identity', group: 'Certificates', label: 'Certificate of Identity', documentType: 'Certificate of Identity', kind: 'identity' },
       { id: 'indigency', group: 'Certificates', label: 'Certificate of Indigency', documentType: 'CertificateOfIndigency', kind: 'indigency', free: true },
       { id: 'cohabitation', group: 'Certificates', label: 'Certificate of Cohabitation', documentType: 'Certificate of Cohabitation', kind: 'cohabitation' },
@@ -8820,12 +8828,13 @@
     }
 
     function manualUsesPurposePreset(config = manualCurrentConfig()) {
-      return !!config && config.kind === 'general_certification';
+      return !!config && config.kind === 'general_certification' && !config.purpose;
     }
 
     function manualSyncPurposePreset() {
       const config = manualCurrentConfig();
       const usesPreset = manualUsesPurposePreset(config);
+      const fixedPurpose = config?.kind === 'general_certification' ? String(config.purpose || '').trim() : '';
       const presetValue = String(manualPurposePreset?.value || '').trim();
 
       manualPurposePresetWrap?.classList.toggle('d-none', !usesPreset);
@@ -8836,6 +8845,19 @@
         }
       }
       if (!manualPurpose) return;
+      if (fixedPurpose) {
+        const isOther = fixedPurpose === '__other__';
+        manualPurpose.classList.toggle('d-none', !isOther);
+        manualPurpose.required = true;
+        manualPurpose.placeholder = 'State the exact purpose shown on the issued document';
+        if (!isOther) {
+          manualPurpose.value = fixedPurpose;
+          manualPurpose.dataset.auto = '1';
+        } else if (manualGeneralCertificationPurposes.has(String(manualPurpose.value || '').trim())) {
+          manualPurpose.value = '';
+        }
+        return;
+      }
       if (!usesPreset) {
         manualPurpose.classList.remove('d-none');
         manualPurpose.required = true;
@@ -8878,6 +8900,10 @@
     }
 
     function manualResolvedDocumentLabel(rawConfig = manualCurrentRawConfig(), effectiveConfig = manualCurrentConfig()) {
+      if (effectiveConfig?.kind === 'general_certification' && effectiveConfig?.purpose === '__other__') {
+        const customPurpose = String(manualPurpose?.value || '').trim();
+        return customPurpose ? `General Certificate - ${customPurpose}` : 'General Certificate - Other';
+      }
       return rawConfig?.label || effectiveConfig?.label || 'Select a manual issuance form';
     }
 
@@ -9740,6 +9766,9 @@
 
     function manualSuggestedPurpose(config) {
       if (!config) return '';
+      if (config.kind === 'general_certification' && config.purpose) {
+        return config.purpose === '__other__' ? '' : config.purpose;
+      }
       if (manualUsesPurposePreset(config)) {
         const presetValue = String(manualPurposePreset?.value || '').trim();
         return presetValue && presetValue !== '__other__' ? presetValue : '';
