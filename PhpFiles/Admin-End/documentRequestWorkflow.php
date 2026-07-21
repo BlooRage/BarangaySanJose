@@ -5756,8 +5756,8 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->Ln(3);
 
             $leftX = 34.0;
-            $colonX = 76.0;
-            $valueX = 79.0;
+            $colonX = 60.0;
+            $valueX = 63.0;
             $lineH = 6.2;
 
             $writeResidencyField = static function (string $label, string $value, bool $valueBold = true, string $emptyFallback = '-') use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {

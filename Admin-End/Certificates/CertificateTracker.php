@@ -984,7 +984,7 @@ if ($certificateLaunchStage === 'release') {
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body .doc-to-block {
       display: grid;
-      grid-template-columns: 145px 18px 1fr;
+      grid-template-columns: 82px 10px 1fr;
       align-items: start;
       column-gap: 0;
       margin: 0 0 4px;
