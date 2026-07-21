@@ -7598,6 +7598,9 @@ if ($action === 'create_manual_request') {
     $payload = dra_manual_fill_payload_from_resident($payload, $residentProfile);
 
     $documentType = dr_normalize_document_type(trim((string)($payload['document_type'] ?? $_POST['document_type'] ?? '')));
+    if (strcasecmp(trim((string)($payload['manual_document_variant'] ?? '')), 'General Certificate - Other') === 0) {
+        $documentType = 'General Certificate - Other';
+    }
     if ($documentType === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'Document type is required.']);
     }

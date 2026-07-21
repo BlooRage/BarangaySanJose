@@ -2732,6 +2732,7 @@
     if (text.includes('indigency')) return 'indigency';
     if (text.includes('firsttime') || text.includes('jobseeker')) return 'firsttimejobseeker';
     if (text.includes('identity')) return 'identity';
+    if (text.includes('generalcertificate') || text.includes('generalcertification')) return 'generalcertificate';
     if (text.includes('residency') || text.includes('residence')) return 'residency';
     if (text.includes('goodmoral')) return 'goodmoral';
     if (text.includes('electricalpermit') || text.includes('waterpermit') || text.includes('residentialpermit') || text.includes('residentialbuildingpermit') || text.includes('commercialpermit') || text.includes('commercialbuildingpermit')) return 'generalpermitclearance';
@@ -5573,11 +5574,19 @@
       return normalizePreviewDocKey(row?.document_type || '') === 'businessclearance';
     }
     if (activeDocumentFilter === '__certificates__') {
+      const rawDocumentType = String(row?.document_type || '').trim().toLowerCase();
+      if (
+        rawDocumentType.includes('certificate')
+        && !rawDocumentType.includes('barangay id')
+        && !rawDocumentType.includes('clearance')
+      ) {
+        return true;
+      }
       const previewKey = normalizePreviewDocKey(row?.document_type || '');
       if (previewKey === 'cohabitation') {
         return true;
       }
-      return ['goodmoral', 'firsttimejobseeker', 'residency', 'indigency', 'identity'].includes(previewKey);
+      return ['goodmoral', 'firsttimejobseeker', 'residency', 'indigency', 'identity', 'generalcertificate'].includes(previewKey);
     }
     if (activeDocumentFilter === '__clr_business_permit__') {
       return normalizedDocumentType === 'Barangay Clearance for Business Permit';
@@ -8900,10 +8909,6 @@
     }
 
     function manualResolvedDocumentLabel(rawConfig = manualCurrentRawConfig(), effectiveConfig = manualCurrentConfig()) {
-      if (effectiveConfig?.kind === 'general_certification' && effectiveConfig?.purpose === '__other__') {
-        const customPurpose = String(manualPurpose?.value || '').trim();
-        return customPurpose ? `General Certificate - ${customPurpose}` : 'General Certificate - Other';
-      }
       return rawConfig?.label || effectiveConfig?.label || 'Select a manual issuance form';
     }
 
