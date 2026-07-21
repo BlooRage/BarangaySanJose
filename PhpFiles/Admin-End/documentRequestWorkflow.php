@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260721af';
+    $currentRenderRevision = 'r20260721ag';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3479,7 +3479,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721af';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721ag';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -4467,9 +4467,6 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $writeFittedCell($pdf, 33.5, 220.0, 46.0, 5.5, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.6, 8.4, 'L');
                 $writeFittedCell($pdf, 23.5, 226.0, 54.0, 5.2, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 10.0, 8.0, 'C');
 
-                // Clear the complete preprinted signatory column so template names,
-                // rules, and uploaded signatures cannot appear twice.
-                $pdf->Rect(118.0, 194.0, 84.0, 62.0, 'F');
                 $pdf->Rect(120.5, 203.5, 80.0, 24.5, 'F');
                 dra_render_signature_image($pdf, $punongSignaturePath, 132.0, 198.8, 52.0, 9.2);
                 $pdf->Line(126.2, 213.3, 194.6, 213.3);
@@ -4822,9 +4819,6 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $writeFittedCell($pdf, 35.0, 219.0, 46.0, 5.5, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.6, 8.4, 'L');
                 $writeFittedCell($pdf, 24.0, 225.0, 54.0, 5.2, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 10.0, 8.0, 'C');
 
-                // Clear the complete preprinted signatory column so template names,
-                // rules, and uploaded signatures cannot appear twice.
-                $pdf->Rect(118.5, 193.0, 84.0, 62.0, 'F');
                 $pdf->Rect(121.0, 202.5, 80.0, 24.5, 'F');
                 dra_render_signature_image($pdf, $punongSignaturePath, 132.2, 197.8, 52.0, 9.2);
                 $pdf->Line(126.7, 212.5, 194.6, 212.5);
@@ -4963,44 +4957,23 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $writeFittedCell($pdf, $bodyLeft, $topY, $bodyWidth, $bodyLineHeight, (string)$value, 'B', 11.0, 9.2, 'C');
                 }
 
-                // Replace the preprinted approval rows instead of drawing on top of them.
-                // The source PDF's third row runs into its preprinted signatory area on
-                // legal paper, which caused stacked text and duplicate signatures.
-                $pdf->Rect(15.0, 173.0, 184.0, 32.5, 'F');
-                // The source template contains two additional legacy officials below
-                // the visible configured pair. Mask the full right-hand column down
-                // to the footer area so only the configured signatories remain.
-                $pdf->Rect(111.0, 173.0, 88.0, 137.0, 'F');
                 $approvalMarkers = [
-                    [
-                        'key' => 'not_banned',
-                        'lineY' => 177.0,
-                        'label' => 'Not among businesses or trade activities prohibited from operating in this Barangay.',
-                    ],
-                    [
-                        'key' => 'no_objection',
-                        'lineY' => 186.6,
-                        'label' => 'Interposes no objection to the issuance of the corresponding Business Permit.',
-                    ],
-                    [
-                        'key' => 'temporary_clearance',
-                        'lineY' => 196.2,
-                        'label' => 'Recommended for temporary clearance, subject to applicable local requirements.',
-                    ],
+                    ['key' => 'not_banned', 'lineY' => $normalizeTop(0.5030)],
+                    ['key' => 'no_objection', 'lineY' => $normalizeTop(0.5287)],
+                    ['key' => 'temporary_clearance', 'lineY' => $normalizeTop(0.5545)],
                 ];
                 foreach ($approvalMarkers as $approvalMarker) {
                     $lineY = (float)$approvalMarker['lineY'];
+                    $pdf->Rect(19.5, $lineY - 7.0, 17.2, 13.0, 'F');
                     $pdf->SetDrawColor(0, 0, 0);
-                    $pdf->SetLineWidth(0.3);
-                    $pdf->Rect(19.5, $lineY - 2.7, 4.6, 4.6);
+                    $pdf->SetLineWidth(0.65);
+                    $pdf->Line(21.0, $lineY + 0.2, 25.4, $lineY + 0.2);
+                    $pdf->Line(30.1, $lineY + 0.2, 34.5, $lineY + 0.2);
                     if (in_array((string)$approvalMarker['key'], $businessApprovalTypes, true)) {
-                        $pdf->SetFont('ZapfDingbats', '', 12.0);
-                        $pdf->SetXY(19.0, $lineY - 3.4);
-                        $pdf->Cell(5.6, 5.6, chr(51), 0, 0, 'C');
+                        $pdf->SetFont('ZapfDingbats', '', 16.0);
+                        $pdf->SetXY(24.9, $lineY - 6.0);
+                        $pdf->Cell(6.0, 6.0, chr(51), 0, 0, 'C');
                     }
-                    $pdf->SetFont('Arial', '', 8.4);
-                    $pdf->SetXY(27.0, $lineY - 2.9);
-                    $pdf->MultiCell(78.0, 3.5, (string)$approvalMarker['label'], 0, 'L');
                     $pdf->SetLineWidth(0.2);
                 }
 
@@ -8893,7 +8866,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260721af';
+        : 'r20260721ag';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
