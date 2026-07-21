@@ -718,6 +718,23 @@ if ($financeSection === 'fees') {
       font-size: 0.84rem;
       color: #6b7280;
     }
+    .manual-transaction-form {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+    .manual-transaction-form > div:nth-of-type(5),
+    .manual-transaction-form > button[type="submit"] {
+      grid-column: 1 / -1;
+    }
+    @media (max-width: 767.98px) {
+      .manual-transaction-form {
+        grid-template-columns: 1fr;
+      }
+      .manual-transaction-form > div:nth-of-type(5),
+      .manual-transaction-form > button[type="submit"] {
+        grid-column: auto;
+      }
+    }
     .certificate-tracker-shell {
       max-width: var(--admin-table-shell-max-width);
       margin: 0 auto;
@@ -1307,10 +1324,10 @@ if ($financeSection === 'fees') {
 
         <div class="row g-4 finance-fee-card transaction-tab-panel p-4 mx-0 mt-0">
           <?php if ($financeSection === 'create'): ?>
-          <div class="col-12 col-lg-5">
+          <div class="col-12">
             <div class="finance-fee-editor">
               <h5 class="fw-bold mb-3">New Finance Transaction</h5>
-              <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=create" class="d-grid gap-3">
+              <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=create" class="manual-transaction-form d-grid gap-3">
                 <?= csrfTokenField() ?>
                 <input type="hidden" name="action" value="create_manual_transaction">
 

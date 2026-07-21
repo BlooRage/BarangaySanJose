@@ -290,7 +290,11 @@ $isContentChangeRequestActive = $current === 'ContentManagement.php'
     && $contentManagementModule === 'requests';
 
 $sbAllowedPermissions = [];
-if (isset($conn) && $conn instanceof mysqli && !empty($_SESSION['user_id'])) {
+if ($sbDeferDb && isset($allowedPermissions) && is_array($allowedPermissions)) {
+    // The admin guard already resolved these for the current request. Reuse
+    // them so lightweight pages do not repeat the permission queries.
+    $sbAllowedPermissions = $allowedPermissions;
+} elseif (!$sbDeferDb && isset($conn) && $conn instanceof mysqli && !empty($_SESSION['user_id'])) {
     amp_ensure_permission_storage($conn);
     $sbAllowedPermissions = amp_get_allowed_permission_keys(
         $conn,
@@ -318,7 +322,7 @@ $sbAppointmentAccess = [
     'can_access_tracker' => true,
     'can_access_settings' => true,
 ];
-if (isset($conn) && $conn instanceof mysqli && $sbSidebarUserId !== '') {
+if (!$sbDeferDb && isset($conn) && $conn instanceof mysqli && $sbSidebarUserId !== '') {
     $sbAppointmentAccessCacheKey = 'admin_sidebar_appointment_scope:' . $sbSidebarCacheScope;
     $sbCachedAppointmentAccess = function_exists('amp_session_cache_get')
         ? amp_session_cache_get($sbAppointmentAccessCacheKey, 300)
@@ -339,7 +343,7 @@ $sbCanAccessAppointmentSchedule = $sbCanAccessAppointmentTracker && !empty($sbAp
 $sbCanReviewContent = strtolower($sbSidebarRole) === 'superadmin';
 if (!$sbCanReviewContent && $sbCurrentOfficialAccount) {
     $sbCanReviewContent = strtolower(trim((string)($sbCurrentOfficialAccount['position_access'] ?? ''))) === 'barangay secretary';
-} elseif (!$sbCanReviewContent && isset($conn) && $conn instanceof mysqli && function_exists('cms_content_can_review')) {
+} elseif (!$sbDeferDb && !$sbCanReviewContent && isset($conn) && $conn instanceof mysqli && function_exists('cms_content_can_review')) {
     $sbCanReviewContentCacheKey = 'admin_sidebar_content_review:' . $sbSidebarCacheScope;
     $sbCachedCanReview = function_exists('amp_session_cache_get')
         ? amp_session_cache_get($sbCanReviewContentCacheKey, 300)
@@ -552,7 +556,7 @@ if (!function_exists('sb_to_public_profile_path')) {
     }
 }
 
-if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
+if (!$sbDeferDb && $sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     $sbProfileCacheKey = 'admin_sidebar_profile:' . md5($sbSidebarUserId);
     $sbCachedProfile = function_exists('amp_session_cache_get')
         ? amp_session_cache_get($sbProfileCacheKey, 300)
