@@ -1719,7 +1719,8 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'AuditLogs.php' => 'audit_logs',
             'WebsiteSettings.php' => 'website_settings',
             'CertificateIssuanceSettings.php' => 'certificate_issuance',
-            'BusinessMonitoringSettings.php' => 'business_monitoring',
+            'BusinessMonitoringSettings.php' => 'clearance_issuance',
+            'ClearanceDocumentSettings.php' => 'clearance_issuance',
             'BarangayIdSettings.php' => 'id_issuance_tracker',
             'FinancePayments.php' => match (strtolower(trim((string)($_GET['section'] ?? 'tracker')))) {
                 'create' => 'finance_create_transaction',

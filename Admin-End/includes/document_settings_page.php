@@ -284,7 +284,7 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
               <input type="hidden" name="action" value="save_document_module_settings">
 
               <?php if ($documentSettingsShowCopySignatureToggle): ?>
-                <section class="document-settings-signatory">
+                <section class="document-settings-signatory" id="clearance-general-settings">
                   <div class="document-settings-signatory-top">
                     <div>
                       <h4 class="document-settings-signatory-title">Resident Copy Signature</h4>
@@ -316,6 +316,7 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                 </section>
               <?php endif; ?>
 
+              <div id="clearance-signatories"></div>
               <?php foreach ((array)$documentSettingsRows as $signatoryRow): ?>
                 <?php
                   $signatoryKey = (string)($signatoryRow['signatory_key'] ?? '');

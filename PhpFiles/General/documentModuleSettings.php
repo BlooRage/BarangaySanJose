@@ -23,10 +23,10 @@ if (!function_exists('dms_module_catalog')) {
             ],
             'monitoring' => [
                 'key' => 'monitoring',
-                'label' => 'Barangay Monitoring Settings',
-                'description' => 'Manage signatories used on clearance issuance and monitoring-related generated documents.',
+                'label' => 'Clearance Document & Signatory Settings',
+                'description' => 'Manage signatories, visible fields, and printing options used by generated clearance documents.',
                 'applies_to' => 'General clearances, tricycle clearances, business permit clearances, and related previews.',
-                'back_href' => 'Admin-End/BusinessMonitoring.php',
+                'back_href' => 'Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__',
                 'signatories' => [
                     'punong' => [
                         'label' => 'Punong Barangay',
