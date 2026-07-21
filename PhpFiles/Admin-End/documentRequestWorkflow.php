@@ -8836,7 +8836,15 @@ if ($action === 'view_issued') {
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
+    $storedIssuedRelative = $publicPath !== '' ? '/' . ltrim(dra_strip_legacy_base($publicPath), '/') : '';
+    $storedIssuedAbsolute = $storedIssuedRelative !== '' ? realpath($baseDir . $storedIssuedRelative) : false;
+    $storedIssuedFileMissing = $publicPath !== '' && (
+        $storedIssuedAbsolute === false
+        || !is_file($storedIssuedAbsolute)
+        || strpos($storedIssuedAbsolute, $baseDir . '/UnifiedFileAttachment/') !== 0
+    );
     $mustRegenerate = ($publicPath === '')
+        || $storedIssuedFileMissing
         || ($isTemplateBasedCertificate && !$isGeneratedIssuedPath)
         || ($isTemplateBasedCertificate && !$isCurrentRenderRevision)
         || ($isTemplateBasedCertificate && !in_array($ext, ['pdf', 'docx'], true))
