@@ -1042,95 +1042,20 @@ if ($financeSection === 'fees') {
         <?php endif; ?>
 
         <div class="row g-4 finance-fee-card p-4 mx-0 mt-0">
-          <div class="col-12 col-lg-5 order-lg-2">
-            <div class="finance-fee-editor">
-              <h5 class="fw-bold mb-2">
-                <i class="fas <?= $editingFee ? 'fa-pen-to-square' : 'fa-circle-plus' ?> text-primary me-1"></i>
-                <?= $editingFee ? 'Edit Price' : 'Add New Price' ?>
-              </h5>
-              <p class="finance-fee-form-note mb-4">
-                Manage the prices stored in <code>generalfeestbl</code>. Only certificate-type document requests are handled here.
-              </p>
-
-              <?php if ($editingFee): ?>
-                <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="d-grid gap-3">
-                  <?= csrfTokenField() ?>
-                  <input type="hidden" name="action" value="update_fee">
-                  <input type="hidden" name="fee_id" value="<?= (int)($editingFee['fee_id'] ?? 0) ?>">
-
-                  <div>
-                    <label class="form-label fw-semibold">Document Type</label>
-                    <input type="text"
-                           class="form-control"
-                           value="<?= htmlspecialchars((string)($editingFee['document_type_name'] ?? ('Document Type #' . (int)($editingFee['document_type_id'] ?? 0))), ENT_QUOTES, 'UTF-8') ?>"
-                           readonly>
-                  </div>
-
-                  <div>
-                    <label class="form-label fw-semibold">Amount</label>
-                    <input type="number"
-                           name="amount"
-                           class="form-control"
-                           min="0"
-                           step="0.01"
-                           value="<?= htmlspecialchars(number_format((float)($editingFee['amount'] ?? 0), 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>"
-                           required>
-                  </div>
-
-                  <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                    <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="btn btn-secondary">Cancel</a>
-                  </div>
-                </form>
-              <?php else: ?>
-                <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="d-grid gap-3">
-                  <?= csrfTokenField() ?>
-                  <input type="hidden" name="action" value="add_fee">
-
-                  <div>
-                    <label for="feeDocumentType" class="form-label fw-semibold">Document Type</label>
-                    <select id="feeDocumentType" name="document_type_id" class="form-select" required>
-                      <option value="">Select a certificate request</option>
-                      <?php foreach ($availableFeeDocuments as $document): ?>
-                        <option value="<?= (int)($document['document_type_id'] ?? 0) ?>">
-                          <?= htmlspecialchars((string)($document['document_type_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                        </option>
-                      <?php endforeach; ?>
-                    </select>
-                    <?php if (!$availableFeeDocuments): ?>
-                      <div class="form-text">All available certificate request types already have prices assigned.</div>
-                    <?php endif; ?>
-                  </div>
-
-                  <div>
-                    <label for="feeAmount" class="form-label fw-semibold">Amount</label>
-                    <input id="feeAmount"
-                           type="number"
-                           name="amount"
-                           class="form-control"
-                           min="0"
-                           step="0.01"
-                           placeholder="0.00"
-                           required>
-                  </div>
-
-                  <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary" <?= !$availableFeeDocuments ? 'disabled' : '' ?>>Add Price</button>
-                  </div>
-                </form>
-              <?php endif; ?>
-            </div>
-          </div>
-
-          <div class="col-12 col-lg-7 order-lg-1">
+          <div class="col-12">
             <div>
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
                   <h5 class="fw-bold mb-1">Current General Fees</h5>
                   <p class="text-muted mb-0">Edit, add, or remove the prices currently stored in <code>generalfeestbl</code>.</p>
                 </div>
-                <div class="badge bg-light text-dark border px-3 py-2">
-                  <?= count($feeRows) ?> fee<?= count($feeRows) === 1 ? '' : 's' ?>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="badge bg-light text-dark border px-3 py-2">
+                    <?= count($feeRows) ?> fee<?= count($feeRows) === 1 ? '' : 's' ?>
+                  </div>
+                  <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addGeneralFeeModal" <?= !$availableFeeDocuments ? 'disabled' : '' ?>>
+                    <i class="fas fa-circle-plus me-1"></i>Add New Price
+                  </button>
                 </div>
               </div>
 
@@ -1164,16 +1089,23 @@ if ($financeSection === 'fees') {
                           <td><?= htmlspecialchars((string)($row['updated_at'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></td>
                           <td class="text-end">
                             <div class="compact-table-actions">
-                              <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees&amp;edit_fee=<?= (int)($row['fee_id'] ?? 0) ?>"
-                                 class="btn btn-sm btn-primary">
+                              <button type="button"
+                                 class="btn btn-sm btn-primary general-fee-edit-btn"
+                                 data-bs-toggle="modal"
+                                 data-bs-target="#editGeneralFeeModal"
+                                 data-fee-id="<?= (int)($row['fee_id'] ?? 0) ?>"
+                                 data-document-name="<?= htmlspecialchars((string)($row['document_type_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                 data-amount="<?= htmlspecialchars(number_format((float)($row['amount'] ?? 0), 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>">
                                 Edit
-                              </a>
-                              <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" onsubmit="return confirm('Delete this price?');">
-                                <?= csrfTokenField() ?>
-                                <input type="hidden" name="action" value="delete_fee">
-                                <input type="hidden" name="fee_id" value="<?= (int)($row['fee_id'] ?? 0) ?>">
-                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                              </form>
+                              </button>
+                              <button type="button"
+                                      class="btn btn-sm btn-danger general-fee-delete-btn"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#deleteGeneralFeeModal"
+                                      data-fee-id="<?= (int)($row['fee_id'] ?? 0) ?>"
+                                      data-document-name="<?= htmlspecialchars((string)($row['document_type_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1186,6 +1118,87 @@ if ($financeSection === 'fees') {
           </div>
         </div>
       </div><!-- end #generalFeesPanel -->
+
+      <div class="modal fade" id="addGeneralFeeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold"><i class="fas fa-circle-plus text-primary me-1"></i>Add New Price</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body d-grid gap-3">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="action" value="add_fee">
+              <div>
+                <label for="modalFeeDocumentType" class="form-label fw-semibold">Document Type</label>
+                <select id="modalFeeDocumentType" name="document_type_id" class="form-select" required>
+                  <option value="">Select a certificate request</option>
+                  <?php foreach ($availableFeeDocuments as $document): ?>
+                    <option value="<?= (int)($document['document_type_id'] ?? 0) ?>"><?= htmlspecialchars((string)($document['document_type_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div>
+                <label for="modalFeeAmount" class="form-label fw-semibold">Amount</label>
+                <input id="modalFeeAmount" type="number" name="amount" class="form-control" min="0" step="0.01" placeholder="0.00" required>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Add Price</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal fade" id="editGeneralFeeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold"><i class="fas fa-pen-to-square text-primary me-1"></i>Edit Price</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body d-grid gap-3">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="action" value="update_fee">
+              <input type="hidden" name="fee_id" id="editGeneralFeeId">
+              <div>
+                <label for="editGeneralFeeDocument" class="form-label fw-semibold">Document Type</label>
+                <input type="text" id="editGeneralFeeDocument" class="form-control" readonly>
+              </div>
+              <div>
+                <label for="editGeneralFeeAmount" class="form-label fw-semibold">Amount</label>
+                <input type="number" id="editGeneralFeeAmount" name="amount" class="form-control" min="0" step="0.01" required>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal fade" id="deleteGeneralFeeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold">Delete Price</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="action" value="delete_fee">
+              <input type="hidden" name="fee_id" id="deleteGeneralFeeId">
+              <p class="mb-0">Delete the price for <strong id="deleteGeneralFeeDocument"></strong>? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-danger">Delete Price</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- ── CLEARANCE FEES PANEL ───────────────────────────────────────────── -->
       <div id="clearanceFeesPanel" class="d-none bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
@@ -1494,7 +1507,7 @@ if ($financeSection === 'fees') {
   </main>
 </div>
 
-<?php if ($financeSection === 'tracker'): ?>
+<?php if ($financeSection === 'tracker' || $financeSection === 'fees'): ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <?php endif; ?>
 <?php if ($financeSection === 'tracker'): ?>
@@ -1761,6 +1774,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnRefreshPendingRequests = document.getElementById('btnRefreshPendingRequests');
   let feesLoaded = false;
   let pendingLoaded = false;
+
+  document.querySelectorAll('.general-fee-edit-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.getElementById('editGeneralFeeId').value = button.dataset.feeId || '';
+      document.getElementById('editGeneralFeeDocument').value = button.dataset.documentName || '';
+      document.getElementById('editGeneralFeeAmount').value = button.dataset.amount || '';
+    });
+  });
+
+  document.querySelectorAll('.general-fee-delete-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.getElementById('deleteGeneralFeeId').value = button.dataset.feeId || '';
+      document.getElementById('deleteGeneralFeeDocument').textContent = button.dataset.documentName || 'this document';
+    });
+  });
 
   function showGeneralTab() {
     tabGeneralFees.classList.add('active');
