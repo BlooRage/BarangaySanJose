@@ -6306,15 +6306,6 @@ function dra_generate_issued_document(array $requestRow): ?string
 
 function dra_generate_issued_document_safe(array $requestRow): ?string
 {
-    global $conn;
-    if ($conn instanceof mysqli) {
-        try {
-            if (empty(dms_resolve_issuance_settings($conn)['qr_verification_enabled'])) {
-                $requestRow['verification_code'] = '';
-                $requestRow['qr_code_path'] = '';
-            }
-        } catch (Throwable $e) {}
-    }
     $bufferLevel = ob_get_level();
     ob_start();
     try {

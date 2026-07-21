@@ -77,7 +77,7 @@ if (empty($issuanceSettings['qr_verification_enabled'])) {
     ti_json(403, [
         'success' => false,
         'verified' => false,
-        'message' => 'QR verification is currently disabled.',
+        'message' => 'QR verification is currently disabled for this department.',
     ]);
 }
 
