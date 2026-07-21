@@ -5585,9 +5585,11 @@ function dra_generate_issued_document(array $requestRow): ?string
         $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
         $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
         if ($isResidency) {
+            $requestResidentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
             $requestResidentId = trim((string)($requestRow['resident_id'] ?? ''));
-            $profile = dra_resident_profile_snapshot($conn, $requestResidentId, $requestResidentId);
-            $fromStartYm = dra_parse_residency_start_ym((string)($profile['barangay_residency'] ?? ''));
+            $profile = dra_resident_profile_snapshot($conn, $requestResidentUserId, $requestResidentId);
+            $residencyStartRaw = trim((string)($payload['barangay_residency'] ?? $profile['barangay_residency'] ?? ''));
+            $fromStartYm = dra_parse_residency_start_ym($residencyStartRaw);
             $fromText = dra_parse_residency_duration_text((string)($profile['residency_duration'] ?? ''));
 
             $profileDuration = null;
@@ -5608,6 +5610,25 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $totalMonths = dra_duration_total_months($bestDuration);
                 $yearsResidency = (string)max(0, intdiv($totalMonths, 12));
                 $monthsResidency = (string)max(0, $totalMonths % 12);
+            }
+
+            if (!preg_match('/\(\s*SINCE\b[^)]*\)/i', $requestPurpose)) {
+                $residencyStartDisplay = $formatDisplayMonthYear($residencyStartRaw);
+                if ($residencyStartDisplay === '' && ($yearsResidency !== '' || $monthsResidency !== '')) {
+                    try {
+                        $inferredStart = new DateTime('first day of this month');
+                        $monthsToSubtract = (max(0, (int)$yearsResidency) * 12) + max(0, (int)$monthsResidency);
+                        if ($monthsToSubtract > 0) {
+                            $inferredStart->modify('-' . $monthsToSubtract . ' months');
+                            $residencyStartDisplay = $inferredStart->format('F Y');
+                        }
+                    } catch (Throwable $ignored) {
+                        $residencyStartDisplay = '';
+                    }
+                }
+                if ($residencyStartDisplay !== '') {
+                    $requestPurpose = trim($requestPurpose) . ' (SINCE ' . strtoupper($residencyStartDisplay) . ')';
+                }
             }
         }
         $residencyParts = [];
@@ -9447,6 +9468,18 @@ if ($action === 'finance_verify') {
         dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID is free and does not go through finance verification.']);
     }
     $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($currentStage === DR_STAGE_PAYMENT_VERIFIED) {
+        $submittedOrNumber = trim((string)($_POST['or_number'] ?? ''));
+        $existingOrNumber = trim((string)($row['or_number'] ?? ''));
+        if ($submittedOrNumber !== '' && $existingOrNumber !== '' && hash_equals($existingOrNumber, $submittedOrNumber)) {
+            dr_respond_json(200, [
+                'success' => true,
+                'already_verified' => true,
+                'request' => $row,
+            ]);
+        }
+        dr_respond_json(422, ['success' => false, 'message' => 'Payment has already been verified for this request. Refresh the list to view its current status.']);
+    }
     if (!in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_SUBMITTED, DR_STAGE_PAYMENT_REJECTED], true)) {
         dr_respond_json(422, ['success' => false, 'message' => 'Request is not eligible for finance verification.']);
     }
