@@ -5,6 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
+require_once __DIR__ . '/../General/documentModuleSettings.php';
 
 function ti_json(int $status, array $payload): void {
     http_response_code($status);
@@ -69,6 +70,15 @@ $verificationCode = trim((string)($_GET['vc'] ?? ''));
 
 if ($requestId === '') {
     ti_json(422, ['success' => false, 'message' => 'Missing request_id.']);
+}
+
+$issuanceSettings = dms_resolve_issuance_settings($conn);
+if (empty($issuanceSettings['qr_verification_enabled'])) {
+    ti_json(403, [
+        'success' => false,
+        'verified' => false,
+        'message' => 'QR verification is currently disabled.',
+    ]);
 }
 
 $statusColumn = dr_request_status_column($conn);
