@@ -2485,10 +2485,6 @@ function dra_update_request_payload_fields(mysqli $conn, string $requestId, arra
     }
 
     $payload = dra_decode_request_payload($requestRow);
-    $renderedDocumentTitle = $docType;
-    if (strcasecmp(trim((string)($payload['manual_document_variant'] ?? '')), 'General Certificate - Other') === 0) {
-        $renderedDocumentTitle = 'General Certificate - Other';
-    }
     foreach ($fields as $key => $value) {
         $normalizedKey = trim((string)$key);
         if ($normalizedKey === '') {
@@ -3080,6 +3076,10 @@ function dra_generate_issued_document(array $requestRow): ?string
     $isGeneralPermitClearance = ($generalPermitPurpose !== '');
     $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
     $customDocumentTitle = trim((string)($payload['custom_document_title'] ?? ''));
+    $renderedDocumentTitle = $customDocumentTitle !== '' ? $customDocumentTitle : $docType;
+    if ($renderedDocumentTitle === '') {
+        $renderedDocumentTitle = 'BARANGAY CERTIFICATION';
+    }
 
     // DOCX template workflow removed: force all issuance through pure-PHP renderer below.
     $isTemplateBasedCertificate = false;
@@ -3704,8 +3704,8 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $composeCardNumber = static function () use ($payload, $requestId, $issuedDateObj): string {
                     return dra_barangay_id_generated_number($payload, $requestId, $issuedDateObj);
                 };
-                $composeValidUntil = static function () use ($payload, $issuedDateObj, $row): string {
-                    return dra_barangay_id_generated_valid_until($payload, $issuedDateObj, (string)($row['document_validity'] ?? ''));
+                $composeValidUntil = static function () use ($payload, $issuedDateObj, $requestRow): string {
+                    return dra_barangay_id_generated_valid_until($payload, $issuedDateObj, (string)($requestRow['document_validity'] ?? ''));
                 };
                 $resolveFpdfImageType = static function (string $diskPath): string {
                     $diskPath = trim($diskPath);
