@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260318ad';
+    $currentRenderRevision = 'r20260721ae';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -117,6 +117,7 @@ if ($action === 'bulk_regenerate_issued') {
              FROM documentrequesttbl
              WHERE issued_file_path LIKE ?
                AND stage IN (?, ?, ?)
+               AND LOWER(COALESCE(document_type, '')) NOT LIKE '%barangay%id%'
                AND LOWER(issued_file_path) NOT LIKE ?
              ORDER BY request_id ASC
              LIMIT ?"
@@ -3478,7 +3479,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260318ad';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721ae';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -8889,7 +8890,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260318ad';
+        : 'r20260721ae';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);

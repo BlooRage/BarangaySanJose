@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../PhpFiles/General/security.php';
 
-$_SESSION['user_id'] = (string)($_SESSION['user_id'] ?? 'CLI_MAINT');
-$_SESSION['role'] = (string)($_SESSION['role'] ?? 'Official');
+$maintenanceUserId = trim((string)(getenv('BARANGAY_MAINT_USER_ID') ?: 'CLI_MAINT'));
+$maintenanceRole = trim((string)(getenv('BARANGAY_MAINT_ROLE') ?: 'Official'));
+$_SESSION['user_id'] = (string)($_SESSION['user_id'] ?? $maintenanceUserId);
+$_SESSION['role'] = (string)($_SESSION['role'] ?? $maintenanceRole);
 $_SESSION['last_activity'] = time();
 
 $limit = isset($argv[1]) ? max(1, min(1000, (int)$argv[1])) : 500;
