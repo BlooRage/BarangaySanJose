@@ -231,7 +231,7 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/sidebar.php'; ?>
 
-    <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
+    <main class="flex-grow-1 p-3 p-md-4 bg-light" id="main-display">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
           <h2 class="document-settings-title"><?= htmlspecialchars($documentSettingsTitle, ENT_QUOTES, 'UTF-8') ?></h2>
@@ -239,9 +239,6 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
             <p class="document-settings-lead mb-0"><?= htmlspecialchars($documentSettingsDescription, ENT_QUOTES, 'UTF-8') ?></p>
           <?php endif; ?>
         </div>
-        <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($documentSettingsBackUrl, ENT_QUOTES, 'UTF-8') ?>">
-          <i class="fa-solid fa-arrow-left me-2"></i>Back to Module
-        </a>
       </div>
       <hr class="mt-0 mb-4">
 
