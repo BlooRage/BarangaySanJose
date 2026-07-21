@@ -581,8 +581,17 @@ if ($financeSection === 'fees') {
       z-index: 2;
       gap: 0.15rem;
     }
+    #transactionTabs {
+      max-width: var(--admin-table-shell-max-width);
+      margin: 0 auto -1px;
+      border-bottom: 0;
+      position: relative;
+      z-index: 2;
+      gap: 0.15rem;
+    }
     body.admin-sidebar-collapsed .finance-fee-shell,
     body.admin-sidebar-collapsed #feesTabs,
+    body.admin-sidebar-collapsed #transactionTabs,
     body.admin-sidebar-collapsed #clearanceFeesPanel,
     body.admin-sidebar-collapsed #pendingRequestsPanel {
       max-width: var(--admin-table-shell-max-width-collapsed);
@@ -599,14 +608,29 @@ if ($financeSection === 'fees') {
       padding: 0.75rem 1rem;
       background: transparent;
     }
+    #transactionTabs .nav-link {
+      color: #d76f12;
+      font-weight: 600;
+      border: 1px solid transparent;
+      border-bottom-color: transparent;
+      border-top-left-radius: 0.75rem;
+      border-top-right-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: transparent;
+    }
     #feesTabs .nav-link:hover,
-    #feesTabs .nav-link:focus-visible {
+    #feesTabs .nav-link:focus-visible,
+    #transactionTabs .nav-link:hover,
+    #transactionTabs .nav-link:focus-visible {
       color: #b45309;
       border-color: transparent;
     }
     #feesTabs .nav-link.active,
     #feesTabs .nav-link.active:hover,
-    #feesTabs .nav-link.active:focus-visible {
+    #feesTabs .nav-link.active:focus-visible,
+    #transactionTabs .nav-link.active,
+    #transactionTabs .nav-link.active:hover,
+    #transactionTabs .nav-link.active:focus-visible {
       color: #d76f12;
       background: #ffffff;
       border-color: #dee2e6;
@@ -634,6 +658,9 @@ if ($financeSection === 'fees') {
     }
     #generalFeesPanel > .finance-fee-card {
       border-top-left-radius: 0;
+    }
+    .transaction-tab-panel {
+      border-top-left-radius: 0 !important;
     }
     .finance-fee-form-note {
       font-size: 0.9rem;
@@ -942,6 +969,14 @@ if ($financeSection === 'fees') {
       #feesTabs .nav-link {
         white-space: nowrap;
       }
+      #transactionTabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+      #transactionTabs .nav-link {
+        white-space: nowrap;
+      }
     }
     #feeTypesTableBody tr { cursor: default; }
     @media print {
@@ -961,6 +996,23 @@ if ($financeSection === 'fees') {
     <hr class="mb-4">
     <?php if ($financeSection === 'tracker' && strcasecmp($financeFilterDocument, 'Barangay ID') === 0): ?>
       <?php include __DIR__ . '/includes/barangay_id_admin_nav.php'; ?>
+    <?php endif; ?>
+
+    <?php if ($financeSection === 'create' || $financeSection === 'tracker'): ?>
+      <ul class="nav nav-tabs mb-0" id="transactionTabs">
+        <li class="nav-item">
+          <a class="nav-link <?= $financeSection === 'create' ? 'active' : '' ?>"
+             href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=create">
+            <i class="fas fa-square-plus me-1"></i>Create Transaction
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $financeSection === 'tracker' ? 'active' : '' ?>"
+             href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>">
+            <i class="fas fa-list-check me-1"></i>Transaction Tracker
+          </a>
+        </li>
+      </ul>
     <?php endif; ?>
 
     <?php if ($financeSection === 'fees'): ?>
@@ -1240,17 +1292,7 @@ if ($financeSection === 'fees') {
           </div>
         <?php endif; ?>
 
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-          <div>
-            <h4 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Create Transaction</h4>
-            <p class="text-muted mb-0 small">Record a manual finance transaction with the name, description, department handle, amount, and OR number receipt.</p>
-          </div>
-          <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-arrow-left me-1"></i>Back to Payment Tracker
-          </a>
-        </div>
-
-        <div class="row g-4 finance-fee-card p-4 mx-0 mt-0">
+        <div class="row g-4 finance-fee-card transaction-tab-panel p-4 mx-0 mt-0">
           <div class="col-12 col-lg-5">
             <div class="finance-fee-editor">
               <h5 class="fw-bold mb-3">New Finance Transaction</h5>
@@ -1392,7 +1434,7 @@ if ($financeSection === 'fees') {
       </div>
 
     <?php else: ?>
-      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
+      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell transaction-tab-panel">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-filter="" data-status-filter="all">&nbsp;&nbsp;All&nbsp;&nbsp;</button>

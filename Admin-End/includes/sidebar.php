@@ -364,7 +364,7 @@ $sbContentFaqActive = $sbCanAccessContentNavigator
     : $isContentFaqCreateActive;
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
-if (isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
+if (!$sbDeferDb && isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
     $sbAttentionCounts = sbatt_get_counts($conn, 300);
 }
 if (!$sbCanReviewContent) {
