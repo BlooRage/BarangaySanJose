@@ -5433,7 +5433,7 @@
       </div>
     `;
     if (paymentProofPrintBtn) {
-      const allowPrint = !!(options && options.allowPrint);
+      const allowPrint = isIssuedDocument || !!(options && options.allowPrint);
       paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly));
       if (allowPrint && isLikelyPdf && !proofOnly) {
         paymentProofPrintUrl = bustedUrl;
