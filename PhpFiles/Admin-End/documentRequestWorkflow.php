@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260721ae';
+    $currentRenderRevision = 'r20260721af';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3479,7 +3479,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721ae';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721af';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -4967,7 +4967,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                 // The source PDF's third row runs into its preprinted signatory area on
                 // legal paper, which caused stacked text and duplicate signatures.
                 $pdf->Rect(15.0, 173.0, 184.0, 32.5, 'F');
-                $pdf->Rect(111.0, 173.0, 88.0, 67.0, 'F');
+                // The source template contains two additional legacy officials below
+                // the visible configured pair. Mask the full right-hand column down
+                // to the footer area so only the configured signatories remain.
+                $pdf->Rect(111.0, 173.0, 88.0, 137.0, 'F');
                 $approvalMarkers = [
                     [
                         'key' => 'not_banned',
@@ -8890,7 +8893,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260721ae';
+        : 'r20260721af';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
