@@ -1669,15 +1669,15 @@ if ($certificateLaunchStage === 'release') {
       text-indent: 48px;
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta {
-      width: 340px;
+      width: 300px;
       margin: 18px 0 0 34px;
       font-size: .97rem;
       line-height: 1.24;
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-row {
       display: grid;
-      grid-template-columns: 126px 16px minmax(120px, 1fr);
-      column-gap: 6px;
+      grid-template-columns: 126px 8px minmax(120px, 1fr);
+      column-gap: 2px;
       align-items: center;
       margin: 0 0 6px;
     }

@@ -6068,28 +6068,28 @@ function dra_generate_issued_document(array $requestRow): ?string
         );
 
         if ($isGoodMoral) {
-            $renderFixedMetaRows($pdf, $indigencyFont, 186.0, 18.0, 34.0, 52.0, 70.0, 8.0, [
+            $renderFixedMetaRows($pdf, $indigencyFont, 186.0, 18.0, 28.0, 46.0, 64.0, 8.0, [
                 ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
                 ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
                 ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
                 ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
             ]);
         } elseif ($isResidency) {
-            $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 34.0, 52.0, 70.0, 7.0, [
+            $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 28.0, 46.0, 64.0, 7.0, [
                 ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
                 ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
                 ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
                 ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
             ]);
         } elseif ($isRelationshipJailVisit) {
-            $renderFixedMetaRows($pdf, $indigencyFont, min(max($pdf->GetY() + 4.0, 170.0), 186.0), 18.0, 34.0, 52.0, 70.0, 7.0, [
+            $renderFixedMetaRows($pdf, $indigencyFont, min(max($pdf->GetY() + 4.0, 170.0), 186.0), 18.0, 28.0, 46.0, 64.0, 7.0, [
                 ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
                 ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
                 ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
                 ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
             ]);
         } elseif ($isCohabitation) {
-            $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 34.0, 52.0, 70.0, 7.0, [
+            $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 28.0, 46.0, 64.0, 7.0, [
                 ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
                 ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
                 ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
