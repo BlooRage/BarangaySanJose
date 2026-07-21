@@ -5393,6 +5393,7 @@
     const normalizedTitle = String(title || '').trim().toLowerCase();
     const proofOnly = String(title || '').toLowerCase().startsWith('proof of residency');
     const isIssuedDocument = normalizedTitle === 'issued document';
+    const isCompletedIssuedDocument = isIssuedDocument && !!options?.completed;
     const releaseRequestId = String(options?.releaseRequestId || '').trim();
     const showReturnButton = proofOnly || isIssuedDocument || paymentProofReturnTarget !== '';
     if (paymentProofReturnBtn) {
@@ -5400,7 +5401,7 @@
       if (proofOnly) paymentProofReturnBtn.classList.remove('d-none');
     }
     if (paymentProofOpenNew) {
-      paymentProofOpenNew.classList.toggle('d-none', proofOnly);
+      paymentProofOpenNew.classList.toggle('d-none', proofOnly || isCompletedIssuedDocument);
     }
     if (paymentProofCloseBtn) {
       paymentProofCloseBtn.classList.toggle('d-none', proofOnly || isIssuedDocument);
@@ -5439,8 +5440,8 @@
     `;
     if (paymentProofPrintBtn) {
       const allowPrint = !!(options && options.allowPrint);
-      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly && !isIssuedDocument));
-      if (allowPrint && isLikelyPdf && !proofOnly && !isIssuedDocument) {
+      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly));
+      if (allowPrint && isLikelyPdf && !proofOnly) {
         paymentProofPrintUrl = bustedUrl;
       }
     }
@@ -7120,14 +7121,16 @@
                 }
                 if (isBarangayIdIssuedDoc) {
                   openBarangayIdCardModal(row, issuedDocUrl, issuedDocumentTitle(row), 'view', {
-                    allowPrint: ['for_printing', 'ready_for_claim'].includes(issuedStageKey),
+                    allowPrint: ['for_printing', 'ready_for_claim', 'completed'].includes(issuedStageKey),
+                    completed: issuedStageKey === 'completed',
                     releaseRequestId: ['for_printing', 'ready_for_claim'].includes(issuedStageKey) ? String(row.request_id || '') : '',
                     previewState: viewPreviewState
                   });
                   return;
                 }
                 openDocumentModal(issuedDocUrl, issuedDocumentTitle(row), 'view', {
-                  allowPrint: ['for_printing', 'ready_for_claim'].includes(issuedStageKey),
+                  allowPrint: ['for_printing', 'ready_for_claim', 'completed'].includes(issuedStageKey),
+                  completed: issuedStageKey === 'completed',
                   releaseRequestId: ['for_printing', 'ready_for_claim'].includes(issuedStageKey) ? String(row.request_id || '') : ''
                 });
                 return;
@@ -7645,7 +7648,11 @@
               });
               return;
             }
-            openDocumentModal(docUrl, docTitle, 'view');
+            const completedDocument = resolveWorkflowStage(row) === 'completed' && docTitle.toLowerCase() === 'issued document';
+            openDocumentModal(docUrl, docTitle, 'view', {
+              allowPrint: completedDocument,
+              completed: completedDocument
+            });
           });
         });
         viewDetailsBody.querySelectorAll('button[data-support-doc-url]').forEach((docBtn) => {
@@ -7710,12 +7717,13 @@
         row = await ensureRowDetails(row);
         if (!row) return;
         const stageKey = resolveWorkflowStage(row);
-        const allowPrint = stageKey === 'for_printing' || stageKey === 'ready_for_claim';
+        const allowPrint = stageKey === 'for_printing' || stageKey === 'ready_for_claim' || stageKey === 'completed';
         const issuedUrl = issuedDocumentUrl(id, row);
         if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
           openBarangayIdCardModal(row, issuedUrl, issuedDocumentTitle(row), '', {
             allowPrint,
-            releaseRequestId: allowPrint ? id : '',
+            completed: stageKey === 'completed',
+            releaseRequestId: ['for_printing', 'ready_for_claim'].includes(stageKey) ? id : '',
             previewState: buildPreviewState(
               row,
               row?.payload && typeof row.payload === 'object' ? row.payload : {},
@@ -7727,7 +7735,8 @@
         }
         openDocumentModal(issuedUrl, issuedDocumentTitle(row), '', {
           allowPrint,
-          releaseRequestId: allowPrint ? id : ''
+          completed: stageKey === 'completed',
+          releaseRequestId: ['for_printing', 'ready_for_claim'].includes(stageKey) ? id : ''
         });
       });
     });
