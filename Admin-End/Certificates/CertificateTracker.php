@@ -176,11 +176,19 @@ if ($certificateLaunchStage === 'release') {
       box-shadow: none;
     }
     #feeChangeSubTabs .nav-link {
-      color: #6b7280 !important;
+      color: #d76f12 !important;
       border: 1px solid transparent;
-      border-radius: .65rem;
+      border-bottom-color: transparent;
+      border-radius: .75rem .75rem 0 0;
       font-weight: 600;
-      padding: .6rem .9rem;
+      padding: .75rem 1rem;
+      margin-bottom: -1px;
+      background: transparent;
+    }
+    #feeChangeSubTabs .nav-link:hover,
+    #feeChangeSubTabs .nav-link:focus-visible {
+      color: #b45309 !important;
+      border-color: transparent;
     }
     #feeChangeSubTabs .nav-link.active,
     #feeChangeSubTabs .nav-link.active:focus,
@@ -188,17 +196,19 @@ if ($certificateLaunchStage === 'release') {
     #feeChangeSubTabs .nav-link.active i,
     #feeChangeSubTabs .nav-link.active:focus i,
     #feeChangeSubTabs .nav-link.active:hover i {
-      color: #fff !important;
-      background: #de710c !important;
-      border-color: #de710c !important;
+      color: #d76f12 !important;
+      background: #fff !important;
+      border-color: #dee2e6 !important;
+      border-bottom-color: #fff !important;
+      box-shadow: none;
     }
     body.fee-settings-view #feeChangePanel {
       padding: 0 !important;
       overflow: hidden;
     }
     body.fee-settings-view #feeChangeSubTabs {
-      gap: .4rem;
-      padding: 1rem 1.25rem;
+      gap: .15rem;
+      padding: 1rem 1.25rem 0;
       margin-bottom: 0 !important;
       border-bottom: 1px solid #dee2e6;
       background: #fff;
@@ -212,26 +222,9 @@ if ($certificateLaunchStage === 'release') {
       width: 100%;
       max-width: 680px;
     }
-    body.fee-settings-view #fcrAddPanel .border,
-    body.fee-settings-view #fcrEditFormWrap {
+    body.fee-settings-view #fcrAddPanel .border {
       background: #fff !important;
       border-color: #dee2e6 !important;
-    }
-    body.fee-settings-view #fcrEditFormWrap {
-      max-width: 680px;
-      margin-top: 1rem;
-    }
-    body.fee-settings-view #fcrEditHint {
-      margin: 0 0 1rem !important;
-      padding: .75rem 1rem;
-      border: 1px solid #dee2e6;
-      border-radius: .65rem;
-      background: #f8f9fa;
-      text-align: left !important;
-    }
-    body.fee-settings-view #fcrEditHint i {
-      transform: rotate(-90deg);
-      color: #de710c;
     }
     body.fee-settings-view #fcrEditCatalogBody .btn-warning,
     body.fee-settings-view #fcrEditSubmitBtn {
@@ -3529,7 +3522,7 @@ if ($certificateLaunchStage === 'release') {
     <div id="feeChangePanel" class="d-none bg-white p-4 rounded-4 shadow-sm border certificate-tracker-shell">
 
       <!-- Sub-tabs -->
-      <ul class="nav nav-pills mb-4" id="feeChangeSubTabs">
+      <ul class="nav nav-tabs mb-4" id="feeChangeSubTabs">
         <li class="nav-item">
           <button class="nav-link active" id="subTabAddFeeType" type="button">
             <i class="fas fa-plus me-1"></i>Request New Fee Type
@@ -3558,9 +3551,9 @@ if ($certificateLaunchStage === 'release') {
                 <input type="text" id="fcrAddName" class="form-control" placeholder="e.g. Inspection Fee">
               </div>
               <div class="mb-3">
-                <label class="form-label fw-semibold small">Proposed Amount (â‚±)</label>
+                <label class="form-label fw-semibold small">Proposed Amount (₱)</label>
                 <div class="input-group">
-                  <span class="input-group-text">â‚±</span>
+                  <span class="input-group-text">₱</span>
                   <input type="number" id="fcrAddAmount" class="form-control" value="0.00" min="0" step="0.01">
                 </div>
               </div>
@@ -3605,44 +3598,6 @@ if ($certificateLaunchStage === 'release') {
             </div>
           </div>
           <div class="col-12">
-            <div class="text-muted small" id="fcrEditHint">
-              <i class="fas fa-arrow-left me-2"></i>Select a fee type from the table to request a price edit.
-            </div>
-            <div class="border rounded-3 p-3 bg-light d-none" id="fcrEditFormWrap">
-              <h6 class="fw-semibold mb-3" id="fcrEditFormTitle"><i class="fas fa-pen me-1 text-warning"></i>Request Price Edit</h6>
-              <input type="hidden" id="fcrEditFeeTypeId">
-              <div class="mb-2">
-                <label class="form-label fw-semibold small">Fee Name</label>
-                <input type="text" id="fcrEditFeeName" class="form-control" readonly>
-              </div>
-              <div class="mb-2">
-                <label class="form-label fw-semibold small">Current Amount</label>
-                <div class="input-group">
-                  <span class="input-group-text">â‚±</span>
-                  <input type="text" id="fcrEditCurrentAmount" class="form-control" readonly>
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-semibold small">Proposed Amount (â‚±) <span class="text-danger">*</span></label>
-                <div class="input-group">
-                  <span class="input-group-text">â‚±</span>
-                  <input type="number" id="fcrEditProposedAmount" class="form-control" min="0" step="0.01">
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-semibold small">Notes</label>
-                <textarea id="fcrEditNotes" class="form-control" rows="2"></textarea>
-              </div>
-              <div id="fcrEditError" class="alert alert-danger d-none py-2 small mb-3" data-modal-inline="true"></div>
-              <div class="d-flex gap-2">
-                <button type="button" class="btn btn-warning flex-fill" id="fcrEditSubmitBtn">
-                  <i class="fas fa-paper-plane me-1"></i>Submit
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="fcrEditCancelBtn">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-            </div>
             <div id="fcrEditSuccess" class="alert alert-success d-none py-2 small mb-3" data-modal-inline="true"></div>
           </div>
         </div>
@@ -3676,6 +3631,49 @@ if ($certificateLaunchStage === 'release') {
         </div>
       </div>
 
+    </div>
+
+    <div class="modal fade" id="fcrEditModal" tabindex="-1" aria-labelledby="fcrEditFormTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header">
+            <h5 class="modal-title fw-semibold" id="fcrEditFormTitle"><i class="fas fa-pen me-2 text-warning"></i>Request Price Edit</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="fcrEditFormWrap">
+            <input type="hidden" id="fcrEditFeeTypeId">
+            <div class="mb-3">
+              <label class="form-label fw-semibold small" for="fcrEditFeeName">Fee Name</label>
+              <input type="text" id="fcrEditFeeName" class="form-control" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold small" for="fcrEditCurrentAmount">Current Amount</label>
+              <div class="input-group">
+                <span class="input-group-text">₱</span>
+                <input type="text" id="fcrEditCurrentAmount" class="form-control" readonly>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold small" for="fcrEditProposedAmount">Proposed Amount (₱) <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">₱</span>
+                <input type="number" id="fcrEditProposedAmount" class="form-control" min="0" step="0.01">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold small" for="fcrEditNotes">Notes / Justification</label>
+              <textarea id="fcrEditNotes" class="form-control" rows="3" placeholder="Why should this amount be changed?"></textarea>
+            </div>
+            <div id="fcrEditError" class="alert alert-danger d-none py-2 small mb-0" data-modal-inline="true"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="fcrEditCancelBtn" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-warning" id="fcrEditSubmitBtn">
+              <i class="fas fa-paper-plane me-1"></i>Submit Request
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -4245,7 +4243,7 @@ if ($certificateLaunchStage === 'release') {
               <input type="text" class="form-control form-control-sm" id="feeCatalogFeeName" placeholder="e.g. Inspection Fee">
             </div>
             <div class="mb-2">
-              <label class="form-label small mb-1">Default Amount (â‚±)</label>
+              <label class="form-label small mb-1">Default Amount (₱)</label>
               <input type="number" class="form-control form-control-sm" id="feeCatalogDefaultAmount" value="0.00" min="0" step="0.01">
             </div>
             <div class="mb-3 form-check">
@@ -4290,7 +4288,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260721-manual-preview-13"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260722-fee-edit-modal"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');

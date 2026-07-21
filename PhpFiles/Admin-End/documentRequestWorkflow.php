@@ -10085,7 +10085,7 @@ if ($action === 'submit_fee_change_request') {
             dr_respond_json(409, ['success' => false, 'message' => 'Fee type not found or already has a pending change.']);
         }
         try {
-            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, 'â‚±' . number_format($proposedAmount, 2), $notes);
+            insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, '₱' . number_format($proposedAmount, 2), $notes);
         } catch (Throwable $__e) {
         }
         dr_respond_json(200, ['success' => true]);

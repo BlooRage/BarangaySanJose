@@ -320,6 +320,10 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
               <?php foreach ((array)$documentSettingsRows as $signatoryRow): ?>
                 <?php
                   $signatoryKey = (string)($signatoryRow['signatory_key'] ?? '');
+                  $moduleKey = (string)($documentSettingsModuleConfig['key'] ?? '');
+                  if ($moduleKey === 'monitoring' && $signatoryKey === 'punong') {
+                      continue;
+                  }
                   $source = (string)($signatoryRow['source'] ?? 'manual');
                   $isMonitoringHeadEditor = $signatoryKey === 'monitoring_head';
                   $signaturePath = trim((string)($signatoryRow['signature_path'] ?? ''));

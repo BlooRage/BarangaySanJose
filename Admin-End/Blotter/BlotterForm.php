@@ -1,9 +1,4 @@
 <?php
-// This page does not need sidebar notification counts to render. Avoid making
-// the form wait on cross-module count queries, which is especially expensive
-// when a local XAMPP instance is connected to the hosted database.
-define('ADMIN_SIDEBAR_DEFER_DB', true);
-
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $adminSegmentPos = strpos($scriptName, '/Admin-End/');

@@ -11642,11 +11642,14 @@
       document.getElementById('fcrEditCurrentAmount').value = Number(amount).toFixed(2);
       document.getElementById('fcrEditProposedAmount').value = Number(amount).toFixed(2);
       document.getElementById('fcrEditNotes').value         = '';
-      document.getElementById('fcrEditFormWrap').classList.remove('d-none');
-      document.getElementById('fcrEditHint').classList.add('d-none');
       showEditError('');
       showEditSuccess('');
-      document.getElementById('fcrEditProposedAmount').focus();
+      const modalElement = document.getElementById('fcrEditModal');
+      const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+      modalElement.addEventListener('shown.bs.modal', () => {
+        document.getElementById('fcrEditProposedAmount').focus();
+      }, { once: true });
+      modal.show();
     };
 
     document.getElementById('fcrEditCatalogBody')?.addEventListener('click', (event) => {
@@ -11660,10 +11663,7 @@
     });
 
     document.getElementById('fcrEditCancelBtn').addEventListener('click', () => {
-      document.getElementById('fcrEditFormWrap').classList.add('d-none');
-      document.getElementById('fcrEditHint').classList.remove('d-none');
       showEditError('');
-      showEditSuccess('');
     });
 
     document.getElementById('fcrEditRefreshBtn').addEventListener('click', () => {
@@ -11713,8 +11713,7 @@
         const res  = await fetch(API, { method: 'POST', body: fd });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Submit failed.');
-        document.getElementById('fcrEditFormWrap').classList.add('d-none');
-        document.getElementById('fcrEditHint').classList.remove('d-none');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('fcrEditModal')).hide();
         showEditError('');
         showEditSuccess('Price edit request submitted. Finance will review it.');
       } catch (e) { showEditError(e.message); }
