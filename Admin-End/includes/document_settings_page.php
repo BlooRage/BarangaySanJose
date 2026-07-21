@@ -195,6 +195,28 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       font-size: 0.86rem;
       margin: 0;
     }
+    .document-settings-text-preview {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 0.8rem;
+      text-align: center;
+      color: #111827;
+    }
+    .document-settings-text-preview-name {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1.2;
+      border-bottom: 1px solid #1f2937;
+      padding: 0 0.4rem 0.25rem;
+    }
+    .document-settings-text-preview-title {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.82rem;
+      font-style: italic;
+      line-height: 1.25;
+    }
     .document-settings-actions {
       display: flex;
       justify-content: flex-end;
@@ -298,6 +320,7 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                 <?php
                   $signatoryKey = (string)($signatoryRow['signatory_key'] ?? '');
                   $source = (string)($signatoryRow['source'] ?? 'manual');
+                  $isMonitoringHeadEditor = $signatoryKey === 'monitoring_head';
                   $signaturePath = trim((string)($signatoryRow['signature_path'] ?? ''));
                   $signatureUrl = $signaturePath !== '' ? appUrl(ltrim($signaturePath, '/')) : '';
                 ?>
@@ -307,6 +330,9 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                       <h4 class="document-settings-signatory-title"><?= htmlspecialchars((string)($signatoryRow['label'] ?? $signatoryKey), ENT_QUOTES, 'UTF-8') ?></h4>
                       <?php if (!empty($signatoryRow['signature_help'])): ?>
                         <p class="document-settings-signatory-subcopy"><?= htmlspecialchars((string)$signatoryRow['signature_help'], ENT_QUOTES, 'UTF-8') ?></p>
+                      <?php endif; ?>
+                      <?php if ($isMonitoringHeadEditor): ?>
+                        <p class="document-settings-signatory-subcopy">Edit the name and position exactly as they should appear in clearance previews and generated documents.</p>
                       <?php endif; ?>
                     </div>
                     <span class="document-settings-source-badge <?= $source === 'manual' ? 'is-manual' : 'is-seat' ?>">
@@ -318,22 +344,24 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                   <div class="document-settings-signatory-grid">
                     <div class="row g-3">
                       <div class="col-12">
-                        <label class="form-label fw-semibold" for="signatory_name_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>">Signatory Name</label>
+                        <label class="form-label fw-semibold" for="signatory_name_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>"><?= $isMonitoringHeadEditor ? 'Displayed Name' : 'Signatory Name' ?></label>
                         <input
                           type="text"
                           class="form-control"
                           id="signatory_name_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>"
                           name="signatory_name_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>"
+                          <?= $isMonitoringHeadEditor ? 'data-monitoring-head-name' : '' ?>
                           value="<?= htmlspecialchars((string)($signatoryRow['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                           <?= $source === 'manual' ? '' : 'readonly' ?>>
                       </div>
                       <div class="col-12">
-                        <label class="form-label fw-semibold" for="signatory_title_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>">Title</label>
+                        <label class="form-label fw-semibold" for="signatory_title_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>"><?= $isMonitoringHeadEditor ? 'Position / Title' : 'Title' ?></label>
                         <input
                           type="text"
                           class="form-control"
                           id="signatory_title_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>"
                           name="signatory_title_<?= htmlspecialchars($signatoryKey, ENT_QUOTES, 'UTF-8') ?>"
+                          <?= $isMonitoringHeadEditor ? 'data-monitoring-head-title' : '' ?>
                           value="<?= htmlspecialchars((string)($signatoryRow['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                           <?= $source === 'manual' ? '' : 'readonly' ?>>
                       </div>
@@ -371,6 +399,12 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                         Current file:
                         <strong><?= $signaturePath !== '' ? htmlspecialchars(basename($signaturePath), ENT_QUOTES, 'UTF-8') : 'None' ?></strong>
                       </p>
+                      <?php if ($isMonitoringHeadEditor): ?>
+                        <div class="document-settings-text-preview" aria-live="polite">
+                          <span class="document-settings-text-preview-name" data-monitoring-head-preview-name><?= htmlspecialchars((string)($signatoryRow['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                          <span class="document-settings-text-preview-title" data-monitoring-head-preview-title><?= htmlspecialchars((string)($signatoryRow['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                        </div>
+                      <?php endif; ?>
                     </aside>
                   </div>
                 </section>
@@ -437,5 +471,22 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       </div>
     </main>
   </div>
+  <script>
+    (() => {
+      const nameInput = document.querySelector('[data-monitoring-head-name]');
+      const titleInput = document.querySelector('[data-monitoring-head-title]');
+      const namePreview = document.querySelector('[data-monitoring-head-preview-name]');
+      const titlePreview = document.querySelector('[data-monitoring-head-preview-title]');
+      if (!nameInput || !titleInput || !namePreview || !titlePreview) return;
+
+      const updatePreview = () => {
+        namePreview.textContent = nameInput.value.trim() || 'SIGNATORY NAME';
+        titlePreview.textContent = titleInput.value.trim() || 'Head, Monitoring & Collection Dept.';
+      };
+      nameInput.addEventListener('input', updatePreview);
+      titleInput.addEventListener('input', updatePreview);
+      updatePreview();
+    })();
+  </script>
 </body>
 </html>

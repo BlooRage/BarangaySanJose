@@ -34,7 +34,7 @@ if (!function_exists('dms_module_catalog')) {
                         'signature_help' => 'Shown on the clearance signatory block.',
                     ],
                     'monitoring_head' => [
-                        'label' => 'Monitoring Head',
+                        'label' => 'Head, Monitoring & Collection Dept.',
                         'source' => 'manual',
                         'default_name' => 'MR. JOSEPH C. PATRICIO',
                         'default_title' => 'Head, Monitoring & Collection Dept.',
