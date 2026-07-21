@@ -78,7 +78,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260318ac';
+    $currentRenderRevision = 'r20260318ad';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3057,6 +3057,8 @@ function dra_generate_issued_document(array $requestRow): ?string
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
+    $isGeneralCertification = (bool)preg_match('/\bgeneral\s+certificat(?:e|ion)\b/i', $docType);
+    $usesResidencyTemplate = $isResidency || $isGeneralCertification;
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
     $isFirstTimeJobSeeker = strpos(preg_replace('/[^a-z0-9]+/', '', $docTypeNorm), 'firsttimejobseeker') !== false;
     $isBusinessPermitClearance = in_array($docTypeToken, [
@@ -3473,7 +3475,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260318ac';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260318ad';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -5168,7 +5170,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     if ($printHeaderEnabled && is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
-    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker;
+    $isSpecialCertificate = $isIndigency || $isGoodMoral || $usesResidencyTemplate || $isCohabitation || $isFirstTimeJobSeeker;
     $fontFace = 'Arial';
     $indigencyFont = 'Arial';
 
@@ -5192,11 +5194,12 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'CERTIFICATE OF INDIGENCY'), 0, 1, 'C');
             $pdf->Ln(4);
-        } elseif ($isResidency) {
+        } elseif ($usesResidencyTemplate) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'CERTIFICATE OF RESIDENCY'), 0, 1, 'C');
+            $residencyTemplateTitle = $isResidency ? 'CERTIFICATE OF RESIDENCY' : 'BARANGAY CERTIFICATION';
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : $residencyTemplateTitle), 0, 1, 'C');
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
             $pdf->SetFont($indigencyFont, 'B', 17);
@@ -5765,9 +5768,11 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $indigencyFont,
                 12
             );
-        } elseif ($isResidency) {
+        } elseif ($usesResidencyTemplate) {
             $writeIndentedParagraph(
-                'This is to certify that the person whose name appears here on has requested a Certificate of Residency from this office and the information are listed below:',
+                $isResidency
+                    ? 'This is to certify that the person whose name appears here on has requested a Certificate of Residency from this office and the information are listed below:'
+                    : 'This is to certify that the person whose name appears here on has requested a Barangay Certification from this office and the information are listed below:',
                 7,
                 18,
                 10,
@@ -5811,7 +5816,10 @@ function dra_generate_issued_document(array $requestRow): ?string
             $writeResidencyField('Birthday', $birthdateValue !== '' ? $birthdateValue : '-', false);
             $writeResidencyField('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-', false);
             $writeResidencyField('Remarks', $remarksValue, false, '');
-            $writeResidencyField('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', false);
+            $displayPurpose = $isGeneralCertification
+                ? trim((string)(preg_replace('/\s*\(\s*SINCE\b[^)]*\)\s*$/i', '', $requestPurpose) ?? $requestPurpose))
+                : $requestPurpose;
+            $writeResidencyField('Purpose', $displayPurpose !== '' ? $displayPurpose : '-', false);
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
             $writeRichParagraph(
@@ -5986,7 +5994,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $indigencyFont,
                 12
             );
-        } elseif ($isResidency) {
+        } elseif ($usesResidencyTemplate) {
             $writeRichParagraph(
                 [
                     ['text' => 'This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11-2019', 'bold' => false],
@@ -6095,7 +6103,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 ['key' => 'issued_on', 'label' => 'Issued On:', 'value' => $issuedOnFooter],
                 ['key' => 'or_number', 'label' => 'OR No.:', 'value' => $orNo],
             ]);
-        } elseif ($isResidency) {
+        } elseif ($usesResidencyTemplate) {
             $renderFixedMetaRows($pdf, $indigencyFont, 196.0, 18.0, 28.0, 46.0, 64.0, 7.0, [
                 ['key' => 'ctc', 'label' => 'CTC No.:', 'value' => ''],
                 ['key' => 'issued_at', 'label' => 'Issued at:', 'value' => $issuedAtFooter],
@@ -6176,7 +6184,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             );
         } else {
             // Issued by + signatory blocks aligned to the same baseline.
-            $signBaseY = ($isGoodMoral || $isResidency || $isCohabitation) ? 230.0 : 214.0;
+            $signBaseY = ($isGoodMoral || $usesResidencyTemplate || $isCohabitation) ? 230.0 : 214.0;
             $issuedByY = $signBaseY + 9;
             $issuedByTitleY = $signBaseY + 15;
             $footerNoteY = 258.0;
@@ -8824,6 +8832,7 @@ if ($action === 'view_issued') {
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
+    $isGeneralCertification = (bool)preg_match('/\bgeneral\s+certificat(?:e|ion)\b/i', (string)($row['document_type'] ?? ''));
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
     $isFirstTimeJobSeeker = strpos(preg_replace('/[^a-z0-9]+/', '', $docTypeNorm), 'firsttimejobseeker') !== false;
     $isBusinessPermitClearance = in_array($docTypeToken, [
@@ -8843,6 +8852,7 @@ if ($action === 'view_issued') {
     $isTemplateBasedCertificate = $isIndigency
         || $isGoodMoral
         || $isResidency
+        || $isGeneralCertification
         || $isCohabitation
         || $isFirstTimeJobSeeker
         || $isBusinessPermitClearance
@@ -8861,7 +8871,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260318ac';
+        : 'r20260318ad';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);

@@ -3386,10 +3386,11 @@
     })();
 
     const basePurposeText = generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '']);
-    const isGeneralCertificationVariant = String(firstNonEmpty([
+    const generalCertificationType = String(firstNonEmpty([
       payload.manual_document_variant,
       requestedDocType
-    ]) || '').trim().toLowerCase() === 'general certification';
+    ]) || '').trim();
+    const isGeneralCertificationVariant = /^general\s+certificat(?:e|ion)\b/i.test(generalCertificationType);
     const residencyPurposeText = requestedDocKey === 'residency' && !isGeneralCertificationVariant
       ? buildResidencyPurposeText(
           basePurposeText,
@@ -3398,7 +3399,9 @@
           firstNonEmpty([payload.months_of_residency]),
           firstNonEmpty([payload.residency_duration, residentProfile.residency_duration])
         )
-      : basePurposeText;
+      : (isGeneralCertificationVariant
+          ? String(basePurposeText || '').replace(/\s*\(\s*since\b[^)]*\)\s*$/i, '').trim()
+          : basePurposeText);
     const submissionTargetType = String(firstNonEmpty([payload.submission_target_type]) || '').trim().toLowerCase();
     const explicitRequestOfficerLines = [
       upperText(firstNonEmpty([payload.request_officer_line1]), ''),
@@ -3615,6 +3618,8 @@
     const isTricyclePermitClearance = docKey === 'tricycleclearance';
     const isGoodMoral = docKey === 'goodmoral';
     const isResidency = docKey === 'residency';
+    const isGeneralCertification = /^general\s+certificat(?:e|ion)\b/i.test(templateDocType);
+    const usesResidencyTemplate = isResidency || isGeneralCertification;
     const isCohabitation = docKey === 'cohabitation';
     const isFirstTimeJobSeeker = docKey === 'firsttimejobseeker';
     const isRelationshipJailVisit = isCohabitation
@@ -4078,7 +4083,7 @@
         </p>
       `;
       metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
-    } else if (isResidency) {
+    } else if (usesResidencyTemplate) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
@@ -4112,7 +4117,7 @@
         </p>
       `;
       metaHtml = '';
-    } else if (isResidency) {
+    } else if (usesResidencyTemplate) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
@@ -4161,7 +4166,7 @@
           ? 'doc-preview-paper doc-preview-paper--generalclearance'
           : isTricyclePermitClearance
             ? 'doc-preview-paper doc-preview-paper--tricycle'
-            : (isBarangayId || isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker)
+            : (isBarangayId || isGoodMoral || usesResidencyTemplate || isCohabitation || isFirstTimeJobSeeker)
               ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
               : 'doc-preview-paper';
 
