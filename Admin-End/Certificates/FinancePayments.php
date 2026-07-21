@@ -625,6 +625,16 @@ if ($financeSection === 'fees') {
       border-top: 0;
       box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06), inset 0 8px 0 #fff;
     }
+    .finance-fee-editor {
+      height: 100%;
+      padding: 1rem;
+      border: 1px solid #dbe0e5;
+      border-radius: 0.75rem;
+      background: #f8f9fa;
+    }
+    #generalFeesPanel > .finance-fee-card {
+      border-top-left-radius: 0;
+    }
     .finance-fee-form-note {
       font-size: 0.9rem;
       color: #6c757d;
@@ -966,12 +976,13 @@ if ($financeSection === 'fees') {
           </div>
         <?php endif; ?>
 
-        <div class="row g-4">
-          <div class="col-12 col-lg-4">
-            <div class="finance-fee-card finance-fee-card--general-form p-4 h-100">
-              <h4 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
+        <div class="row g-4 finance-fee-card p-4 mx-0">
+          <div class="col-12 col-lg-5 order-lg-2">
+            <div class="finance-fee-editor">
+              <h5 class="fw-bold mb-2">
+                <i class="fas <?= $editingFee ? 'fa-pen-to-square' : 'fa-circle-plus' ?> text-primary me-1"></i>
                 <?= $editingFee ? 'Edit Price' : 'Add New Price' ?>
-              </h4>
+              </h5>
               <p class="finance-fee-form-note mb-4">
                 Manage the prices stored in <code>generalfeestbl</code>. Only certificate-type document requests are handled here.
               </p>
@@ -1046,11 +1057,11 @@ if ($financeSection === 'fees') {
             </div>
           </div>
 
-          <div class="col-12 col-lg-8">
-            <div class="finance-fee-card p-4 h-100">
+          <div class="col-12 col-lg-7 order-lg-1">
+            <div>
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
-                  <h4 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Current General Fees</h4>
+                  <h5 class="fw-bold mb-1">Current General Fees</h5>
                   <p class="text-muted mb-0">Edit, add, or remove the prices currently stored in <code>generalfeestbl</code>.</p>
                 </div>
                 <div class="badge bg-light text-dark border px-3 py-2">
