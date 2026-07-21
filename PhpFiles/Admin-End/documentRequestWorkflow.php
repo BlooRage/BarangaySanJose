@@ -49,8 +49,9 @@ if ($action === 'optimize_indexes') {
 
 if ($action === 'barangay_id_template_config') {
     $templateAssets = dra_barangay_id_template_assets();
-    $barangayIdSignatories = dms_resolve_module_signatories($conn, 'barangay_id');
+    $barangayIdSignatories = dra_current_barangay_signatories($conn);
     $punongSignatory = is_array($barangayIdSignatories['punong'] ?? null) ? $barangayIdSignatories['punong'] : [];
+    $secretarySignatory = is_array($barangayIdSignatories['secretary'] ?? null) ? $barangayIdSignatories['secretary'] : [];
     $punongSignaturePath = trim((string)($punongSignatory['signature_path'] ?? ''));
     $frontPublicPath = trim((string)($templateAssets['front_public_path'] ?? ''));
     $backPublicPath = trim((string)($templateAssets['back_public_path'] ?? ''));
@@ -74,6 +75,8 @@ if ($action === 'barangay_id_template_config') {
         'punong_signatory_name' => trim((string)($punongSignatory['name'] ?? '')),
         'punong_signatory_title' => trim((string)($punongSignatory['title'] ?? '')),
         'punong_signatory_signature_url' => $punongSignaturePath !== '' ? dra_public_asset_path($punongSignaturePath) : '',
+        'secretary_signatory_name' => trim((string)($secretarySignatory['name'] ?? '')),
+        'secretary_signatory_title' => trim((string)($secretarySignatory['title'] ?? '')),
     ]);
 }
 

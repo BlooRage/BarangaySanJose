@@ -145,7 +145,9 @@
         sampleData: data?.sample_data && typeof data.sample_data === 'object' ? data.sample_data : null,
         punongSignatoryName: String(data?.punong_signatory_name || '').trim(),
         punongSignatoryTitle: String(data?.punong_signatory_title || '').trim(),
-        punongSignatorySignatureUrl: String(data?.punong_signatory_signature_url || '').trim()
+        punongSignatorySignatureUrl: String(data?.punong_signatory_signature_url || '').trim(),
+        secretarySignatoryName: String(data?.secretary_signatory_name || '').trim(),
+        secretarySignatoryTitle: String(data?.secretary_signatory_title || '').trim()
       };
       return barangayIdTemplateConfigCache;
     })();
@@ -8763,6 +8765,7 @@
       if (isIdIssuanceTrackerView || !manualDocumentInlinePreview) return;
       manualDocumentInlinePreview.innerHTML = '<div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing document preview...</div>';
       try {
+        await fetchBarangayIdTemplateConfig({ force: true });
         const bundle = manualPreviewStateBundle();
         if (bundle.config.clearance && !bundle.feeRows.length && !manualHasExemptSector(manualCurrentSectorValues())) {
           manualSetAlert('Tag at least one clearance fee first so the manual request can proceed to finance after submission.', 'warning');
@@ -10860,7 +10863,12 @@
         fee_amount: config.clearance && feeRows.length
           ? feeRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
           : (manualIsOtherDocumentSelection(rawConfig) ? manualResolvedDocumentFee() : null),
-        submitted_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+        submitted_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        punong_signatory_name: String(barangayIdTemplateConfigCache?.punongSignatoryName || '').trim(),
+        punong_signatory_title: String(barangayIdTemplateConfigCache?.punongSignatoryTitle || '').trim(),
+        punong_signatory_signature_path: String(barangayIdTemplateConfigCache?.punongSignatorySignatureUrl || '').trim(),
+        secretary_signatory_name: String(barangayIdTemplateConfigCache?.secretarySignatoryName || '').trim(),
+        secretary_signatory_title: String(barangayIdTemplateConfigCache?.secretarySignatoryTitle || '').trim()
       };
       const residentProfile = manualSelectedResident ? { ...manualSelectedResident } : {};
       const signature = JSON.stringify({

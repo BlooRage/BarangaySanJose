@@ -743,6 +743,12 @@ if ($certificateLaunchStage === 'release') {
       place-items: center;
       padding: 4px 0 14px;
     }
+    #manualDocumentInlinePreview .doc-preview-shell {
+      max-height: min(68vh, 720px);
+      overflow: auto;
+      place-items: start center;
+      overscroll-behavior: contain;
+    }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-stage {
       border: 1px solid #d9dee6;
       border-radius: 10px;
@@ -4282,7 +4288,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260721-print-issued-12"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260721-manual-preview-13"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
