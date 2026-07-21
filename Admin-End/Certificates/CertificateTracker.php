@@ -2539,6 +2539,16 @@ if ($certificateLaunchStage === 'release') {
       justify-content: space-between;
       gap: 14px;
       flex-wrap: wrap;
+      cursor: pointer;
+      transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+    .manual-resident-result:hover,
+    .manual-resident-result:focus-visible {
+      border-color: #2563eb;
+      background: #eff6ff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+      transform: translateY(-1px);
+      outline: none;
     }
     .manual-resident-result-name {
       font-size: .96rem;

@@ -3523,18 +3523,10 @@
       ]),
       documentValidity: documentValidityDate,
       approvedByName: upperText(firstNonEmptyName([
-        row.punong_signatory_name,
-        row.reviewed_by,
-        row.personnel_name,
-        row.released_by,
-        row.finance_user_name
+        row.punong_signatory_name
       ]), 'HON. GLENN S. EVANGELISTA'),
       punongSignatoryName: upperText(firstNonEmptyName([
-        row.punong_signatory_name,
-        row.reviewed_by,
-        row.personnel_name,
-        row.released_by,
-        row.finance_user_name
+        row.punong_signatory_name
       ]), 'HON. GLENN S. EVANGELISTA'),
       punongSignatoryTitle: firstNonEmpty([
         row.punong_signatory_title,
@@ -3758,11 +3750,11 @@
         : 'at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal';
       return `Issued this <strong>${esc(issuedDateWord)}</strong> ${officeText}`;
     };
-    const buildSharedIssuedMetaRows = (ctcValue = '_____') => ([
-      { label: 'CTC No.:', value: ctcValue },
-      { label: 'Issued at:', value: generalClearanceIssuedAt || '_____' },
-      { label: 'Issued On:', value: generalClearanceIssuedOn || '_____' },
-      { label: 'OR No.:', value: safe(state.orNumber, '_____') },
+    const buildSharedIssuedMetaRows = () => ([
+      { label: 'CTC No.:', value: '_____' },
+      { label: 'Issued at:', value: '_____' },
+      { label: 'Issued On:', value: '_____' },
+      { label: 'OR No.:', value: '_____' },
     ]);
     const buildCertificateFooterNote = () => {
       const dayWord = sentenceCaseWords(numberToWords(certificateValidityDays || 0)) || 'Forty-five';
@@ -3878,27 +3870,27 @@
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>CTC No.</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(certificateNumber, '${CERTIFICATE_NUMBER}')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Issued at</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(generalClearanceIssuedAt)}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Issued On</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(generalClearanceIssuedOn)}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(amount, '${AMOUNT}')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>OR No.</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(state.orNumber, '${OR_NUMBER}')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
           </div>
         </div>
       `;
@@ -3953,7 +3945,7 @@
         </p>
       `;
       issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
-      const tricycleMetaValues = [certificateNumber, state.orNumber, amount].map((value) => String(value || '').trim());
+      const tricycleMetaValues = ['', '', ''];
       const tricycleMetaLongest = tricycleMetaValues.reduce((max, value) => Math.max(max, value.length), 0);
       const tricycleMetaWidthCh = Math.max(8, tricycleMetaLongest + 1.2);
       const tricycleMetaLine = (value) => {
@@ -3965,17 +3957,17 @@
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Clearance No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(certificateNumber)}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Receipt No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(state.orNumber)}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(amount)}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
           </div>
         </div>
       `;
@@ -4209,17 +4201,17 @@
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>O.R No.</strong></div>
             <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('orNumber', state.orNumber)}</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('orNumber', '')}</div>
           </div>
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('amount', amount)}</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('amount', '')}</div>
           </div>
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>Plate No.</strong></div>
             <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('plateNumber', plateNumber)}</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('plateNumber', '')}</div>
           </div>
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>Date Issued</strong></div>
@@ -10675,7 +10667,7 @@
 
       manualResidentResultsWrap.classList.remove('d-none');
       manualResidentResults.innerHTML = manualResidentSearchResults.map((row, index) => `
-        <div class="manual-resident-result">
+        <div class="manual-resident-result" role="button" tabindex="0" data-manual-use-resident="${index}" aria-label="Select ${esc(row.full_name || 'resident')}">
           <div>
             <div class="manual-resident-result-name">${esc(row.full_name || 'Unnamed Resident')}</div>
             <p class="manual-resident-result-meta">
@@ -10683,9 +10675,6 @@
             </p>
             <p class="manual-resident-result-meta">${esc(row.full_address || '-')}</p>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-primary" data-manual-use-resident="${index}">
-            <i class="fas fa-link me-1"></i>Use Resident
-          </button>
         </div>
       `).join('');
     }
@@ -10964,6 +10953,15 @@
     manualResidentResults?.addEventListener('click', (event) => {
       const trigger = event.target.closest('[data-manual-use-resident]');
       if (!trigger) return;
+      const index = Number(trigger.getAttribute('data-manual-use-resident') || '-1');
+      if (!Number.isInteger(index) || index < 0 || index >= manualResidentSearchResults.length) return;
+      manualFillFormFromResident(manualResidentSearchResults[index]);
+    });
+    manualResidentResults?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const trigger = event.target.closest('[data-manual-use-resident]');
+      if (!trigger) return;
+      event.preventDefault();
       const index = Number(trigger.getAttribute('data-manual-use-resident') || '-1');
       if (!Number.isInteger(index) || index < 0 || index >= manualResidentSearchResults.length) return;
       manualFillFormFromResident(manualResidentSearchResults[index]);
