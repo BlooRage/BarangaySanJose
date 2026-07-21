@@ -199,9 +199,10 @@ $isClearanceIssuanceSectionActive = $isClearanceIssuanceActive
     || $isClearanceElectricPermitActive
     || $isClearanceWaterPermitActive
     || $isClearanceResidentialPermitActive
-    || $isClearanceCommercialPermitActive;
+    || $isClearanceCommercialPermitActive
+    || $isBusinessMonitoringSettingsActive;
+$isClearanceIssuanceTrackerActive = $isClearanceIssuanceSectionActive && !$isBusinessMonitoringSettingsActive;
 $isBusinessMonitoringActive = $current === 'BusinessMonitoring.php'
-    || $isBusinessMonitoringSettingsActive
     || (
         $current === 'CertificateTracker.php'
         && !$isIdIssuanceActive
@@ -1418,17 +1419,38 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Monitoring</li>
       <?php if ($sbCan('clearance_issuance')): ?>
       <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $isClearanceIssuanceSectionActive ? 'active' : '' ?>"
+        <button type="button"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceSectionActive ? '' : 'collapsed' ?>"
+           data-sidebar-toggle="collapse"
+           data-sidebar-target="#clearance-issuance-collapse"
+           aria-controls="clearance-issuance-collapse"
+           aria-expanded="<?= $isClearanceIssuanceSectionActive ? 'true' : 'false' ?>"
            data-sidebar-has-badge="<?= $sbCount('clearance_issuance') > 0 ? 'true' : 'false' ?>"
-           style="<?= $isClearanceIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
+        >
           <span class="sidebar-icon-wrap">
             <i class="fas fa-stamp"></i>
             <?= $sbRenderAttentionDot($sbModuleCount('clearance_issuance')) ?>
             <?= $sbRenderAttentionBadge($sbCount('clearance_issuance')) ?>
           </span>
           <span class="sidebar-button-label">Clearance Issuance</span>
-        </a>
+        </button>
+        <div class="collapse <?= $isClearanceIssuanceSectionActive ? 'show' : '' ?>" id="clearance-issuance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isClearanceIssuanceTrackerActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('clearance_issuance')) ?>
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoringSettings.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isBusinessMonitoringSettingsActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Settings</span>
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
       <?php endif; ?>
       <?php if ($sbCan('business_monitoring')): ?>
@@ -1440,16 +1462,6 @@ if ($sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
             <i class="fas fa-store"></i>
           </span>
           <span class="sidebar-button-label">Business Monitoring</span>
-        </a>
-      </li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoringSettings.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $isBusinessMonitoringSettingsActive ? 'active' : '' ?>"
-           style="<?= $isBusinessMonitoringSettingsActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-gear"></i>
-          </span>
-          <span class="sidebar-button-label">Monitoring Settings</span>
         </a>
       </li>
       <?php endif; ?>
