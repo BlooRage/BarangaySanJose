@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260721ag';
+    $currentRenderRevision = 'r20260721ah';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3479,7 +3479,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721ag';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260721ah';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -5043,18 +5043,6 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
                 $writeFittedCell($pdf, 32.0, 206.0, 48.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.4, 8.2, 'L');
                 $writeFittedCell($pdf, 22.0, 211.6, 56.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
-
-                $pdf->Rect(114.0, 188.8, 83.0, 24.0, 'F');
-                dra_render_signature_image($pdf, $punongSignaturePath, 125.5, 184.2, 52.0, 8.8);
-                $pdf->Line(119.8, 198.6, 191.2, 198.6);
-                $writeFittedCell($pdf, 118.0, 199.7, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
-                $writeFittedCell($pdf, 118.0, 205.0, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
-
-                $pdf->Rect(114.0, 214.8, 83.0, 24.0, 'F');
-                dra_render_signature_image($pdf, $monitoringSignaturePath, 125.5, 210.2, 52.0, 8.8);
-                $pdf->Line(119.8, 224.6, 191.2, 224.6);
-                $writeFittedCell($pdf, 118.0, 225.7, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.6, 8.2, 'C');
-                $writeFittedCell($pdf, 118.0, 231.0, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.6, 7.6, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
@@ -8866,7 +8854,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260721ag';
+        : 'r20260721ah';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
