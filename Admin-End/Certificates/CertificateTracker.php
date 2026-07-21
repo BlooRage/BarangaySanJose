@@ -3957,6 +3957,7 @@ if ($certificateLaunchStage === 'release') {
       </div>
       <div class="modal-footer">
         <button type="button" id="paymentProofReturnBtn" class="btn btn-secondary me-auto d-none">Return</button>
+        <button type="button" id="paymentProofRegenerateBtn" class="btn btn-warning d-none"><i class="fas fa-rotate me-1"></i>Regenerate Document</button>
         <button type="button" id="paymentProofPrintBtn" class="btn btn-outline-dark d-none">Print</button>
         <a id="paymentProofOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open in New Tab</a>
         <button type="button" id="paymentProofReleaseBtn" class="btn btn-success d-none">Release</button>
@@ -4248,6 +4249,6 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260721-admin-regenerate-release-9"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260721-admin-regenerate-modal-10"></script>
 </body>
 </html>

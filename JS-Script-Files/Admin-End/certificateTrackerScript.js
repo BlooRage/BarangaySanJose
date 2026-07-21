@@ -563,6 +563,7 @@
   const paymentProofPrintBtn = document.getElementById('paymentProofPrintBtn');
   const paymentProofTitle = document.getElementById('paymentProofTitle');
   const paymentProofReturnBtn = document.getElementById('paymentProofReturnBtn');
+  const paymentProofRegenerateBtn = document.getElementById('paymentProofRegenerateBtn');
   const paymentProofReleaseBtn = document.getElementById('paymentProofReleaseBtn');
   const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
   const idPrintProcessModalEl = document.getElementById('idPrintProcessModal');
@@ -1463,9 +1464,6 @@
     const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && canOpenIssuedDocument(row))
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">${issuedLabel}</button>`
       : '';
-    const regenerateBtn = (!isFinancePaymentsPage && stageKey === 'ready_for_claim')
-      ? `<button class="btn btn-sm btn-warning me-1" data-regenerate-id="${esc(row.request_id)}"><i class="fas fa-rotate me-1"></i>Regenerate</button>`
-      : '';
     if (isFinancePaymentsPage) {
       const financeKey = statusBucket(row);
       if (financeKey === 'pending_verification') {
@@ -1473,7 +1471,7 @@
       }
       return viewBtn;
     }
-    const buttons = `${viewBtn}${viewIssuedBtn}${regenerateBtn}`;
+    const buttons = `${viewBtn}${viewIssuedBtn}`;
     return isIdIssuanceTrackerView
       ? `<div class="id-issuance-table-actions">${buttons}</div>`
       : buttons;
@@ -1547,7 +1545,6 @@
       if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
       return `
         ${proofBtn}
-        <button class="btn btn-sm btn-warning" data-view-action="regenerate_document" data-id="${id}"><i class="fas fa-rotate me-1"></i>Regenerate Document</button>
         <button class="btn btn-sm btn-success" data-view-action="mark_completed" data-id="${id}">Mark as Claimed</button>
       `;
     }
@@ -4800,6 +4797,38 @@
     }
   });
 
+  paymentProofRegenerateBtn?.addEventListener('click', async () => {
+    const requestId = String(paymentProofReleaseRequestId || '').trim();
+    if (!requestId || !window.confirm('Regenerate this issued document using the current admin settings? The current generated file will be replaced.')) {
+      return;
+    }
+    const modalState = paymentProofModalState ? {
+      docUrl: paymentProofModalState.docUrl,
+      title: paymentProofModalState.title,
+      returnTarget: paymentProofModalState.returnTarget,
+      options: { ...(paymentProofModalState.options || {}) }
+    } : null;
+    paymentProofRegenerateBtn.disabled = true;
+    paymentProofRegenerateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regenerating...';
+    try {
+      const body = new FormData();
+      body.append('action', 'regenerate_issued_document');
+      body.append('request_id', requestId);
+      const data = await fetchJson(endpoint, { method: 'POST', body });
+      cachedAllItems = null;
+      await load({ force: true });
+      if (modalState) {
+        openDocumentModal(modalState.docUrl, modalState.title, modalState.returnTarget, modalState.options);
+      }
+      alert(data?.message || 'Issued document regenerated successfully.');
+    } catch (error) {
+      alert(error?.message || 'Unable to regenerate the issued document.');
+    } finally {
+      paymentProofRegenerateBtn.disabled = false;
+      paymentProofRegenerateBtn.innerHTML = '<i class="fas fa-rotate me-1"></i>Regenerate Document';
+    }
+  });
+
   paymentProofReleaseBtn?.addEventListener('click', async () => {
     const requestId = String(paymentProofReleaseRequestId || '').trim();
     if (!requestId) return;
@@ -5209,6 +5238,11 @@
       paymentProofPrintBtn.classList.add('d-none');
       paymentProofPrintBtn.textContent = 'Print';
     }
+    if (paymentProofRegenerateBtn) {
+      paymentProofRegenerateBtn.classList.add('d-none');
+      paymentProofRegenerateBtn.disabled = false;
+      paymentProofRegenerateBtn.innerHTML = '<i class="fas fa-rotate me-1"></i>Regenerate Document';
+    }
     if (paymentProofReleaseBtn) {
       paymentProofReleaseBtn.classList.add('d-none');
       paymentProofReleaseBtn.disabled = false;
@@ -5377,6 +5411,10 @@
       paymentProofReleaseBtn.classList.toggle('d-none', !(isIssuedDocument && releaseRequestId));
       paymentProofReleaseBtn.disabled = false;
       paymentProofReleaseBtn.textContent = 'Release';
+    }
+    if (paymentProofRegenerateBtn) {
+      paymentProofRegenerateBtn.classList.toggle('d-none', !(isIssuedDocument && releaseRequestId));
+      paymentProofRegenerateBtn.disabled = false;
     }
     paymentProofModal.show();
     window.requestAnimationFrame(() => {
@@ -6868,30 +6906,6 @@
   }
 
   function bindActionButtons() {
-    tableBody.querySelectorAll('button[data-regenerate-id]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = String(btn.getAttribute('data-regenerate-id') || '').trim();
-        if (!id || !window.confirm('Regenerate this issued document using the current admin settings? The current generated file will be replaced.')) {
-          return;
-        }
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regenerating...';
-        try {
-          const body = new FormData();
-          body.append('action', 'regenerate_issued_document');
-          body.append('request_id', id);
-          const data = await fetchJson(endpoint, { method: 'POST', body });
-          cachedAllItems = null;
-          alert(data?.message || 'Issued document regenerated successfully.');
-          await load({ force: true });
-        } catch (error) {
-          alert(error?.message || 'Unable to regenerate the issued document.');
-          btn.disabled = false;
-          btn.innerHTML = originalHtml;
-        }
-      });
-    });
     tableBody.querySelectorAll('button[data-view-id]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = String(btn.getAttribute('data-view-id') || '');
@@ -7546,32 +7560,6 @@
           actionBtn.addEventListener('click', () => {
             const action = String(actionBtn.getAttribute('data-view-action') || '').trim();
             const actionId = String(actionBtn.getAttribute('data-id') || '').trim();
-            if (action === 'regenerate_document') {
-              void (async () => {
-                if (!window.confirm('Regenerate this issued document using the current admin settings? The current generated file will be replaced.')) {
-                  return;
-                }
-                const originalHtml = actionBtn.innerHTML;
-                actionBtn.disabled = true;
-                actionBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regenerating...';
-                try {
-                  const body = new FormData();
-                  body.append('action', 'regenerate_issued_document');
-                  body.append('request_id', actionId);
-                  const data = await fetchJson(endpoint, { method: 'POST', body });
-                  cachedAllItems = null;
-                  alert(data?.message || 'Issued document regenerated successfully.');
-                  viewModal?.hide();
-                  await load({ force: true });
-                } catch (error) {
-                  alert(error?.message || 'Unable to regenerate the issued document.');
-                } finally {
-                  actionBtn.disabled = false;
-                  actionBtn.innerHTML = originalHtml;
-                }
-              })();
-              return;
-            }
             if (action === 'mark_completed') {
               openActionModal('mark_completed_confirm', actionId);
               return;
