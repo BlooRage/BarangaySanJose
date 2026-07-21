@@ -795,9 +795,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setNarrativeMode();
     syncBlotterComplaintType();
     setFiledDateTime();
-    if (timeFiledInput) {
-        setInterval(setFiledDateTime, 1000);
-    }
     phoneInputs.forEach((input) => syncPhoneValidation(input));
     updateState();
 
