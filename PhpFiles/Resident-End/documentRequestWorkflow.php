@@ -1148,6 +1148,24 @@ if ($action === 'submit_request') {
             dr_respond_json(422, ['success' => false, 'message' => 'This certificate is currently unavailable for online requests.']);
         }
     }
+    if (dr_is_clearance_document_type($documentType)) {
+        $clearanceSettings = dms_resolve_clearance_settings($conn);
+        $clearanceKey = match (true) {
+            str_contains($issuanceToken, 'businesspermit') => 'business_permit',
+            str_contains($issuanceToken, 'tricycle') => 'tricycle_permit',
+            str_contains($issuanceToken, 'electrical'), str_contains($issuanceToken, 'electric') => 'electrical_permit',
+            str_contains($issuanceToken, 'water') => 'water_permit',
+            str_contains($issuanceToken, 'residential') => 'residential_permit',
+            str_contains($issuanceToken, 'commercial') => 'commercial_permit',
+            default => 'general',
+        };
+        if (empty($clearanceSettings['online_requests_enabled'])) {
+            dr_respond_json(503, ['success' => false, 'message' => 'Online clearance requests are temporarily suspended. Please contact the barangay office.']);
+        }
+        if (empty($clearanceSettings['clearance_types'][$clearanceKey]['enabled'])) {
+            dr_respond_json(422, ['success' => false, 'message' => 'This clearance is currently unavailable for online requests.']);
+        }
+    }
     $documentTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
 
     $purpose = trim((string)($_POST['request_purpose'] ?? $_POST['purpose'] ?? ''));

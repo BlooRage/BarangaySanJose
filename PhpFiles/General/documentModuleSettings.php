@@ -163,6 +163,140 @@ if (!function_exists('dms_resolve_issuance_settings')) {
     }
 }
 
+if (!function_exists('dms_clearance_type_catalog')) {
+    function dms_clearance_type_catalog(): array
+    {
+        return [
+            'general' => 'General Barangay Clearance',
+            'business_permit' => 'Barangay Clearance for Business Permit',
+            'tricycle_permit' => 'Barangay Clearance for Tricycle Permit',
+            'electrical_permit' => 'Barangay Clearance for Electrical Permit',
+            'water_permit' => 'Barangay Clearance for Water Permit',
+            'residential_permit' => 'Barangay Clearance for Residential Building Permit',
+            'commercial_permit' => 'Barangay Clearance for Commercial Building Permit',
+        ];
+    }
+}
+
+if (!function_exists('dms_default_clearance_settings')) {
+    function dms_default_clearance_settings(): array
+    {
+        $purposeMap = [
+            'general' => ['Employment', 'Business Requirement', 'Government Transaction', 'Legal Requirement', 'Other'],
+            'business_permit' => ['New Business Permit', 'Business Permit Renewal', 'Other'],
+            'tricycle_permit' => ['New Franchise / Permit', 'Permit Renewal', 'Other'],
+            'electrical_permit' => ['New Electrical Connection', 'Electrical Installation', 'Other'],
+            'water_permit' => ['New Water Connection', 'Water Service Requirement', 'Other'],
+            'residential_permit' => ['New Construction', 'Renovation', 'Building Permit Requirement', 'Other'],
+            'commercial_permit' => ['New Construction', 'Renovation', 'Building Permit Requirement', 'Other'],
+        ];
+        $types = [];
+        foreach (dms_clearance_type_catalog() as $key => $label) {
+            $types[$key] = ['label' => $label, 'enabled' => true, 'purpose_options' => $purposeMap[$key] ?? ['Other']];
+        }
+        return [
+            'online_requests_enabled' => true,
+            'default_validity_days' => 45,
+            'allowed_validity_days' => [3, 15, 30, 45, 60],
+            'qr_verification_enabled' => true,
+            'essential_details_only' => true,
+            'copy_has_signature' => true,
+            'print_header_enabled' => true,
+            'document_field_visibility' => array_fill_keys(array_keys(dms_document_field_catalog('monitoring')), true),
+            'resident_notifications' => [
+                'submitted' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been submitted and is awaiting review.'],
+                'approved' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been approved.'],
+                'rejected' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) was rejected. Reason: {reason}'],
+                'ready_for_claim' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) is ready for claim.'],
+                'released' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been released.'],
+            ],
+            'aging_notification_enabled' => true,
+            'aging_days' => 3,
+            'aging_message' => '{count} clearance request(s) have been pending for at least {days} day(s).',
+            'aging_recipient_mode' => 'module_access',
+            'aging_recipient_user_ids' => [],
+            'clearance_types' => $types,
+        ];
+    }
+}
+
+if (!function_exists('dms_ensure_clearance_settings_table')) {
+    function dms_ensure_clearance_settings_table(mysqli $conn): void
+    {
+        $conn->query("CREATE TABLE IF NOT EXISTS documentclearancesettingstbl (setting_id TINYINT UNSIGNED NOT NULL DEFAULT 1, settings_json LONGTEXT NOT NULL, updated_by_user_id VARCHAR(64) DEFAULT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (setting_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+}
+
+if (!function_exists('dms_resolve_clearance_settings')) {
+    function dms_resolve_clearance_settings(mysqli $conn): array
+    {
+        dms_ensure_clearance_settings_table($conn);
+        $defaults = dms_default_clearance_settings();
+        $result = $conn->query("SELECT settings_json, updated_by_user_id, updated_at FROM documentclearancesettingstbl WHERE setting_id=1 LIMIT 1");
+        $row = $result instanceof mysqli_result ? $result->fetch_assoc() : null;
+        $stored = $row ? json_decode((string)($row['settings_json'] ?? ''), true) : null;
+        $settings = is_array($stored) ? array_replace_recursive($defaults, $stored) : $defaults;
+        $settings['copy_has_signature'] = dms_resolve_module_copy_signature_setting($conn, 'monitoring');
+        $settings['print_header_enabled'] = dms_resolve_module_print_header_setting($conn, 'monitoring');
+        $settings['document_field_visibility'] = dms_resolve_document_field_visibility($conn, 'monitoring');
+        $settings['updated_by_user_id'] = (string)($row['updated_by_user_id'] ?? '');
+        $settings['updated_at'] = (string)($row['updated_at'] ?? '');
+        return $settings;
+    }
+}
+
+if (!function_exists('dms_save_clearance_settings')) {
+    function dms_save_clearance_settings(mysqli $conn, array $post, string $updatedByUserId): array
+    {
+        $before = dms_resolve_clearance_settings($conn);
+        $scope = strtolower(trim((string)($post['settings_scope'] ?? 'all')));
+        if (!in_array($scope, ['all', 'general', 'types', 'notifications'], true)) $scope = 'all';
+        $settings = array_replace_recursive(dms_default_clearance_settings(), $before);
+        unset($settings['updated_by_user_id'], $settings['updated_at']);
+        if (in_array($scope, ['all', 'general'], true)) {
+            foreach (['online_requests_enabled', 'qr_verification_enabled', 'essential_details_only'] as $key) $settings[$key] = isset($post[$key]);
+            $settings['copy_has_signature'] = isset($post['copy_has_signature']);
+            $settings['print_header_enabled'] = isset($post['print_header_enabled']);
+            $allowed = array_values(array_unique(array_filter(array_map('intval', (array)($post['allowed_validity_days'] ?? [])), static fn(int $v): bool => $v >= 1 && $v <= 365)));
+            $default = max(1, min(365, (int)($post['default_validity_days'] ?? 45)));
+            if (!in_array($default, $allowed, true)) $allowed[] = $default;
+            sort($allowed); $settings['allowed_validity_days'] = $allowed ?: [$default]; $settings['default_validity_days'] = $default;
+            foreach (dms_document_field_catalog('monitoring') as $key => $_label) $settings['document_field_visibility'][$key] = isset($post['document_field_visible'][$key]);
+        }
+        if (in_array($scope, ['all', 'types'], true)) {
+            foreach (dms_clearance_type_catalog() as $key => $label) {
+                $settings['clearance_types'][$key]['enabled'] = isset($post['clearance_type_enabled'][$key]);
+                $lines = preg_split('/\R/u', (string)($post['purpose_options'][$key] ?? '')) ?: [];
+                $settings['clearance_types'][$key]['purpose_options'] = array_slice(array_values(array_unique(array_filter(array_map('trim', $lines), static fn(string $v): bool => $v !== ''))), 0, 50);
+            }
+        }
+        if (in_array($scope, ['all', 'notifications'], true)) {
+            $settings['aging_notification_enabled'] = isset($post['aging_notification_enabled']);
+            $settings['aging_days'] = max(1, min(90, (int)($post['aging_days'] ?? 3)));
+            $settings['aging_message'] = trim((string)($post['aging_message'] ?? $settings['aging_message'])) ?: $settings['aging_message'];
+            $mode = strtolower(trim((string)($post['aging_recipient_mode'] ?? 'module_access')));
+            $settings['aging_recipient_mode'] = in_array($mode, ['module_access', 'specific'], true) ? $mode : 'module_access';
+            $settings['aging_recipient_user_ids'] = array_values(array_unique(array_filter(array_map(static fn($v): string => preg_replace('/[^A-Za-z0-9_-]/', '', trim((string)$v)) ?: '', (array)($post['aging_recipient_user_ids'] ?? [])))));
+            foreach ($settings['resident_notifications'] as $event => &$notification) {
+                $notification['enabled'] = isset($post['notification_enabled'][$event]);
+                $message = trim((string)($post['notification_message'][$event] ?? '')); if ($message !== '') $notification['message'] = $message;
+            }
+            unset($notification);
+        }
+        $json = json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) throw new RuntimeException('Unable to encode clearance settings.');
+        $stmt = $conn->prepare("INSERT INTO documentclearancesettingstbl (setting_id,settings_json,updated_by_user_id) VALUES (1,?,?) ON DUPLICATE KEY UPDATE settings_json=VALUES(settings_json),updated_by_user_id=VALUES(updated_by_user_id),updated_at=CURRENT_TIMESTAMP");
+        if (!$stmt) throw new RuntimeException('Unable to prepare clearance settings save.');
+        $stmt->bind_param('ss', $json, $updatedByUserId); if (!$stmt->execute()) throw new RuntimeException('Unable to save clearance settings.'); $stmt->close();
+        if (in_array($scope, ['all', 'general'], true)) {
+            dms_save_module_copy_signature_setting($conn, 'monitoring', !empty($settings['copy_has_signature']), $updatedByUserId);
+            dms_save_module_print_header_setting($conn, 'monitoring', !empty($settings['print_header_enabled']), $updatedByUserId);
+            dms_save_document_field_visibility($conn, 'monitoring', $post, $updatedByUserId);
+        }
+        return ['before' => $before, 'after' => dms_resolve_clearance_settings($conn)];
+    }
+}
+
 if (!function_exists('dms_save_issuance_settings')) {
     function dms_save_issuance_settings(mysqli $conn, array $post, string $updatedByUserId): array
     {

@@ -436,6 +436,18 @@ function dra_default_certificate_validity_datetime(?string $baseDateTime = null)
     return $base->modify('+' . $days . ' days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
 }
 
+function dra_default_clearance_validity_datetime(?string $baseDateTime = null): string
+{
+    global $conn;
+    try { $base = $baseDateTime !== null && trim($baseDateTime) !== '' ? new DateTimeImmutable($baseDateTime) : new DateTimeImmutable(dr_now()); }
+    catch (Throwable $e) { $base = new DateTimeImmutable(dr_now()); }
+    $days = 45;
+    if ($conn instanceof mysqli) {
+        try { $days = max(1, min(365, (int)(dms_resolve_clearance_settings($conn)['default_validity_days'] ?? 45))); } catch (Throwable $e) {}
+    }
+    return $base->modify('+' . $days . ' days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+}
+
 function dra_default_barangay_id_validity_datetime(?string $baseDateTime = null): string
 {
     try {
@@ -519,6 +531,14 @@ function dra_resolve_document_validity_datetime(string $documentType, ?string $r
 {
     if (dr_is_barangay_id_document_type($documentType)) {
         return dra_resolve_barangay_id_validity_datetime($requestedValidity, $existingValidity, $baseDateTime);
+    }
+
+    if (dr_is_clearance_document_type($documentType)) {
+        $requested = dra_normalize_validity_selection_input($requestedValidity, $baseDateTime);
+        if ($requested !== null) return $requested;
+        $existing = dr_parse_datetime_value((string)$existingValidity, true);
+        if ($existing instanceof DateTimeImmutable) return $existing->format('Y-m-d H:i:s');
+        return dra_default_clearance_validity_datetime($baseDateTime);
     }
 
     return dra_resolve_certificate_validity_datetime($documentType, $requestedValidity, $existingValidity, $baseDateTime);
@@ -669,7 +689,9 @@ function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string
 function dra_send_notification_deferred(mysqli $conn, array $request, string $subject, string $message): void
 {
     try {
-        $settings = dms_resolve_issuance_settings($conn);
+        $settings = dr_is_clearance_document_type((string)($request['document_type'] ?? ''))
+            ? dms_resolve_clearance_settings($conn)
+            : dms_resolve_issuance_settings($conn);
         $subjectToken = strtolower($subject);
         $stage = strtolower(trim((string)($request['stage'] ?? '')));
         $event = str_contains($subjectToken, 'reject') || str_contains($stage, 'rejected') || str_contains($stage, 'failed')
@@ -3025,6 +3047,11 @@ function dra_generate_issued_document(array $requestRow): ?string
         && $verificationCode !== ''
         && in_array($currentStage, $qrEligibleStages, true)
     );
+    if ($allowQr && dr_is_clearance_document_type($docType) && $conn instanceof mysqli) {
+        $allowQr = !empty(dms_resolve_clearance_settings($conn)['qr_verification_enabled']);
+    } elseif ($allowQr && !$isBarangayId && $conn instanceof mysqli) {
+        $allowQr = !empty(dms_resolve_issuance_settings($conn)['qr_verification_enabled']);
+    }
     $verifyUrl = $allowQr ? dra_qr_verify_url($requestId, $verificationCode) : '';
     $qrFile = 'qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
     $qrDiskPath = $qrDir . '/' . $qrFile;

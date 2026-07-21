@@ -11,5 +11,6 @@ $documentSettingsErrorMessage = trim((string)($_GET['error'] ?? ''));
 $documentSettingsRows = dms_resolve_module_signatories($conn, $documentSettingsModuleKey);
 $documentSettingsFieldVisibility = dms_resolve_document_field_visibility($conn, $documentSettingsModuleKey);
 $documentSettingsPrintHeaderEnabled = dms_resolve_module_print_header_setting($conn, $documentSettingsModuleKey);
+$clearanceSettings = dms_resolve_clearance_settings($conn);
 
 include __DIR__ . '/includes/clearance_settings_landing.php';

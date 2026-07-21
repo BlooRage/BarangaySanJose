@@ -3,9 +3,13 @@ declare(strict_types=1);
 $monitoringHead = (array)($documentSettingsRows['monitoring_head'] ?? []);
 $monitoringHeadName = trim((string)($monitoringHead['name'] ?? '')) ?: 'Not configured';
 $visibleFieldCount = count(array_filter($documentSettingsFieldVisibility));
+$activeClearanceTypes = count(array_filter((array)($clearanceSettings['clearance_types'] ?? []), static fn(array $row): bool => !empty($row['enabled'])));
+$activeNotifications = count(array_filter((array)($clearanceSettings['resident_notifications'] ?? []), static fn(array $row): bool => !empty($row['enabled'])));
 $items = [
-    ['General Clearance Settings', 'Control released-copy signatures, visible PDF fields, and the barangay printing header.', 'fa-sliders', appUrl('Admin-End/ClearanceDocumentSettings.php#clearance-general-settings'), $visibleFieldCount . ' visible fields · Header ' . ($documentSettingsPrintHeaderEnabled ? 'enabled' : 'disabled')],
+    ['General Clearance Settings', 'Manage online availability, validity, QR verification, privacy, letterhead, signatures, and generated PDF fields.', 'fa-sliders', appUrl('Admin-End/ClearanceGeneralSettings.php'), !empty($clearanceSettings['online_requests_enabled']) ? 'Online requests enabled' : 'Online requests suspended'],
+    ['Clearance Types & Request Choices', 'Enable supported clearance forms and customize purpose choices shown to residents.', 'fa-stamp', appUrl('Admin-End/ClearanceTypeSettings.php'), $activeClearanceTypes . ' of ' . count(dms_clearance_type_catalog()) . ' active'],
     ['Signatories', 'Edit the Head, Monitoring & Collection Dept., manage displayed titles, and upload clearance signature files.', 'fa-file-signature', appUrl('Admin-End/ClearanceDocumentSettings.php#clearance-signatories'), $monitoringHeadName],
+    ['Notifications', 'Configure resident status messages and alerts for clearance requests that remain pending too long.', 'fa-bell', appUrl('Admin-End/ClearanceNotificationSettings.php'), $activeNotifications . ' of 5 events active'],
     ['Fees & Change Requests', 'Submit clearance fee additions or price updates and review the current request queue.', 'fa-peso-sign', appUrl('Admin-End/Certificates/CertificateTracker.php?tab=fees&fee_scope=monitoring&filter_document=__clearances__'), 'Fee settings and requests'],
 ];
 ?>

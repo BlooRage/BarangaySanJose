@@ -72,15 +72,6 @@ if ($requestId === '') {
     ti_json(422, ['success' => false, 'message' => 'Missing request_id.']);
 }
 
-$issuanceSettings = dms_resolve_issuance_settings($conn);
-if (empty($issuanceSettings['qr_verification_enabled'])) {
-    ti_json(403, [
-        'success' => false,
-        'verified' => false,
-        'message' => 'QR verification is currently disabled for this department.',
-    ]);
-}
-
 $statusColumn = dr_request_status_column($conn);
 if ($statusColumn === null) {
     ti_json(500, ['success' => false, 'message' => 'Missing status column in documentrequesttbl.']);
@@ -153,6 +144,12 @@ if ($row['document_type'] === '') {
 }
 if ($row['document_type'] === '') {
     $row['document_type'] = 'Certificate Request';
+}
+$verificationSettings = dr_is_clearance_document_type((string)$row['document_type'])
+    ? dms_resolve_clearance_settings($conn)
+    : dms_resolve_issuance_settings($conn);
+if (empty($verificationSettings['qr_verification_enabled'])) {
+    ti_json(403, ['success' => false, 'verified' => false, 'message' => 'QR verification is currently disabled for this department.']);
 }
 $row['purpose'] = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
 $row['status_remarks'] = trim((string)($payload['status_remarks'] ?? ''));

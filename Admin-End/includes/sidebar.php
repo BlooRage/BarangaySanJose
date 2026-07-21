@@ -110,7 +110,7 @@ $isCertificateIssuanceSettingsActive = in_array($current, [
     'IndigencyRecipientSettings.php',
     'IssuanceFeeSettings.php',
 ], true) || $isCertificateFeeSettingsRoute;
-$isBusinessMonitoringSettingsActive = in_array($current, ['BusinessMonitoringSettings.php', 'ClearanceDocumentSettings.php'], true) || $isMonitoringFeeSettingsRoute;
+$isBusinessMonitoringSettingsActive = in_array($current, ['BusinessMonitoringSettings.php', 'ClearanceDocumentSettings.php', 'ClearanceGeneralSettings.php', 'ClearanceTypeSettings.php', 'ClearanceNotificationSettings.php'], true) || $isMonitoringFeeSettingsRoute;
 $isBarangayIdSettingsActive = ($current === 'BarangayIdSettings.php');
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
 $isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);

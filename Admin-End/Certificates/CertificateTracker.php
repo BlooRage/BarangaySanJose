@@ -41,6 +41,7 @@ if ($isFeeSettingsView) {
 $barangayIdAdminNavActive = 'applications';
 $barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
 $issuanceOperationalSettings = dms_resolve_issuance_settings($conn);
+$clearanceOperationalSettings = dms_resolve_clearance_settings($conn);
 $manualGovernmentPositionOptions = [];
 $manualGovernmentOfficials = [];
 $manualGovernmentOfficialGroups = [
@@ -4271,6 +4272,7 @@ if ($certificateLaunchStage === 'release') {
 <script>
   window.BARANGAY_ID_SETTINGS = <?= json_encode($barangayIdOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.ISSUANCE_SETTINGS = <?= json_encode($issuanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  window.CLEARANCE_SETTINGS = <?= json_encode($clearanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.MANUAL_INDIGENCY_GOVERNMENT_DIRECTORY = <?= json_encode([
     'groups' => $manualGovernmentOfficialGroups,
     'positions' => $manualGovernmentPositionOptions,
