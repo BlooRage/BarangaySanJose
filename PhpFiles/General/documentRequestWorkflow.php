@@ -156,6 +156,57 @@ function dr_table_exists(mysqli $conn, string $table): bool {
     return $exists;
 }
 
+/**
+ * Check whether an official receipt number is already assigned to any finance
+ * transaction. Comparisons are normalized so casing and surrounding spaces
+ * cannot be used to enter the same OR twice.
+ */
+function dr_or_number_exists(mysqli $conn, string $orNumber, string $excludeRequestId = ''): bool {
+    $normalizedOr = strtoupper(trim($orNumber));
+    if ($normalizedOr === '') {
+        return false;
+    }
+
+    if (dr_table_exists($conn, 'financetransactiontbl') && dr_column_exists($conn, 'financetransactiontbl', 'or_number')) {
+        $sql = "SELECT 1 FROM financetransactiontbl WHERE UPPER(TRIM(or_number)) = ?";
+        $excludeCurrentRequest = $excludeRequestId !== '' && dr_column_exists($conn, 'financetransactiontbl', 'request_id');
+        if ($excludeCurrentRequest) {
+            $sql .= " AND request_id <> ?";
+        }
+        $sql .= " LIMIT 1";
+
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            if ($excludeCurrentRequest) {
+                $stmt->bind_param('ss', $normalizedOr, $excludeRequestId);
+            } else {
+                $stmt->bind_param('s', $normalizedOr);
+            }
+            $stmt->execute();
+            $exists = $stmt->get_result()->fetch_row() !== null;
+            $stmt->close();
+            if ($exists) {
+                return true;
+            }
+        }
+    }
+
+    if (dr_table_exists($conn, 'manualfinancetransactiontbl') && dr_column_exists($conn, 'manualfinancetransactiontbl', 'or_number_receipt')) {
+        $stmt = $conn->prepare("SELECT 1 FROM manualfinancetransactiontbl WHERE UPPER(TRIM(or_number_receipt)) = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('s', $normalizedOr);
+            $stmt->execute();
+            $exists = $stmt->get_result()->fetch_row() !== null;
+            $stmt->close();
+            if ($exists) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 function dr_get_column_type(mysqli $conn, string $table, string $column, string $fallback): string {
     $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
     if ($tableSafe === '') {

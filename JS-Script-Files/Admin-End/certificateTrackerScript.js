@@ -566,6 +566,9 @@
   const paymentProofRegenerateBtn = document.getElementById('paymentProofRegenerateBtn');
   const paymentProofReleaseBtn = document.getElementById('paymentProofReleaseBtn');
   const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
+  const regenerateIssuedConfirmModalEl = document.getElementById('regenerateIssuedConfirmModal');
+  const regenerateIssuedConfirmModal = regenerateIssuedConfirmModalEl ? new bootstrap.Modal(regenerateIssuedConfirmModalEl) : null;
+  const regenerateIssuedConfirmBtn = document.getElementById('regenerateIssuedConfirmBtn');
   const idPrintProcessModalEl = document.getElementById('idPrintProcessModal');
   const idPrintProcessModal = idPrintProcessModalEl ? new bootstrap.Modal(idPrintProcessModalEl) : null;
   const idPrintProcessPreview = document.getElementById('idPrintProcessPreview');
@@ -4802,9 +4805,38 @@
     }
   });
 
+  function confirmIssuedDocumentRegeneration() {
+    if (!regenerateIssuedConfirmModal || !regenerateIssuedConfirmModalEl || !regenerateIssuedConfirmBtn) {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (confirmed) => {
+        if (settled) return;
+        settled = true;
+        resolve(confirmed);
+      };
+      const handleConfirm = () => {
+        finish(true);
+        regenerateIssuedConfirmModal.hide();
+      };
+      const handleHidden = () => {
+        regenerateIssuedConfirmBtn.removeEventListener('click', handleConfirm);
+        regenerateIssuedConfirmModalEl.removeEventListener('hidden.bs.modal', handleHidden);
+        if (paymentProofModalEl?.classList.contains('show')) {
+          document.body.classList.add('modal-open');
+        }
+        finish(false);
+      };
+      regenerateIssuedConfirmBtn.addEventListener('click', handleConfirm, { once: true });
+      regenerateIssuedConfirmModalEl.addEventListener('hidden.bs.modal', handleHidden, { once: true });
+      regenerateIssuedConfirmModal.show();
+    });
+  }
+
   paymentProofRegenerateBtn?.addEventListener('click', async () => {
     const requestId = String(paymentProofReleaseRequestId || '').trim();
-    if (!requestId || !window.confirm('Regenerate this issued document using the current admin settings? The current generated file will be replaced.')) {
+    if (!requestId || !(await confirmIssuedDocumentRegeneration())) {
       return;
     }
     const modalState = paymentProofModalState ? {

@@ -9499,7 +9499,7 @@ if ($action === 'finance_verify') {
     }
 
     $amountRaw = trim((string)($_POST['amount'] ?? ''));
-    $orNumber = trim((string)($_POST['or_number'] ?? ''));
+    $orNumber = strtoupper(trim((string)($_POST['or_number'] ?? '')));
     $defaultFee = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row);
     $taggedFeeTotal = null;
     if (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
@@ -9537,6 +9537,9 @@ if ($action === 'finance_verify') {
     }
     if ($orNumber === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'OR number is required.']);
+    }
+    if (dr_or_number_exists($conn, $orNumber, $requestId)) {
+        dr_respond_json(409, ['success' => false, 'message' => 'OR number already exists. Please enter a different OR number.']);
     }
 
     $isManualIssuance = dr_is_manual_issuance_request($row);
