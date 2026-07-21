@@ -5385,7 +5385,6 @@
     const normalizedTitle = String(title || '').trim().toLowerCase();
     const proofOnly = String(title || '').toLowerCase().startsWith('proof of residency');
     const isIssuedDocument = normalizedTitle === 'issued document';
-    const isCompletedIssuedDocument = isIssuedDocument && !!options?.completed;
     const releaseRequestId = String(options?.releaseRequestId || '').trim();
     const showReturnButton = proofOnly || isIssuedDocument || paymentProofReturnTarget !== '';
     if (paymentProofReturnBtn) {
@@ -5393,7 +5392,7 @@
       if (proofOnly) paymentProofReturnBtn.classList.remove('d-none');
     }
     if (paymentProofOpenNew) {
-      paymentProofOpenNew.classList.toggle('d-none', proofOnly || isCompletedIssuedDocument);
+      paymentProofOpenNew.classList.toggle('d-none', proofOnly || isIssuedDocument);
     }
     if (paymentProofCloseBtn) {
       paymentProofCloseBtn.classList.toggle('d-none', proofOnly || isIssuedDocument);
@@ -5412,6 +5411,9 @@
       }
     } catch (_) {
       // keep extension-based fallback
+    }
+    if (isIssuedDocument) {
+      isLikelyPdf = true;
     }
 
     const renderModalContent = () => {
