@@ -2837,14 +2837,13 @@ function dra_generate_issued_document(array $requestRow): ?string
         $currentY = $startY;
         foreach ($rows as $row) {
             $key = (string)($row['key'] ?? '');
-            if ($key !== '' && !$fieldVisible($key)) {
-                continue;
-            }
             $pdf->SetFont($fontFamily, 'B', 12);
             $pdf->SetXY($labelX, $currentY);
             $pdf->Cell($labelW, 6, (string)($row['label'] ?? ''), 0, 0, 'L');
             $pdf->Line($lineX1, $currentY + 5, $lineX2, $currentY + 5);
-            $value = trim((string)($row['value'] ?? ''));
+            $value = ($key === '' || $fieldVisible($key))
+                ? trim((string)($row['value'] ?? ''))
+                : '';
             if ($value !== '') {
                 $pdf->SetXY($lineX1, $currentY);
                 $pdf->SetFont($fontFamily, '', 11);
@@ -4426,7 +4425,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                     ['key' => 'amount', 'label' => 'Amount', 'value' => $amountText],
                     ['key' => 'or_number', 'label' => 'OR No.', 'value' => $orNumberText],
                 ];
-                $footerRows = array_values(array_filter($footerRows, static fn(array $row): bool => $fieldVisible((string)$row['key'])));
+                $footerRows = array_map(static function (array $row) use ($fieldVisible): array {
+                    if (!$fieldVisible((string)$row['key'])) $row['value'] = '';
+                    return $row;
+                }, $footerRows);
                 $footerLabelX = 16.5;
                 $footerColonX = 41.5;
                 $footerLineX1 = 47.2;
@@ -4756,7 +4758,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                     ['key' => 'receipt_no', 'label' => 'Receipt No.', 'value' => $receiptNumber],
                     ['key' => 'amount', 'label' => 'Amount', 'value' => $amountText],
                 ];
-                $metaRows = array_values(array_filter($metaRows, static fn(array $row): bool => $fieldVisible((string)$row['key'])));
+                $metaRows = array_map(static function (array $row) use ($fieldVisible): array {
+                    if (!$fieldVisible((string)$row['key'])) $row['value'] = '';
+                    return $row;
+                }, $metaRows);
                 $metaLabelX = 22.2;
                 $metaColonX = 55.2;
                 $metaValueX = 60.2;
@@ -4998,7 +5003,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                     ['label' => 'Date Issued', 'value' => $issuedAt],
                     ['label' => 'Place Issued', 'value' => 'Barangay San Jose'],
                 ];
-                $metaRows = array_values(array_filter($metaRows, static fn(array $row): bool => !isset($row['key']) || $fieldVisible((string)$row['key'])));
+                $metaRows = array_map(static function (array $row) use ($fieldVisible): array {
+                    if (isset($row['key']) && !$fieldVisible((string)$row['key'])) $row['value'] = '';
+                    return $row;
+                }, $metaRows);
                 $labelX = 18.5;
                 $colonX = 46.0;
                 $lineX1 = 52.5;
