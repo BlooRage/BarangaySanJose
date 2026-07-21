@@ -652,6 +652,19 @@ if ($financeSection === 'fees') {
       justify-content: flex-end;
       width: 100%;
     }
+    .general-fees-table {
+      min-width: 0;
+      table-layout: fixed;
+    }
+    .general-fees-table th:nth-child(1) { width: 36%; }
+    .general-fees-table th:nth-child(2) { width: 17%; }
+    .general-fees-table th:nth-child(3) { width: 12%; }
+    .general-fees-table th:nth-child(4) { width: 20%; }
+    .general-fees-table th:nth-child(5) { width: 15%; }
+    .general-fees-table th,
+    .general-fees-table td {
+      overflow-wrap: anywhere;
+    }
     .finance-fee-empty {
       border: 1px dashed #d0d7de;
       border-radius: 16px;
@@ -976,7 +989,7 @@ if ($financeSection === 'fees') {
           </div>
         <?php endif; ?>
 
-        <div class="row g-4 finance-fee-card p-4 mx-0">
+        <div class="row g-4 finance-fee-card p-4 mx-0 mt-0">
           <div class="col-12 col-lg-5 order-lg-2">
             <div class="finance-fee-editor">
               <h5 class="fw-bold mb-2">
@@ -1075,7 +1088,7 @@ if ($financeSection === 'fees') {
                 </div>
               <?php else: ?>
                 <div class="table-responsive compact-admin-table-shell">
-                  <table class="table finance-fee-table compact-admin-table compact-admin-table--wide align-middle">
+                  <table class="table finance-fee-table general-fees-table compact-admin-table align-middle">
                     <thead>
                       <tr>
                         <th>Document Type</th>
@@ -1237,9 +1250,9 @@ if ($financeSection === 'fees') {
           </a>
         </div>
 
-        <div class="row g-4">
+        <div class="row g-4 finance-fee-card p-4 mx-0 mt-0">
           <div class="col-12 col-lg-5">
-            <div class="finance-fee-card p-4 h-100">
+            <div class="finance-fee-editor">
               <h5 class="fw-bold mb-3">New Finance Transaction</h5>
               <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=create" class="d-grid gap-3">
                 <?= csrfTokenField() ?>
@@ -1300,7 +1313,7 @@ if ($financeSection === 'fees') {
           </div>
 
           <div class="col-12 col-lg-7">
-            <div class="finance-fee-card p-4 h-100">
+            <div class="h-100">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                   <h5 class="fw-bold mb-1">Recent Transactions</h5>

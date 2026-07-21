@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260722ai';
+    $currentRenderRevision = 'r20260722aj';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3506,7 +3506,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722ai';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722aj';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -5063,13 +5063,6 @@ function dra_generate_issued_document(array $requestRow): ?string
                     }
                     $metaY += 6.0;
                 }
-
-                $pdf->Rect(12.8, 201.0, 71.0, 17.0, 'F');
-                $pdf->SetFont('Arial', '', 10.4);
-                $pdf->SetXY(13.6, 206.2);
-                $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
-                $writeFittedCell($pdf, 32.0, 206.0, 48.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.4, 8.2, 'L');
-                $writeFittedCell($pdf, 22.0, 211.6, 56.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
@@ -8881,7 +8874,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260722ai';
+        : 'r20260722aj';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
