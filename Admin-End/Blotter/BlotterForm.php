@@ -1,4 +1,10 @@
 <?php
+// Rendering this form does not require application data. Keep the remote
+// database connection and the sidebar's cross-module attention counts off the
+// critical path; the submit endpoint performs its own authenticated DB work.
+define('ADMIN_GUARD_LIGHT', true);
+define('ADMIN_SIDEBAR_DEFER_DB', true);
+
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $adminSegmentPos = strpos($scriptName, '/Admin-End/');
@@ -14,7 +20,6 @@ if (!isset($baseUrl)) {
     }
 }
 
-require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../includes/admin_guard.php";
 
 $defaultFiledDate = date('Y-m-d');
@@ -27,6 +32,8 @@ $defaultFiledTime = date('H:i');
     <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
     <title>Blotter Form</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -605,8 +612,8 @@ $defaultFiledTime = date('H:i');
     </main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260722-no-background-timer"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
+<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260722-no-background-timer" defer></script>
 </body>
 </html>

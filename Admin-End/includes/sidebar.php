@@ -368,7 +368,24 @@ $sbContentFaqActive = $sbCanAccessContentNavigator
     : $isContentFaqCreateActive;
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
-if (!$sbDeferDb && isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
+if ($sbDeferDb) {
+    // Lightweight pages may reuse warm attention data, but must never refresh
+    // it synchronously and delay the page that the user is opening.
+    $sbCachedAttention = $_SESSION['admin_sidebar_attention_counts_v1'] ?? null;
+    $sbCachedAttentionCounts = null;
+    if (
+        is_array($sbCachedAttention)
+        && (int)($sbCachedAttention['expires_at'] ?? 0) >= time()
+        && is_array($sbCachedAttention['counts'] ?? null)
+    ) {
+        $sbCachedAttentionCounts = $sbCachedAttention['counts'];
+    } elseif (function_exists('sbatt_shared_cache_get')) {
+        $sbCachedAttentionCounts = sbatt_shared_cache_get('admin_sidebar_attention_counts_v1', 300);
+    }
+    if (is_array($sbCachedAttentionCounts)) {
+        $sbAttentionCounts = array_merge($sbAttentionCounts, $sbCachedAttentionCounts);
+    }
+} elseif (isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
     $sbAttentionCounts = sbatt_get_counts($conn, 300);
 }
 if (!$sbCanReviewContent) {
@@ -556,7 +573,7 @@ if (!function_exists('sb_to_public_profile_path')) {
     }
 }
 
-if (!$sbDeferDb && $sbSidebarUserId !== '' && isset($conn) && $conn instanceof mysqli) {
+if ($sbSidebarUserId !== '') {
     $sbProfileCacheKey = 'admin_sidebar_profile:' . md5($sbSidebarUserId);
     $sbCachedProfile = function_exists('amp_session_cache_get')
         ? amp_session_cache_get($sbProfileCacheKey, 300)
@@ -566,7 +583,7 @@ if (!$sbDeferDb && $sbSidebarUserId !== '' && isset($conn) && $conn instanceof m
         $adminDisplayName = trim((string)($sbCachedProfile['display_name'] ?? $adminDisplayName)) ?: $adminDisplayName;
         $adminPosition = trim((string)($sbCachedProfile['position'] ?? $adminPosition)) ?: $adminPosition;
         $adminProfileImageUrl = trim((string)($sbCachedProfile['image_url'] ?? $adminProfileImageUrl)) ?: $adminProfileImageUrl;
-    } else {
+    } elseif (!$sbDeferDb && isset($conn) && $conn instanceof mysqli) {
         $sbSchemaCacheKey = 'admin_sidebar_officialinfo_schema_v1';
         $sbOfficialInfoSchema = function_exists('amp_session_cache_get')
             ? amp_session_cache_get($sbSchemaCacheKey, 1800)
