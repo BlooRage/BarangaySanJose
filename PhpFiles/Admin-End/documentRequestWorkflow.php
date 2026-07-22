@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260722al';
+    $currentRenderRevision = 'r20260722an';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3506,7 +3506,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722al';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722an';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -4465,7 +4465,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $footerLabelX = 16.5;
                 $footerColonX = 41.5;
                 $footerLineX1 = 47.2;
-                $footerLineX2 = 82.0;
+                $footerLineX2 = $footerLineX1 + 28.0;
                 $footerRowY = 162.4;
                 foreach ($footerRows as $footerRow) {
                     $pdf->SetFont('Arial', 'B', 9.8);
@@ -4798,35 +4798,8 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $metaLabelX = 22.2;
                 $metaColonX = 55.2;
                 $metaValueX = 60.2;
-                $metaValueW = 70.0;
-                $measureFittedTextWidth = static function (
-                    \setasign\Fpdi\Fpdi $pdfInstance,
-                    string $text,
-                    string $style = '',
-                    float $fontSize = 11.0,
-                    float $minFontSize = 9.4,
-                    float $maxWidth = 70.0
-                ): float {
-                    $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
-                    if ($clean === '') {
-                        return 0.0;
-                    }
-                    for ($size = $fontSize; $size >= $minFontSize; $size -= 0.2) {
-                        $pdfInstance->SetFont('Arial', $style, $size);
-                        if ($pdfInstance->GetStringWidth($clean) <= $maxWidth) {
-                            break;
-                        }
-                    }
-                    $pdfInstance->SetFont('Arial', $style, max($minFontSize, $size));
-                    return min($maxWidth, $pdfInstance->GetStringWidth($clean));
-                };
-                $metaUnderlineW = 0.0;
-                foreach ($metaRows as $metaRow) {
-                    $metaUnderlineW = max(
-                        $metaUnderlineW,
-                        $measureFittedTextWidth($pdf, (string)($metaRow['value'] ?? ''), '', 11.0, 9.4, $metaValueW)
-                    );
-                }
+                $metaValueW = 28.0;
+                $metaUnderlineW = 28.0;
                 $metaY = 177.1;
                 foreach ($metaRows as $metaRow) {
                     $pdf->SetFont('Arial', 'B', 10.8);
@@ -5012,18 +4985,23 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $issuedBlockW = $pageWidth - 52.0;
                 $issuedBlockH = 19.0;
                 $pdf->Rect(24.0, $issuedMaskY, $issuedBlockW + 4.0, $issuedBlockH, 'F');
-                $pdf->SetFont('Arial', '', 9.0);
+                $pdf->SetFont('Arial', '', 10.5);
                 $pdf->SetXY($issuedBlockX, $issuedBlockY);
                 $pdf->MultiCell(
                     $issuedBlockW,
-                    4.2,
+                    5.0,
                     $issuedOfficeSentence,
                     0,
                     'C'
                 );
 
                 $metaBlockX = 19.0;
-                $metaBlockY = $normalizeTop(0.8290);
+                // Clear the source template's original bottom metadata block, then
+                // redraw it directly after the issued-at sentence so document details
+                // appear before the issued-by and signatory sections.
+                $sourceMetaBlockY = $normalizeTop(0.8290);
+                $pdf->Rect($metaBlockX - 0.8, $sourceMetaBlockY - 0.8, 82.0, 33.0, 'F');
+                $metaBlockY = 240.0;
                 $metaMaskX = $metaBlockX - 0.8;
                 $metaMaskY = $metaBlockY - 0.8;
                 $metaMaskW = 82.0;
@@ -5043,7 +5021,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $labelX = 18.5;
                 $colonX = 46.0;
                 $lineX1 = 52.5;
-                $lineX2 = 90.5;
+                $lineX2 = $lineX1 + 28.0;
                 $metaY = $metaBlockY + 0.1;
                 foreach ($metaRows as $rowMeta) {
                     $pdf->SetFont('Arial', 'B', 9.6);
@@ -8874,7 +8852,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260722al';
+        : 'r20260722an';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
