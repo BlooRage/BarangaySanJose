@@ -126,7 +126,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 field.dataset.originalRequired = field.required ? "1" : "0";
             }
 
-            field.disabled = disabled;
+            // dateFieldModal proxies the date input's `disabled` property and
+            // emits form events when it changes. Reassigning the same value on
+            // every updateState() call recursively re-entered updateState and
+            // locked the page during DOMContentLoaded.
+            if (field.disabled !== disabled) {
+                field.disabled = disabled;
+            }
             field.required = !disabled && field.dataset.originalRequired === "1";
 
             if (disabled) {
@@ -741,8 +747,16 @@ document.addEventListener("DOMContentLoaded", () => {
         updateState();
     });
 
-    form.addEventListener("input", updateState);
-    form.addEventListener("change", updateState);
+    const handleFormStateEvent = (event) => {
+        // The visible proxy created by dateFieldModal emits synthetic input and
+        // change events while synchronizing the real date field. Those events
+        // are presentation-only and must not re-enter the form state machine.
+        if (event.target?.classList?.contains("resident-date-proxy")) return;
+        updateState();
+    };
+
+    form.addEventListener("input", handleFormStateEvent);
+    form.addEventListener("change", handleFormStateEvent);
     form.addEventListener("submit", (e) => {
         const requiresSignature = (inputMethod?.value || "") === "text";
         const signaturesValid =
@@ -803,4 +817,3 @@ document.addEventListener("DOMContentLoaded", () => {
         successModal?.show();
     }
 });
-
