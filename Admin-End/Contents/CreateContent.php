@@ -21,6 +21,7 @@ $meta = $typeMeta[$contentType];
 $isPageType = $contentType === 'page';
 $isDeliveryType = $contentType === 'delivery';
 $isFaqType = $contentType === 'faq';
+$usesWizard = $isPageType || $isDeliveryType;
 $guideMeta = [
   'page' => [
     'kicker' => 'Before You Start',
@@ -128,7 +129,7 @@ $sharedMeta = [
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260323-38">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260722-wizard-6">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -163,17 +164,65 @@ $sharedMeta = [
         </div>
       </section>
 
-      <form class="announcement-create-shell p-3 p-md-4 shadow-sm" action="../../PhpFiles/Admin-End/announcementsCreation.php" method="post">
+      <form class="announcement-create-shell p-3 p-md-4 shadow-sm<?= $usesWizard ? ' announcement-create-wizard' : '' ?>" action="../../PhpFiles/Admin-End/announcementsCreation.php" method="post">
         <input type="hidden" name="channel_context" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <input type="hidden" name="content_type" value="<?= htmlspecialchars($contentType) ?>">
+        <?php if ($usesWizard): ?>
+        <nav class="announcement-wizard-progress" aria-label="Announcement creation progress">
+          <button type="button" class="announcement-wizard-step is-active" data-wizard-step="1" aria-current="step">
+            <span class="announcement-wizard-step-number">1</span>
+            <span><strong><?= $isPageType ? 'Placement' : 'Delivery' ?></strong><small><?= $isPageType ? 'Choose the pages' : 'Choose SMS or email' ?></small></span>
+          </button>
+          <span class="announcement-wizard-line" aria-hidden="true"></span>
+          <button type="button" class="announcement-wizard-step" data-wizard-step="2" disabled>
+            <span class="announcement-wizard-step-number">2</span>
+            <span><strong>Audience</strong><small>Choose residents</small></span>
+          </button>
+          <span class="announcement-wizard-line" aria-hidden="true"></span>
+          <button type="button" class="announcement-wizard-step" data-wizard-step="3" disabled>
+            <span class="announcement-wizard-step-number">3</span>
+            <span><strong>Write</strong><small>Title and message</small></span>
+          </button>
+          <span class="announcement-wizard-line" aria-hidden="true"></span>
+          <button type="button" class="announcement-wizard-step" data-wizard-step="4" disabled>
+            <span class="announcement-wizard-step-number">4</span>
+            <span><strong>Review</strong><small>Schedule and publish</small></span>
+          </button>
+        </nav>
+        <?php endif; ?>
         <div class="row g-4">
           <?php if (!$isFaqType): ?>
-          <div class="col-12">
+          <div class="col-12"<?= $usesWizard ? ' data-wizard-panel="1,2"' : '' ?>>
             <section class="announcement-section-card">
+              <?php if ($isPageType): ?>
+              <div class="announcement-wizard-panel-heading" data-wizard-heading="1">
+                <span class="announcement-wizard-eyebrow">Step 1 of 4</span>
+                <h5 class="announcement-section-title mb-1">Choose where this announcement will appear</h5>
+                <p class="announcement-editor-helper mb-0">Select the guest page, account page, or both.</p>
+              </div>
+              <div class="announcement-wizard-panel-heading" data-wizard-heading="2" hidden>
+                <span class="announcement-wizard-eyebrow">Step 2 of 4</span>
+                <h5 class="announcement-section-title mb-1">Choose the audience</h5>
+                <p class="announcement-editor-helper mb-0">Share with all residents, or narrow the announcement to selected areas and roles.</p>
+              </div>
+              <?php elseif ($isDeliveryType): ?>
+              <div class="announcement-wizard-panel-heading" data-wizard-heading="1">
+                <span class="announcement-wizard-eyebrow">Step 1 of 4</span>
+                <h5 class="announcement-section-title mb-1">Choose the delivery channels</h5>
+                <p class="announcement-editor-helper mb-0">Select SMS, email, or both. You will write the message details in Step 3.</p>
+              </div>
+              <div class="announcement-wizard-panel-heading" data-wizard-heading="2" hidden>
+                <span class="announcement-wizard-eyebrow">Step 2 of 4</span>
+                <h5 class="announcement-section-title mb-1">Choose the audience</h5>
+                <p class="announcement-editor-helper mb-0">Send to all residents, or narrow the recipients to selected areas and roles.</p>
+              </div>
+              <?php else: ?>
               <h5 class="announcement-section-title">Distribution and Audience Setup</h5>
+              <?php endif; ?>
+              <?php if ($usesWizard): ?><div class="announcement-wizard-error d-none" data-wizard-error role="alert" aria-live="polite"></div><?php endif; ?>
               <div class="announcement-config-grid <?= $isPageType ? 'announcement-config-grid--page' : 'announcement-config-grid--delivery' ?>">
                 <?php if ($isPageType): ?>
-                <div class="announcement-config-panel" id="pagePlacementPanel">
+                <div class="announcement-config-panel" id="pagePlacementPanel" data-wizard-stage="1">
                   <h6 class="announcement-card-title">Page Placement</h6>
                   <label class="form-label fw-semibold mb-2">Where should this announcement appear?</label>
                   <input class="form-check-input placement-checkbox d-none" type="checkbox" value="public_news" id="placementPublicNews" name="placements[]" hidden aria-hidden="true" tabindex="-1">
@@ -190,7 +239,7 @@ $sharedMeta = [
                   </div>
                 </div>
 
-                <div class="announcement-config-panel" id="announcementDestinationsGroup">
+                <div class="announcement-config-panel" id="announcementDestinationsGroup" data-wizard-stage="1">
                   <h6 class="announcement-card-title">Page Destinations</h6>
                   <p class="announcement-editor-helper mb-3">Choose where the announcement version should be shown once the Announcements placement is enabled.</p>
                   <div class="form-check mb-3">
@@ -205,8 +254,8 @@ $sharedMeta = [
                 </div>
                 <?php endif; ?>
 
-                <div class="announcement-config-panel announcement-config-panel--audience-publishing">
-                  <h6 class="announcement-card-title">Audience and Publishing</h6>
+                <div class="announcement-config-panel announcement-config-panel--audience-publishing"<?= $usesWizard ? ' data-wizard-stage="2" hidden' : '' ?>>
+                  <h6 class="announcement-card-title">Audience</h6>
                   <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="audience_scope" id="audienceAll" value="all" checked>
                     <label class="form-check-label" for="audienceAll">All Residents</label>
@@ -251,6 +300,7 @@ $sharedMeta = [
                     </div>
                   </div>
 
+                  <?php if (!$usesWizard): ?>
                   <div class="announcement-create-divider"></div>
                   <div class="row g-3 announcement-publish-grid">
                     <div class="col-12 col-xl-6">
@@ -262,22 +312,18 @@ $sharedMeta = [
                       <input type="time" class="form-control" name="schedule_time">
                     </div>
                   </div>
+                  <?php endif; ?>
                 </div>
 
                 <?php if ($isDeliveryType): ?>
-                <div class="announcement-config-panel announcement-config-panel--delivery">
+                <div class="announcement-config-panel announcement-config-panel--delivery" data-wizard-stage="1">
                   <h6 class="announcement-card-title">Delivery</h6>
-                  <p class="announcement-editor-helper mb-3">Choose the channels to send and compose the message details below.</p>
+                  <p class="announcement-editor-helper mb-3">Choose one or both channels for this announcement.</p>
                   <div class="announcement-delivery-grid">
                     <div class="announcement-channel-item announcement-delivery-card">
                       <div class="form-check mb-0">
                         <input class="form-check-input channel-checkbox" type="checkbox" value="sms" id="channelSms" name="channels[]" <?= $deliveryChannel === 'sms' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
                         <label class="form-check-label" for="channelSms">SMS</label>
-                      </div>
-                      <div id="smsField" class="channel-field channel-field-collapsible is-collapsed" aria-hidden="true">
-                        <label for="smsPreview" class="form-label mb-1">SMS Message</label>
-                        <textarea id="smsPreview" class="form-control" rows="5" name="sms_message" maxlength="320"></textarea>
-                        <small id="smsCounter" class="text-muted">0 / 320 characters</small>
                       </div>
                     </div>
 
@@ -285,10 +331,6 @@ $sharedMeta = [
                       <div class="form-check mb-0">
                         <input class="form-check-input channel-checkbox" type="checkbox" value="email" id="channelEmail" name="channels[]" <?= $deliveryChannel === 'email' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
                         <label class="form-check-label" for="channelEmail">Email</label>
-                      </div>
-                      <div id="emailField" class="channel-field channel-field-collapsible is-collapsed" aria-hidden="true">
-                        <label for="emailSubject" class="form-label mb-1">Email Subject</label>
-                        <input id="emailSubject" type="text" class="form-control" name="email_subject" placeholder="Enter email subject">
                       </div>
                     </div>
                   </div>
@@ -299,7 +341,7 @@ $sharedMeta = [
           </div>
           <?php endif; ?>
 
-          <div class="col-12">
+          <div class="col-12"<?= $usesWizard ? ' data-wizard-panel="3" hidden' : '' ?>>
             <?php if ($isFaqType): ?>
             <section class="announcement-section-card announcement-faq-shell mb-4">
               <div id="faqItemsContainer" class="announcement-faq-list"></div>
@@ -309,6 +351,14 @@ $sharedMeta = [
             <?php if (!$isFaqType): ?>
             <div id="sharedContentFields">
               <section class="announcement-section-card">
+                <?php if ($usesWizard): ?>
+                <div class="announcement-wizard-panel-heading">
+                  <span class="announcement-wizard-eyebrow">Step 3 of 4</span>
+                  <h5 class="announcement-section-title mb-1"><?= $isPageType ? 'Write the announcement' : 'Write the message content' ?></h5>
+                  <p class="announcement-editor-helper mb-0"><?= $isPageType ? 'Lead with the key update, then add short paragraphs or lists for the details.' : 'Write the complete message that supports the selected SMS and email delivery.' ?></p>
+                </div>
+                <div class="announcement-wizard-error d-none" data-wizard-error role="alert" aria-live="polite"></div>
+                <?php endif; ?>
                 <div class="mb-3 announcement-primary-title-wrap">
                   <label for="announcementTitle" class="form-label fw-semibold"><?= htmlspecialchars($sharedMeta['title_label']) ?></label>
                   <input id="announcementTitle" name="title" type="text" class="form-control announcement-primary-title-input" placeholder="<?= htmlspecialchars($sharedMeta['title_placeholder']) ?>" required>
@@ -329,6 +379,24 @@ $sharedMeta = [
                     <span id="sharedSidebarCounter" class="announcement-counter-text">0 characters</span>
                   </div>
                 </div>
+
+                <?php if ($isDeliveryType): ?>
+                <input id="smsPreview" type="hidden" name="sms_message">
+                <div id="deliveryEmailDetails" hidden>
+                  <div class="announcement-create-divider"></div>
+                  <h6 class="announcement-card-title mb-1">Email details</h6>
+                  <p class="announcement-editor-helper mb-3">Add a subject for the email selected in Step 1.</p>
+                  <div class="announcement-delivery-grid">
+                    <div class="announcement-delivery-card" id="emailComposeCard" hidden>
+                      <h6 class="announcement-card-title mb-0">Email</h6>
+                      <div id="emailField" class="channel-field channel-field-collapsible is-collapsed" aria-hidden="true">
+                        <label for="emailSubject" class="form-label mb-1">Email Subject</label>
+                        <input id="emailSubject" type="text" class="form-control" name="email_subject" placeholder="Enter email subject">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <?php endif; ?>
               </section>
             </div>
             <?php endif; ?>
@@ -385,10 +453,77 @@ $sharedMeta = [
             </div>
             <?php endif; ?>
           </div>
+
+          <?php if ($usesWizard): ?>
+          <div class="col-12" data-wizard-panel="4" hidden>
+            <section class="announcement-section-card">
+              <div class="announcement-wizard-panel-heading">
+                <span class="announcement-wizard-eyebrow">Step 4 of 4</span>
+                <h5 class="announcement-section-title mb-1">Review and publish</h5>
+                <p class="announcement-editor-helper mb-0">Check the details below, then publish now or choose an optional schedule.</p>
+              </div>
+
+              <div class="announcement-review-grid">
+                <div class="announcement-review-item">
+                  <span><?= $isPageType ? 'Page destinations' : 'Delivery channels' ?></span>
+                  <strong id="wizardReviewDestinations">—</strong>
+                  <button type="button" class="announcement-review-edit" data-wizard-go="1">Edit <?= $isPageType ? 'setup' : 'delivery' ?></button>
+                </div>
+                <div class="announcement-review-item">
+                  <span>Audience</span>
+                  <strong id="wizardReviewAudience">All Residents</strong>
+                  <button type="button" class="announcement-review-edit" data-wizard-go="2">Edit audience</button>
+                </div>
+                <div class="announcement-review-item announcement-review-item--wide">
+                  <span>Announcement title</span>
+                  <strong id="wizardReviewTitle">—</strong>
+                  <button type="button" class="announcement-review-edit" data-wizard-go="3">Edit content</button>
+                </div>
+                <?php if ($isDeliveryType): ?>
+                <div class="announcement-review-item" id="wizardReviewSmsItem">
+                  <span>SMS preview</span>
+                  <strong id="wizardReviewSms">—</strong>
+                  <button type="button" class="announcement-review-edit" data-wizard-go="3">Edit message</button>
+                </div>
+                <div class="announcement-review-item" id="wizardReviewEmailItem">
+                  <span>Email subject</span>
+                  <strong id="wizardReviewEmail">—</strong>
+                  <button type="button" class="announcement-review-edit" data-wizard-go="3">Edit email</button>
+                </div>
+                <?php endif; ?>
+                <div class="announcement-review-item announcement-review-item--wide">
+                  <span>Message preview</span>
+                  <strong id="wizardReviewMessage">—</strong>
+                  <button type="button" class="announcement-review-edit" data-wizard-go="3">Edit message</button>
+                </div>
+              </div>
+
+              <div class="announcement-create-divider"></div>
+              <h6 class="announcement-card-title mb-1">Publishing schedule</h6>
+              <p class="announcement-editor-helper mb-3">Leave both fields blank to publish as soon as the announcement is approved.</p>
+              <div class="row g-3 announcement-publish-grid">
+                <div class="col-12 col-md-6">
+                  <label class="form-label mb-1">Schedule Date (optional)</label>
+                  <input type="date" class="form-control" name="schedule_date" data-date-modal-style="calendar">
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mb-1">Schedule Time (optional)</label>
+                  <input type="time" class="form-control" name="schedule_time">
+                </div>
+              </div>
+            </section>
+          </div>
+          <?php endif; ?>
         </div>
 
-        <div class="announcement-sticky-actions mt-4">
-          <div class="announcement-modal-footer-start">
+        <div class="announcement-sticky-actions mt-4<?= $usesWizard ? ' announcement-wizard-actions' : '' ?>">
+          <?php if ($usesWizard): ?>
+          <button type="button" id="wizardBackBtn" class="btn btn-outline-secondary" hidden><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Back</button>
+          <span id="wizardStepHint" class="announcement-wizard-action-hint">Next: choose the audience</span>
+          <button type="button" id="wizardNextBtn" class="btn btn-primary text-white">Continue<i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></button>
+          <?php endif; ?>
+          <div class="announcement-modal-footer-start<?= $usesWizard ? ' announcement-wizard-submit-actions' : '' ?>">
+            <?php if ($usesWizard): ?><button type="button" class="btn btn-outline-secondary" data-wizard-go="3"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Back</button><?php endif; ?>
             <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark">Save as Draft</button>
             <?php if ($isSuperAdmin): ?>
               <button type="submit" id="btnPostAnnouncement" name="submit_action" value="approved" class="btn btn-primary text-white">Post</button>
@@ -459,7 +594,6 @@ $sharedMeta = [
       const sharedSidebarCounter = document.getElementById("sharedSidebarCounter");
       const publicAnnouncementCounter = document.getElementById("publicAnnouncementCounter");
       const smsPreview = document.getElementById("smsPreview");
-      const smsCounter = document.getElementById("smsCounter");
       const placementPublicNews = document.getElementById("placementPublicNews");
       const placementPublic = document.getElementById("placementPublic");
       const dualPlacementNotice = document.getElementById("dualPlacementNotice");
@@ -467,8 +601,10 @@ $sharedMeta = [
       const channelGuestPage = document.getElementById("channelGuestPage");
       const channelSms = document.getElementById("channelSms");
       const channelEmail = document.getElementById("channelEmail");
-      const smsField = document.getElementById("smsField");
       const emailField = document.getElementById("emailField");
+      const emailComposeCard = document.getElementById("emailComposeCard");
+      const deliveryEmailDetails = document.getElementById("deliveryEmailDetails");
+      const emailSubject = document.getElementById("emailSubject");
       const audienceAll = document.getElementById("audienceAll");
       const customAudienceFields = document.getElementById("customAudienceFields");
       const audienceCustom = document.getElementById("audienceCustom");
@@ -481,6 +617,20 @@ $sharedMeta = [
       const appDialogMessage = document.getElementById("appDialogMessage");
       const appDialogConfirmBtn = document.getElementById("appDialogConfirmBtn");
       const appDialogCancelBtn = document.getElementById("appDialogCancelBtn");
+      const wizardPanels = Array.from(document.querySelectorAll("[data-wizard-panel]"));
+      const wizardSteps = Array.from(document.querySelectorAll("[data-wizard-step]"));
+      const wizardBackBtn = document.getElementById("wizardBackBtn");
+      const wizardNextBtn = document.getElementById("wizardNextBtn");
+      const wizardStepHint = document.getElementById("wizardStepHint");
+      const wizardActions = document.querySelector(".announcement-wizard-actions");
+      const wizardReviewDestinations = document.getElementById("wizardReviewDestinations");
+      const wizardReviewAudience = document.getElementById("wizardReviewAudience");
+      const wizardReviewTitle = document.getElementById("wizardReviewTitle");
+      const wizardReviewMessage = document.getElementById("wizardReviewMessage");
+      const wizardReviewSms = document.getElementById("wizardReviewSms");
+      const wizardReviewEmail = document.getElementById("wizardReviewEmail");
+      const wizardReviewSmsItem = document.getElementById("wizardReviewSmsItem");
+      const wizardReviewEmailItem = document.getElementById("wizardReviewEmailItem");
       const sharedEditorEl = $("#announcementEditor");
       const publicNewsEditorEl = $("#publicNewsEditor");
       const publicAnnouncementEditorEl = $("#publicAnnouncementEditor");
@@ -494,13 +644,17 @@ $sharedMeta = [
         "How long does barangay document processing take?",
         "What documents are required for barangay services?"
       ];
+      if (appDialogModalEl && appDialogModalEl.parentElement !== document.body) {
+        document.body.appendChild(appDialogModalEl);
+      }
       const appDialogModal = appDialogModalEl ? bootstrap.Modal.getOrCreateInstance(appDialogModalEl, {
         backdrop: "static",
         keyboard: false
       }) : null;
       let appDialogResolver = null;
       let appDialogResult = false;
-      let smsManuallyEdited = false;
+      let currentWizardStep = 1;
+      let furthestWizardStep = 1;
       const fullToolbar = [
         ["style", ["style"]],
         ["font", ["bold", "italic", "underline", "clear"]],
@@ -787,11 +941,8 @@ $sharedMeta = [
 
         const previewSource = dualPlacementActive ? publicNewsHtml : sharedHtml;
         const plain = getPlainTextFromHtml(previewSource);
-        if (smsPreview && (!smsManuallyEdited || !smsPreview.value.trim())) {
-          smsPreview.value = plain;
-        }
-        if (smsCounter) {
-          smsCounter.textContent = (smsPreview?.value || "").length + " / 320 characters";
+        if (smsPreview) {
+          smsPreview.value = plain.slice(0, 320);
         }
 
         if (sharedSidebarWarning && sharedSidebarCounter) {
@@ -809,15 +960,16 @@ $sharedMeta = [
       }
 
       function toggleChannelFields() {
-        if (!smsField || !emailField || !channelSms || !channelEmail) {
+        if (!channelSms || !channelEmail) {
           return;
         }
-        const showSms = !!channelSms.checked;
         const showEmail = !!channelEmail.checked;
-        smsField.classList.toggle("is-collapsed", !showSms);
-        smsField.setAttribute("aria-hidden", showSms ? "false" : "true");
-        emailField.classList.toggle("is-collapsed", !showEmail);
-        emailField.setAttribute("aria-hidden", showEmail ? "false" : "true");
+        if (emailComposeCard) emailComposeCard.hidden = !showEmail;
+        if (deliveryEmailDetails) deliveryEmailDetails.hidden = !showEmail;
+        if (emailField) {
+          emailField.classList.toggle("is-collapsed", !showEmail);
+          emailField.setAttribute("aria-hidden", showEmail ? "false" : "true");
+        }
       }
 
       function togglePlacementGuidance() {
@@ -877,6 +1029,178 @@ $sharedMeta = [
             }
           }
         });
+      }
+
+      function updateWizardReview() {
+        if (contentType === "faq") {
+          return;
+        }
+        const destinationLabels = [];
+        if (contentType === "page") {
+          if (document.getElementById("channelGuestPage")?.checked) destinationLabels.push("Guest Page");
+          if (document.getElementById("channelWebsite")?.checked) destinationLabels.push("Account Page");
+        } else {
+          if (channelSms?.checked) destinationLabels.push("SMS");
+          if (channelEmail?.checked) destinationLabels.push("Email");
+        }
+        if (wizardReviewDestinations) {
+          wizardReviewDestinations.textContent = destinationLabels.join(" and ") || "No destination selected";
+        }
+
+        if (wizardReviewAudience) {
+          if (audienceCustom?.checked) {
+            const selectedAreas = Array.from(document.querySelectorAll("input[name='area[]']:checked")).map((field) => field.value);
+            const selectedRoles = Array.from(document.querySelectorAll("input[name='role_group[]']:checked")).map((field) => field.value);
+            const audienceParts = [];
+            if (selectedAreas.length) audienceParts.push(selectedAreas.join(", "));
+            if (selectedRoles.length) audienceParts.push(selectedRoles.join(", "));
+            wizardReviewAudience.textContent = audienceParts.join(" · ") || "Custom audience (no filters selected)";
+          } else {
+            wizardReviewAudience.textContent = "All Residents";
+          }
+        }
+
+        if (wizardReviewTitle) {
+          wizardReviewTitle.textContent = (sharedTitleInput?.value || "").trim() || "Untitled announcement";
+        }
+        if (wizardReviewMessage) {
+          const message = getPlainTextFromHtml(getEditorCode(sharedEditorEl));
+          wizardReviewMessage.textContent = message || "No message added";
+        }
+        if (wizardReviewSms && wizardReviewSmsItem) {
+          wizardReviewSmsItem.hidden = !channelSms?.checked;
+          wizardReviewSms.textContent = (smsPreview?.value || "").trim() || "Uses the message content";
+        }
+        if (wizardReviewEmail && wizardReviewEmailItem) {
+          wizardReviewEmailItem.hidden = !channelEmail?.checked;
+          wizardReviewEmail.textContent = (emailSubject?.value || "").trim() || "No subject added";
+        }
+      }
+
+      function clearWizardError() {
+        document.querySelectorAll("[data-wizard-error]").forEach((errorBox) => {
+          errorBox.textContent = "";
+          errorBox.classList.add("d-none");
+        });
+        sharedTitleInput?.classList.remove("is-invalid");
+        sharedEditorEl.next(".note-editor").removeClass("is-invalid");
+      }
+
+      function showWizardError(message, field = null) {
+        const activePanel = wizardPanels.find((panel) => !panel.hidden);
+        const errorBox = activePanel?.querySelector("[data-wizard-error]");
+        if (errorBox) {
+          errorBox.textContent = message;
+          errorBox.classList.remove("d-none");
+        }
+        if (field) {
+          if (field.jquery) {
+            field.addClass("is-invalid");
+          } else {
+            field.classList?.add("is-invalid");
+          }
+        }
+      }
+
+      async function validateWizardStep(step) {
+        if (contentType === "faq") {
+          return true;
+        }
+        clearWizardError();
+        if (contentType === "page" && step === 1) {
+          if (!placementPublic?.checked) {
+            showWizardError("Select Announcements before continuing.");
+            return false;
+          }
+          const hasDestination = !!(channelGuestPage?.checked || document.getElementById("channelWebsite")?.checked);
+          if (!hasDestination) {
+            showWizardError("Select Guest Page, Account Page, or both before continuing.");
+            return false;
+          }
+        }
+        const audienceStep = 2;
+        if (step === audienceStep && audienceCustom?.checked) {
+          const hasCustomFilter = !!document.querySelector("input[name='area[]']:checked, input[name='role_group[]']:checked");
+          if (!hasCustomFilter) {
+            showWizardError("Choose at least one area or role group for the custom audience.");
+            return false;
+          }
+        }
+        if (contentType === "delivery" && step === 1 && !channelSms?.checked && !channelEmail?.checked) {
+          showWizardError("Select SMS, Email, or both before continuing.");
+          return false;
+        }
+        if (step === 3) {
+          const title = (sharedTitleInput?.value || "").trim();
+          const body = getPlainTextFromHtml(getEditorCode(sharedEditorEl));
+          if (!title) {
+            showWizardError("Enter an announcement title before continuing.", sharedTitleInput);
+            sharedTitleInput?.focus();
+            return false;
+          }
+          if (!body) {
+            const editorFrame = sharedEditorEl.next(".note-editor");
+            showWizardError("Write the announcement message before continuing.", editorFrame);
+            editorFrame.find(".note-editable").trigger("focus");
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function renderWizardStep(shouldScroll = true) {
+        if (contentType === "faq") {
+          return;
+        }
+        wizardPanels.forEach((panel) => {
+          const panelSteps = String(panel.dataset.wizardPanel || "").split(",").map(Number);
+          const isCurrent = panelSteps.includes(currentWizardStep);
+          panel.hidden = !isCurrent;
+        });
+        document.querySelectorAll("[data-wizard-stage]").forEach((section) => {
+          section.hidden = Number(section.dataset.wizardStage) !== currentWizardStep;
+        });
+        document.querySelectorAll("[data-wizard-heading]").forEach((heading) => {
+          heading.hidden = Number(heading.dataset.wizardHeading) !== currentWizardStep;
+        });
+        document.querySelector(".announcement-create-wizard")?.setAttribute("data-current-step", String(currentWizardStep));
+        wizardSteps.forEach((stepButton) => {
+          const stepNumber = Number(stepButton.dataset.wizardStep);
+          const isCurrent = stepNumber === currentWizardStep;
+          stepButton.classList.toggle("is-active", isCurrent);
+          stepButton.classList.toggle("is-complete", stepNumber < currentWizardStep);
+          stepButton.disabled = stepNumber > furthestWizardStep;
+          if (isCurrent) {
+            stepButton.setAttribute("aria-current", "step");
+          } else {
+            stepButton.removeAttribute("aria-current");
+          }
+        });
+        if (wizardBackBtn) wizardBackBtn.hidden = currentWizardStep === 1;
+        if (wizardActions) wizardActions.classList.toggle("is-final-step", currentWizardStep === 4);
+        if (wizardStepHint) {
+          const hints = {
+            1: "Next: choose the audience",
+            2: contentType === "page" ? "Next: write the announcement" : "Next: write the message content",
+            3: "Next: review and publish"
+          };
+          wizardStepHint.textContent = hints[currentWizardStep] || "";
+        }
+        if (currentWizardStep === 4) updateWizardReview();
+        if (shouldScroll) {
+          document.querySelector(".announcement-create-wizard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+
+      async function goToWizardStep(targetStep) {
+        const nextStep = Math.max(1, Math.min(4, Number(targetStep) || 1));
+        if (nextStep > currentWizardStep && !(await validateWizardStep(currentWizardStep))) {
+          return;
+        }
+        currentWizardStep = nextStep;
+        furthestWizardStep = Math.max(furthestWizardStep, currentWizardStep);
+        clearWizardError();
+        renderWizardStep();
       }
 
       function applyToolbarTooltips() {
@@ -940,6 +1264,9 @@ $sharedMeta = [
           callbacks: {
             onChange: function () {
               updateEditorOutputs();
+              if (contentType !== "faq" && currentWizardStep === 3) {
+                clearWizardError();
+              }
             },
             onImageUpload: async function (files) {
               for (const file of files) {
@@ -978,15 +1305,6 @@ $sharedMeta = [
       initEditor(publicAnnouncementEditorEl, "Write the sidebar announcement content here...");
       applyToolbarTooltips();
       applyContentTypeMode();
-
-      if (smsPreview) {
-        smsPreview.addEventListener("input", function () {
-          smsManuallyEdited = true;
-          if (smsCounter) {
-            smsCounter.textContent = smsPreview.value.length + " / 320 characters";
-          }
-        });
-      }
 
       if (contentType === "faq") {
         setFaqItemTargetCount(faqQuestionTarget ? Number(faqQuestionTarget.value || 1) : 1);
@@ -1055,6 +1373,9 @@ $sharedMeta = [
         let superAdminPostConfirmed = false;
 
         if (createForm && postBtn && postConfirmModalEl && postConfirmBtn) {
+          if (postConfirmModalEl.parentElement !== document.body) {
+            document.body.appendChild(postConfirmModalEl);
+          }
           const postConfirmModal = bootstrap.Modal.getOrCreateInstance(postConfirmModalEl, {
             backdrop: "static",
             keyboard: false
@@ -1104,6 +1425,36 @@ $sharedMeta = [
         el.addEventListener("change", toggleAudienceFields);
       });
       toggleAudienceFields();
+
+      if (contentType !== "faq") {
+        wizardNextBtn?.addEventListener("click", function () {
+          goToWizardStep(currentWizardStep + 1);
+        });
+        wizardBackBtn?.addEventListener("click", function () {
+          goToWizardStep(currentWizardStep - 1);
+        });
+        wizardSteps.forEach((stepButton) => {
+          stepButton.addEventListener("click", function () {
+            goToWizardStep(stepButton.dataset.wizardStep);
+          });
+        });
+        document.querySelectorAll("[data-wizard-go]").forEach((button) => {
+          button.addEventListener("click", function () {
+            goToWizardStep(button.dataset.wizardGo);
+          });
+        });
+        document.querySelectorAll("input[name='channels[]'], input[name='audience_scope'], input[name='area[]'], input[name='role_group[]']").forEach((field) => {
+          field.addEventListener("change", updateWizardReview);
+        });
+        document.querySelectorAll(".announcement-create-wizard input").forEach((field) => {
+          field.addEventListener("input", clearWizardError);
+          field.addEventListener("change", clearWizardError);
+        });
+        sharedTitleInput?.addEventListener("input", updateWizardReview);
+        emailSubject?.addEventListener("input", updateWizardReview);
+        renderWizardStep(false);
+        updateWizardReview();
+      }
 
       if (faqQuestionTarget) {
         faqQuestionTarget.addEventListener('change', function () {

@@ -80,6 +80,10 @@ function ann_creator_display_label(mysqli $conn, string $userId, string $fallbac
     return $userId;
   }
 
+  if (function_exists('pii_decrypt_official_row')) {
+    $row = pii_decrypt_official_row($row) ?? $row;
+  }
+
   $firstName = trim((string)($row["firstname"] ?? ""));
   $middleName = trim((string)($row["middlename"] ?? ""));
   $lastName = trim((string)($row["lastname"] ?? ""));

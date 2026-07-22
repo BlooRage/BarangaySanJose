@@ -276,18 +276,12 @@ $contentManagementModule = strtolower(trim((string)($_GET['module'] ?? 'requests
 if (!in_array($contentManagementModule, ['requests', 'announcements', 'home', 'government', 'services', 'faq', 'contact', 'login'], true)) {
     $contentManagementModule = 'requests';
 }
-$contentRequestsView = strtolower(trim((string)($_GET['requests_view'] ?? 'my_requests')));
-if (!in_array($contentRequestsView, ['my_requests', 'review_queue', 'archived_requests', 'approved_history'], true)) {
-    $contentRequestsView = 'my_requests';
-}
 $isContentCreateSectionActive = in_array($current, ['CreateContent.php', 'CreateNews.php'], true);
 $isContentToolsSectionActive = $current === 'Contents.php' && $sidebarContentTypeFilter !== 'news';
 $isContentFaqCreateActive = $current === 'CreateContent.php' && $contentCreateType === 'faq';
 $isContentNewsCreateActive = $current === 'CreateNews.php';
 $isNewsManagementActive = ($current === 'Contents.php' && $sidebarContentTypeFilter === 'news');
 $isContentNavigatorActive = $current === 'ContentManagement.php' || $isContentFaqCreateActive;
-$isContentChangeRequestActive = $current === 'ContentManagement.php'
-    && $contentManagementModule === 'requests';
 
 $sbAllowedPermissions = [];
 if ($sbDeferDb && isset($allowedPermissions) && is_array($allowedPermissions)) {
@@ -1657,28 +1651,12 @@ if ($sbSidebarUserId !== '') {
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCanAccessContentNavigator): ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=my_requests"
-                 class="link-dark rounded sidebar-subnav-link <?= $isContentChangeRequestActive ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Content Change Request</span>
-              </a>
-            </li>
-            <?php if ($sbCanReviewContent): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=review_queue"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'review_queue') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Review Queue</span>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">CMS Tools</span>
                 <?= $sbRenderAttentionBadge($sbCount('content_change_request')) ?>
               </a>
             </li>
-            <?php endif; ?>
-            <?php if ($sbCanReviewContent): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=approved_history"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'approved_history') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Approved Version History</span>
-              </a>
-            </li>
-            <?php endif; ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
