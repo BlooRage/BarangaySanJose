@@ -26,6 +26,7 @@ $data = getResidentProfileData($conn, $userId);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
+$configuredPurposeOptions = dms_document_purpose_options($conn, 'Barangay Clearance for Business Permit');
 
 $ownerLastName = htmlspecialchars((string)($residentinformationtbl['lastname'] ?? ''), ENT_QUOTES, 'UTF-8');
 $ownerFirstName = htmlspecialchars((string)($residentinformationtbl['firstname'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -383,6 +384,7 @@ $residentUploadLimitLabel = app_upload_limit_label('resident');
                 <input type="hidden" name="document_type" value="Barangay Clearance for Business Permit">
                 <input type="hidden" name="redirect" value="1">
                 <input type="hidden" name="request_purpose" id="businessRequestPurpose" value="">
+                <div class="mb-3"><label class="form-label fw-semibold">Request purpose</label><select name="purpose" class="form-select" required><option value="">Select purpose</option><?php foreach ($configuredPurposeOptions as $purposeOption): ?><option value="<?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></select></div>
                 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">

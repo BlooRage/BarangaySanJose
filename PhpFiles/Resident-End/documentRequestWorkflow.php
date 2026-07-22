@@ -1168,12 +1168,16 @@ if ($action === 'submit_request') {
     }
     $documentTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
 
-    $purpose = trim((string)($_POST['request_purpose'] ?? $_POST['purpose'] ?? ''));
+    $purpose = trim((string)($_POST['purpose'] ?? $_POST['request_purpose'] ?? ''));
     if ($purpose === '') {
         $purpose = trim((string)($_POST['request_officer'] ?? ''));
     }
     if (strtolower(trim($documentType)) === 'certificate of residency') {
-        $purpose = 'Residency Verification';
+        if ($purpose === '') $purpose = 'Residency Verification';
+    }
+    $configuredPurposes = dms_document_purpose_options($conn, $documentType);
+    if ($configuredPurposes !== [] && !dms_purpose_is_allowed($purpose, $configuredPurposes)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Please select one of the currently configured request purposes.']);
     }
 
     $documentTypeToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);

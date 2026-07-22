@@ -25,6 +25,7 @@ $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
+$configuredPurposeOptions = dms_document_purpose_options($conn, 'indigency');
 
 $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -242,12 +243,9 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <label class="top-label">Request for <span class="required-asterisk">*</span></label>
                                 <select name="purpose" required>
                                     <option value="">Select Purpose</option>
-                                    <option value="Scholarship">Scholarship</option>
-                                    <option value="Employment">Employment</option>
-                                    <option value="Financial Assistance">Financial Assistance</option>
-                                    <option value="Medical Assistance">Medical Assistance</option>
-                                    <option value="Educational Assistance">Educational Assistance</option>
-                                    <option value="Other">Other</option>
+                                    <?php foreach ($configuredPurposeOptions as $purposeOption): ?>
+                                        <option value="<?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?></option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>

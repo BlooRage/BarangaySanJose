@@ -81,7 +81,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260722an';
+    $currentRenderRevision = 'r20260722ap';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3506,7 +3506,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722an';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722ap';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -4261,7 +4261,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $pdfInstance->SetLineWidth(0.2);
                     $cleanValue = trim((string)$value);
                     if ($cleanValue !== '') {
-                        $writeFittedCell($pdfInstance, $lineX1 + 0.8, $y - 0.1, max(4.0, $lineWidth - 1.6), 5.2, $cleanValue, '', $fontSize, 9.4, 'L');
+                        $writeFittedCell($pdfInstance, $lineX1 + 0.8, $y - 0.1, max(4.0, $lineWidth - 1.6), 5.2, $cleanValue, '', $fontSize, 7.2, 'L');
                     }
                 };
                 // Align the dynamic text with the revised March 2026 General Clearance template.
@@ -4465,7 +4465,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $footerLabelX = 16.5;
                 $footerColonX = 41.5;
                 $footerLineX1 = 47.2;
-                $footerLineX2 = $footerLineX1 + 28.0;
+                $footerLineX2 = $footerLineX1 + 15.0;
                 $footerRowY = 162.4;
                 foreach ($footerRows as $footerRow) {
                     $pdf->SetFont('Arial', 'B', 9.8);
@@ -4798,8 +4798,8 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $metaLabelX = 22.2;
                 $metaColonX = 55.2;
                 $metaValueX = 60.2;
-                $metaValueW = 28.0;
-                $metaUnderlineW = 28.0;
+                $metaValueW = 15.0;
+                $metaUnderlineW = 15.0;
                 $metaY = 177.1;
                 foreach ($metaRows as $metaRow) {
                     $pdf->SetFont('Arial', 'B', 10.8);
@@ -4807,7 +4807,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $pdf->Cell(max(10.0, $metaColonX - $metaLabelX - 1.0), 5.4, (string)$metaRow['label'], 0, 0, 'L');
                     $pdf->SetXY($metaColonX, $metaY);
                     $pdf->Cell(3.0, 5.4, ':', 0, 0, 'L');
-                    $writeFittedCell($pdf, $metaValueX, $metaY, $metaValueW, 5.4, (string)$metaRow['value'], '', 11.0, 9.4, 'L');
+                    $writeFittedCell($pdf, $metaValueX, $metaY, $metaValueW, 5.4, (string)$metaRow['value'], '', 11.0, 7.2, 'L');
                     $pdf->Line($metaValueX, $metaY + 5.0, $metaValueX + $metaUnderlineW, $metaY + 5.0);
                     $metaY += 6.1;
                 }
@@ -5021,7 +5021,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $labelX = 18.5;
                 $colonX = 46.0;
                 $lineX1 = 52.5;
-                $lineX2 = $lineX1 + 28.0;
+                $lineX2 = $lineX1 + 15.0;
                 $metaY = $metaBlockY + 0.1;
                 foreach ($metaRows as $rowMeta) {
                     $pdf->SetFont('Arial', 'B', 9.6);
@@ -5037,10 +5037,32 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $pdf->SetLineWidth(0.2);
                     $metaValue = trim((string)($rowMeta['value'] ?? ''));
                     if ($metaValue !== '') {
-                        $writeFittedCell($pdf, $lineX1 + 0.8, $metaY - 0.1, ($lineX2 - $lineX1) - 1.4, 5.6, $metaValue, '', 11.0, 9.2, 'L');
+                        $writeFittedCell($pdf, $lineX1 + 0.8, $metaY - 0.1, ($lineX2 - $lineX1) - 1.4, 5.6, $metaValue, '', 11.0, 7.2, 'L');
                     }
                     $metaY += 6.0;
                 }
+
+                // Replace the template's legacy issued-by and signatory names with
+                // the current officials resolved from Clearance Issuance Settings.
+                // These blocks intentionally follow the metadata section.
+                $pdf->Rect(12.0, 272.0, 92.0, 43.0, 'F');
+                $pdf->Rect(108.0, 246.0, max(1.0, $pageWidth - 108.0), 72.0, 'F');
+
+                $pdf->SetFont('Arial', '', 10.2);
+                $pdf->SetXY(14.0, 282.0);
+                $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
+                $writeFittedCell($pdf, 32.0, 281.8, 56.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.2, 8.2, 'L');
+                $writeFittedCell($pdf, 22.0, 287.2, 66.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 9.6, 7.8, 'C');
+
+                dra_render_signature_image($pdf, $punongSignaturePath, 126.0, 270.0, 52.0, 8.8);
+                $pdf->Line(119.8, 280.0, 191.2, 280.0);
+                $writeFittedCell($pdf, 118.0, 281.2, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 286.5, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 295.0, 52.0, 8.8);
+                $pdf->Line(119.8, 305.0, 191.2, 305.0);
+                $writeFittedCell($pdf, 118.0, 306.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 311.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.6, 7.6, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
@@ -7860,7 +7882,7 @@ if ($action === 'create_manual_request') {
     if ($isOtherDocumentRequest) {
         $defaultFee = max(0.0, (float)$payload['other_document_fee']);
     }
-    if ($isFirstTimeJobSeeker || $hasManualSectorExemption) {
+    if (($isFirstTimeJobSeeker && dms_first_time_job_seeker_is_exempt($conn)) || $hasManualSectorExemption) {
         $defaultFee = 0.0;
     }
 
@@ -8525,6 +8547,12 @@ if ($action === 'get_request') {
         ? $barangayIdSettings
         : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
     $row['document_settings_module_key'] = $moduleSettingsKey;
+    $operationalSettings = $moduleSettingsKey === 'monitoring'
+        ? dms_resolve_clearance_settings($conn)
+        : dms_resolve_issuance_settings($conn);
+    if (!empty($operationalSettings['essential_details_only']) && is_array($row['resident_profile'] ?? null)) {
+        $row['resident_profile'] = dms_filter_essential_resident_profile($row['resident_profile']);
+    }
     $showCopySignature = dms_resolve_module_copy_signature_setting($conn, $moduleSettingsKey);
     $row['punong_signatory_signature_path'] = $showCopySignature
         ? trim((string)($moduleSettings['punong']['signature_path'] ?? ''))
@@ -8852,7 +8880,7 @@ if ($action === 'view_issued') {
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260722an';
+        : 'r20260722ap';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);

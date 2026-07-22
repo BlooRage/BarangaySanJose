@@ -19,12 +19,14 @@ $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
 
 $userId = $_SESSION['user_id'] ?? '';
 $data = getResidentProfileData($conn, $userId);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
+$configuredPurposeOptions = dms_document_purpose_options($conn, 'residency');
 
 $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -250,7 +252,12 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Purpose for Request <span class="required-asterisk">*</span></label>
-                                <textarea name="purpose" rows="5" required></textarea>
+                                <select name="purpose" required>
+                                    <option value="">Select purpose</option>
+                                    <?php foreach ($configuredPurposeOptions as $purposeOption): ?>
+                                        <option value="<?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                         </div>
 
