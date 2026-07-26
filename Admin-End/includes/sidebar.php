@@ -1773,6 +1773,12 @@ if ($sbSidebarUserId !== '') {
         </button>
         <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === '') ? 'active' : '' ?>">
+                Overview
+              </a>
+            </li>
             <?php if ($sbCan('reports_certificate_issuance')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=certificate_issuance"

@@ -1313,6 +1313,10 @@ $dateTo     = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_to']   ??
 if ($dateTo < $dateFrom) $dateTo = $dateFrom;
 
 $baseUrl = appUrl('Admin-End/Reports/Reports.php');
+if (!array_key_exists('module', $_GET) && (($_GET['format'] ?? '') !== 'print')) {
+    require __DIR__ . '/ReportsLanding.php';
+    exit;
+}
 $rawFilterTypeParam = $_GET['filter_type'] ?? '';
 $rawFilterAreaParam = $_GET['filter_area'] ?? '';
 $rawFilterSectorParam = $_GET['filter_sector'] ?? '';
