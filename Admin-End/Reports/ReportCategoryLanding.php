@@ -55,15 +55,37 @@ $choices = [[
 
 $issuanceConfig = rp_issuance_module_config($module);
 if ($issuanceConfig !== null) {
+    $choices[] = [
+        'title' => 'All Requesters Masterlist',
+        'description' => 'Generate one masterlist of everyone who requested any document in this category.',
+        'icon' => 'fa-users',
+        'query' => [
+            'module' => $module,
+            'report' => 'requester_masterlist',
+            'show_section' => ['requesters'],
+        ],
+    ];
     foreach ((array)$issuanceConfig['request_types'] as $typeKey => $typeLabel) {
         $choices[] = [
-            'title' => $typeLabel,
-            'description' => 'Generate a focused issuance report for ' . $typeLabel . '.',
-            'icon' => $module === 'certificate_issuance' ? 'fa-file-lines' : 'fa-stamp',
+            'title' => $typeLabel . ' Summary',
+            'description' => 'Generate statistics, breakdowns, charts, revenue, and trends for ' . $typeLabel . '.',
+            'icon' => 'fa-chart-column',
             'query' => [
                 'module' => $module,
-                'report' => 'request_type',
+                'report' => 'document_summary',
                 'filter_type' => [$typeKey],
+                'show_section' => ['summary', 'breakdown', 'charts', 'tables', 'channel', 'revenue', 'trend'],
+            ],
+        ];
+        $choices[] = [
+            'title' => $typeLabel . ' Requester Masterlist',
+            'description' => 'List every person who requested ' . $typeLabel . ', with request and status details.',
+            'icon' => 'fa-users-rectangle',
+            'query' => [
+                'module' => $module,
+                'report' => 'requester_masterlist',
+                'filter_type' => [$typeKey],
+                'show_section' => ['requesters'],
             ],
         ];
     }

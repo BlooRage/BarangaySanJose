@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentRequestWorkflow.php';
+require_once __DIR__ . '/../../PhpFiles/General/piiCrypto.php';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function rp_table_exists(mysqli $conn, string $t): bool {
@@ -408,15 +409,21 @@ function rp_document_request_resident_parts(mysqli $conn, string $requestAlias =
     $joins = [];
     $sectorCandidates = [];
     $areaCandidates = [];
+    $nameCandidates = array_fill_keys(['firstname', 'middlename', 'lastname', 'suffix'], []);
 
     if (!rp_table_exists($conn, 'residentinformationtbl')) {
-        return ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
+        return ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL', 'name_exprs' => []];
     }
 
     if (rp_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
         $infoAlias = $prefix . 'iu';
         $joins[] = "LEFT JOIN residentinformationtbl {$infoAlias} ON {$infoAlias}.user_id = {$requestAlias}.resident_user_id";
         $sectorCandidates[] = "NULLIF(TRIM({$infoAlias}.sector_membership), '')";
+        foreach (array_keys($nameCandidates) as $column) {
+            if (rp_column_exists($conn, 'residentinformationtbl', $column)) {
+                $nameCandidates[$column][] = "NULLIF(TRIM({$infoAlias}.{$column}), '')";
+            }
+        }
         if (rp_table_exists($conn, 'residentaddresstbl')) {
             $addrAlias = $prefix . 'au';
             $joins[] = trim(rp_join_latest_address_sql("{$infoAlias}.resident_id", $addrAlias));
@@ -428,6 +435,11 @@ function rp_document_request_resident_parts(mysqli $conn, string $requestAlias =
         $infoAlias = $prefix . 'ir';
         $joins[] = "LEFT JOIN residentinformationtbl {$infoAlias} ON {$infoAlias}.resident_id = {$requestAlias}.resident_id";
         $sectorCandidates[] = "NULLIF(TRIM({$infoAlias}.sector_membership), '')";
+        foreach (array_keys($nameCandidates) as $column) {
+            if (rp_column_exists($conn, 'residentinformationtbl', $column)) {
+                $nameCandidates[$column][] = "NULLIF(TRIM({$infoAlias}.{$column}), '')";
+            }
+        }
         if (rp_table_exists($conn, 'residentaddresstbl')) {
             $addrAlias = $prefix . 'ar';
             $joins[] = trim(rp_join_latest_address_sql("{$requestAlias}.resident_id", $addrAlias));
@@ -439,6 +451,10 @@ function rp_document_request_resident_parts(mysqli $conn, string $requestAlias =
         'joins' => implode("\n        ", array_filter($joins)),
         'sector_expr' => $sectorCandidates ? 'COALESCE(' . implode(', ', $sectorCandidates) . ')' : 'NULL',
         'area_expr' => $areaCandidates ? 'COALESCE(' . implode(', ', $areaCandidates) . ')' : 'NULL',
+        'name_exprs' => array_map(
+            static fn(array $values): string => $values ? 'COALESCE(' . implode(', ', $values) . ", '')" : "''",
+            $nameCandidates
+        ),
     ];
 }
 
@@ -902,6 +918,8 @@ function rp_breakdown_sector_column_key(string $sector): string {
 
 function rp_issuance_customize_columns(bool $includeBreakdownSectors = true): array {
     $columns = [
+        'identifier' => 'Masterlist: Request ID',
+        'resident' => 'Masterlist: Requester Name',
         'date' => 'Monthly Trend: Month',
         'type' => 'Request / Document Type',
         'area' => 'Tables: Area Number',
@@ -941,6 +959,11 @@ function rp_issuance_customize_column_groups(bool $includeBreakdownSectors = tru
     $breakdownColumns[] = 'breakdown_total';
 
     return [
+        [
+            'label' => 'Requester Masterlist',
+            'sections' => ['requesters'],
+            'columns' => ['identifier', 'resident', 'date', 'type', 'status', 'area', 'channel', 'revenue'],
+        ],
         [
             'label' => 'Breakdown',
             'sections' => ['breakdown'],
@@ -1043,6 +1066,7 @@ function rp_report_customize_config(string $module): array {
         'certificate_issuance' => [
             'sections' => [
                 'summary' => 'Summary',
+                'requesters' => 'Requester Masterlist',
                 'breakdown' => 'Breakdown',
                 'charts' => 'Charts',
                 'tables' => 'Tables',
@@ -1056,6 +1080,7 @@ function rp_report_customize_config(string $module): array {
         'clearance_issuance' => [
             'sections' => [
                 'summary' => 'Summary',
+                'requesters' => 'Requester Masterlist',
                 'breakdown' => 'Breakdown',
                 'charts' => 'Charts',
                 'tables' => 'Tables',
@@ -1436,6 +1461,11 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
     $residentJoin = $residentParts['joins'] !== '' ? $residentParts['joins'] : '';
     $areaExpr = $residentParts['area_expr'] !== 'NULL' ? $residentParts['area_expr'] : "''";
     $sectorExpr = $residentParts['sector_expr'] !== 'NULL' ? $residentParts['sector_expr'] : "''";
+    $residentNameExprs = (array)($residentParts['name_exprs'] ?? []);
+    $residentFirstNameExpr = $residentNameExprs['firstname'] ?? "''";
+    $residentMiddleNameExpr = $residentNameExprs['middlename'] ?? "''";
+    $residentLastNameExpr = $residentNameExprs['lastname'] ?? "''";
+    $residentSuffixExpr = $residentNameExprs['suffix'] ?? "''";
     $amountExpr = $hasFinanceTable && rp_column_exists($conn, 'financetransactiontbl', 'transaction_amount')
         ? "COALESCE(f.transaction_amount, 0)"
         : "0";
@@ -1451,6 +1481,10 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
           COALESCE(NULLIF(TRIM(d.document_type), ''), '') AS document_type,
           COALESCE(NULLIF(TRIM(d.stage), ''), 'submitted') AS stage,
           COALESCE(d.request_details, '') AS request_details,
+          {$residentFirstNameExpr} AS resident_firstname,
+          {$residentMiddleNameExpr} AS resident_middlename,
+          {$residentLastNameExpr} AS resident_lastname,
+          {$residentSuffixExpr} AS resident_suffix,
           {$areaExpr} AS area_number,
           {$sectorExpr} AS sector_membership,
           {$amountExpr} AS revenue_amount
@@ -1497,6 +1531,15 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
 
     foreach ($rows as $row) {
         $payload = rp_decode_json_assoc((string)($row['request_details'] ?? ''));
+        $residentName = trim(implode(' ', array_filter([
+            trim(pii_decrypt_string((string)($row['resident_firstname'] ?? ''))),
+            trim(pii_decrypt_string((string)($row['resident_middlename'] ?? ''))),
+            trim(pii_decrypt_string((string)($row['resident_lastname'] ?? ''))),
+            trim(pii_decrypt_string((string)($row['resident_suffix'] ?? ''))),
+        ], static fn(string $part): bool => $part !== '')));
+        if ($residentName === '') {
+            $residentName = trim((string)($payload['resident_name'] ?? $payload['full_name'] ?? $payload['applicant_name'] ?? ''));
+        }
         $rawDocumentType = trim((string)($row['document_type'] ?? ''));
         if ($rawDocumentType === '') {
             $rawDocumentType = trim((string)($payload['document_type'] ?? ''));
@@ -1538,6 +1581,7 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'request_date_label' => $requestDateLabel,
             'request_type_key' => $requestTypeKey,
             'request_type_label' => $issuanceModuleConfig['request_types'][$requestTypeKey],
+            'resident_name' => $residentName !== '' ? $residentName : 'Unavailable',
             'status_key' => $statusKey,
             'status_label' => $reportFilterStatusOptions[$statusKey] ?? rp_stage_label($effectiveStage),
             'area_number' => $areaNumber,
@@ -3608,6 +3652,42 @@ if ($issuanceModuleConfig !== null):
               <?php endif; ?>
             </tbody>
           </table>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('requesters')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('requesters')) ?></div>
+          <?php if ($issuanceRows === []): ?>
+            <p class="rp-empty">No requester records matched the selected document and filters.</p>
+          <?php else: ?>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Request ID</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Requester</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Requested</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>">Area</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Channel</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($issuanceRows as $requesterRow): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_id'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($requesterRow['resident_name'] ?? 'Unavailable')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_type_label'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_date_label'] ?? 'N/A')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars((string)($requesterRow['status_label'] ?? '')) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>"><?= htmlspecialchars((string)(($requesterRow['area_number'] ?? '') ?: 'Unspecified')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_source'] ?? '')) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
 
