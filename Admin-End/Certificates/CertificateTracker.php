@@ -1295,6 +1295,7 @@ if ($certificateLaunchStage === 'release') {
       text-align: left;
       align-self: end;
       padding-bottom: 10px;
+      transform: translateY(-8px);
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-left-column {
       align-self: end;
@@ -1304,6 +1305,7 @@ if ($certificateLaunchStage === 'release') {
       justify-items: center;
       row-gap: 10px;
       text-align: center;
+      transform: translateY(-8px);
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signature {
       justify-items: center;
@@ -1322,7 +1324,7 @@ if ($certificateLaunchStage === 'release') {
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta {
       width: 280px;
-      margin-top: 22px;
+      margin-top: 30px;
       margin-left: 8px;
       font-size: .86rem;
       line-height: 1.2;

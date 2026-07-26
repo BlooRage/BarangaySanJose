@@ -3383,7 +3383,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $issuedDateWord = $issuedAt;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 37,
+                'cache_version' => 38,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -5003,7 +5003,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $legacyFooterBottom = min($pageHeight - 24.0, $sourceMetaBlockY + 39.0);
                 $pdf->Rect(12.0, 242.0, 92.0, max(1.0, $legacyFooterBottom - 242.0), 'F');
                 $pdf->Rect(108.0, 242.0, max(1.0, $pageWidth - 108.0), 76.0, 'F');
-                $metaBlockY = 276.0;
+                $metaBlockY = 282.0;
                 $metaMaskX = $metaBlockX - 0.8;
                 $metaMaskY = $metaBlockY - 0.8;
                 $metaMaskW = 82.0;
@@ -5050,20 +5050,20 @@ function dra_generate_issued_document(array $requestRow): ?string
                 // Draw only the current officials resolved from their active
                 // Barangay positions; no template name is allowed to remain.
                 $pdf->SetFont('Arial', '', 10.2);
-                $pdf->SetXY(14.0, 255.0);
+                $pdf->SetXY(14.0, 249.0);
                 $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
-                $writeFittedCell($pdf, 32.0, 254.8, 66.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.2, 8.2, 'L');
-                $writeFittedCell($pdf, 22.0, 260.2, 76.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : 'Barangay Secretary', 'I', 9.6, 7.8, 'C');
+                $writeFittedCell($pdf, 32.0, 248.8, 66.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.2, 8.2, 'L');
+                $writeFittedCell($pdf, 22.0, 254.2, 76.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : 'Barangay Secretary', 'I', 9.6, 7.8, 'C');
 
-                dra_render_signature_image($pdf, $punongSignaturePath, 126.0, 244.0, 52.0, 8.8);
-                $pdf->Line(119.8, 254.0, 191.2, 254.0);
-                $writeFittedCell($pdf, 118.0, 255.2, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
-                $writeFittedCell($pdf, 118.0, 260.5, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+                dra_render_signature_image($pdf, $punongSignaturePath, 126.0, 238.0, 52.0, 8.8);
+                $pdf->Line(119.8, 248.0, 191.2, 248.0);
+                $writeFittedCell($pdf, 118.0, 249.2, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 254.5, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
 
-                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 262.0, 52.0, 8.8);
-                $pdf->Line(119.8, 272.0, 191.2, 272.0);
-                $writeFittedCell($pdf, 118.0, 273.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.4, 8.0, 'C');
-                $writeFittedCell($pdf, 118.0, 278.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.3, 7.4, 'C');
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 256.0, 52.0, 8.8);
+                $pdf->Line(119.8, 266.0, 191.2, 266.0);
+                $writeFittedCell($pdf, 118.0, 267.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.4, 8.0, 'C');
+                $writeFittedCell($pdf, 118.0, 272.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.3, 7.4, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
