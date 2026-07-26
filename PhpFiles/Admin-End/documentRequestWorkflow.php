@@ -3383,7 +3383,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $issuedDateWord = $issuedAt;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 36,
+                'cache_version' => 37,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -5003,7 +5003,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $legacyFooterBottom = min($pageHeight - 24.0, $sourceMetaBlockY + 39.0);
                 $pdf->Rect(12.0, 242.0, 92.0, max(1.0, $legacyFooterBottom - 242.0), 'F');
                 $pdf->Rect(108.0, 242.0, max(1.0, $pageWidth - 108.0), 76.0, 'F');
-                $metaBlockY = 268.0;
+                $metaBlockY = 276.0;
                 $metaMaskX = $metaBlockX - 0.8;
                 $metaMaskY = $metaBlockY - 0.8;
                 $metaMaskW = 82.0;
@@ -5029,7 +5029,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $lineX2 = $lineX1 + 15.0;
                 $metaY = $metaBlockY + 0.1;
                 foreach ($metaRows as $rowMeta) {
-                    $pdf->SetFont('Arial', 'B', 9.6);
+                    $pdf->SetFont('Arial', 'B', 8.8);
                     $pdf->SetXY($labelX, $metaY);
                     $pdf->Cell(max(10.0, $colonX - $labelX - 1.0), 5.6, (string)$rowMeta['label'], 0, 0, 'L');
                     $pdf->SetXY($colonX, $metaY);
@@ -5042,9 +5042,9 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $pdf->SetLineWidth(0.2);
                     $metaValue = trim((string)($rowMeta['value'] ?? ''));
                     if ($metaValue !== '') {
-                        $writeFittedCell($pdf, $lineX1 + 0.8, $metaY - 0.1, ($lineX2 - $lineX1) - 1.4, 5.6, $metaValue, '', 11.0, 7.2, 'L');
+                        $writeFittedCell($pdf, $lineX1 + 0.6, $metaY - 0.1, ($lineX2 - $lineX1) - 1.0, 5.4, $metaValue, '', 9.2, 6.4, 'L');
                     }
-                    $metaY += 6.0;
+                    $metaY += 5.4;
                 }
 
                 // Draw only the current officials resolved from their active
@@ -5060,10 +5060,10 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $writeFittedCell($pdf, 118.0, 255.2, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
                 $writeFittedCell($pdf, 118.0, 260.5, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
 
-                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 273.0, 52.0, 8.8);
-                $pdf->Line(119.8, 283.0, 191.2, 283.0);
-                $writeFittedCell($pdf, 118.0, 284.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.6, 8.2, 'C');
-                $writeFittedCell($pdf, 118.0, 289.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.6, 7.6, 'C');
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 262.0, 52.0, 8.8);
+                $pdf->Line(119.8, 272.0, 191.2, 272.0);
+                $writeFittedCell($pdf, 118.0, 273.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.4, 8.0, 'C');
+                $writeFittedCell($pdf, 118.0, 278.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.3, 7.4, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
@@ -5077,6 +5077,18 @@ function dra_generate_issued_document(array $requestRow): ?string
                         $qrSize
                     );
                 }
+
+                // The legacy footer can be partially covered while removing its
+                // preprinted metadata. Redraw it last so both lines remain legible.
+                $footerTextX = 48.0;
+                $footerTextW = 116.0;
+                $footerTextY = $pageHeight - 29.0;
+                $pdf->Rect($footerTextX - 2.0, $footerTextY - 1.0, $footerTextW + 4.0, 14.0, 'F');
+                $pdf->SetFont('Arial', 'I', 9.0);
+                $pdf->SetXY($footerTextX, $footerTextY);
+                $pdf->Cell($footerTextW, 5.0, 'This document is valid until the end of the year,', 0, 0, 'C');
+                $pdf->SetXY($footerTextX, $footerTextY + 5.2);
+                $pdf->Cell($footerTextW, 5.0, 'Check the qr code to verify the authenticity of this document.', 0, 0, 'C');
 
                 $pdf->Output('F', $diskPath);
                 return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;

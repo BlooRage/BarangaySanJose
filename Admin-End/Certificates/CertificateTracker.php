@@ -1302,7 +1302,7 @@ if ($certificateLaunchStage === 'release') {
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signing {
       display: grid;
       justify-items: center;
-      row-gap: 18px;
+      row-gap: 10px;
       text-align: center;
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signature {
@@ -1322,9 +1322,9 @@ if ($certificateLaunchStage === 'release') {
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta {
       width: 280px;
-      margin-top: 14px;
+      margin-top: 22px;
       margin-left: 8px;
-      font-size: .97rem;
+      font-size: .86rem;
       line-height: 1.2;
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-row {
