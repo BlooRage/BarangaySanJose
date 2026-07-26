@@ -1317,6 +1317,15 @@ if (!array_key_exists('module', $_GET) && (($_GET['format'] ?? '') !== 'print'))
     require __DIR__ . '/ReportsLanding.php';
     exit;
 }
+if (
+    array_key_exists('module', $_GET)
+    && count($_GET) === 1
+    && !array_key_exists('report', $_GET)
+    && (($_GET['format'] ?? '') !== 'print')
+) {
+    require __DIR__ . '/ReportCategoryLanding.php';
+    exit;
+}
 $rawFilterTypeParam = $_GET['filter_type'] ?? '';
 $rawFilterAreaParam = $_GET['filter_area'] ?? '';
 $rawFilterSectorParam = $_GET['filter_sector'] ?? '';

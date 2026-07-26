@@ -41,6 +41,13 @@ $createAnnouncementUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type
 $reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_issuance';
 
 $contentModules = [
+    'overview' => [
+        'label' => 'Overview',
+        'title' => 'Content Manager',
+        'icon' => 'fa-layer-group',
+        'status' => 'Navigation',
+        'summary' => 'Choose a public page to edit or open the content request tracker.',
+    ],
     'requests' => [
         'label' => 'Content Change Request',
         'title' => 'Content Change Request',
@@ -169,9 +176,9 @@ $editorMeta = [
 ];
 
 $allModuleMeta = $contentModules + $hiddenEditorModules;
-$selectedModuleKey = strtolower(trim((string)($_GET['module'] ?? 'requests')));
+$selectedModuleKey = strtolower(trim((string)($_GET['module'] ?? 'overview')));
 if (!isset($allModuleMeta[$selectedModuleKey])) {
-    $selectedModuleKey = 'requests';
+    $selectedModuleKey = 'overview';
 }
 $selectedModule = $allModuleMeta[$selectedModuleKey];
 
@@ -849,7 +856,86 @@ $previewCssAssets = [
         </div>
       <?php endif; ?>
 
-      <?php if ($selectedModuleKey === 'requests'): ?>
+      <?php if ($selectedModuleKey === 'overview'): ?>
+        <section class="cms-hero-card mb-4">
+          <div class="cms-hero-copy">
+            <div class="cms-kicker mb-2">Content Manager</div>
+            <h3 class="cms-page-title mb-2">Manage the public website</h3>
+            <p class="cms-page-subtitle mb-0">
+              Select a page editor, review your content requests, or continue with an item waiting for attention.
+            </p>
+          </div>
+          <div class="cms-hero-actions">
+            <a href="<?= htmlspecialchars(cms_request_view_url('my_requests'), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-light fw-semibold">
+              <i class="fa-solid fa-code-compare me-1" aria-hidden="true"></i>My Requests
+            </a>
+            <?php if ($canReviewContent): ?>
+              <a href="<?= htmlspecialchars(cms_request_view_url('review_queue'), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-outline-light fw-semibold">
+                <i class="fa-solid fa-clipboard-check me-1" aria-hidden="true"></i>Review Queue
+                <?php if ($pendingReviewCount > 0): ?>
+                  <span class="badge text-bg-danger ms-1"><?= (int)$pendingReviewCount ?></span>
+                <?php endif; ?>
+              </a>
+            <?php endif; ?>
+          </div>
+        </section>
+
+        <div class="cms-rule-strip mb-4" aria-label="Content request summary">
+          <div class="cms-rule-chip">
+            <i class="fa-solid fa-file-pen" aria-hidden="true"></i>
+            <div><strong><?= (int)$draftCount ?></strong> draft<?= $draftCount === 1 ? '' : 's' ?> ready to continue</div>
+          </div>
+          <div class="cms-rule-chip">
+            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+            <div><strong><?= (int)$myPendingCount ?></strong> request<?= $myPendingCount === 1 ? '' : 's' ?> pending</div>
+          </div>
+          <div class="cms-rule-chip">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+            <div><strong><?= (int)$myApprovedCount ?></strong> approved request<?= $myApprovedCount === 1 ? '' : 's' ?></div>
+          </div>
+          <div class="cms-rule-chip">
+            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+            <div><strong><?= (int)$myArchivedCount ?></strong> archived request<?= $myArchivedCount === 1 ? '' : 's' ?></div>
+          </div>
+        </div>
+
+        <section class="cms-section-card mb-4">
+          <div class="cms-section-heading">
+            <div>
+              <div class="cms-section-kicker mb-1">Page editors</div>
+              <h3 class="cms-section-title mb-1">What would you like to update?</h3>
+              <p class="text-muted mb-0">Open an editor to preview and prepare changes for the public website.</p>
+            </div>
+          </div>
+          <div class="cms-nav-grid">
+            <?php foreach ($contentModules as $moduleKey => $moduleMeta): ?>
+              <?php if (in_array($moduleKey, ['overview', 'requests'], true)) continue; ?>
+              <a class="cms-nav-link" href="<?= htmlspecialchars(cms_nav_url($moduleKey), ENT_QUOTES, 'UTF-8') ?>">
+                <span class="cms-nav-link-icon">
+                  <i class="fa-solid <?= htmlspecialchars((string)$moduleMeta['icon'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></i>
+                </span>
+                <span class="cms-nav-link-copy">
+                  <strong class="d-block"><?= htmlspecialchars((string)$moduleMeta['label']) ?></strong>
+                  <span class="cms-nav-link-meta"><?= htmlspecialchars((string)$moduleMeta['summary']) ?></span>
+                </span>
+              </a>
+            <?php endforeach; ?>
+          </div>
+        </section>
+
+        <section class="cms-section-card">
+          <div class="cms-section-heading mb-0">
+            <div>
+              <div class="cms-section-kicker mb-1">Workflow</div>
+              <h3 class="cms-section-title mb-1">Content change requests</h3>
+              <p class="text-muted mb-0">Track drafts, approvals, denials, and published website updates.</p>
+            </div>
+            <a href="<?= htmlspecialchars(cms_nav_url('requests'), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary fw-semibold">
+              Open Request Tracker
+            </a>
+          </div>
+        </section>
+      <?php elseif ($selectedModuleKey === 'requests'): ?>
         <ul class="nav nav-tabs mb-0 cms-request-view-tabs" aria-label="Content request views">
           <?php foreach ($requestViewDefinitions as $requestViewKey => $requestViewMeta): ?>
             <?php $isRequestViewActive = $contentRequestsView === $requestViewKey; ?>

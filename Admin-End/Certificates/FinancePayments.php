@@ -683,6 +683,12 @@ if ($financeSection === 'fees') {
       border-radius: 0.75rem;
       background: #f8f9fa;
     }
+    .transaction-tab-panel .finance-fee-editor {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
     #generalFeesPanel > .finance-fee-card {
       border-top-left-radius: 0;
     }
@@ -823,9 +829,6 @@ if ($financeSection === 'fees') {
       }
       .finance-fee-card.transaction-tab-panel {
         padding: 1rem !important;
-      }
-      .finance-fee-editor {
-        padding: 1rem;
       }
       .manual-transactions-scroll-note {
         display: block;

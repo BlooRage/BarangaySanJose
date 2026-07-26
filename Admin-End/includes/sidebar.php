@@ -118,10 +118,6 @@ $isOfficialTransitionActive = in_array($current, $officialTransitionPages);
 $isReportActive = in_array($current, $reportPages);
 $isStatisticsActive = ($current === 'AdminDashboard.php');
 $isAdminProfileActive = ($current === 'admin_profile.php');
-$reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
-if ($reportModule === 'document_requests') {
-    $reportModule = 'certificate_issuance';
-}
 $areaManagementTab = strtolower(trim((string)($_GET['tab'] ?? 'summary')));
 $areaManagementArea = trim((string)($_GET['area'] ?? ''));
 $isSuperAdminSidebar = (strtolower(trim((string)($_SESSION['role'] ?? ''))) === 'superadmin');
@@ -272,9 +268,9 @@ $contentToolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if ($contentToolView !== 'tracker') {
     $contentToolView = 'tracker';
 }
-$contentManagementModule = strtolower(trim((string)($_GET['module'] ?? 'requests')));
-if (!in_array($contentManagementModule, ['requests', 'announcements', 'home', 'government', 'services', 'faq', 'contact', 'login'], true)) {
-    $contentManagementModule = 'requests';
+$contentManagementModule = strtolower(trim((string)($_GET['module'] ?? 'overview')));
+if (!in_array($contentManagementModule, ['overview', 'requests', 'announcements', 'home', 'government', 'services', 'faq', 'contact', 'login'], true)) {
+    $contentManagementModule = 'overview';
 }
 $isContentCreateSectionActive = in_array($current, ['CreateContent.php', 'CreateNews.php'], true);
 $isContentToolsSectionActive = $current === 'Contents.php' && $sidebarContentTypeFilter !== 'news';
@@ -1654,8 +1650,14 @@ if ($sbSidebarUserId !== '') {
             <?php if ($sbCanAccessContentNavigator): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'overview') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Overview</span>
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">CMS Tools</span>
+                <span class="sidebar-subnav-text">Content Requests</span>
                 <?= $sbRenderAttentionBadge($sbCount('content_change_request')) ?>
               </a>
             </li>
@@ -1760,75 +1762,13 @@ if ($sbSidebarUserId !== '') {
       <?php endif; ?>
       <?php if ($sbHasAny($sbReportKeys)): ?>
       <li class="mb-2">
-        <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isReportActive ? '' : 'collapsed' ?>"
-                data-sidebar-toggle="collapse"
-                data-sidebar-target="#reports-collapse"
-                aria-controls="reports-collapse"
-                aria-expanded="<?= $isReportActive ? 'true' : 'false' ?>">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isReportActive ? 'active' : '' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-chart-bar"></i>
           </span>
           <span class="sidebar-button-label">Reports</span>
-        </button>
-        <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === '') ? 'active' : '' ?>">
-                Overview
-              </a>
-            </li>
-            <?php if ($sbCan('reports_certificate_issuance')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=certificate_issuance"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'certificate_issuance') ? 'active' : '' ?>">
-                Certificate Issuance
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('reports_clearance_issuance')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=clearance_issuance"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'clearance_issuance') ? 'active' : '' ?>">
-                Clearance Issuance
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('reports_financial')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=financial"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'financial') ? 'active' : '' ?>">
-                Financial
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('reports_residents')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=residents"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'residents') ? 'active' : '' ?>">
-                Residents
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('reports_blotter')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=blotter"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'blotter') ? 'active' : '' ?>">
-                Blotter
-              </a>
-            </li>
-            <?php endif; ?>
-            <?php if ($sbCan('reports_complaints')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=complaints"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'complaints') ? 'active' : '' ?>">
-                Complaints
-              </a>
-            </li>
-            <?php endif; ?>
-          </ul>
-        </div>
+        </a>
       </li>
       <?php endif; ?>
       <?php endif; ?>
