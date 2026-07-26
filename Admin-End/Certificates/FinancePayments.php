@@ -643,6 +643,33 @@ if ($financeSection === 'fees') {
       background: #fff;
       box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06);
     }
+    /*
+     * Keep page dialogs above the universal-modal and mobile-sidebar layers.
+     * Without an explicit shared layer, Bootstrap's backdrop can sit over the
+     * fee dialog and intercept every mouse/touch event.
+     */
+    body > .modal-backdrop {
+      z-index: 2040;
+    }
+    .uniform-modal {
+      z-index: 2070;
+    }
+    #addGeneralFeeModal,
+    #editGeneralFeeModal,
+    #deleteGeneralFeeModal,
+    #modalFinanceFilter,
+    #modalFinanceColumns,
+    #viewModal {
+      z-index: 2050;
+    }
+    #addGeneralFeeModal .btn-close,
+    #editGeneralFeeModal .btn-close,
+    #deleteGeneralFeeModal .btn-close,
+    #modalFinanceFilter .btn-close,
+    #modalFinanceColumns .btn-close,
+    #viewModal .btn-close {
+      display: block !important;
+    }
     .finance-fee-card--general-form {
       border-top-left-radius: 4px;
       border-top-right-radius: 18px;
@@ -721,18 +748,90 @@ if ($financeSection === 'fees') {
     .manual-transaction-form {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       align-items: start;
+      column-gap: 1.25rem !important;
+      row-gap: 1rem !important;
     }
-    .manual-transaction-form > div:nth-of-type(5),
-    .manual-transaction-form > button[type="submit"] {
+    .manual-transaction-field--wide,
+    .manual-transaction-actions {
       grid-column: 1 / -1;
+    }
+    .manual-transaction-form .form-label {
+      margin-bottom: 0.4rem;
+      font-size: 0.9rem;
+    }
+    .manual-transaction-form .form-control,
+    .manual-transaction-form .form-select,
+    .manual-transaction-form .input-group-text {
+      min-height: 44px;
+    }
+    .manual-transaction-form textarea.form-control {
+      min-height: 92px;
+      resize: vertical;
+    }
+    .manual-transaction-form .manual-transaction-description {
+      min-height: 120px;
+    }
+    .manual-transaction-required {
+      color: #dc3545;
+    }
+    .manual-transaction-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 0.25rem;
+    }
+    .manual-transaction-actions .btn {
+      min-width: 220px;
+      min-height: 44px;
+    }
+    .manual-transactions-scroll {
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-gutter: stable;
+    }
+    .manual-transactions-table {
+      min-width: 1120px;
+      table-layout: fixed;
+    }
+    .manual-transactions-table th:nth-child(1) { width: 12%; }
+    .manual-transactions-table th:nth-child(2) { width: 22%; }
+    .manual-transactions-table th:nth-child(3) { width: 14%; }
+    .manual-transactions-table th:nth-child(4) { width: 13%; }
+    .manual-transactions-table th:nth-child(5) { width: 12%; }
+    .manual-transactions-table th:nth-child(6) { width: 10%; }
+    .manual-transactions-table th:nth-child(7) { width: 17%; }
+    .manual-transactions-table th,
+    .manual-transactions-table td {
+      overflow-wrap: anywhere;
+    }
+    .manual-transactions-table .finance-fee-amount {
+      white-space: nowrap;
+    }
+    .manual-transactions-scroll-note {
+      display: none;
     }
     @media (max-width: 767.98px) {
       .manual-transaction-form {
         grid-template-columns: 1fr;
       }
-      .manual-transaction-form > div:nth-of-type(5),
-      .manual-transaction-form > button[type="submit"] {
+      .manual-transaction-field--wide,
+      .manual-transaction-actions {
         grid-column: auto;
+      }
+      .manual-transaction-actions .btn {
+        width: 100%;
+      }
+      .finance-fee-card.transaction-tab-panel {
+        padding: 1rem !important;
+      }
+      .finance-fee-editor {
+        padding: 1rem;
+      }
+      .manual-transactions-scroll-note {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #6c757d;
+        font-size: 0.8rem;
       }
     }
     .certificate-tracker-shell {
@@ -1331,35 +1430,35 @@ if ($financeSection === 'fees') {
                 <?= csrfTokenField() ?>
                 <input type="hidden" name="action" value="create_manual_transaction">
 
-                <div>
-                  <label class="form-label fw-semibold">Name</label>
-                  <input type="text" name="transaction_name" class="form-control" placeholder="Enter payer or transaction name" required>
+                <div class="manual-transaction-field">
+                  <label for="manualTransactionName" class="form-label fw-semibold">Payer name <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <input id="manualTransactionName" type="text" name="transaction_name" class="form-control" placeholder="Enter the payer's full name" autocomplete="name" required>
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">Address</label>
-                  <textarea name="resident_address" class="form-control" rows="3" placeholder="Enter resident address" required></textarea>
+                <div class="manual-transaction-field">
+                  <label for="manualTransactionAddress" class="form-label fw-semibold">Resident address <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <textarea id="manualTransactionAddress" name="resident_address" class="form-control" rows="2" placeholder="House number, street, barangay, city" autocomplete="street-address" required></textarea>
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">Resident Phone Number <span class="text-muted fw-normal">(optional)</span></label>
-                  <input type="text" name="resident_phone_number" class="form-control" placeholder="Enter resident phone number">
+                <div class="manual-transaction-field">
+                  <label for="manualTransactionPhone" class="form-label fw-semibold">Phone number <span class="text-muted fw-normal">(optional)</span></label>
+                  <input id="manualTransactionPhone" type="tel" name="resident_phone_number" class="form-control" placeholder="e.g. 0912 345 6789" autocomplete="tel" inputmode="tel">
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">Email <span class="text-muted fw-normal">(optional)</span></label>
-                  <input type="email" name="resident_email" class="form-control" placeholder="Enter resident email">
+                <div class="manual-transaction-field">
+                  <label for="manualTransactionEmail" class="form-label fw-semibold">Email address <span class="text-muted fw-normal">(optional)</span></label>
+                  <input id="manualTransactionEmail" type="email" name="resident_email" class="form-control" placeholder="e.g. resident@example.com" autocomplete="email">
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">Description of Transaction</label>
-                  <textarea name="transaction_description" class="form-control" rows="4" placeholder="Describe the transaction" required></textarea>
+                <div class="manual-transaction-field manual-transaction-field--wide">
+                  <label for="manualTransactionDescription" class="form-label fw-semibold">Transaction description <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <textarea id="manualTransactionDescription" name="transaction_description" class="form-control manual-transaction-description" rows="3" placeholder="Briefly describe the payment or purpose" required></textarea>
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">Barangay Department Handle</label>
-                  <select name="department_handle" class="form-select" required>
-                    <option value="">Select department</option>
+                <div class="manual-transaction-field">
+                  <label for="manualTransactionDepartment" class="form-label fw-semibold">Barangay department <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <select id="manualTransactionDepartment" name="department_handle" class="form-select" required>
+                    <option value="" selected disabled>Select a department</option>
                     <?php foreach ($manualDepartmentOptions as $departmentOption): ?>
                       <option value="<?= htmlspecialchars((string)$departmentOption, ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars((string)$departmentOption, ENT_QUOTES, 'UTF-8') ?>
@@ -1368,19 +1467,24 @@ if ($financeSection === 'fees') {
                   </select>
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">Amount</label>
-                  <input type="number" name="transaction_amount" class="form-control" min="0.01" step="0.01" placeholder="0.00" required>
+                <div class="manual-transaction-field">
+                  <label for="manualTransactionAmount" class="form-label fw-semibold">Amount <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <div class="input-group">
+                    <span class="input-group-text">₱</span>
+                    <input id="manualTransactionAmount" type="number" name="transaction_amount" class="form-control" min="0.01" step="0.01" placeholder="0.00" inputmode="decimal" required>
+                  </div>
                 </div>
 
-                <div>
-                  <label class="form-label fw-semibold">OR Number Receipt</label>
-                  <input type="text" name="or_number_receipt" class="form-control" placeholder="Enter OR number" required>
+                <div class="manual-transaction-field manual-transaction-field--wide">
+                  <label for="manualTransactionOrNumber" class="form-label fw-semibold">Official receipt (OR) number <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <input id="manualTransactionOrNumber" type="text" name="or_number_receipt" class="form-control" placeholder="Enter the official receipt number" autocomplete="off" required>
                 </div>
 
-                <button type="submit" class="btn btn-success">
-                  <i class="fas fa-plus-circle me-1"></i>Create Transaction
-                </button>
+                <div class="manual-transaction-actions">
+                  <button type="submit" class="btn btn-success">
+                    <i class="fas fa-plus-circle me-1"></i>Create Transaction
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -1403,8 +1507,9 @@ if ($financeSection === 'fees') {
                   No manual finance transactions yet.
                 </div>
               <?php else: ?>
-                <div class="table-responsive compact-admin-table-shell">
-                  <table class="table align-middle compact-admin-table finance-fee-table">
+                <div class="manual-transactions-scroll-note"><i class="fas fa-arrows-left-right me-1" aria-hidden="true"></i>Swipe horizontally to view all transaction details.</div>
+                <div class="table-responsive compact-admin-table-shell manual-transactions-scroll" tabindex="0" role="region" aria-label="Finance transactions table. Scroll horizontally to view all columns.">
+                  <table class="table align-middle compact-admin-table finance-fee-table manual-transactions-table">
                     <thead>
                       <tr class="table-light">
                         <th>ID</th>
@@ -2149,5 +2254,22 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <?php endif; ?>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  [
+    'addGeneralFeeModal',
+    'editGeneralFeeModal',
+    'deleteGeneralFeeModal',
+    'modalFinanceFilter',
+    'modalFinanceColumns',
+    'viewModal'
+  ].forEach((modalId) => {
+    const modalElement = document.getElementById(modalId);
+    if (modalElement && modalElement.parentElement !== document.body) {
+      document.body.appendChild(modalElement);
+    }
+  });
+});
+</script>
 </body>
 </html>
