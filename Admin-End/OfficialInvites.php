@@ -767,7 +767,7 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
                 <div class="invite-help">Latest 100 invite records with onboarding state and remaining actions.</div>
             </div>
                 <div class="table-responsive compact-admin-table-shell">
-                    <table class="table table-sm align-middle mb-0 invite-history-table compact-admin-table compact-admin-table--wide">
+                    <table class="table table-sm align-middle mb-0 invite-history-table compact-admin-table compact-admin-table--wide" data-table-pagination>
                         <thead>
                         <tr>
                             <th>ID</th>

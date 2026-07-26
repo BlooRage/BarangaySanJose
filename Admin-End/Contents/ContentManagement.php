@@ -709,7 +709,7 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
     ob_start();
     ?>
     <div class="table-responsive compact-admin-table-shell">
-      <table class="table align-middle mb-0 compact-admin-table compact-admin-table--wide cms-request-table">
+      <table class="table align-middle mb-0 compact-admin-table compact-admin-table--wide cms-request-table" data-table-pagination>
         <thead>
           <tr class="table-light">
             <th>Request Info</th>

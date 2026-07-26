@@ -209,7 +209,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
             <div id="householdMemberVerificationEmpty" class="text-muted small d-none">No household member verification requests found.</div>
 
             <div class="table-responsive compact-admin-table-shell">
-                <table class="table align-middle compact-admin-table" id="table-householdMemberVerification">
+                <table class="table align-middle compact-admin-table" id="table-householdMemberVerification" data-table-pagination>
                     <thead>
                         <tr class="table-light">
                             <th>Request ID</th>

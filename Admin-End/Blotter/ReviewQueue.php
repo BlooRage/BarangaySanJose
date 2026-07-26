@@ -131,7 +131,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
 
             <div class="table-responsive compact-admin-table-shell">
-                <table id="table-appData" class="table align-middle compact-admin-table compact-admin-table--wide">
+                <table id="table-appData" class="table align-middle compact-admin-table compact-admin-table--wide" data-table-pagination>
                     <thead>
                         <tr class="table-light">
                             <th>Request ID</th>

@@ -1503,7 +1503,7 @@ if ($financeSection === 'fees') {
         </div>
 
         <div class="table-responsive compact-admin-table-shell">
-          <table id="table-certificateTracker" class="table align-middle compact-admin-table compact-admin-table--wide">
+          <table id="table-certificateTracker" class="table align-middle compact-admin-table compact-admin-table--wide" data-table-pagination>
             <thead>
               <tr class="table-light">
                 <th class="col-request-id">Request ID</th>

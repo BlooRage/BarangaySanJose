@@ -80,7 +80,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
 
             <!-- TABLE -->
             <div class="table-responsive compact-admin-table-shell">
-                <table class="table align-middle compact-admin-table" id="table-householdProfiling">
+                <table class="table align-middle compact-admin-table" id="table-householdProfiling" data-table-pagination>
                     <thead>
                         <tr class="table-light">
                             <th id="th-col-1">Address ID</th>

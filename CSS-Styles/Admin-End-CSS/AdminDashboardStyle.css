@@ -159,6 +159,12 @@ body {
 
 #main-display {
     flex-grow: 1;
+    /*
+     * Allow this flex item to shrink to the available viewport width.
+     * Wide tables already scroll inside their .table-responsive wrapper;
+     * without this, their min-width expands the whole document instead.
+     */
+    min-width: 0;
     padding: 20px;
     background-color: #f8f9fa;
     font-family: 'Geist', sans-serif;
