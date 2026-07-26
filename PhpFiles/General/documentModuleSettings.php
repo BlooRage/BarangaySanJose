@@ -163,6 +163,90 @@ if (!function_exists('dms_resolve_issuance_settings')) {
     }
 }
 
+if (!function_exists('dms_issuance_certificate_key')) {
+    function dms_issuance_certificate_key(string $documentType): string
+    {
+        $token = strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $documentType));
+        return match (true) {
+            str_contains($token, 'indigency') => 'indigency',
+            str_contains($token, 'residency'), str_contains($token, 'residence') => 'residency',
+            str_contains($token, 'goodmoral') => 'good_moral',
+            str_contains($token, 'cohabitation') => 'cohabitation',
+            str_contains($token, 'jail'), str_contains($token, 'visitation') => 'jail_visitation',
+            str_contains($token, 'firsttimejobseeker') => 'first_time_job_seeker',
+            default => '',
+        };
+    }
+}
+
+if (!function_exists('dms_clearance_type_key')) {
+    function dms_clearance_type_key(string $documentType): string
+    {
+        $token = strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $documentType));
+        return match (true) {
+            str_contains($token, 'businesspermit'), str_contains($token, 'businessclearance') => 'business_permit',
+            str_contains($token, 'tricycle') => 'tricycle_permit',
+            str_contains($token, 'electrical'), str_contains($token, 'electric') => 'electrical_permit',
+            str_contains($token, 'water') => 'water_permit',
+            str_contains($token, 'residential') => 'residential_permit',
+            str_contains($token, 'commercial') => 'commercial_permit',
+            str_contains($token, 'clearance'), str_contains($token, 'certification') => 'general',
+            default => '',
+        };
+    }
+}
+
+if (!function_exists('dms_purpose_is_allowed')) {
+    function dms_purpose_is_allowed(string $purpose, array $options): bool
+    {
+        $purpose = trim($purpose);
+        if ($purpose === '') return false;
+        foreach ($options as $option) {
+            if (strcasecmp($purpose, trim((string)$option)) === 0) return true;
+        }
+        foreach ($options as $option) {
+            if (in_array(strtolower(trim((string)$option)), ['other', 'others'], true)) return true;
+        }
+        return false;
+    }
+}
+
+if (!function_exists('dms_document_purpose_options')) {
+    function dms_document_purpose_options(mysqli $conn, string $documentType): array
+    {
+        $certificateKey = dms_issuance_certificate_key($documentType);
+        if ($certificateKey !== '') {
+            return array_values((array)(dms_resolve_issuance_settings($conn)['certificates'][$certificateKey]['purpose_options'] ?? []));
+        }
+        $clearanceKey = dms_clearance_type_key($documentType);
+        if ($clearanceKey !== '') {
+            return array_values((array)(dms_resolve_clearance_settings($conn)['clearance_types'][$clearanceKey]['purpose_options'] ?? []));
+        }
+        return [];
+    }
+}
+
+if (!function_exists('dms_first_time_job_seeker_is_exempt')) {
+    function dms_first_time_job_seeker_is_exempt(mysqli $conn): bool
+    {
+        return !empty(dms_resolve_issuance_settings($conn)['first_time_job_seeker_exempt']);
+    }
+}
+
+if (!function_exists('dms_filter_essential_resident_profile')) {
+    function dms_filter_essential_resident_profile(array $profile): array
+    {
+        $essentialKeys = [
+            'resident_id', 'user_id', 'firstname', 'middlename', 'lastname', 'suffix', 'full_name',
+            'birthdate', 'date_of_birth', 'age', 'sex', 'civil_status', 'nationality',
+            'full_address', 'address', 'unit_number', 'street_number', 'street_name', 'phase_number',
+            'subdivision', 'area_number', 'barangay', 'city', 'province', 'phone_number',
+            'id_picture_path', 'id_picture_url', 'years_of_residency', 'months_of_residency',
+        ];
+        return array_intersect_key($profile, array_fill_keys($essentialKeys, true));
+    }
+}
+
 if (!function_exists('dms_clearance_type_catalog')) {
     function dms_clearance_type_catalog(): array
     {
@@ -1232,6 +1316,34 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
         $stmt->close();
 
         return is_array($row) ? $row : [];
+    }
+}
+
+if (!function_exists('dms_build_aging_alert')) {
+    function dms_build_aging_alert(mysqli $conn, string $scope, string $currentUserId): ?array
+    {
+        $scope = $scope === 'clearance' ? 'clearance' : 'issuance';
+        $settings = $scope === 'clearance' ? dms_resolve_clearance_settings($conn) : dms_resolve_issuance_settings($conn);
+        if (empty($settings['aging_notification_enabled'])) return null;
+        if (($settings['aging_recipient_mode'] ?? 'module_access') === 'specific'
+            && !in_array($currentUserId, (array)($settings['aging_recipient_user_ids'] ?? []), true)) return null;
+        if (!dms_db_table_exists($conn, 'documentrequesttbl')) return null;
+
+        $days = max(1, min(90, (int)($settings['aging_days'] ?? 3)));
+        $typePredicate = $scope === 'clearance'
+            ? "LOWER(COALESCE(document_type,'')) LIKE '%clearance%'"
+            : "LOWER(COALESCE(document_type,'')) NOT LIKE '%clearance%' AND LOWER(COALESCE(document_type,'')) NOT LIKE '%barangay id%'";
+        $sql = "SELECT COUNT(*) AS request_count FROM documentrequesttbl
+                WHERE {$typePredicate}
+                  AND COALESCE(created_at, CURRENT_TIMESTAMP) <= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL {$days} DAY)
+                  AND LOWER(COALESCE(stage,'')) NOT IN ('completed','released','rejected','cancelled','failed')";
+        $result = $conn->query($sql);
+        $count = $result instanceof mysqli_result ? (int)($result->fetch_assoc()['request_count'] ?? 0) : 0;
+        if ($result instanceof mysqli_result) $result->free();
+        if ($count <= 0) return null;
+        $message = trim((string)($settings['aging_message'] ?? ''));
+        $message = strtr($message, ['{count}' => (string)$count, '{days}' => (string)$days]);
+        return ['count' => $count, 'days' => $days, 'message' => $message];
     }
 }
 

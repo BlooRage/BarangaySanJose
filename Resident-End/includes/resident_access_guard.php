@@ -132,3 +132,34 @@ if ($hasResidentProfile && !$isResidentVerified) {
         exit;
     }
 }
+
+// Prevent direct access to request forms that administrators have suspended.
+if ($hasResidentProfile && $isResidentVerified) {
+    require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
+    $requestPath = strtolower(resident_guard_normalize_public_path((string)($_SERVER['SCRIPT_NAME'] ?? '')));
+    $certificateForms = [
+        'cohabitationform' => str_contains(strtolower((string)($_SERVER['QUERY_STRING'] ?? '')), 'jail') ? 'jail_visitation' : 'cohabitation',
+        'indigencyform' => 'indigency', 'firsttimejobseekerform' => 'first_time_job_seeker',
+        'goodmoralform' => 'good_moral', 'residencyform' => 'residency',
+    ];
+    $clearanceForms = [
+        'barangaycertificationform' => 'general', 'businessclearanceform' => 'business_permit',
+        'tricycleform' => 'tricycle_permit', 'electricalform' => 'electrical_permit',
+        'waterform' => 'water_permit', 'residentialform' => 'residential_permit',
+        'commercialform' => 'commercial_permit',
+    ];
+    $formName = strtolower((string)pathinfo($requestPath, PATHINFO_BASENAME));
+    if (isset($certificateForms[$formName])) {
+        $settings = dms_resolve_issuance_settings($conn);
+        if (empty($settings['online_requests_enabled']) || empty($settings['certificates'][$certificateForms[$formName]]['enabled'])) {
+            header('Location: ' . appUrl('/Resident-End/Certificates/CertificatesLandingPage.php?unavailable=1'));
+            exit;
+        }
+    } elseif (isset($clearanceForms[$formName])) {
+        $settings = dms_resolve_clearance_settings($conn);
+        if (empty($settings['online_requests_enabled']) || empty($settings['clearance_types'][$clearanceForms[$formName]]['enabled'])) {
+            header('Location: ' . appUrl('/Resident-End/Clearances/ClearancesLandingPage.php?unavailable=1'));
+            exit;
+        }
+    }
+}

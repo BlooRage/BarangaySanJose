@@ -152,6 +152,10 @@ function ann_creator_display_from_user_id(mysqli $conn, string $userId, string $
     return $cache[$userId];
   }
 
+  if (function_exists('pii_decrypt_official_row')) {
+    $row = pii_decrypt_official_row($row) ?? $row;
+  }
+
   $firstName = trim((string)($row['firstname'] ?? ''));
   $middleName = trim((string)($row['middlename'] ?? ''));
   $lastName = trim((string)($row['lastname'] ?? ''));
@@ -435,7 +439,7 @@ foreach ($newsRows as $item) {
 $visibleRows = array_values(array_filter($filteredByChannel, function ($item) use ($statusFilter, $typeFilter, $searchTerm, $channelLabels, $statusLabels, $typeLabels, $currentUserId, $currentUserDisplayLabel, $isNewsManagementView, $newsScope, $nowTs) {
   $displayStatus = ann_display_status($item, $currentUserId, $currentUserDisplayLabel);
   $contentType = strtolower((string)($item['content_type'] ?? 'page'));
-  if ($typeFilter !== 'all' && $contentType !== $typeFilter) {
+  if ($isNewsManagementView && $typeFilter !== 'all' && $contentType !== $typeFilter) {
     return false;
   }
 
@@ -456,8 +460,6 @@ $visibleRows = array_values(array_filter($filteredByChannel, function ($item) us
     if ($newsScope === 'archived' && $displayStatus !== 'archived') {
       return false;
     }
-  } elseif ($statusFilter !== 'all' && $displayStatus !== $statusFilter) {
-    return false;
   }
 
   if ($searchTerm === '') {
@@ -634,10 +636,10 @@ function ann_decode_faq_items(?string $json): array
   }));
 }
 
-$contentToolsTitle = $isNewsManagementView ? 'News' : 'Content Tools';
+$contentToolsTitle = $isNewsManagementView ? 'News' : 'Announcement Tracker';
 $contentToolsDescription = $isNewsManagementView
   ? 'Manage posted, scheduled, draft, and archived news articles in one place.'
-  : 'Track and manage public content, delivery announcements, and FAQ entries.';
+  : 'Track page and SMS/email announcements, review submissions, and manage published content or drafts.';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -645,13 +647,13 @@ $contentToolsDescription = $isNewsManagementView
   <meta charset="UTF-8">
   <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Content Tools</title>
+  <title><?= htmlspecialchars($contentToolsTitle) ?></title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260323-38">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260722-announcement-tracker-tabs-4">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
   <style>
@@ -926,10 +928,12 @@ $contentToolsDescription = $isNewsManagementView
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
         <?= htmlspecialchars($contentToolsTitle) ?>
       </h2>
+      <?php if ($isNewsManagementView): ?>
       <p class="text-muted mb-0" style="margin-top:-1rem; max-width:72ch;"><?= htmlspecialchars($contentToolsDescription) ?></p>
+      <?php endif; ?>
       <hr><br>
 
-      <?php if ($isSuperAdmin && !$isNewsManagementView): ?>
+      <?php if (false): // Pending reviews now live in the unified announcement tracker. ?>
         <div id="review-queue-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
           <div class="review-queue-top d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
             <div class="review-queue-title-wrap">
@@ -1057,12 +1061,42 @@ $contentToolsDescription = $isNewsManagementView
           </div>
         </div>
       <?php endif; ?>
-      <div id="tracker-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
+      <?php if (!$isNewsManagementView): ?>
+        <ul class="nav nav-tabs mb-0 announcement-page-tabs" aria-label="Announcement tracker views">
+          <li class="nav-item">
+            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'all') . '#tracker-card') ?>" class="nav-link fw-semibold <?= $statusFilter === 'all' && $typeFilter === 'all' ? 'active' : '' ?>" data-tab-status="all" data-tab-type="all" <?= $statusFilter === 'all' && $typeFilter === 'all' ? 'aria-current="page"' : '' ?>>
+              All Announcements
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'page') . '#tracker-card') ?>" class="nav-link fw-semibold <?= $statusFilter === 'all' && $typeFilter === 'page' ? 'active' : '' ?>" data-tab-status="all" data-tab-type="page" <?= $statusFilter === 'all' && $typeFilter === 'page' ? 'aria-current="page"' : '' ?>>
+              Page Announcements
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'delivery') . '#tracker-card') ?>" class="nav-link fw-semibold <?= $statusFilter === 'all' && $typeFilter === 'delivery' ? 'active' : '' ?>" data-tab-status="all" data-tab-type="delivery" <?= $statusFilter === 'all' && $typeFilter === 'delivery' ? 'aria-current="page"' : '' ?>>
+              SMS / Email Announcements
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'approved', $searchTerm, 'all') . '#tracker-card') ?>" class="nav-link fw-semibold <?= $statusFilter === 'approved' && $typeFilter === 'all' ? 'active' : '' ?>" data-tab-status="approved" data-tab-type="all" <?= $statusFilter === 'approved' && $typeFilter === 'all' ? 'aria-current="page"' : '' ?>>
+              Posted Announcements
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'draft', $searchTerm, 'all') . '#tracker-card') ?>" class="nav-link fw-semibold <?= $statusFilter === 'draft' && $typeFilter === 'all' ? 'active' : '' ?>" data-tab-status="draft" data-tab-type="all" <?= $statusFilter === 'draft' && $typeFilter === 'all' ? 'aria-current="page"' : '' ?>>
+              Drafts
+            </a>
+          </li>
+        </ul>
+      <?php endif; ?>
+
+      <div id="tracker-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border <?= !$isNewsManagementView ? 'announcement-tabbed-card' : '' ?>">
 
         <div class="admin-list-toolbar mb-3 pt-2 <?= $isNewsManagementView ? 'admin-list-toolbar--newswide' : '' ?>">
+          <?php if ($isNewsManagementView): ?>
           <div class="admin-list-toolbar-start">
             <div class="admin-list-tabs">
-              <?php if ($isNewsManagementView): ?>
                 <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'active')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'active' ? 'active' : '' ?>">
                   Active News
                 </a>
@@ -1075,34 +1109,15 @@ $contentToolsDescription = $isNewsManagementView
                 <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, 'news', 'archived')) ?>" class="btn btn-outline-secondary btn-sm status-filter-btn news-scope-tab fw-semibold <?= $newsScope === 'archived' ? 'active' : '' ?>">
                   Archived
                 </a>
-              <?php else: ?>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm, $typeFilter)) ?>" data-filter="ALL" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'all' ? 'active' : '' ?>">
-                  &nbsp;&nbsp;All&nbsp;&nbsp;
-                </a>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'approved', $searchTerm, $typeFilter)) ?>" data-filter="Approved" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'approved' ? 'active' : '' ?>">
-                  &nbsp;&nbsp;Approved&nbsp;&nbsp;
-                </a>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'denied', $searchTerm, $typeFilter)) ?>" data-filter="Denied" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'denied' ? 'active' : '' ?>">
-                  &nbsp;&nbsp;Denied&nbsp;&nbsp;
-                </a>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'draft', $searchTerm, $typeFilter)) ?>" data-filter="Draft" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'draft' ? 'active' : '' ?>">
-                  &nbsp;&nbsp;Draft&nbsp;&nbsp;
-                </a>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'pending', $searchTerm, $typeFilter)) ?>" data-filter="Pending" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif <?= $statusFilter === 'pending' ? 'active' : '' ?>">
-                  &nbsp;&nbsp;Pending
-                  <?php if ($statusCounts['pending'] > 0): ?>
-                    <span class="pending-count-badge"><?= (int)$statusCounts['pending'] ?></span>
-                  <?php endif; ?>
-                </a>
-              <?php endif; ?>
             </div>
-            <?php if ($isNewsManagementView && $canCreateNews): ?>
+            <?php if ($canCreateNews): ?>
             <a href="<?= htmlspecialchars(appUrl('/Admin-End/Contents/CreateNews.php')) ?>" class="btn btn-primary btn-linear-control news-toolbar-create">
               <i class="fas fa-plus"></i>
               <span>Create News</span>
             </a>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
 
           <div class="admin-list-toolbar-end">
             <div class="admin-list-actions <?= $isNewsManagementView ? 'admin-list-actions--newswide' : '' ?>">
@@ -1185,7 +1200,7 @@ $contentToolsDescription = $isNewsManagementView
                       && $displayStatus !== 'draft'
                       && ($isSuperAdmin || $isOwnedByCurrentUser);
                   ?>
-                  <tr>
+                  <tr data-announcement-status="<?= htmlspecialchars($displayStatus) ?>" data-announcement-type="<?= htmlspecialchars(strtolower((string)$item['content_type'])) ?>">
                     <td class="<?= $isNewsManagementView ? 'announcement-title-cell' : '' ?>">
                       <?php if ($isNewsManagementView): ?>
                         <span class="announcement-title-text" title="<?= htmlspecialchars($item['title']) ?>"><?= htmlspecialchars($item['title']) ?></span>
@@ -3205,12 +3220,41 @@ $contentToolsDescription = $isNewsManagementView
       const tableBody = document.getElementById("tableBody");
       const entriesPerPageInput = document.getElementById("entriesPerPageInput");
       const paginationEl = document.getElementById("announcementsPagination");
+      const trackerTabs = Array.from(document.querySelectorAll(".announcement-page-tabs [data-tab-status][data-tab-type]"));
+      const visibleCountBadge = document.getElementById("announcementsVisibleCountBadge");
       if (!tableBody || !entriesPerPageInput || !paginationEl) return;
+
+      let activeStatus = "<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8') ?>";
+      let activeType = "<?= htmlspecialchars($typeFilter, ENT_QUOTES, 'UTF-8') ?>";
 
       function getDataRows() {
         return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
-          return !row.querySelector("td[colspan]");
+          return row.hasAttribute("data-announcement-status");
         });
+      }
+
+      function getMatchingRows() {
+        const rows = getDataRows();
+        if (!trackerTabs.length) return rows;
+
+        return rows.filter((row) => {
+          const rowStatus = (row.dataset.announcementStatus || "").toLowerCase();
+          const rowType = (row.dataset.announcementType || "").toLowerCase();
+          const statusMatches = activeStatus === "all" || rowStatus === activeStatus;
+          const typeMatches = activeType === "all" || rowType === activeType;
+          return statusMatches && typeMatches;
+        });
+      }
+
+      function getClientEmptyRow() {
+        let row = tableBody.querySelector("#announcementTabEmptyRow");
+        if (row) return row;
+
+        row = document.createElement("tr");
+        row.id = "announcementTabEmptyRow";
+        row.innerHTML = '<td colspan="8" class="text-center text-muted py-4">No content items match this tab.</td>';
+        tableBody.appendChild(row);
+        return row;
       }
 
       let currentPage = 1;
@@ -3248,7 +3292,8 @@ $contentToolsDescription = $isNewsManagementView
       }
 
       function renderPage() {
-        const rows = getDataRows();
+        const allRows = getDataRows();
+        const rows = getMatchingRows();
         const totalRows = rows.length;
         const totalPages = Math.max(1, Math.ceil(totalRows / entriesPerPage));
         if (currentPage > totalPages) currentPage = totalPages;
@@ -3257,12 +3302,68 @@ $contentToolsDescription = $isNewsManagementView
         const start = (currentPage - 1) * entriesPerPage;
         const end = start + entriesPerPage;
 
+        allRows.forEach((row) => {
+          row.style.display = "none";
+        });
         rows.forEach((row, idx) => {
           row.style.display = idx >= start && idx < end ? "" : "none";
         });
 
+        const serverEmptyRow = Array.from(tableBody.querySelectorAll("tr")).find((row) => {
+          return row.id !== "announcementTabEmptyRow" && !!row.querySelector("td[colspan]");
+        });
+        if (serverEmptyRow) {
+          serverEmptyRow.style.display = allRows.length === 0 ? "" : "none";
+        }
+
+        if (trackerTabs.length) {
+          getClientEmptyRow().style.display = allRows.length > 0 && totalRows === 0 ? "" : "none";
+        }
+
+        if (visibleCountBadge) {
+          visibleCountBadge.textContent = `Showing ${totalRows} of ${allRows.length}`;
+        }
+
         renderPagination(totalRows);
       }
+
+      function syncTabState(selectedTab) {
+        trackerTabs.forEach((tab) => {
+          const isActive = tab === selectedTab;
+          tab.classList.toggle("active", isActive);
+          if (isActive) {
+            tab.setAttribute("aria-current", "page");
+          } else {
+            tab.removeAttribute("aria-current");
+          }
+        });
+      }
+
+      trackerTabs.forEach((tab) => {
+        tab.addEventListener("click", (event) => {
+          event.preventDefault();
+          activeStatus = (tab.dataset.tabStatus || "all").toLowerCase();
+          activeType = (tab.dataset.tabType || "all").toLowerCase();
+          currentPage = 1;
+          syncTabState(tab);
+
+          document.querySelectorAll('input[type="hidden"][name="status"]').forEach((input) => {
+            input.value = activeStatus;
+          });
+          document.querySelectorAll('input[type="hidden"][name="type_filter"]').forEach((input) => {
+            input.value = activeType;
+          });
+          document.querySelectorAll('input[type="radio"][name="status"]').forEach((input) => {
+            input.checked = input.value.toLowerCase() === activeStatus;
+          });
+          document.querySelectorAll('input[type="radio"][name="type_filter"]').forEach((input) => {
+            input.checked = input.value.toLowerCase() === activeType;
+          });
+
+          window.history.replaceState(null, "", tab.href);
+          renderPage();
+        });
+      });
 
       entriesPerPageInput.addEventListener("change", () => {
         const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);

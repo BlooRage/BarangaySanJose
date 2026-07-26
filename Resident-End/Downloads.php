@@ -242,9 +242,63 @@ if (isset($conn) && $conn instanceof mysqli) {
         .admin-list-actions {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            flex-wrap: wrap;
+            gap: 8px;
+            flex-wrap: nowrap;
             margin-left: auto;
+        }
+        .downloads-shell .admin-list-actions .form-control,
+        .downloads-shell .admin-list-actions .input-group-text {
+            height: 38px;
+        }
+        .downloads-shell .admin-search {
+            min-width: 300px;
+            max-width: 360px;
+        }
+        /* Keep these controls visually identical to the admin tracker even when
+           Bootstrap's resident-side button variables are present. */
+        .downloads-shell .btn-icon.admin-filter,
+        .downloads-shell .btn-icon.admin-columns,
+        .downloads-shell .btn-icon.admin-refresh {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+            padding: 0;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+            box-shadow: none;
+        }
+        .downloads-shell .btn-icon.admin-filter {
+            border-color: rgba(108, 117, 125, 0.28);
+            color: #495057;
+            background: linear-gradient(180deg, #fbfcfd 0%, #f3f6f8 100%);
+        }
+        .downloads-shell .btn-icon.admin-columns {
+            border-color: rgba(13, 110, 253, 0.25);
+            color: #0d47a1;
+            background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+        }
+        .downloads-shell .btn-icon.admin-refresh {
+            border-color: rgba(254, 153, 60, 0.45);
+            color: #b85b00;
+            background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
+        }
+        .downloads-shell .btn-icon.admin-filter:hover {
+            border-color: rgba(73, 80, 87, 0.45);
+            color: #343a40;
+            background: linear-gradient(180deg, #f8fafb 0%, #edf1f4 100%);
+        }
+        .downloads-shell .btn-icon.admin-columns:hover {
+            border-color: rgba(13, 110, 253, 0.45);
+            color: #0a3a84;
+            background: linear-gradient(180deg, #eff6ff 0%, #e7f0ff 100%);
+        }
+        .downloads-shell .btn-icon.admin-refresh:hover {
+            border-color: rgba(254, 153, 60, 0.7);
+            color: #a04f00;
+            background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
         }
         .downloads-summary {
             display: inline-flex;
@@ -502,6 +556,13 @@ if (isset($conn) && $conn instanceof mysqli) {
             .admin-list-actions {
                 width: 100%;
                 gap: 0.6rem;
+                flex-wrap: wrap;
+            }
+            .downloads-shell .admin-search {
+                min-width: 0;
+                max-width: 100%;
+                width: 100%;
+                flex: 1 1 100%;
             }
             .tracker-table-responsive {
                 display: none;
@@ -651,10 +712,10 @@ if (isset($conn) && $conn instanceof mysqli) {
                 <?php else: ?>
                     <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                         <div class="admin-list-tabs">
-                            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn download-tab active" data-tab="all" data-filter="ALL">All</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab" data-tab="certificate" data-filter="Certificates">Certificates</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab" data-tab="clearance" data-filter="Clearances">Clearances</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab" data-tab="barangay-id" data-filter="Barangay ID">Barangay ID</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn download-tab active" data-tab="all" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab fw-semibold" data-tab="certificate" data-filter="Certificates">&nbsp;&nbsp;Certificates&nbsp;&nbsp;</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab fw-semibold" data-tab="clearance" data-filter="Clearances">&nbsp;&nbsp;Clearances&nbsp;&nbsp;</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn download-tab fw-semibold" data-tab="barangay-id" data-filter="Barangay ID">&nbsp;&nbsp;Barangay ID&nbsp;&nbsp;</button>
                         </div>
                         <div class="admin-list-actions">
                             <div class="input-group admin-search">

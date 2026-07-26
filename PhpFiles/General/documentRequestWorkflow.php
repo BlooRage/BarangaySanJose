@@ -2705,6 +2705,12 @@ function dr_get_effective_document_fee_amount(mysqli $conn, string $documentType
     if (dr_is_barangay_id_document_type($documentType)) {
         return 0.0;
     }
+    if (function_exists('dms_issuance_certificate_key')
+        && dms_issuance_certificate_key($documentType) === 'first_time_job_seeker'
+        && function_exists('dms_first_time_job_seeker_is_exempt')
+        && dms_first_time_job_seeker_is_exempt($conn)) {
+        return 0.0;
+    }
 
     $resolvedFee = $baseFee;
     if ($resolvedFee === null) {

@@ -42,6 +42,10 @@ $barangayIdAdminNavActive = 'applications';
 $barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
 $issuanceOperationalSettings = dms_resolve_issuance_settings($conn);
 $clearanceOperationalSettings = dms_resolve_clearance_settings($conn);
+$agingAlertScope = ($certificateLaunchFilterToken === '__clearances__' || str_contains($certificateLaunchFilterToken, 'clearance')) ? 'clearance' : 'issuance';
+$issuanceAgingAlert = !$isFeeSettingsView && !$isIdIssuanceTrackerView
+  ? dms_build_aging_alert($conn, $agingAlertScope, trim((string)($_SESSION['user_id'] ?? '')))
+  : null;
 $manualGovernmentPositionOptions = [];
 $manualGovernmentOfficials = [];
 $manualGovernmentOfficialGroups = [
@@ -2976,6 +2980,12 @@ if ($certificateLaunchStage === 'release') {
       <?php endif; ?>
     </div>
     <hr class="mb-4">
+    <?php if ($issuanceAgingAlert !== null): ?>
+      <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
+        <i class="fa-solid fa-clock-rotate-left mt-1"></i>
+        <div><?= htmlspecialchars((string)$issuanceAgingAlert['message'], ENT_QUOTES, 'UTF-8') ?></div>
+      </div>
+    <?php endif; ?>
 
     <!-- Page-level navigation -->
     <ul class="nav nav-tabs mb-0 <?= $isFeeSettingsView ? 'd-none' : '' ?>" id="certTrackerPageTabs" style="border-bottom:0">

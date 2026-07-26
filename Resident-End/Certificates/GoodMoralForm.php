@@ -19,12 +19,14 @@ $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
 
 $userId = $_SESSION['user_id'] ?? '';
 $data = getResidentProfileData($conn, $userId);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
+$configuredPurposeOptions = dms_document_purpose_options($conn, 'goodmoral');
 
 $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -193,13 +195,9 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
                                 <select id="purposeSelect" required>
                                     <option value="" selected disabled>Select purpose</option>
-                                    <option value="Employment">Employment</option>
-                                    <option value="Government Aid-Programs">Government Aid-Programs</option>
-                                    <option value="Business Permit Application">Business Permit Application</option>
-                                    <option value="School Requirement">School Requirement</option>
-                                    <option value="Scholarship">Scholarship</option>
-                                    <option value="Board Examination">Board Examination</option>
-                                    <option value="Others">Others</option>
+                                    <?php foreach ($configuredPurposeOptions as $purposeOption): ?>
+                                        <option value="<?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?></option>
+                                    <?php endforeach; ?>
                                 </select>
                                 <div id="purposeOtherWrap" class="mt-2 d-none">
                                     <label class="top-label" for="purposeOther">Please specify <span class="required-asterisk">*</span></label>
@@ -233,7 +231,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
             const syncPurposeValue = () => {
                 const choice = String(purposeSelect.value || "").trim();
-                if (choice === "Others") {
+                if (["other", "others"].includes(choice.toLowerCase())) {
                     purposeOtherWrap.classList.remove("d-none");
                     purposeOther.required = true;
                     purposeFinal.value = String(purposeOther.value || "").trim();

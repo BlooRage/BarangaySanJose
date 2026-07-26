@@ -15,6 +15,9 @@ if (!isset($baseUrl)) {
 }
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
+
+$issuanceSettings = dms_resolve_issuance_settings($conn);
 
 $certificateApplyTriggerAttrs = $isResidentVerified
     ? 'data-bs-toggle="modal" data-bs-target="#requirementsModal"'
@@ -136,6 +139,20 @@ HTML,
         'fee_class' => 'fee-note--standard',
     ],
 ];
+$documentCards = array_values(array_filter($documentCards, static function (array $card) use ($issuanceSettings): bool {
+    $href = strtolower((string)($card['apply_href'] ?? ''));
+    $key = str_contains($href, 'jail') ? 'jail_visitation' : dms_issuance_certificate_key($href);
+    return $key === '' || !empty($issuanceSettings['certificates'][$key]['enabled']);
+}));
+if (empty($issuanceSettings['online_requests_enabled'])) $documentCards = [];
+foreach ($documentCards as &$documentCard) {
+    if (dms_issuance_certificate_key((string)($documentCard['apply_href'] ?? '')) === 'first_time_job_seeker'
+        && empty($issuanceSettings['first_time_job_seeker_exempt'])) {
+        $documentCard['fee_label'] = 'Standard certificate fee applies';
+        $documentCard['fee_class'] = 'fee-note--standard';
+    }
+}
+unset($documentCard);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -195,6 +212,10 @@ HTML,
             <?php endif; ?>
 
             <p class="section-label">List of documents:</p>
+
+            <?php if ($documentCards === []): ?>
+                <div class="alert alert-info">Online certificate requests are currently unavailable. Please contact the barangay office.</div>
+            <?php endif; ?>
 
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 certificate-grid justify-content-center">
                 <?php foreach ($documentCards as $card): ?>

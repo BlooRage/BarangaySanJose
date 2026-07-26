@@ -1,6 +1,8 @@
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
+$clearanceSettings = dms_resolve_clearance_settings($conn);
 $clearanceApplyTriggerAttrs = $isResidentVerified
     ? 'data-bs-toggle="modal" data-bs-target="#requirementsModal"'
     : 'data-verify-required="1"';
@@ -454,6 +456,27 @@ $clearanceApplyTriggerAttrs = $isResidentVerified
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const clearanceAvailability = <?= json_encode([
+            'online' => !empty($clearanceSettings['online_requests_enabled']),
+            'types' => array_map(static fn(array $row): bool => !empty($row['enabled']), (array)$clearanceSettings['clearance_types']),
+        ], JSON_UNESCAPED_SLASHES) ?>;
+        const clearanceHrefKeys = {
+            BusinessClearanceForm: 'business_permit', TricycleForm: 'tricycle_permit',
+            ElectricalForm: 'electrical_permit', WaterForm: 'water_permit',
+            ResidentialForm: 'residential_permit', CommercialForm: 'commercial_permit'
+        };
+        document.querySelectorAll('[data-apply-href]').forEach((button) => {
+            const href = String(button.dataset.applyHref || '').split('?')[0];
+            const key = clearanceHrefKeys[href];
+            if (!clearanceAvailability.online || (key && clearanceAvailability.types[key] === false)) {
+                button.closest('.col')?.remove();
+            }
+        });
+        const clearanceGrid = document.querySelector('.certificate-grid');
+        if (clearanceGrid && !clearanceGrid.querySelector('.col')) {
+            clearanceGrid.insertAdjacentHTML('beforebegin', '<div class="alert alert-info">Online clearance requests are currently unavailable. Please contact the barangay office.</div>');
+        }
+
         const burgerBtn = document.getElementById("btn-burger");
         const sidebar = document.getElementById("div-sidebarWrapper");
 

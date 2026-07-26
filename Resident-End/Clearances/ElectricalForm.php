@@ -23,6 +23,7 @@ $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
+$configuredPurposeOptions = dms_document_purpose_options($conn, 'Barangay Clearance for Electrical Permit');
 
 $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -151,7 +152,8 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 <input type="hidden" name="action" value="submit_request">
                 <input type="hidden" name="document_type" value="Barangay Clearance for Electrical Permit">
                 <input type="hidden" name="redirect" value="1">
-                <input type="hidden" name="request_purpose" value="Electrical Permit Application">
+                <label class="form-label fw-semibold">Request purpose</label>
+                <select name="request_purpose" class="form-select" required><option value="">Select purpose</option><?php foreach ($configuredPurposeOptions as $purposeOption): ?><option value="<?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$purposeOption, ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></select>
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
                     <div class="input-stack"><label class="top-label">Last Name <span class="required-asterisk">*</span></label><input type="text" name="applicant_last_name" required readonly value="<?php echo $lastName; ?>"></div>

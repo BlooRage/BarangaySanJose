@@ -705,6 +705,9 @@ if (!function_exists('cms_content_current_user_display')) {
         if (!$row) {
             return $fallback;
         }
+        if (function_exists('pii_decrypt_official_row')) {
+            $row = pii_decrypt_official_row($row) ?? $row;
+        }
 
         $firstName = trim((string)($row['firstname'] ?? ''));
         $middleName = trim((string)($row['middlename'] ?? ''));

@@ -199,6 +199,7 @@ $approvedHistoryRequests = array_values(array_filter($allRequests, static fn(arr
 $requestViewDefinitions = [
     'my_requests' => [
         'nav_label' => 'My Requests',
+        'nav_icon' => 'fa-file-lines',
         'title' => 'My Content Requests',
         'description' => 'Track your drafts, submitted changes, and active CMS requests from the page editors.',
         'requests' => $myActiveRequests,
@@ -208,6 +209,7 @@ $requestViewDefinitions = [
 if ($canReviewContent) {
     $requestViewDefinitions['review_queue'] = [
         'nav_label' => 'Review Queue',
+        'nav_icon' => 'fa-clipboard-check',
         'title' => 'Review Queue',
         'description' => 'Pending CMS requests waiting for approval or denial.',
         'requests' => $reviewQueue,
@@ -216,6 +218,7 @@ if ($canReviewContent) {
 }
 $requestViewDefinitions['archived_requests'] = [
     'nav_label' => 'Archived Requests',
+    'nav_icon' => 'fa-box-archive',
     'title' => $canReviewContent ? 'Archived Requests' : 'My Archived Requests',
     'description' => $canReviewContent
         ? 'Archived CMS requests that remain available for reference.'
@@ -228,6 +231,7 @@ $requestViewDefinitions['archived_requests'] = [
 if ($canReviewContent) {
     $requestViewDefinitions['approved_history'] = [
         'nav_label' => 'Approved Version History',
+        'nav_icon' => 'fa-clock-rotate-left',
         'title' => 'Approved Version History',
         'description' => 'Approved CMS versions sorted from newest to oldest.',
         'requests' => $approvedHistoryRequests,
@@ -238,7 +242,6 @@ $contentRequestsView = strtolower(trim((string)($_GET['requests_view'] ?? 'my_re
 if (!isset($requestViewDefinitions[$contentRequestsView])) {
     $contentRequestsView = 'my_requests';
 }
-$selectedRequestView = $requestViewDefinitions[$contentRequestsView];
 usort($approvedHistoryRequests, static function (array $left, array $right): int {
     return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
 });
@@ -256,7 +259,6 @@ $requestViewDefinitions['archived_requests']['requests'] = $archivedRequests;
 if ($canReviewContent) {
     $requestViewDefinitions['approved_history']['requests'] = $approvedHistoryRequests;
 }
-$selectedRequestView = $requestViewDefinitions[$contentRequestsView];
 
 $approvedRequestsByPage = [];
 foreach ($approvedHistoryRequests as $request) {
@@ -735,14 +737,28 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
                 $archivedFromStatus = trim((string)($request['archived_from_status'] ?? ''));
                 $archivedAt = trim((string)($request['archived_at'] ?? ''));
                 $archivedByLabel = trim((string)($request['archived_by_label'] ?? ''));
+                $filterStatus = $status === 'archived' && $archivedFromStatus !== '' ? strtolower($archivedFromStatus) : $status;
+                $searchValue = strtolower(implode(' ', [
+                    $requestId,
+                    $pageKey,
+                    $pageLabel,
+                    (string)($request['created_by_label'] ?? ''),
+                    (string)($request['created_by_role'] ?? ''),
+                    $status,
+                    $archivedFromStatus,
+                    (string)($request['updated_at'] ?? ''),
+                    (string)($request['submitted_at'] ?? ''),
+                    (string)($request['reviewed_at'] ?? ''),
+                ]));
                 $versionMeta = $requestVersionMeta[$requestId] ?? [];
                 $isLiveVersion = (bool)($versionMeta['is_live'] ?? false);
-                $canRestoreLive = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_this'] ?? false);
-                $canRestorePrevious = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_previous'] ?? false);
-                $canArchive = cms_content_request_is_archivable_by($request, $currentUserId, $canReviewContent, $isLiveVersion);
-                $canRestore = cms_content_request_is_restorable_by($request, $currentUserId, $canReviewContent);
+                $canArchive = $status !== 'denied'
+                    && cms_content_request_is_archivable_by($request, $currentUserId, $canReviewContent, $isLiveVersion);
               ?>
-              <tr>
+              <tr
+                data-cms-request-row
+                data-cms-request-status="<?= htmlspecialchars($filterStatus, ENT_QUOTES, 'UTF-8') ?>"
+                data-cms-request-search="<?= htmlspecialchars($searchValue, ENT_QUOTES, 'UTF-8') ?>">
                 <td>
                   <div class="cms-request-table-primary"><?= htmlspecialchars($pageLabel) ?></div>
                 </td>
@@ -771,27 +787,17 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
                 <td>
                   <div class="compact-table-actions cms-request-table-actions">
                     <a href="<?= htmlspecialchars(cms_nav_url($pageKey, $requestId)) ?>" class="btn btn-primary btn-sm compact-table-btn">View</a>
-                    <?php if ($canRestore): ?>
-                      <?= cms_render_request_action_form('restore_request', $requestId, 'Restore', 'btn-success', 'Restore this archived content request?') ?>
-                    <?php endif; ?>
-                    <?php if ($canRestoreLive): ?>
-                      <?= cms_render_request_action_form('revert_to_this_version', $requestId, 'Restore Live', 'btn-warning', 'Restore the live page to this approved version?') ?>
-                    <?php endif; ?>
-                    <?php if ($canRestorePrevious): ?>
-                      <?= cms_render_request_action_form('revert_to_previous_version', $requestId, 'Restore Previous', 'btn-warning', 'Restore the live page to the previous approved version?') ?>
-                    <?php endif; ?>
-                    <?php if ($canReviewContent && $status === 'pending'): ?>
-                      <?= cms_render_request_action_form('approve_request', $requestId, 'Approve', 'btn-success', 'Approve and publish this content request?') ?>
-                      <?= cms_render_request_action_form('deny_request', $requestId, 'Deny', 'btn-danger', 'Deny this content request?') ?>
-                    <?php endif; ?>
                     <?php if ($canArchive): ?>
-                      <?= cms_render_request_action_form('archive_request', $requestId, 'Archive', 'btn-outline-danger', 'Archive this content request? You can restore it later from the tracker.') ?>
+                      <?= cms_render_request_action_form('archive_request', $requestId, 'Archive', 'btn-warning', 'Archive this content request? You can restore it later from the tracker.') ?>
                     <?php endif; ?>
                   </div>
                 </td>
               </tr>
             <?php endforeach; ?>
           <?php endif; ?>
+          <tr class="d-none" data-cms-request-no-results>
+            <td colspan="7" class="text-center text-muted py-4">No content requests match the selected status and search.</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -825,7 +831,7 @@ $previewCssAssets = [
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260325-7">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260722-4">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -835,7 +841,7 @@ $previewCssAssets = [
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
         Content Management System
       </h2>
-      <hr><br>
+      <hr class="mb-4">
 
       <?php if (is_array($flash) && !empty($flash['message'])): ?>
         <div class="alert alert-<?= htmlspecialchars((string)($flash['type'] ?? 'info')) ?> shadow-sm border-0 mb-4">
@@ -843,76 +849,111 @@ $previewCssAssets = [
         </div>
       <?php endif; ?>
 
-      <section class="cms-section-card mb-4">
-        <div class="cms-section-heading">
-          <h3 class="cms-section-title mb-0">Content Management Module</h3>
-        </div>
-        <div class="cms-nav-grid">
-          <?php foreach ($contentModules as $moduleKey => $module): ?>
-            <?php if ($moduleKey === 'requests') { continue; } ?>
-            <a href="<?= htmlspecialchars(cms_nav_url($moduleKey)) ?>" class="cms-nav-link <?= $selectedModuleKey === $moduleKey ? 'is-active' : '' ?>">
-              <span class="cms-nav-link-icon">
-                <i class="fa-solid <?= htmlspecialchars((string)$module['icon']) ?>"></i>
-              </span>
-              <span class="cms-nav-link-copy">
-                <span class="cms-nav-link-title"><?= htmlspecialchars((string)$module['label']) ?></span>
-              </span>
-            </a>
-          <?php endforeach; ?>
-        </div>
-      </section>
-
       <?php if ($selectedModuleKey === 'requests'): ?>
-        <section class="bg-white p-4 pt-3 rounded-4 shadow-sm border resident-masterlist-shell cms-request-tracker-shell mb-4">
-          <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
-            <div class="admin-list-tabs">
-              <?php foreach ($requestViewDefinitions as $requestViewKey => $requestViewMeta): ?>
-                <?php
-                  $isRequestViewActive = $contentRequestsView === $requestViewKey;
-                  $requestViewButtonClass = $requestViewKey === 'my_requests' ? 'btn-outline-primary' : 'btn-outline-secondary';
-                  $requestViewDataFilter = $requestViewKey === 'my_requests' ? '' : strtoupper($requestViewKey);
-                ?>
-                <a
-                  href="<?= htmlspecialchars(cms_request_view_url($requestViewKey)) ?>"
-                  data-filter="<?= htmlspecialchars($requestViewDataFilter, ENT_QUOTES, 'UTF-8') ?>"
-                  class="btn <?= $requestViewButtonClass ?> btn-sm status-filter-btn fw-semibold <?= $requestViewKey === 'review_queue' ? 'has-notif' : '' ?> <?= $isRequestViewActive ? 'active' : '' ?>">
-                  <?= htmlspecialchars((string)$requestViewMeta['nav_label']) ?>
-                  <?php if ($requestViewKey === 'review_queue' && $pendingReviewCount > 0): ?>
-                    <span class="pending-count-badge"><?= (int)$pendingReviewCount ?></span>
-                  <?php endif; ?>
-                </a>
-              <?php endforeach; ?>
-            </div>
-          </div>
+        <ul class="nav nav-tabs mb-0 cms-request-view-tabs" aria-label="Content request views">
+          <?php foreach ($requestViewDefinitions as $requestViewKey => $requestViewMeta): ?>
+            <?php $isRequestViewActive = $contentRequestsView === $requestViewKey; ?>
+            <li class="nav-item">
+              <button
+                type="button"
+                class="nav-link fw-semibold <?= $isRequestViewActive ? 'active' : '' ?>"
+                data-cms-request-tab="<?= htmlspecialchars($requestViewKey, ENT_QUOTES, 'UTF-8') ?>"
+                data-cms-request-url="<?= htmlspecialchars(cms_request_view_url($requestViewKey), ENT_QUOTES, 'UTF-8') ?>"
+                aria-controls="cms-request-panel-<?= htmlspecialchars($requestViewKey, ENT_QUOTES, 'UTF-8') ?>"
+                aria-selected="<?= $isRequestViewActive ? 'true' : 'false' ?>">
+                <i class="fa-solid <?= htmlspecialchars((string)$requestViewMeta['nav_icon']) ?> me-1" aria-hidden="true"></i>
+                <?= htmlspecialchars((string)$requestViewMeta['nav_label']) ?>
+                <?php if ($requestViewKey === 'review_queue' && $pendingReviewCount > 0): ?>
+                  <span class="pending-count-badge"><?= (int)$pendingReviewCount ?></span>
+                <?php endif; ?>
+              </button>
+            </li>
+          <?php endforeach; ?>
+        </ul>
 
-          <div class="cms-request-tracker-header mb-3">
-            <div>
-              <h3 class="cms-section-title mb-1"><?= htmlspecialchars((string)$selectedRequestView['title']) ?></h3>
-              <p class="small text-muted mb-0"><?= htmlspecialchars((string)$selectedRequestView['description']) ?></p>
-            </div>
-            <span class="badge rounded-pill text-bg-light border cms-request-tracker-badge">
-              <?= (int)count($selectedRequestView['requests']) ?> <?= count($selectedRequestView['requests']) === 1 ? 'entry' : 'entries' ?>
-            </span>
-          </div>
-
-          <?= cms_render_request_table(
-            (array)$selectedRequestView['requests'],
-            (string)$selectedRequestView['empty_message'],
-            $currentUserId,
-            $canReviewContent,
-            $requestVersionMeta
-          ) ?>
-
-          <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
-            <div class="d-flex align-items-center gap-2">
-              <label class="small text-muted mb-0">Entries</label>
-              <span class="small fw-semibold"><?= (int)count($selectedRequestView['requests']) ?></span>
-              <span class="badge rounded-pill bg-light text-secondary border">
-                Showing <?= (int)count($selectedRequestView['requests']) ?> <?= count($selectedRequestView['requests']) === 1 ? 'request' : 'requests' ?>
+        <?php foreach ($requestViewDefinitions as $requestViewKey => $requestViewMeta): ?>
+          <?php
+            $isRequestViewActive = $contentRequestsView === $requestViewKey;
+            $requestViewCount = count((array)$requestViewMeta['requests']);
+            $requestViewStatusCounts = ['approved' => 0, 'denied' => 0, 'pending' => 0];
+            foreach ((array)$requestViewMeta['requests'] as $requestForCount) {
+                $requestStatusForCount = strtolower(trim((string)($requestForCount['status'] ?? 'draft')));
+                if ($requestStatusForCount === 'archived') {
+                    $requestStatusForCount = strtolower(trim((string)($requestForCount['archived_from_status'] ?? 'archived')));
+                }
+                if (isset($requestViewStatusCounts[$requestStatusForCount])) {
+                    $requestViewStatusCounts[$requestStatusForCount]++;
+                }
+            }
+          ?>
+          <section
+            id="cms-request-panel-<?= htmlspecialchars($requestViewKey, ENT_QUOTES, 'UTF-8') ?>"
+            class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell cms-request-tracker-shell mb-4 <?= $isRequestViewActive ? '' : 'd-none' ?>"
+            data-cms-request-panel="<?= htmlspecialchars($requestViewKey, ENT_QUOTES, 'UTF-8') ?>">
+            <div class="cms-request-tracker-header mb-3">
+              <div>
+                <h3 class="cms-section-title mb-1"><?= htmlspecialchars((string)$requestViewMeta['title']) ?></h3>
+                <p class="small text-muted mb-0"><?= htmlspecialchars((string)$requestViewMeta['description']) ?></p>
+              </div>
+              <span class="badge rounded-pill text-bg-light border cms-request-tracker-badge" data-cms-visible-entry-badge>
+                <?= (int)$requestViewCount ?> <?= $requestViewCount === 1 ? 'entry' : 'entries' ?>
               </span>
             </div>
-          </div>
-        </section>
+
+            <div class="admin-list-toolbar mb-3 flex-wrap" data-cms-request-toolbar>
+              <div class="admin-list-tabs">
+                <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold active px-3" data-filter="ALL" data-cms-status-filter="all">All</button>
+                <?php foreach (['approved' => 'Approved', 'denied' => 'Denied', 'pending' => 'Pending'] as $statusFilterKey => $statusFilterLabel): ?>
+                  <?php $statusFilterCount = (int)$requestViewStatusCounts[$statusFilterKey]; ?>
+                  <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold px-3 <?= $requestViewKey !== 'archived_requests' && $statusFilterKey === 'pending' && $statusFilterCount > 0 ? 'has-notif' : '' ?>" data-filter="<?= strtoupper($statusFilterKey) ?>" data-cms-status-filter="<?= $statusFilterKey ?>">
+                    <?= $statusFilterLabel ?>
+                    <?php if ($requestViewKey !== 'archived_requests' && $statusFilterKey === 'pending' && $statusFilterCount > 0): ?>
+                      <span class="pending-count-badge"><?= $statusFilterCount ?></span>
+                    <?php endif; ?>
+                  </button>
+                <?php endforeach; ?>
+              </div>
+              <div class="admin-list-actions">
+                <div class="input-group admin-search">
+                  <input
+                    type="search"
+                    class="form-control"
+                    placeholder="Request ID, page, creator, status"
+                    aria-label="Search content requests"
+                    data-cms-request-search-input>
+                  <button class="btn btn-outline-secondary bg-white" type="button" title="Search" aria-label="Search" data-cms-request-search-button><i class="fas fa-search" aria-hidden="true"></i></button>
+                </div>
+                <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#cmsRequestFilterModal" title="Filter" aria-label="Filter">
+                  <i class="fas fa-filter" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-outline-primary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#cmsRequestColumnsModal" title="Columns" aria-label="Columns">
+                  <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-outline-warning btn-icon admin-refresh" type="button" title="Refresh tracker" aria-label="Refresh tracker" data-cms-refresh-list>
+                  <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+
+            <?= cms_render_request_table(
+              (array)$requestViewMeta['requests'],
+              (string)$requestViewMeta['empty_message'],
+              $currentUserId,
+              $canReviewContent,
+              $requestVersionMeta
+            ) ?>
+
+            <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+              <div class="d-flex align-items-center gap-2">
+                <label class="small text-muted mb-0">Entries</label>
+                <span class="small fw-semibold" data-cms-visible-entry-count><?= (int)$requestViewCount ?></span>
+                <span class="badge rounded-pill bg-light text-secondary border" data-cms-visible-entry-summary>
+                  Showing <?= (int)$requestViewCount ?> <?= $requestViewCount === 1 ? 'request' : 'requests' ?>
+                </span>
+              </div>
+            </div>
+          </section>
+        <?php endforeach; ?>
       <?php else: ?>
         <?php
         $selectedRequestStatus = strtolower(trim((string)($editorRequest['status'] ?? '')));
@@ -1290,6 +1331,60 @@ $previewCssAssets = [
     </div>
   </div>
 
+  <div class="modal fade" id="cmsRequestFilterModal" tabindex="-1" aria-labelledby="cmsRequestFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header">
+          <h5 class="modal-title" id="cmsRequestFilterModalLabel">Filter Content Requests</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label fw-semibold">Status</label>
+          <div class="d-grid gap-2">
+            <?php foreach (['all' => 'All statuses', 'approved' => 'Approved', 'denied' => 'Denied', 'pending' => 'Pending'] as $modalStatusKey => $modalStatusLabel): ?>
+              <label class="form-check border rounded-3 p-3 ps-5 mb-0">
+                <input class="form-check-input" type="radio" name="cms_request_modal_status" value="<?= $modalStatusKey ?>" <?= $modalStatusKey === 'all' ? 'checked' : '' ?> data-cms-modal-status-filter>
+                <span class="form-check-label"><?= $modalStatusLabel ?></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-cms-modal-filter-reset>Reset</button>
+          <button type="button" class="btn btn-primary" data-cms-modal-filter-apply>Apply Filter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="cmsRequestColumnsModal" tabindex="-1" aria-labelledby="cmsRequestColumnsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header">
+          <h5 class="modal-title" id="cmsRequestColumnsModalLabel">Content Request Columns</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Choose the columns shown in the current request view.</p>
+          <div class="row g-3">
+            <?php foreach ([2 => 'Created By', 3 => 'Status', 4 => 'Updated', 5 => 'Submitted', 6 => 'Reviewed'] as $modalColumnIndex => $modalColumnLabel): ?>
+              <div class="col-12 col-sm-6">
+                <label class="form-check border rounded-3 p-3 ps-5 mb-0 h-100">
+                  <input class="form-check-input" type="checkbox" value="<?= $modalColumnIndex ?>" checked data-cms-modal-column-toggle="<?= $modalColumnIndex ?>">
+                  <span class="form-check-label"><?= $modalColumnLabel ?></span>
+                </label>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-cms-modal-columns-reset>Show All</button>
+          <button type="button" class="btn btn-primary" data-cms-modal-columns-apply>Apply Columns</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="appDialogModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg">
@@ -1535,6 +1630,165 @@ $previewCssAssets = [
   <script src="../../JS-Script-Files/siteContentRuntime.js?v=20260325-1"></script>
   <script>
     (function () {
+      const requestViewTabs = Array.from(document.querySelectorAll("[data-cms-request-tab]"));
+      const requestViewPanels = Array.from(document.querySelectorAll("[data-cms-request-panel]"));
+
+      function activateRequestView(viewKey) {
+        const selectedTab = requestViewTabs.find(function (tab) {
+          return tab.dataset.cmsRequestTab === viewKey;
+        });
+        const selectedPanel = requestViewPanels.find(function (panel) {
+          return panel.dataset.cmsRequestPanel === viewKey;
+        });
+        if (!selectedTab || !selectedPanel) {
+          return;
+        }
+
+        requestViewTabs.forEach(function (tab) {
+          const isActive = tab === selectedTab;
+          tab.classList.toggle("active", isActive);
+          tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        requestViewPanels.forEach(function (panel) {
+          panel.classList.toggle("d-none", panel !== selectedPanel);
+        });
+
+        const targetUrl = selectedTab.dataset.cmsRequestUrl;
+        if (targetUrl && window.history && window.history.replaceState) {
+          window.history.replaceState({}, "", targetUrl);
+        }
+      }
+
+      requestViewTabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          activateRequestView(tab.dataset.cmsRequestTab || "my_requests");
+        });
+      });
+
+      requestViewPanels.forEach(function (panel) {
+        const rows = Array.from(panel.querySelectorAll("[data-cms-request-row]"));
+        const filterButtons = Array.from(panel.querySelectorAll("[data-cms-status-filter]"));
+        const searchInput = panel.querySelector("[data-cms-request-search-input]");
+        const searchButton = panel.querySelector("[data-cms-request-search-button]");
+        const refreshButton = panel.querySelector("[data-cms-refresh-list]");
+        const noResultsRow = panel.querySelector("[data-cms-request-no-results]");
+        const entryBadge = panel.querySelector("[data-cms-visible-entry-badge]");
+        const entryCount = panel.querySelector("[data-cms-visible-entry-count]");
+        const entrySummary = panel.querySelector("[data-cms-visible-entry-summary]");
+        let activeStatus = "all";
+
+        function updateVisibleRequestRows() {
+          const searchTerm = String(searchInput?.value || "").trim().toLowerCase();
+          let visibleCount = 0;
+
+          rows.forEach(function (row) {
+            const rowStatus = String(row.dataset.cmsRequestStatus || "").toLowerCase();
+            const rowSearch = String(row.dataset.cmsRequestSearch || "").toLowerCase();
+            const statusMatches = activeStatus === "all" || rowStatus === activeStatus;
+            const searchMatches = searchTerm === "" || rowSearch.includes(searchTerm);
+            const isVisible = statusMatches && searchMatches;
+            row.classList.toggle("d-none", !isVisible);
+            if (isVisible) {
+              visibleCount += 1;
+            }
+          });
+
+          if (noResultsRow) {
+            noResultsRow.classList.toggle("d-none", rows.length === 0 || visibleCount > 0);
+          }
+          if (entryBadge) {
+            entryBadge.textContent = visibleCount + (visibleCount === 1 ? " entry" : " entries");
+          }
+          if (entryCount) {
+            entryCount.textContent = String(visibleCount);
+          }
+          if (entrySummary) {
+            entrySummary.textContent = "Showing " + visibleCount + (visibleCount === 1 ? " request" : " requests");
+          }
+        }
+
+        filterButtons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            activeStatus = String(button.dataset.cmsStatusFilter || "all").toLowerCase();
+            filterButtons.forEach(function (candidate) {
+              candidate.classList.toggle("active", candidate === button);
+            });
+            updateVisibleRequestRows();
+          });
+        });
+        searchInput?.addEventListener("input", updateVisibleRequestRows);
+        searchButton?.addEventListener("click", updateVisibleRequestRows);
+        refreshButton?.addEventListener("click", function () {
+          refreshButton.classList.add("is-loading");
+          refreshButton.disabled = true;
+          window.location.reload();
+        });
+        updateVisibleRequestRows();
+      });
+
+      function activeRequestPanel() {
+        return requestViewPanels.find(function (panel) {
+          return !panel.classList.contains("d-none");
+        }) || null;
+      }
+
+      const requestFilterModalEl = document.getElementById("cmsRequestFilterModal");
+      const requestFilterModalInputs = Array.from(document.querySelectorAll("[data-cms-modal-status-filter]"));
+      const requestFilterApplyButton = document.querySelector("[data-cms-modal-filter-apply]");
+      const requestFilterResetButton = document.querySelector("[data-cms-modal-filter-reset]");
+      requestFilterModalEl?.addEventListener("show.bs.modal", function () {
+        const panel = activeRequestPanel();
+        const activeButton = panel?.querySelector("[data-cms-status-filter].active");
+        const activeValue = activeButton?.dataset.cmsStatusFilter || "all";
+        requestFilterModalInputs.forEach(function (input) {
+          input.checked = input.value === activeValue;
+        });
+      });
+      requestFilterApplyButton?.addEventListener("click", function () {
+        const selectedStatus = requestFilterModalInputs.find(function (input) {
+          return input.checked;
+        })?.value || "all";
+        activeRequestPanel()?.querySelector('[data-cms-status-filter="' + selectedStatus + '"]')?.click();
+        if (requestFilterModalEl) {
+          bootstrap.Modal.getOrCreateInstance(requestFilterModalEl).hide();
+        }
+      });
+      requestFilterResetButton?.addEventListener("click", function () {
+        requestFilterModalInputs.forEach(function (input) {
+          input.checked = input.value === "all";
+        });
+      });
+
+      const requestColumnsModalEl = document.getElementById("cmsRequestColumnsModal");
+      const requestColumnInputs = Array.from(document.querySelectorAll("[data-cms-modal-column-toggle]"));
+      const requestColumnsApplyButton = document.querySelector("[data-cms-modal-columns-apply]");
+      const requestColumnsResetButton = document.querySelector("[data-cms-modal-columns-reset]");
+      requestColumnsModalEl?.addEventListener("show.bs.modal", function () {
+        const table = activeRequestPanel()?.querySelector(".cms-request-table");
+        requestColumnInputs.forEach(function (input) {
+          const columnIndex = Number(input.dataset.cmsModalColumnToggle || 0);
+          const header = table?.querySelector("thead th:nth-child(" + columnIndex + ")");
+          input.checked = Boolean(header && !header.classList.contains("d-none"));
+        });
+      });
+      requestColumnsApplyButton?.addEventListener("click", function () {
+        const table = activeRequestPanel()?.querySelector(".cms-request-table");
+        requestColumnInputs.forEach(function (input) {
+          const columnIndex = Number(input.dataset.cmsModalColumnToggle || 0);
+          table?.querySelectorAll("tr > :nth-child(" + columnIndex + ")").forEach(function (cell) {
+            cell.classList.toggle("d-none", !input.checked);
+          });
+        });
+        if (requestColumnsModalEl) {
+          bootstrap.Modal.getOrCreateInstance(requestColumnsModalEl).hide();
+        }
+      });
+      requestColumnsResetButton?.addEventListener("click", function () {
+        requestColumnInputs.forEach(function (input) {
+          input.checked = true;
+        });
+      });
+
       const selectedPageKey = <?= json_encode(in_array($selectedModuleKey, cms_content_editable_page_keys(), true) ? $selectedModuleKey : '') ?>;
       const previewAssetBase = <?= json_encode($previewAssetBase) ?>;
       const previewRuntimeJs = <?= json_encode($previewRuntimeJs) ?>;
@@ -1712,10 +1966,10 @@ $previewCssAssets = [
           '        <img src="' + escapeHtml(logoUrl) + '" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center">',
           "        Barangay San Jose",
           "      </a>",
-          '      <button class="navbar-toggler" type="button" aria-label="Toggle navigation">',
+          '      <button class="navbar-toggler" type="button" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">',
           '        <span class="navbar-toggler-icon"></span>',
           "      </button>",
-          '      <div class="collapse navbar-collapse show" id="navbarNav">',
+          '      <div class="collapse navbar-collapse" id="navbarNav">',
           '        <ul id="navbarLinks" class="navbar-nav ms-auto">',
           navItems,
           '          <li class="nav-item">',
@@ -1777,24 +2031,41 @@ $previewCssAssets = [
       }
 
       function buildPreviewBehaviorScript(pageKey) {
-        if (pageKey !== "home") {
+        if (pageKey === "login") {
           return "";
         }
 
-        return [
+        const behaviorLines = [
           "<script>",
           "(function(){",
+          "  var toggler=document.querySelector('.navbar-toggler');",
+          "  var navbarCollapse=document.getElementById('navbarNav');",
+          "  if(toggler&&navbarCollapse){",
+          "    toggler.addEventListener('click',function(){",
+          "      var willOpen=!navbarCollapse.classList.contains('show');",
+          "      navbarCollapse.classList.toggle('show',willOpen);",
+          "      toggler.setAttribute('aria-expanded',willOpen?'true':'false');",
+          "    });",
+          "  }"
+        ];
+
+        if (pageKey === "home") {
+          behaviorLines.push(
           "  var navbar=document.getElementById('mainNavbar');",
-          "  if(!navbar){return;}",
           "  function updateNavbarState(){",
           "    var top=window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;",
-          "    navbar.classList.toggle('navbar--scrolled', top>20);",
+          "    if(navbar){navbar.classList.toggle('navbar--scrolled',top>20);}",
           "  }",
           "  window.addEventListener('scroll', updateNavbarState, { passive: true });",
-          "  updateNavbarState();",
+          "  updateNavbarState();"
+          );
+        }
+
+        behaviorLines.push(
           "})();",
           "<\/script>"
-        ].join("");
+        );
+        return behaviorLines.join("");
       }
 
       function buildPreviewDocument(pageKey, payload) {
@@ -1844,12 +2115,7 @@ $previewCssAssets = [
           ".cms-preview-doc{min-height:100vh;}",
           ".cms-preview-doc *{pointer-events:none !important;}",
           "body a,body button,body input,body textarea,body select{pointer-events:none !important;}",
-          ".cms-preview-site-shell .navbar-toggler{display:none !important;}",
-          ".cms-preview-site-shell .navbar-collapse{display:flex !important;flex-basis:auto !important;}",
-          ".cms-preview-site-shell #navbarLinks{flex-direction:row !important;align-items:center !important;}",
-          ".cms-preview-site-shell #navbarLinks .nav-item{margin:0 0.9rem !important;}",
-          ".cms-preview-site-shell #navbarLinks .nav-item:last-child{margin-right:0 !important;}",
-          ".cms-preview-site-shell #navbarLinks .nav-link.btn{margin-left:0.75rem !important;}",
+          ".cms-preview-site-shell .navbar-toggler{pointer-events:auto !important;}",
           ".cms-runtime-richtext p:last-child{margin-bottom:0;}",
           ".login-signup-container{margin:32px auto;}",
           ".bannerText h1,.bannerText p{color:#ffffff !important;}",
