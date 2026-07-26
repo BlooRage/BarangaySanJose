@@ -700,6 +700,31 @@ if ($sbSidebarUserId !== '') {
     border-bottom: 1px solid #d7dde5;
   }
 
+  #dashboard-sidebar .sidebar-brand-link {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  #dashboard-sidebar .sidebar-brand-logo {
+    display: block;
+    width: 40px;
+    height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    flex: 0 0 40px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  #dashboard-sidebar .sidebar-brand-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   #dashboard-sidebar .sidebar-edge-toggle {
     position: absolute;
     top: 50%;
