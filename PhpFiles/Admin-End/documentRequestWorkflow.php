@@ -2810,12 +2810,12 @@ function dra_generate_issued_document(array $requestRow): ?string
     $signatories = ($conn instanceof mysqli)
         ? dra_current_barangay_signatories($conn)
         : [
-            'punong' => ['name' => 'HON. GLENN S. EVANGELISTA', 'title' => 'Punong Barangay'],
-            'secretary' => ['name' => 'MINERVA D. QUITA', 'title' => 'Barangay Secretary'],
+            'punong' => ['name' => trim((string)($requestRow['punong_signatory_name'] ?? '')), 'title' => 'Punong Barangay'],
+            'secretary' => ['name' => trim((string)($requestRow['secretary_signatory_name'] ?? '')), 'title' => 'Barangay Secretary'],
         ];
-    $punongSignatoryName = trim((string)($signatories['punong']['name'] ?? 'HON. GLENN S. EVANGELISTA'));
+    $punongSignatoryName = trim((string)($signatories['punong']['name'] ?? ''));
     $punongSignatoryTitle = trim((string)($signatories['punong']['title'] ?? 'Punong Barangay'));
-    $secretarySignatoryName = trim((string)($signatories['secretary']['name'] ?? 'MINERVA D. QUITA'));
+    $secretarySignatoryName = trim((string)($signatories['secretary']['name'] ?? ''));
     $secretarySignatoryTitle = trim((string)($signatories['secretary']['title'] ?? 'Barangay Secretary'));
 
     $baseDir = realpath(__DIR__ . '/../../');
@@ -3383,7 +3383,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $issuedDateWord = $issuedAt;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 34,
+                'cache_version' => 35,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -4997,15 +4997,16 @@ function dra_generate_issued_document(array $requestRow): ?string
                 );
 
                 $metaBlockX = 19.0;
-                // Clear the source template's original metadata block and restore it
-                // below the issued-by signatory, matching the legacy permit layout.
+                // Clear the complete legacy footer (including its hard-coded
+                // secretary) before drawing the current position holders.
                 $sourceMetaBlockY = $normalizeTop(0.8290);
-                $pdf->Rect($metaBlockX - 0.8, $sourceMetaBlockY - 0.8, 82.0, 33.0, 'F');
-                $metaBlockY = $sourceMetaBlockY;
+                $pdf->Rect(12.0, 242.0, 92.0, 74.0, 'F');
+                $pdf->Rect(108.0, 242.0, max(1.0, $pageWidth - 108.0), 76.0, 'F');
+                $metaBlockY = 268.0;
                 $metaMaskX = $metaBlockX - 0.8;
                 $metaMaskY = $metaBlockY - 0.8;
                 $metaMaskW = 82.0;
-                $metaMaskH = 33.0;
+                $metaMaskH = 38.0;
                 $pdf->Rect($metaMaskX, $metaMaskY, $metaMaskW, $metaMaskH, 'F');
                 $metaRows = [
                     ['key' => 'clearance_no', 'label' => 'Clearance No.', 'value' => $certNo !== '' ? $certNo : $requestId],
@@ -5045,27 +5046,23 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $metaY += 6.0;
                 }
 
-                // Replace the template's legacy issued-by and signatory names with
-                // the current officials resolved from Clearance Issuance Settings.
-                // Keep the left mask above the restored metadata block.
-                $pdf->Rect(12.0, 272.0, 92.0, max(1.0, $metaBlockY - 272.0 - 0.8), 'F');
-                $pdf->Rect(108.0, 246.0, max(1.0, $pageWidth - 108.0), 72.0, 'F');
-
+                // Draw only the current officials resolved from their active
+                // Barangay positions; no template name is allowed to remain.
                 $pdf->SetFont('Arial', '', 10.2);
-                $pdf->SetXY(14.0, 282.0);
+                $pdf->SetXY(14.0, 255.0);
                 $pdf->Cell(18.0, 5.4, 'Issued by:', 0, 0, 'L');
-                $writeFittedCell($pdf, 32.0, 281.8, 56.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.2, 8.2, 'L');
-                $writeFittedCell($pdf, 22.0, 287.2, 66.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : '-', 'I', 9.6, 7.8, 'C');
+                $writeFittedCell($pdf, 32.0, 254.8, 66.0, 5.4, $secretarySignatoryName !== '' ? $secretarySignatoryName : '-', 'B', 10.2, 8.2, 'L');
+                $writeFittedCell($pdf, 22.0, 260.2, 76.0, 5.0, $secretarySignatoryTitle !== '' ? $secretarySignatoryTitle : 'Barangay Secretary', 'I', 9.6, 7.8, 'C');
 
-                dra_render_signature_image($pdf, $punongSignaturePath, 126.0, 270.0, 52.0, 8.8);
-                $pdf->Line(119.8, 280.0, 191.2, 280.0);
-                $writeFittedCell($pdf, 118.0, 281.2, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
-                $writeFittedCell($pdf, 118.0, 286.5, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
+                dra_render_signature_image($pdf, $punongSignaturePath, 126.0, 244.0, 52.0, 8.8);
+                $pdf->Line(119.8, 254.0, 191.2, 254.0);
+                $writeFittedCell($pdf, 118.0, 255.2, 76.0, 5.4, $punongSignatoryName !== '' ? $punongSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 260.5, 76.0, 4.9, $punongSignatoryTitle !== '' ? $punongSignatoryTitle : '-', 'I', 9.8, 7.8, 'C');
 
-                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 295.0, 52.0, 8.8);
-                $pdf->Line(119.8, 305.0, 191.2, 305.0);
-                $writeFittedCell($pdf, 118.0, 306.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.6, 8.2, 'C');
-                $writeFittedCell($pdf, 118.0, 311.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.6, 7.6, 'C');
+                dra_render_signature_image($pdf, $monitoringSignaturePath, 126.0, 273.0, 52.0, 8.8);
+                $pdf->Line(119.8, 283.0, 191.2, 283.0);
+                $writeFittedCell($pdf, 118.0, 284.2, 76.0, 5.4, $monitoringSignatoryName !== '' ? $monitoringSignatoryName : '-', 'B', 10.6, 8.2, 'C');
+                $writeFittedCell($pdf, 118.0, 289.5, 76.0, 4.8, $monitoringSignatoryTitle !== '' ? $monitoringSignatoryTitle : '-', 'I', 9.6, 7.6, 'C');
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;

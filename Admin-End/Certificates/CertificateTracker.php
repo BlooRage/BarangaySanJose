@@ -1340,7 +1340,7 @@ if ($certificateLaunchStage === 'release') {
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-line {
       display: inline-block;
-      width: 72px;
+      width: 128px;
       border-bottom: 1px solid #111827;
       transform: translateY(-2px);
     }

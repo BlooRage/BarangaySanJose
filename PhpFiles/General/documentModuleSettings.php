@@ -617,11 +617,11 @@ if (!function_exists('dms_current_barangay_signatories')) {
 
         $fallback = [
             'punong' => [
-                'name' => 'HON. GLENN S. EVANGELISTA',
+                'name' => '',
                 'title' => 'Punong Barangay',
             ],
             'secretary' => [
-                'name' => 'MINERVA D. QUITA',
+                'name' => '',
                 'title' => 'Barangay Secretary',
             ],
         ];

@@ -3542,7 +3542,7 @@
       ])),
       secretarySignatoryName: upperText(firstNonEmptyName([
         row.secretary_signatory_name
-      ]), 'MINERVA D. QUITA'),
+      ]), ''),
       secretarySignatoryTitle: firstNonEmpty([
         row.secretary_signatory_title,
         'Barangay Secretary'
@@ -3669,7 +3669,7 @@
     const punongSignatoryNameText = String(state.punongSignatoryName || approvedByNameText).trim() || approvedByNameText;
     const punongSignatoryTitleText = String(state.punongSignatoryTitle || 'Punong Barangay').trim() || 'Punong Barangay';
     const punongSignatorySignatureUrl = String(state.punongSignatorySignatureUrl || '').trim();
-    const secretarySignatoryNameText = String(state.secretarySignatoryName || 'MINERVA D. QUITA').trim() || 'MINERVA D. QUITA';
+    const secretarySignatoryNameText = String(state.secretarySignatoryName || '').trim() || '-';
     const secretarySignatoryTitleText = String(state.secretarySignatoryTitle || 'Barangay Secretary').trim() || 'Barangay Secretary';
     const monitoringSignatoryNameText = String(state.monitoringSignatoryName || 'MR. JOSEPH C. PATRICIO').trim() || 'MR. JOSEPH C. PATRICIO';
     const monitoringSignatoryTitleText = String(state.monitoringSignatoryTitle || 'Head, Monitoring & Collection Dept.').trim() || 'Head, Monitoring & Collection Dept.';
