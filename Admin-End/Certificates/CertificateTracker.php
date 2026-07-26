@@ -1296,6 +1296,9 @@ if ($certificateLaunchStage === 'release') {
       align-self: end;
       padding-bottom: 10px;
     }
+    :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-left-column {
+      align-self: end;
+    }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signing {
       display: grid;
       justify-items: center;
@@ -1319,7 +1322,7 @@ if ($certificateLaunchStage === 'release') {
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta {
       width: 280px;
-      margin-top: 18px;
+      margin-top: 14px;
       margin-left: 8px;
       font-size: .97rem;
       line-height: 1.2;
@@ -4298,7 +4301,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260722-fee-edit-modal"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260726-business-meta-layout"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');

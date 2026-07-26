@@ -3503,6 +3503,9 @@
         payload.complete_address
       ))), ''),
       amount: upperText(previewAmount, ''),
+      documentFieldVisibility: row.document_field_visibility && typeof row.document_field_visibility === 'object'
+        ? row.document_field_visibility
+        : {},
       issuedAt: upperText(stripTemplateTokens(firstNonEmpty([
         payload.issued_at,
         payload.issuedAt,
@@ -3709,6 +3712,24 @@
       const text = String(value || '').trim();
       if (!text) return '<span class="doc-preview-business-meta-line"></span>';
       return previewEditable(key, text, '_____');
+    };
+    const documentFieldVisible = (key) => {
+      const visibility = state.documentFieldVisibility && typeof state.documentFieldVisibility === 'object'
+        ? state.documentFieldVisibility
+        : {};
+      return !Object.prototype.hasOwnProperty.call(visibility, key) || Boolean(visibility[key]);
+    };
+    const businessMetaRow = (settingKey, label, valueHtml) => {
+      const renderedValue = settingKey && !documentFieldVisible(settingKey)
+        ? '<span class="doc-preview-business-meta-line"></span>'
+        : valueHtml;
+      return `
+        <div class="doc-preview-business-meta-row">
+          <div class="doc-preview-business-meta-label"><strong>${esc(label)}</strong></div>
+          <div class="doc-preview-business-meta-colon">:</div>
+          <div class="doc-preview-business-meta-value">${renderedValue}</div>
+        </div>
+      `;
     };
     const businessCheckMark = (type) => {
       const selected = businessApprovalTypes.includes(type);
@@ -4183,7 +4204,17 @@
       footerAreaHtml = `
         <div class="doc-preview-business-footer-area${qrBlockHtml ? '' : ' doc-preview-business-footer-area--noqr'}">
           <div class="doc-preview-business-footer-main">
-            <div class="doc-preview-business-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+            <div class="doc-preview-business-left-column">
+              <div class="doc-preview-business-issuedby">Issued by: <strong>${esc(secretarySignatoryNameText)}</strong><br><em>${esc(secretarySignatoryTitleText)}</em></div>
+              <div class="doc-preview-business-meta">
+                ${businessMetaRow('clearance_no', 'Clearance No.', businessMetaValue('certificateNumber', certificateNumber))}
+                ${businessMetaRow('or_number', 'O.R No.', businessMetaValue('orNumber', state.orNumber))}
+                ${businessMetaRow('amount', 'Amount', businessMetaValue('amount', amount))}
+                ${businessMetaRow('', 'Plate No.', businessMetaValue('plateNumber', plateNumber))}
+                ${businessMetaRow('issued_on', 'Date Issued', businessMetaValue('issuedOn', previewDateText(state.issuedOn || state.issuedDate)))}
+                ${businessMetaRow('issued_at', 'Place Issued', businessMetaValue('issuedAt', state.issuedAt || 'Barangay San Jose'))}
+              </div>
+            </div>
             <div class="doc-preview-business-signing">
               <div class="doc-preview-signature doc-preview-business-signature">
                 ${renderSignatureInk(punongSignatorySignatureUrl, `${punongSignatoryNameText} signature`)}
@@ -4198,33 +4229,6 @@
             </div>
           </div>
           ${qrBlockHtml}
-        </div>
-        <div class="doc-preview-business-meta">
-          <div class="doc-preview-business-meta-row">
-            <div class="doc-preview-business-meta-label"><strong>O.R No.</strong></div>
-            <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('orNumber', state.orNumber)}</div>
-          </div>
-          <div class="doc-preview-business-meta-row">
-            <div class="doc-preview-business-meta-label"><strong>Amount</strong></div>
-            <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('amount', amount)}</div>
-          </div>
-          <div class="doc-preview-business-meta-row">
-            <div class="doc-preview-business-meta-label"><strong>Plate No.</strong></div>
-            <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('plateNumber', plateNumber)}</div>
-          </div>
-          <div class="doc-preview-business-meta-row">
-            <div class="doc-preview-business-meta-label"><strong>Date Issued</strong></div>
-            <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value"><span class="doc-preview-business-meta-line"></span></div>
-          </div>
-          <div class="doc-preview-business-meta-row">
-            <div class="doc-preview-business-meta-label"><strong>Place Issued</strong></div>
-            <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value"><span class="doc-preview-business-meta-line"></span></div>
-          </div>
         </div>
       `;
       footerNoteHtml = `This document is valid until December 31, ${new Date().getFullYear()},<br>Check the qr code to verify the authenticity of this document.`;

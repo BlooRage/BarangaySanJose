@@ -3383,7 +3383,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $issuedDateWord = $issuedAt;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 33,
+                'cache_version' => 34,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -3408,6 +3408,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 'finance_decision_at' => (string)($requestRow['finance_decision_at'] ?? ''),
                 'template_file' => $templateFile,
                 'template_mtime' => @filemtime($templatePath) ?: 0,
+                'document_field_visibility' => $documentFieldVisibility,
             ]));
             $fileStem = ($previewMode ? 'preview_' : 'issued_')
                 . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId)
@@ -4996,32 +4997,34 @@ function dra_generate_issued_document(array $requestRow): ?string
                 );
 
                 $metaBlockX = 19.0;
-                // Clear the source template's original bottom metadata block, then
-                // redraw it directly after the issued-at sentence so document details
-                // appear before the issued-by and signatory sections.
+                // Clear the source template's original metadata block and restore it
+                // below the issued-by signatory, matching the legacy permit layout.
                 $sourceMetaBlockY = $normalizeTop(0.8290);
                 $pdf->Rect($metaBlockX - 0.8, $sourceMetaBlockY - 0.8, 82.0, 33.0, 'F');
-                $metaBlockY = 240.0;
+                $metaBlockY = $sourceMetaBlockY;
                 $metaMaskX = $metaBlockX - 0.8;
                 $metaMaskY = $metaBlockY - 0.8;
                 $metaMaskW = 82.0;
                 $metaMaskH = 33.0;
                 $pdf->Rect($metaMaskX, $metaMaskY, $metaMaskW, $metaMaskH, 'F');
                 $metaRows = [
+                    ['key' => 'clearance_no', 'label' => 'Clearance No.', 'value' => $certNo !== '' ? $certNo : $requestId],
                     ['key' => 'or_number', 'label' => 'O.R No.', 'value' => $orNo],
                     ['key' => 'amount', 'label' => 'Amount', 'value' => $amountText],
                     ['label' => 'Plate No.', 'value' => $plateNumber],
-                    ['label' => 'Date Issued', 'value' => $issuedAt],
-                    ['label' => 'Place Issued', 'value' => 'Barangay San Jose'],
+                    ['key' => 'issued_on', 'label' => 'Date Issued', 'value' => $issuedAt],
+                    ['key' => 'issued_at', 'label' => 'Place Issued', 'value' => 'Barangay San Jose'],
                 ];
                 $metaRows = array_map(static function (array $row) use ($fieldVisible): array {
-                    if (isset($row['key']) && !$fieldVisible((string)$row['key'])) $row['value'] = '';
+                    if (isset($row['key']) && !$fieldVisible((string)$row['key'])) {
+                        $row['value'] = '';
+                    }
                     return $row;
                 }, $metaRows);
                 $labelX = 18.5;
                 $colonX = 46.0;
                 $lineX1 = 52.5;
-                $lineX2 = $lineX1 + 15.0;
+                $lineX2 = 90.5;
                 $metaY = $metaBlockY + 0.1;
                 foreach ($metaRows as $rowMeta) {
                     $pdf->SetFont('Arial', 'B', 9.6);
@@ -5044,8 +5047,8 @@ function dra_generate_issued_document(array $requestRow): ?string
 
                 // Replace the template's legacy issued-by and signatory names with
                 // the current officials resolved from Clearance Issuance Settings.
-                // These blocks intentionally follow the metadata section.
-                $pdf->Rect(12.0, 272.0, 92.0, 43.0, 'F');
+                // Keep the left mask above the restored metadata block.
+                $pdf->Rect(12.0, 272.0, 92.0, max(1.0, $metaBlockY - 272.0 - 0.8), 'F');
                 $pdf->Rect(108.0, 246.0, max(1.0, $pageWidth - 108.0), 72.0, 'F');
 
                 $pdf->SetFont('Arial', '', 10.2);
@@ -8347,6 +8350,7 @@ if ($action === 'list') {
             ? $barangayIdSettings
             : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
         $row['document_settings_module_key'] = $moduleSettingsKey;
+        $row['document_field_visibility'] = dms_resolve_document_field_visibility($conn, $moduleSettingsKey);
         $showCopySignature = dms_resolve_module_copy_signature_setting($conn, $moduleSettingsKey);
         $row['punong_signatory_signature_path'] = $showCopySignature
             ? trim((string)($moduleSettings['punong']['signature_path'] ?? ''))
@@ -8547,6 +8551,7 @@ if ($action === 'get_request') {
         ? $barangayIdSettings
         : ($moduleSettingsKey === 'monitoring' ? $monitoringSettings : $issuanceSettings);
     $row['document_settings_module_key'] = $moduleSettingsKey;
+    $row['document_field_visibility'] = dms_resolve_document_field_visibility($conn, $moduleSettingsKey);
     $operationalSettings = $moduleSettingsKey === 'monitoring'
         ? dms_resolve_clearance_settings($conn)
         : dms_resolve_issuance_settings($conn);
