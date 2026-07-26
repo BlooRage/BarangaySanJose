@@ -210,7 +210,7 @@ if (!function_exists('dms_default_clearance_settings')) {
                 'ready_for_claim' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) is ready for claim.'],
                 'released' => ['enabled' => true, 'message' => 'Your {document_type} request ({request_id}) has been released.'],
             ],
-            'aging_notification_enabled' => true,
+            'aging_notification_enabled' => false,
             'aging_days' => 3,
             'aging_message' => '{count} clearance request(s) have been pending for at least {days} day(s).',
             'aging_recipient_mode' => 'module_access',
@@ -236,6 +236,7 @@ if (!function_exists('dms_resolve_clearance_settings')) {
         $row = $result instanceof mysqli_result ? $result->fetch_assoc() : null;
         $stored = $row ? json_decode((string)($row['settings_json'] ?? ''), true) : null;
         $settings = is_array($stored) ? array_replace_recursive($defaults, $stored) : $defaults;
+        $settings['aging_notification_enabled'] = false;
         $settings['copy_has_signature'] = dms_resolve_module_copy_signature_setting($conn, 'monitoring');
         $settings['print_header_enabled'] = dms_resolve_module_print_header_setting($conn, 'monitoring');
         $settings['document_field_visibility'] = dms_resolve_document_field_visibility($conn, 'monitoring');

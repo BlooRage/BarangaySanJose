@@ -3872,27 +3872,27 @@
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>CTC No.</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(certificateNumber, '${CERTIFICATE_NUMBER}')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Issued at</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(generalClearanceIssuedAt)}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Issued On</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(generalClearanceIssuedOn)}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(amount, '${AMOUNT}')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>OR No.</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue('')}</div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(state.orNumber, '${OR_NUMBER}')}</div>
           </div>
         </div>
       `;
@@ -3947,7 +3947,7 @@
         </p>
       `;
       issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
-      const tricycleMetaValues = ['', '', ''];
+      const tricycleMetaValues = [certificateNumber, state.orNumber, amount].map((value) => String(value || '').trim());
       const tricycleMetaLongest = tricycleMetaValues.reduce((max, value) => Math.max(max, value.length), 0);
       const tricycleMetaWidthCh = Math.max(8, tricycleMetaLongest + 1.2);
       const tricycleMetaLine = (value) => {
@@ -3959,17 +3959,17 @@
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Clearance No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(certificateNumber)}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Receipt No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(state.orNumber)}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(amount)}</div>
           </div>
         </div>
       `;
@@ -4203,17 +4203,17 @@
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>O.R No.</strong></div>
             <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('orNumber', '')}</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('orNumber', state.orNumber)}</div>
           </div>
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('amount', '')}</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('amount', amount)}</div>
           </div>
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>Plate No.</strong></div>
             <div class="doc-preview-business-meta-colon">:</div>
-            <div class="doc-preview-business-meta-value">${businessMetaValue('plateNumber', '')}</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('plateNumber', plateNumber)}</div>
           </div>
           <div class="doc-preview-business-meta-row">
             <div class="doc-preview-business-meta-label"><strong>Date Issued</strong></div>
