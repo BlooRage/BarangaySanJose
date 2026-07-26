@@ -3383,7 +3383,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $issuedDateWord = $issuedAt;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 35,
+                'cache_version' => 36,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -5000,7 +5000,8 @@ function dra_generate_issued_document(array $requestRow): ?string
                 // Clear the complete legacy footer (including its hard-coded
                 // secretary) before drawing the current position holders.
                 $sourceMetaBlockY = $normalizeTop(0.8290);
-                $pdf->Rect(12.0, 242.0, 92.0, 74.0, 'F');
+                $legacyFooterBottom = min($pageHeight - 24.0, $sourceMetaBlockY + 39.0);
+                $pdf->Rect(12.0, 242.0, 92.0, max(1.0, $legacyFooterBottom - 242.0), 'F');
                 $pdf->Rect(108.0, 242.0, max(1.0, $pageWidth - 108.0), 76.0, 'F');
                 $metaBlockY = 268.0;
                 $metaMaskX = $metaBlockX - 0.8;
@@ -5025,7 +5026,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $labelX = 18.5;
                 $colonX = 46.0;
                 $lineX1 = 52.5;
-                $lineX2 = 90.5;
+                $lineX2 = $lineX1 + 15.0;
                 $metaY = $metaBlockY + 0.1;
                 foreach ($metaRows as $rowMeta) {
                     $pdf->SetFont('Arial', 'B', 9.6);

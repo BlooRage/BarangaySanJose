@@ -1335,12 +1335,14 @@ if ($certificateLaunchStage === 'release') {
       margin: 0 0 2px;
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-value .doc-editable {
-      min-width: 96px;
+      width: 57px;
+      min-width: 57px;
+      white-space: nowrap;
       text-align: left;
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-line {
       display: inline-block;
-      width: 128px;
+      width: 57px;
       border-bottom: 1px solid #111827;
       transform: translateY(-2px);
     }
