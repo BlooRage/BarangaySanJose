@@ -1430,12 +1430,12 @@ if ($financeSection === 'fees') {
                 <?= csrfTokenField() ?>
                 <input type="hidden" name="action" value="create_manual_transaction">
 
-                <div class="manual-transaction-field">
+                <div class="manual-transaction-field manual-transaction-field--wide">
                   <label for="manualTransactionName" class="form-label fw-semibold">Payer name <span class="manual-transaction-required" aria-hidden="true">*</span></label>
                   <input id="manualTransactionName" type="text" name="transaction_name" class="form-control" placeholder="Enter the payer's full name" autocomplete="name" required>
                 </div>
 
-                <div class="manual-transaction-field">
+                <div class="manual-transaction-field manual-transaction-field--wide">
                   <label for="manualTransactionAddress" class="form-label fw-semibold">Resident address <span class="manual-transaction-required" aria-hidden="true">*</span></label>
                   <textarea id="manualTransactionAddress" name="resident_address" class="form-control" rows="2" placeholder="House number, street, barangay, city" autocomplete="street-address" required></textarea>
                 </div>
