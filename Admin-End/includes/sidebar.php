@@ -869,6 +869,19 @@ if ($sbSidebarUserId !== '') {
     gap: 0.5rem;
   }
 
+  #dashboard-sidebar .sidebar-direct-link.active,
+  #dashboard-sidebar .sidebar-direct-link.active:hover,
+  #dashboard-sidebar .sidebar-direct-link.active:focus {
+    background-color: #de710c !important;
+    color: #ffffff !important;
+    font-weight: 600;
+  }
+
+  #dashboard-sidebar .sidebar-direct-link.active i,
+  #dashboard-sidebar .sidebar-direct-link.active .sidebar-button-label {
+    color: #ffffff !important;
+  }
+
   #dashboard-sidebar .sidebar-profile-trigger {
     display: flex;
     align-items: center;
