@@ -885,6 +885,24 @@ if ($financeSection === 'fees') {
     #table-certificateTracker .col-submitted { width: 10%; }
     #table-certificateTracker .col-action { width: 15%; }
 
+    /* Keep every finance dialog above its backdrop and usable on short screens. */
+    body > .modal {
+      z-index: 2060;
+    }
+    body > .modal-backdrop {
+      z-index: 2050;
+    }
+    body > .modal .modal-dialog {
+      max-height: calc(100dvh - 2rem);
+    }
+    body > .modal .modal-content {
+      max-height: calc(100dvh - 2rem);
+    }
+    body > .modal .modal-body {
+      overflow-y: auto;
+      min-height: 0;
+    }
+
     #viewModal .modal-dialog {
       width: min(88vw, 920px);
       max-width: 920px;
@@ -1842,7 +1860,7 @@ if ($financeSection === 'fees') {
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260721-manual-preview-13"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260728-modal-handoff-14"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');

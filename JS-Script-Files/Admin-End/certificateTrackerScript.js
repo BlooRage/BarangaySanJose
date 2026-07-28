@@ -6399,14 +6399,26 @@
     }
 
     const explicitReturnTarget = String(options?.returnTarget || '').trim();
+    const isReturningFromView = !!(
+      viewModalEl &&
+      viewModalEl.classList.contains('show') &&
+      viewModal
+    );
+    const showPreparedActionModal = () => {
+      if (isReturningFromView) {
+        runAfterModalHidden(viewModalEl, () => actionModal.show());
+        viewModal.hide();
+        return;
+      }
+      actionModal.show();
+    };
     actionReturnState = options && typeof options === 'object' && options.reopenState
       ? { ...options.reopenState }
       : null;
     if (explicitReturnTarget === 'paymentProof') {
       actionReturnTarget = 'paymentProof';
-    } else if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+    } else if (isReturningFromView) {
       preserveViewStateOnNextHide = true;
-      viewModal.hide();
       actionReturnTarget = 'view';
     } else {
       actionReturnTarget = '';
@@ -6477,7 +6489,7 @@
 
     if (isBusinessClearanceApproval) {
       configureBusinessApprovalSelectionStep(existingBusinessApprovalType, existingPlateNumber);
-      actionModal.show();
+      showPreparedActionModal();
       return;
     }
 
@@ -6684,7 +6696,7 @@
       actionPrompt.classList.remove('d-none');
     }
 
-    actionModal.show();
+    showPreparedActionModal();
   }
 
   // ── Fee Tagging Modal ────────────────────────────────────────────────────────
