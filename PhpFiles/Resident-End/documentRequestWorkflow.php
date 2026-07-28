@@ -2533,7 +2533,7 @@ if ($action === 'download_issued') {
     $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
 
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('File not found.');
     }
@@ -2580,7 +2580,7 @@ if ($action === 'view_issued') {
     $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
 
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('File not found.');
     }
@@ -2655,7 +2655,7 @@ if ($action === 'download_invoice') {
     $relative = '/' . ltrim(dr_strip_legacy_base($invoicePublicPath), '/');
     $absolute = realpath($baseDir . $relative);
 
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('Invoice file not found.');
     }
@@ -2701,7 +2701,7 @@ if ($action === 'view_payment_proof') {
 
     $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('File not found.');
     }

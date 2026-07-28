@@ -600,3 +600,31 @@ function normalizeRoleName(string $role): string
     ];
     return $map[$role] ?? $role;
 }
+
+/**
+ * Verify that a resolved file belongs to UnifiedFileAttachment.
+ *
+ * realpath() follows symlinks, so comparing a file with the checkout path
+ * rejects valid files when uploads live in persistent storage outside Git.
+ * Resolving the upload root first keeps the containment check traversal-safe
+ * and works for both a normal directory and a symlink.
+ */
+function appIsUnifiedAttachmentFile(mixed $candidate, string $projectRoot): bool
+{
+    if (!is_string($candidate) || $candidate === '' || !is_file($candidate)) {
+        return false;
+    }
+
+    $resolvedFile = realpath($candidate);
+    $resolvedRoot = realpath(rtrim($projectRoot, "/\\") . '/UnifiedFileAttachment');
+    if ($resolvedFile === false || $resolvedRoot === false) {
+        return false;
+    }
+
+    $filePath = str_replace('\\', '/', $resolvedFile);
+    $rootPath = rtrim(str_replace('\\', '/', $resolvedRoot), '/') . '/';
+    if (DIRECTORY_SEPARATOR === '\\') {
+        return str_starts_with(strtolower($filePath), strtolower($rootPath));
+    }
+    return str_starts_with($filePath, $rootPath);
+}

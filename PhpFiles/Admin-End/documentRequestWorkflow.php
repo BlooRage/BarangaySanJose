@@ -8601,6 +8601,21 @@ if ($action === 'get_request') {
     if ($customOtherFee !== '' && is_numeric($customOtherFee)) {
         $row['fee_amount'] = (float)$customOtherFee;
     }
+    // Clearance prices are assigned per request. The general document catalog
+    // (and older finance rows) may legitimately contain 0.00, so the sum of
+    // the tagged fees is the authoritative amount shown to Finance.
+    if (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
+        $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
+        if ($taggedFees) {
+            $taggedFeeTotal = 0.0;
+            foreach ($taggedFees as $taggedFee) {
+                $taggedFeeTotal += (float)($taggedFee['amount'] ?? 0);
+            }
+            $row['clearance_fees'] = $taggedFees;
+            $row['clearance_fee_count'] = count($taggedFees);
+            $row['fee_amount'] = $taggedFeeTotal;
+        }
+    }
 
     dr_respond_json(200, ['success' => true, 'item' => $row]);
 }
@@ -8627,7 +8642,7 @@ if ($action === 'view_payment_proof') {
     }
     $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('File not found.');
     }
@@ -8686,7 +8701,7 @@ if ($action === 'view_preview_issued') {
     }
     $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('File not found.');
     }
@@ -8903,8 +8918,7 @@ if ($action === 'view_issued') {
     $storedIssuedAbsolute = $storedIssuedRelative !== '' ? realpath($baseDir . $storedIssuedRelative) : false;
     $storedIssuedFileMissing = $publicPath !== '' && (
         $storedIssuedAbsolute === false
-        || !is_file($storedIssuedAbsolute)
-        || strpos($storedIssuedAbsolute, $baseDir . '/UnifiedFileAttachment/') !== 0
+        || !appIsUnifiedAttachmentFile($storedIssuedAbsolute, $baseDir)
     );
     $mustRegenerate = ($publicPath === '')
         || $storedIssuedFileMissing
@@ -8938,7 +8952,7 @@ if ($action === 'view_issued') {
 
     $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+    if (!appIsUnifiedAttachmentFile($absolute, $baseDir)) {
         http_response_code(404);
         exit('Issued file path exists but file is missing on disk. Regenerate the issued document from the request.');
     }
@@ -9536,10 +9550,10 @@ if ($action === 'finance_verify') {
         }
     }
     $resolvedAmount = null;
-    if (isset($row['fee_amount']) && $row['fee_amount'] !== null && is_numeric((string)$row['fee_amount'])) {
-        $resolvedAmount = (float)$row['fee_amount'];
-    } elseif ($taggedFeeTotal !== null) {
+    if ($taggedFeeTotal !== null) {
         $resolvedAmount = $taggedFeeTotal;
+    } elseif (isset($row['fee_amount']) && $row['fee_amount'] !== null && is_numeric((string)$row['fee_amount'])) {
+        $resolvedAmount = (float)$row['fee_amount'];
     } elseif ($defaultFee !== null) {
         // Finance amount is system-controlled from configured fee.
         $resolvedAmount = (float)$defaultFee;
