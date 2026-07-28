@@ -72,6 +72,8 @@ prepare_persistent_uploads() {
     "$PERSISTENT_UPLOAD_DIR/Documents"
     "$PERSISTENT_UPLOAD_DIR/IDPictures"
     "$PERSISTENT_UPLOAD_DIR/DocumentRequests"
+    "$PERSISTENT_UPLOAD_DIR/Content/Announcements/EditorUploads"
+    "$PERSISTENT_UPLOAD_DIR/Content/SiteContent"
     "$PERSISTENT_UPLOAD_DIR/IssuedDocuments"
     "$PERSISTENT_UPLOAD_DIR/IssuedDocuments/Generated"
     "$PERSISTENT_UPLOAD_DIR/IssuedDocuments/QR"

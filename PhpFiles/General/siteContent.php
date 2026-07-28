@@ -1018,7 +1018,7 @@ if (!function_exists('cms_content_save_image_data_url')) {
 
         $safePage = preg_replace('/[^a-z0-9_-]+/i', '-', strtolower($pageKey)) ?: 'page';
         $safeField = preg_replace('/[^a-z0-9_-]+/i', '-', strtolower($fieldKey)) ?: 'field';
-        $relativeDir = 'Images/ContentManagement/' . $safePage;
+        $relativeDir = 'UnifiedFileAttachment/Content/SiteContent/' . $safePage;
         $absoluteDir = dirname(__DIR__, 2) . '/' . $relativeDir;
         if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0775, true) && !is_dir($absoluteDir)) {
             return '';

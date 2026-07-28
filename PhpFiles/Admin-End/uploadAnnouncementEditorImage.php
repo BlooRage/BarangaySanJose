@@ -49,7 +49,7 @@ if (!isset($allowedMimes[$mime])) {
 $ext = $allowedMimes[$mime];
 $filename = "announcement_" . date("Ymd_His") . "_" . bin2hex(random_bytes(6)) . "." . $ext;
 
-$uploadDir = __DIR__ . "/../../Images/Announcements/EditorUploads";
+$uploadDir = __DIR__ . "/../../UnifiedFileAttachment/Content/Announcements/EditorUploads";
 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
   http_response_code(500);
   echo json_encode(["success" => false, "message" => "Unable to create upload directory."]);
@@ -70,5 +70,5 @@ if ($phpFilesPos !== false) {
   $baseUrl = substr($scriptName, 0, $phpFilesPos);
 }
 
-$publicUrl = rtrim($baseUrl, "/") . "/Images/Announcements/EditorUploads/" . rawurlencode($filename);
+$publicUrl = rtrim($baseUrl, "/") . "/UnifiedFileAttachment/Content/Announcements/EditorUploads/" . rawurlencode($filename);
 echo json_encode(["success" => true, "url" => $publicUrl]);

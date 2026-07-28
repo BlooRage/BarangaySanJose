@@ -2434,7 +2434,9 @@
       'barangay_id_photo_url',
       'barangay_id_photo_path',
       'barangay_id_photo_capture',
-      'id_picture_data_url'
+      'id_picture_data_url',
+      'payment_proof_path',
+      'payment_proof_url'
     ]);
     const isRelationshipJailVisit = String(payload?.cohabitation_variant || '').trim() === 'relationship_jail_visit'
       || String(payload?.cohabitation_variant || '').trim() === 'conjugal_visit';
@@ -2472,8 +2474,6 @@
       const fileName = normalized.split('/').pop() || pathText.replace(/\\/g, '/').split('/').pop() || '';
       docs.push({ label: String(label || 'Document'), url, path: normalized, name: fileName });
     };
-
-    addDoc('Payment Proof', row?.payment_proof_path);
 
     if (payload && typeof payload === 'object') {
       Object.keys(payload).forEach((key) => {
