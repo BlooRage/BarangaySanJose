@@ -8526,6 +8526,15 @@ if ($action === 'get_request') {
     }
 
     $row['payload'] = dr_decode_request_payload($row);
+    if (trim((string)($row['payment_proof_path'] ?? '')) === '') {
+        foreach (['payment_proof_path', 'payment_proof', 'payment_proof_url'] as $proofPayloadKey) {
+            $payloadProofPath = trim((string)($row['payload'][$proofPayloadKey] ?? ''));
+            if ($payloadProofPath !== '' && stripos(str_replace('\\', '/', $payloadProofPath), '/UnifiedFileAttachment/') !== false) {
+                $row['payment_proof_path'] = $payloadProofPath;
+                break;
+            }
+        }
+    }
     dra_hydrate_request_resident_name($conn, $row, $row['payload']);
 
     $residentUserId = trim((string)($row['resident_user_id'] ?? ''));
@@ -8643,6 +8652,16 @@ if ($action === 'view_payment_proof') {
         exit('Request not found.');
     }
     $publicPath = trim((string)($row['payment_proof_path'] ?? ''));
+    if ($publicPath === '') {
+        $paymentPayload = dr_decode_request_payload($row);
+        foreach (['payment_proof_path', 'payment_proof', 'payment_proof_url'] as $proofPayloadKey) {
+            $payloadProofPath = trim((string)($paymentPayload[$proofPayloadKey] ?? ''));
+            if ($payloadProofPath !== '' && stripos(str_replace('\\', '/', $payloadProofPath), '/UnifiedFileAttachment/') !== false) {
+                $publicPath = $payloadProofPath;
+                break;
+            }
+        }
+    }
     if ($publicPath === '') {
         http_response_code(404);
         exit('Payment proof not found.');

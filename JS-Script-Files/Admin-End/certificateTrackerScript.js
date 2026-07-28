@@ -1121,13 +1121,20 @@
   }
 
   function resolvePaymentProofUrl(row, requestId = '') {
-    const raw = String(row?.payment_proof_path || '').trim();
-    if (!raw) return '';
-
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+    const raw = String(
+      row?.payment_proof_path
+      || payload?.payment_proof_path
+      || payload?.payment_proof
+      || payload?.payment_proof_url
+      || ''
+    ).trim();
     const id = String(requestId || row?.request_id || '').trim();
-    if (id) {
+    const isGcash = String(row?.payment_method || '').trim().toLowerCase() === 'gcash';
+    if (id && (raw || isGcash)) {
       return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
     }
+    if (!raw) return '';
 
     const unifiedMatch = raw.replace(/\\/g, '/').match(/\/UnifiedFileAttachment\/[^\s"'<>]+/i);
     if (unifiedMatch && unifiedMatch[0]) {
@@ -2480,6 +2487,8 @@
         const normalizedKey = String(key || '').trim().toLowerCase();
         if (
           skipDocKeys.has(normalizedKey)
+          || normalizedKey.includes('payment_proof')
+          || normalizedKey.includes('paymentproof')
           || normalizedKey.includes('id_picture')
           || normalizedKey.includes('profile_image')
           || normalizedKey.includes('barangay_id_photo')
