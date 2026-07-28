@@ -7100,8 +7100,8 @@
               + formSection('Payment Transaction Information', `${pendingSummaryGrid || ''}${verifyActionButtons}`);
           } else {
             viewDetailsHtml = `<div class="tracker-doc-highlight">Transaction Details</div>`
-              + formSection('Payment Transaction Information', `${compactGrid}`)
               + (paymentProofHtml ? formSection('Submitted Proof of Payment', paymentProofHtml) : '')
+              + formSection('Payment Transaction Information', `${compactGrid}`)
               + (isVerifiedPayment
                   ? formSection('Payment Transaction Summary', `${verifiedDetailsGrid || ''}`)
                   : '');
