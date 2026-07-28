@@ -53,10 +53,6 @@
     margin: 0;
 }
 
-.modal .btn-close {
-    display: none !important;
-}
-
 .modal.fade {
     transition: opacity 0.18s linear;
 }

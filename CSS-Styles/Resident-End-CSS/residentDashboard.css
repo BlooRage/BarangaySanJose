@@ -1199,3 +1199,27 @@ body {
 .modal .modal-header h6 {
   color: #000 !important;
 }
+
+/* Shared modal accessibility baseline. */
+.modal {
+    z-index: 2060 !important;
+}
+
+.modal-backdrop {
+    z-index: 2050 !important;
+}
+
+.modal .modal-dialog {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+}
+
+.modal .modal-content {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+}
+
+.modal .modal-body {
+    min-height: 0;
+    overflow-y: auto;
+}

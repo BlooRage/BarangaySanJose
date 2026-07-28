@@ -564,7 +564,7 @@ if ($financeSection === 'fees') {
   <title>Finance Payments</title>
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css?v=20260728-modal-accessibility">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/barangayIdAdminNav.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260720-status-pill-consistency">
   <style>
@@ -642,33 +642,6 @@ if ($financeSection === 'fees') {
       border-radius: 24px;
       background: #fff;
       box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06);
-    }
-    /*
-     * Keep page dialogs above the universal-modal and mobile-sidebar layers.
-     * Without an explicit shared layer, Bootstrap's backdrop can sit over the
-     * fee dialog and intercept every mouse/touch event.
-     */
-    body > .modal-backdrop {
-      z-index: 2040;
-    }
-    .uniform-modal {
-      z-index: 2070;
-    }
-    #addGeneralFeeModal,
-    #editGeneralFeeModal,
-    #deleteGeneralFeeModal,
-    #modalFinanceFilter,
-    #modalFinanceColumns,
-    #viewModal {
-      z-index: 2050;
-    }
-    #addGeneralFeeModal .btn-close,
-    #editGeneralFeeModal .btn-close,
-    #deleteGeneralFeeModal .btn-close,
-    #modalFinanceFilter .btn-close,
-    #modalFinanceColumns .btn-close,
-    #viewModal .btn-close {
-      display: block !important;
     }
     .finance-fee-card--general-form {
       border-top-left-radius: 4px;
@@ -884,24 +857,6 @@ if ($financeSection === 'fees') {
     #table-certificateTracker .col-status { width: 13%; }
     #table-certificateTracker .col-submitted { width: 10%; }
     #table-certificateTracker .col-action { width: 15%; }
-
-    /* Keep every finance dialog above its backdrop and usable on short screens. */
-    body > .modal {
-      z-index: 2060;
-    }
-    body > .modal-backdrop {
-      z-index: 2050;
-    }
-    body > .modal .modal-dialog {
-      max-height: calc(100dvh - 2rem);
-    }
-    body > .modal .modal-content {
-      max-height: calc(100dvh - 2rem);
-    }
-    body > .modal .modal-body {
-      overflow-y: auto;
-      min-height: 0;
-    }
 
     #viewModal .modal-dialog {
       width: min(88vw, 920px);
