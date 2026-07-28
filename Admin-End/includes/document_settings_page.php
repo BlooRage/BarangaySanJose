@@ -156,8 +156,8 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
     }
     .document-settings-signatory-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr);
-      gap: 1rem;
+      grid-template-columns: minmax(300px, 1fr) minmax(300px, 0.75fr);
+      gap: 1.25rem;
       align-items: start;
     }
     .document-settings-preview {
@@ -169,7 +169,8 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       gap: 0.75rem;
     }
     .document-settings-preview-frame {
-      aspect-ratio: 3 / 1.7;
+      min-height: 190px;
+      aspect-ratio: 16 / 9;
       border-radius: 14px;
       border: 1px solid #e2e8f0;
       background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
@@ -179,10 +180,14 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       overflow: hidden;
     }
     .document-settings-preview-frame img {
-      max-width: 100%;
-      max-height: 100%;
+      width: 100%;
+      height: 100%;
       display: block;
       object-fit: contain;
+      padding: 0.75rem;
+    }
+    .document-settings-preview-frame img.is-unavailable {
+      display: none;
     }
     .document-settings-preview-empty {
       color: #94a3b8;
@@ -327,7 +332,11 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                   $source = (string)($signatoryRow['source'] ?? 'manual');
                   $isMonitoringHeadEditor = $signatoryKey === 'monitoring_head';
                   $signaturePath = trim((string)($signatoryRow['signature_path'] ?? ''));
-                  $signatureUrl = $signaturePath !== '' ? appUrl(ltrim($signaturePath, '/')) : '';
+                  $signatureUrl = $signaturePath !== ''
+                      ? $documentSettingsActionUrl
+                          . '?action=view_signature&signatory=' . rawurlencode($signatoryKey)
+                          . '&v=' . rawurlencode((string)($signatoryRow['updated_at'] ?? ''))
+                      : '';
                 ?>
                 <section class="document-settings-signatory">
                   <div class="document-settings-signatory-top">
@@ -395,7 +404,11 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
                     <aside class="document-settings-preview">
                       <div class="document-settings-preview-frame">
                         <?php if ($signatureUrl !== ''): ?>
-                          <img src="<?= htmlspecialchars($signatureUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string)($signatoryRow['label'] ?? $signatoryKey), ENT_QUOTES, 'UTF-8') ?> signature preview">
+                          <img
+                            src="<?= htmlspecialchars($signatureUrl, ENT_QUOTES, 'UTF-8') ?>"
+                            alt="<?= htmlspecialchars((string)($signatoryRow['label'] ?? $signatoryKey), ENT_QUOTES, 'UTF-8') ?> signature preview"
+                            data-signature-preview-image>
+                          <div class="document-settings-preview-empty d-none" data-signature-preview-error>Unable to load the current signature. Upload a replacement and save.</div>
                         <?php else: ?>
                           <div class="document-settings-preview-empty">No signature uploaded yet for this signatory.</div>
                         <?php endif; ?>
@@ -482,15 +495,34 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       const titleInput = document.querySelector('[data-monitoring-head-title]');
       const namePreview = document.querySelector('[data-monitoring-head-preview-name]');
       const titlePreview = document.querySelector('[data-monitoring-head-preview-title]');
-      if (!nameInput || !titleInput || !namePreview || !titlePreview) return;
+      if (nameInput && titleInput && namePreview && titlePreview) {
+        const updatePreview = () => {
+          namePreview.textContent = nameInput.value.trim() || 'SIGNATORY NAME';
+          titlePreview.textContent = titleInput.value.trim() || 'Head, Monitoring & Collection Dept.';
+        };
+        nameInput.addEventListener('input', updatePreview);
+        titleInput.addEventListener('input', updatePreview);
+        updatePreview();
+      }
 
-      const updatePreview = () => {
-        namePreview.textContent = nameInput.value.trim() || 'SIGNATORY NAME';
-        titlePreview.textContent = titleInput.value.trim() || 'Head, Monitoring & Collection Dept.';
-      };
-      nameInput.addEventListener('input', updatePreview);
-      titleInput.addEventListener('input', updatePreview);
-      updatePreview();
+      document.querySelectorAll('[data-signature-preview-image]').forEach((image) => {
+        image.addEventListener('error', () => {
+          image.classList.add('is-unavailable');
+          image.parentElement?.querySelector('[data-signature-preview-error]')?.classList.remove('d-none');
+        });
+      });
+
+      document.querySelectorAll('input[type="file"][name^="signature_file_"]').forEach((input) => {
+        input.addEventListener('change', () => {
+          const card = input.closest('.document-settings-signatory');
+          const image = card?.querySelector('[data-signature-preview-image]');
+          const file = input.files?.[0];
+          if (!image || !file || !file.type.startsWith('image/')) return;
+          image.src = URL.createObjectURL(file);
+          image.classList.remove('is-unavailable');
+          image.parentElement?.querySelector('[data-signature-preview-error]')?.classList.add('d-none');
+        });
+      });
     })();
   </script>
 </body>

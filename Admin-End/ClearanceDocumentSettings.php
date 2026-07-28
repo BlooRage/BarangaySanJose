@@ -19,6 +19,32 @@ $documentSettingsShowFieldVisibility = false;
 $documentSettingsPrintHeaderEnabled = dms_resolve_module_print_header_setting($conn, $documentSettingsModuleKey);
 $documentSettingsShowPrintHeaderToggle = false;
 
+if (strtolower(trim((string)($_GET['action'] ?? ''))) === 'view_signature') {
+    $requestedKey = trim((string)($_GET['signatory'] ?? ''));
+    $signaturePath = trim((string)($documentSettingsRows[$requestedKey]['signature_path'] ?? ''));
+    $projectRoot = realpath(__DIR__ . '/..');
+    $absolutePath = ($projectRoot !== false && $signaturePath !== '')
+        ? realpath($projectRoot . '/' . ltrim(str_replace('\\', '/', $signaturePath), '/'))
+        : false;
+
+    if ($projectRoot === false || !appIsUnifiedAttachmentFile($absolutePath, $projectRoot)) {
+        http_response_code(404);
+        exit('Signature image not found.');
+    }
+
+    $mime = (string)(mime_content_type($absolutePath) ?: 'application/octet-stream');
+    if (!in_array($mime, ['image/png', 'image/jpeg'], true)) {
+        http_response_code(415);
+        exit('Unsupported signature image.');
+    }
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($absolutePath) . '"');
+    header('Content-Length: ' . filesize($absolutePath));
+    header('Cache-Control: private, max-age=300');
+    readfile($absolutePath);
+    exit;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_document_module_settings') {
     verifyCsrfToken(false);
     try {
