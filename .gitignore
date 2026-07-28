@@ -1,16 +1,6 @@
-# Runtime uploads and generated documents must stay out of Git.
-UnifiedFileAttachment/.DS_Store
-UnifiedFileAttachment/Documents/**
-UnifiedFileAttachment/IDPictures/**
-UnifiedFileAttachment/DocumentRequests/**
-UnifiedFileAttachment/IssuedDocuments/Generated/**
-UnifiedFileAttachment/IssuedDocuments/QR/**
-
-!UnifiedFileAttachment/Documents/.gitkeep
-!UnifiedFileAttachment/IDPictures/.gitkeep
-!UnifiedFileAttachment/DocumentRequests/.gitkeep
-!UnifiedFileAttachment/IssuedDocuments/Generated/.gitkeep
-!UnifiedFileAttachment/IssuedDocuments/QR/.gitkeep
+# Runtime uploads and generated documents must stay out of Git. On the server,
+# deploy_hostinger.sh links this path to persistent storage outside the checkout.
+UnifiedFileAttachment/
 
 # Existing local ignore retained.
 JS-Script-Files/Resident-End/Clearances/electricalPermitScript.js

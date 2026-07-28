@@ -13,6 +13,8 @@ zip -r "$OUT_DIR/$OUT_FILE" . \
   -x ".gitignore" \
   -x ".DS_Store" \
   -x "desktop.ini" \
+  -x "UnifiedFileAttachment" \
+  -x "UnifiedFileAttachment/*" \
   -x "dist/*"
 
 echo "Created $OUT_DIR/$OUT_FILE"
