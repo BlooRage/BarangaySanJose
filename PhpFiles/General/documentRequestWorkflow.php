@@ -1838,6 +1838,20 @@ function dr_merge_finance_transaction_into_request(mysqli $conn, array &$row): v
     $row['payment_submitted_at'] = (string)($tx['payment_timestamp'] ?? '');
     $row['finance_decision_at'] = (string)($tx['finance_decision_at'] ?? '');
     $row['finance_user_id'] = (string)($tx['user_id_employee_process'] ?? '');
+    if (
+        $proofColumn
+        && trim((string)($row['payment_proof_path'] ?? '')) === ''
+        && strcasecmp(trim((string)($row['payment_method'] ?? '')), 'gcash') === 0
+    ) {
+        $recoveredProofPath = dr_recover_payment_proof_path(
+            $conn,
+            $requestId,
+            (string)($row['payment_submitted_at'] ?? '')
+        );
+        if ($recoveredProofPath !== null) {
+            $row['payment_proof_path'] = $recoveredProofPath;
+        }
+    }
     $txDetails = (string)($tx['transaction_details'] ?? '');
     if ($txDetails !== '') {
         $decoded = json_decode($txDetails, true);
@@ -1850,6 +1864,59 @@ function dr_merge_finance_transaction_into_request(mysqli $conn, array &$row): v
             $row['payment_reference'] = trim((string)($m[1] ?? ''));
         }
     }
+}
+
+/**
+ * Recover legacy GCash proofs whose database path was cleared by an older
+ * transaction sync. Upload filenames begin with YmdHis, so only an exact,
+ * unique timestamp match is safe to relink automatically.
+ */
+function dr_recover_payment_proof_path(mysqli $conn, string $requestId, string $paymentTimestamp): ?string {
+    $requestId = trim($requestId);
+    $timestamp = strtotime(trim($paymentTimestamp));
+    if ($requestId === '' || $timestamp === false) {
+        return null;
+    }
+
+    $projectRoot = realpath(__DIR__ . '/../../');
+    if ($projectRoot === false) {
+        return null;
+    }
+    $proofDir = $projectRoot . '/UnifiedFileAttachment/DocumentPayments';
+    if (!is_dir($proofDir)) {
+        return null;
+    }
+
+    $prefix = date('YmdHis', $timestamp) . '_';
+    $matches = [];
+    foreach (glob($proofDir . '/' . $prefix . '*') ?: [] as $candidate) {
+        $extension = strtolower(pathinfo($candidate, PATHINFO_EXTENSION));
+        if (is_file($candidate) && in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            $matches[] = $candidate;
+        }
+    }
+    if (count($matches) !== 1) {
+        return null;
+    }
+
+    $publicPath = '/UnifiedFileAttachment/DocumentPayments/' . basename($matches[0]);
+    $updatedAtSql = dr_column_exists($conn, 'financetransactiontbl', 'updated_at')
+        ? ', updated_at = CURRENT_TIMESTAMP'
+        : '';
+    $stmt = $conn->prepare("
+        UPDATE financetransactiontbl
+        SET payment_proof_path = ?{$updatedAtSql}
+        WHERE request_id = ?
+          AND (payment_proof_path IS NULL OR payment_proof_path = '')
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('ss', $publicPath, $requestId);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok ? $publicPath : null;
 }
 
 function dr_sync_transaction(mysqli $conn, array $request): void {
@@ -2040,6 +2107,12 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
 
     $statusId = dr_map_stage_to_transaction_status_id($conn, $stage);
     $proofColumn = dr_column_exists($conn, 'financetransactiontbl', 'payment_proof_path');
+    $proofUpdateSql = '';
+    if ($proofColumn) {
+        $proofUpdateSql = strcasecmp((string)$txPaymentMethod, 'barangay') === 0
+            ? "payment_proof_path = NULL,"
+            : "payment_proof_path = COALESCE(NULLIF(VALUES(payment_proof_path), ''), payment_proof_path),";
+    }
     $sql = "
         INSERT INTO financetransactiontbl (
             transaction_id, request_id, transaction_amount, applicant_lastname, applicant_firstname, applicant_middleInitial,
@@ -2051,7 +2124,7 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
             applicant_firstname = VALUES(applicant_firstname),
             applicant_middleInitial = VALUES(applicant_middleInitial),
             payment_method = VALUES(payment_method),
-            " . ($proofColumn ? "payment_proof_path = VALUES(payment_proof_path)," : "") . "
+            " . $proofUpdateSql . "
             transaction_details = VALUES(transaction_details),
             or_number = VALUES(or_number),
             transaction_status_id = VALUES(transaction_status_id),

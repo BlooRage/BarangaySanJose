@@ -1461,6 +1461,19 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
     $row['payment_submitted_at'] = (string)($row['_tx_payment_timestamp'] ?? '');
     $row['finance_decision_at'] = (string)($row['_tx_finance_decision_at'] ?? '');
     $row['finance_user_id'] = (string)($row['_tx_finance_user_id'] ?? '');
+    if (
+        trim((string)$row['payment_proof_path']) === ''
+        && strcasecmp(trim((string)$row['payment_method']), 'gcash') === 0
+    ) {
+        $recoveredProofPath = dr_recover_payment_proof_path(
+            $conn,
+            $requestId,
+            (string)$row['payment_submitted_at']
+        );
+        if ($recoveredProofPath !== null) {
+            $row['payment_proof_path'] = $recoveredProofPath;
+        }
+    }
 
     $txDetails = (string)($row['_tx_transaction_details'] ?? '');
     if ($txDetails !== '') {
