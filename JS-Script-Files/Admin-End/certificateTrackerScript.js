@@ -4576,6 +4576,54 @@
     valueEl.textContent = text;
   }
 
+  function residentProfileDisplayName(record) {
+    if (!record || typeof record !== 'object') return '';
+    return String(firstNonEmpty([
+      record.full_name,
+      [
+        record.firstname || record.first_name,
+        record.middlename || record.middle_name,
+        record.lastname || record.last_name,
+        record.suffix
+      ].filter(Boolean).join(' ')
+    ]) || '').trim();
+  }
+
+  function normalizeResidentProfileSnapshot(record) {
+    if (!record || typeof record !== 'object') return null;
+    const emergencyFirstName = String(firstNonEmpty([record.emergency_first_name, record.emergency_first])).trim();
+    const emergencyMiddleName = String(firstNonEmpty([record.emergency_middle_name, record.emergency_middle])).trim();
+    const emergencyLastName = String(firstNonEmpty([record.emergency_last_name, record.emergency_last])).trim();
+    const emergencySuffix = String(firstNonEmpty([record.emergency_suffix])).trim();
+    const normalized = {
+      ...record,
+      resident_id: String(firstNonEmpty([record.resident_id])).trim(),
+      resident_user_id: String(firstNonEmpty([record.resident_user_id, record.user_id])).trim(),
+      first_name: String(firstNonEmpty([record.firstname, record.first_name])).trim(),
+      middle_name: String(firstNonEmpty([record.middlename, record.middle_name])).trim(),
+      last_name: String(firstNonEmpty([record.lastname, record.last_name])).trim(),
+      occupation_display: String(firstNonEmpty([record.occupation_display, record.occupation, record.occupation_detail])).trim(),
+      house_number: String(firstNonEmpty([record.house_number, record.street_number])).trim(),
+      emergency_first_name: emergencyFirstName,
+      emergency_middle_name: emergencyMiddleName,
+      emergency_last_name: emergencyLastName,
+      emergency_suffix: emergencySuffix,
+      emergency_contact_number: String(firstNonEmpty([
+        record.emergency_contact_number,
+        record.emergency_contact,
+        record.emergency_phone_number
+      ])).trim(),
+      id_picture_url: String(firstNonEmpty([record.id_picture_url])).trim(),
+      id_picture_path: String(firstNonEmpty([record.id_picture_path])).trim()
+    };
+    normalized.full_name = residentProfileDisplayName(record) || residentProfileDisplayName(normalized);
+    normalized.emergency_full_name = String(firstNonEmpty([
+      record.emergency_full_name,
+      [emergencyFirstName, emergencyMiddleName, emergencyLastName, emergencySuffix].filter(Boolean).join(' ')
+    ])).trim();
+    return normalized;
+  }
+
   function renderResidentStatusBanner(status) {
     const banner = document.getElementById('div-statusBanner');
     if (!banner) return;
@@ -4592,10 +4640,10 @@
 
   function fillResidentProfileModal(data) {
     const placeholder = `${appBase}/Images/Profile-Placeholder.png`;
-    const displayName = firstNonEmpty([data?.full_name, manualResidentDisplayName(data)]);
+    const displayName = firstNonEmpty([data?.full_name, residentProfileDisplayName(data)]);
     const emergencyDisplayName = firstNonEmpty([
       data?.emergency_full_name,
-      manualResidentDisplayName({
+      residentProfileDisplayName({
         first_name: data?.emergency_first_name,
         middle_name: data?.emergency_middle_name,
         last_name: data?.emergency_last_name,
@@ -4665,6 +4713,15 @@
     setById('txt-modalResidencyDuration', data?.residency_duration);
 
     renderResidentStatusBanner(data?.status);
+
+    // Older templates contained a mojibake version of the em dash. Normalize
+    // any remaining empty-value placeholders after the profile is hydrated.
+    residentProfileModalEl?.querySelectorAll('p, span').forEach((element) => {
+      const text = String(element.textContent || '').trim();
+      if (text === 'â€”' || text === 'â€' || text === 'â€˜') {
+        element.textContent = '—';
+      }
+    });
   }
 
   function isSameToken(a, b) {
@@ -4696,7 +4753,7 @@
     }
 
     const searchToken = rid || uid || fallbackRid || fallbackUid;
-    const fallbackNormalized = manualNormalizeResident(fallbackProfile);
+    const fallbackNormalized = normalizeResidentProfileSnapshot(fallbackProfile);
     if (!searchToken) {
       return fallbackNormalized;
     }
@@ -4717,7 +4774,7 @@
         match = findResidentRow(retryRows, rid, uid);
       }
 
-      const normalized = manualNormalizeResident(match || fallbackProfile);
+      const normalized = normalizeResidentProfileSnapshot(match || fallbackProfile);
       if (cacheKey !== '|' && normalized) {
         residentProfileSnapshotByLookup.set(cacheKey, normalized);
       }
