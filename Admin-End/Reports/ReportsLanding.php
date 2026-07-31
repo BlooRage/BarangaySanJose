@@ -79,7 +79,8 @@ $reportCards = [
     .reports-card {
       position: relative;
       display: flex;
-      min-height: 245px;
+      min-height: 0;
+      aspect-ratio: 1 / 1;
       flex-direction: column;
       align-items: center;
       justify-content: center;
@@ -94,14 +95,6 @@ $reportCards = [
       background: linear-gradient(145deg, #fff 48%, var(--report-soft) 135%);
       box-shadow: 0 .3rem 1rem rgba(15, 23, 42, .055);
       transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-    }
-    .reports-card::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 auto;
-      height: 4px;
-      background: var(--report-accent);
-      opacity: .75;
     }
     .reports-card::after {
       content: "";
@@ -156,6 +149,7 @@ $reportCards = [
     }
     @media (max-width: 991.98px) {
       .reports-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .reports-card { aspect-ratio: auto; min-height: 245px; }
     }
     @media (max-width: 575.98px) {
       .reports-card-grid { grid-template-columns: 1fr; }

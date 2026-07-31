@@ -5,7 +5,6 @@ require_once "../General/security.php";
 require_once "../General/audit.php";
 require_once "../General/adminModulePermissions.php";
 require_once "../General/userAccountLocks.php";
-require_once "../General/sendSMS.php";
 require_once "../EmailHandlers/emailSender.php";
 
 requireRoleSession(['SuperAdmin']);
@@ -137,13 +136,7 @@ function userMasterlistSendArchiveNotice(array $recipient): array
     ];
 
     $displayName = userMasterlistAccountHolderName($recipient);
-    $phone = normalizeSmsRecipient((string)($recipient['phone_number'] ?? ''));
     $email = trim((string)($recipient['email'] ?? ''));
-
-    $smsMessage = 'Your account has been archived and can no longer be used to log in. If this is a mistake, please contact the barangay office.';
-    if ($phone !== '') {
-        $result['sms'] = sendSMS($phone, $smsMessage) ? 'sent' : 'failed';
-    }
 
     if ($email !== '') {
         $smtpConfig = require __DIR__ . '/../General/mailConfigurations.php';
