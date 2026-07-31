@@ -1431,8 +1431,79 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     }
 }
 $currentBarangaySignatories = dms_current_barangay_signatories($conn);
-$reportNotedByName = trim((string)($currentBarangaySignatories['punong']['name'] ?? ''));
-$reportNotedByRole = trim((string)($currentBarangaySignatories['punong']['title'] ?? ''));
+$defaultReportSignatoryName = trim((string)($currentBarangaySignatories['punong']['name'] ?? ''));
+$defaultReportSignatoryRole = trim((string)($currentBarangaySignatories['punong']['title'] ?? ''));
+$reportSignatoryOptions = [];
+$reportSignatorySettingsReady = $conn->query("CREATE TABLE IF NOT EXISTS report_signatory_settings (
+    report_module VARCHAR(64) NOT NULL PRIMARY KEY,
+    official_id VARCHAR(64) NULL,
+    updated_by VARCHAR(64) NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+$officialPositionSelect = rp_column_exists($conn, 'officialinformationtbl', 'position_access')
+    ? 'position_access'
+    : "'' AS position_access";
+$officialSignatoryResult = $conn->query("SELECT official_id, {$officialPositionSelect}, role_access, firstname, middlename, lastname, suffix FROM officialinformationtbl ORDER BY firstname, lastname");
+if ($officialSignatoryResult instanceof mysqli_result) {
+    while ($officialRow = $officialSignatoryResult->fetch_assoc()) {
+        $officialRow = pii_decrypt_official_row($officialRow) ?? $officialRow;
+        $officialId = trim((string)($officialRow['official_id'] ?? ''));
+        $officialName = dms_format_official_display_name(
+            (string)($officialRow['firstname'] ?? ''),
+            (string)($officialRow['middlename'] ?? ''),
+            (string)($officialRow['lastname'] ?? ''),
+            (string)($officialRow['suffix'] ?? ''),
+            true
+        );
+        if ($officialId === '' || $officialName === '') continue;
+        $officialRole = trim((string)($officialRow['position_access'] ?? ''));
+        if ($officialRole === '') {
+            $officialRole = trim((string)($officialRow['role_access'] ?? '')) ?: 'Barangay Official';
+        }
+        $reportSignatoryOptions[$officialId] = ['name' => $officialName, 'role' => $officialRole];
+    }
+    $officialSignatoryResult->free();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_report_signatory'])) {
+    verifyCsrfToken();
+    $selectedOfficialId = trim((string)($_POST['report_signatory_official_id'] ?? ''));
+    if ($selectedOfficialId !== '' && !isset($reportSignatoryOptions[$selectedOfficialId])) {
+        http_response_code(422);
+        exit('Invalid report signatory.');
+    }
+    if ($reportSignatorySettingsReady) {
+        $saveSignatory = $conn->prepare("INSERT INTO report_signatory_settings (report_module, official_id, updated_by) VALUES (?, NULLIF(?, ''), ?) ON DUPLICATE KEY UPDATE official_id=VALUES(official_id), updated_by=VALUES(updated_by)");
+        if ($saveSignatory) {
+            $updatedBy = (string)($_SESSION['user_id'] ?? '');
+            $saveSignatory->bind_param('sss', $module, $selectedOfficialId, $updatedBy);
+            $saveSignatory->execute();
+            $saveSignatory->close();
+        }
+    }
+    header('Location: ' . (string)($_SERVER['REQUEST_URI'] ?? ($baseUrl . '?module=' . rawurlencode($module))));
+    exit;
+}
+
+$savedReportSignatoryId = '';
+if ($reportSignatorySettingsReady) {
+    $loadSignatory = $conn->prepare('SELECT official_id FROM report_signatory_settings WHERE report_module=? LIMIT 1');
+    if ($loadSignatory) {
+        $loadSignatory->bind_param('s', $module);
+        $loadSignatory->execute();
+        $savedSignatoryRow = $loadSignatory->get_result()->fetch_assoc();
+        $savedReportSignatoryId = trim((string)($savedSignatoryRow['official_id'] ?? ''));
+        $loadSignatory->close();
+    }
+}
+
+$reportNotedByName = $defaultReportSignatoryName;
+$reportNotedByRole = $defaultReportSignatoryRole;
+if ($savedReportSignatoryId !== '' && isset($reportSignatoryOptions[$savedReportSignatoryId])) {
+    $reportNotedByName = $reportSignatoryOptions[$savedReportSignatoryId]['name'];
+    $reportNotedByRole = $reportSignatoryOptions[$savedReportSignatoryId]['role'];
+}
 if ($reportNotedByName === '') {
     $reportNotedByName = 'HON. GLENN S. EVANGELISTA';
 }
@@ -3270,6 +3341,9 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
               <span class="rp-filter-count ms-1"><?= $selectedCustomizationCount ?></span>
               <?php endif; ?>
             </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#reportSignatoryModal">
+              <i class="fas fa-signature me-1"></i>Signatory
+            </button>
             <a href="<?= htmlspecialchars($reportResetUrl) ?>" class="btn btn-sm btn-outline-secondary">Reset</a>
           </div>
         </div>
@@ -3362,6 +3436,40 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
                 <a href="<?= htmlspecialchars($reportResetUrl) ?>" class="btn btn-outline-secondary me-auto">Reset</a>
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Apply Filters</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="reportSignatoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <form method="POST">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="save_report_signatory" value="1">
+              <div class="modal-header">
+                <div>
+                  <h5 class="modal-title mb-0">Report Signatory</h5>
+                  <p class="text-muted small mb-0 mt-1">Set the signatory used for every generated <?= htmlspecialchars($currentLabel) ?>.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <label for="reportSignatoryOfficial" class="form-label fw-semibold">Noted by</label>
+                <select id="reportSignatoryOfficial" name="report_signatory_official_id" class="form-select">
+                  <option value="">Current Punong Barangay (automatic)</option>
+                  <?php foreach ($reportSignatoryOptions as $officialId => $signatory): ?>
+                  <option value="<?= htmlspecialchars($officialId) ?>" <?= $savedReportSignatoryId === $officialId ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($signatory['name'] . ' — ' . $signatory['role']) ?>
+                  </option>
+                  <?php endforeach; ?>
+                </select>
+                <div class="form-text">This setting is saved separately for this report category. Choosing automatic follows future chairman changes.</div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Signatory</button>
               </div>
             </form>
           </div>
