@@ -133,10 +133,6 @@ if ($issuanceConfig !== null) {
       color: #6c757d; font-size: .9rem; font-weight: 600; text-decoration: none;
     }
     .report-choice-back:hover { color: #de710c; }
-    .report-choice-title {
-      margin: 0 0 .3rem; color: #de710c;
-      font-family: "Charis SIL Bold", Georgia, serif;
-    }
     .report-choice-panel { padding: 1.25rem; border: 1px solid #dee2e6; border-radius: 1rem; background: #fff; box-shadow: 0 .125rem .25rem rgba(0,0,0,.075); }
     .report-choice-panel-head { padding-bottom: .75rem; margin-bottom: .75rem; border-bottom: 1px solid #edf0f3; }
     .report-choice-heading { margin: 0; color: #212529; font-size: 1.05rem; font-weight: 700; }
@@ -170,18 +166,15 @@ if ($issuanceConfig !== null) {
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height:100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
-  <main id="main-display" class="report-choice-main flex-grow-1 p-3 p-md-4 bg-light">
+  <main id="main-display" class="report-choice-main flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
     <div class="report-choice-page">
-      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-        <div>
-          <h1 class="report-choice-title h2"><?= htmlspecialchars($meta['title']) ?> Reports</h1>
-          <p class="mb-0 text-muted"><?= htmlspecialchars($meta['description']) ?></p>
-        </div>
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;"><?= htmlspecialchars($meta['title']) ?> Reports</h2>
         <a class="report-choice-back" href="<?= htmlspecialchars($reportsBaseUrl, ENT_QUOTES, 'UTF-8') ?>">
           <i class="fas fa-arrow-left" aria-hidden="true"></i>All report categories
         </a>
       </div>
-      <hr class="mt-0 mb-4">
+      <hr><br>
       <section class="report-choice-panel" aria-labelledby="availableReportsHeading">
         <div class="report-choice-panel-head">
           <h2 class="report-choice-heading" id="availableReportsHeading">Available Reports</h2>

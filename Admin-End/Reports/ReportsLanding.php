@@ -71,11 +71,6 @@ $reportCards = [
     :root { --reports-accent: #de710c; }
     .reports-main { min-width: 0; overflow-x: hidden; }
     .reports-landing { width: 100%; max-width: none; margin: 0; }
-    .reports-page-title {
-      margin: 0 0 .3rem;
-      color: var(--reports-accent);
-      font-family: "Charis SIL Bold", Georgia, serif;
-    }
     .reports-panel {
       padding: 1.25rem;
       border: 1px solid #dee2e6;
@@ -158,15 +153,10 @@ $reportCards = [
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height:100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
-  <main id="main-display" class="reports-main flex-grow-1 p-3 p-md-4 bg-light">
+  <main id="main-display" class="reports-main flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
     <div class="reports-landing">
-      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-        <div>
-          <h1 class="reports-page-title h2">Reports</h1>
-          <p class="mb-0 text-muted">Review barangay activity, customize report content, and generate formal PDF reports.</p>
-        </div>
-      </div>
-      <hr class="mt-0 mb-4">
+      <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Reports</h2>
+      <hr><br>
 
       <section class="reports-panel" aria-labelledby="reportsCategoryHeading">
         <div class="reports-panel-head">

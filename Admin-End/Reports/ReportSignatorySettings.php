@@ -98,12 +98,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height:100vh">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
-  <main id="main-display" class="rss-main flex-grow-1 p-3 p-md-4 bg-light">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-      <div><h1 class="rss-title h2 mb-1">Report Signatory Settings</h1><p class="mb-0 text-muted"><?= htmlspecialchars($departmentLabel) ?> reports</p></div>
+  <main id="main-display" class="rss-main flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Report Signatory Settings</h2>
       <a class="rss-back" href="<?= htmlspecialchars($categoryUrl) ?>"><i class="fas fa-arrow-left me-2"></i>Back to report options</a>
     </div>
-    <hr class="mt-0 mb-4">
+    <hr><br>
     <?php if (isset($_GET['saved'])): ?><div class="alert alert-success">Report signatories saved successfully.</div><?php endif; ?>
     <?php if (!empty($settingsError)): ?><div class="alert alert-danger"><?= htmlspecialchars($settingsError) ?></div><?php endif; ?>
     <section class="rss-panel">
