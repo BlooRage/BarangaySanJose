@@ -52,6 +52,12 @@ $choices = [[
     'icon' => 'fa-chart-column',
     'query' => ['module' => $module, 'report' => 'complete'],
 ]];
+$choices[] = [
+    'title' => 'Report Signatory Settings',
+    'description' => 'Set the names and positions of the two signatories shown on generated reports for this category.',
+    'icon' => 'fa-signature',
+    'query' => ['module' => $module, 'report' => 'signatory_settings'],
+];
 
 $issuanceConfig = rp_issuance_module_config($module);
 if ($issuanceConfig !== null) {
@@ -120,86 +126,79 @@ if ($issuanceConfig !== null) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <style>
-    .report-choice-page { width: min(1180px, 100%); margin: 0 auto; }
+    .report-choice-main { min-width: 0; overflow-x: hidden; }
+    .report-choice-page { width: 100%; max-width: none; margin: 0; }
     .report-choice-back {
-      display: inline-flex; align-items: center; gap: .45rem; margin-bottom: 1rem;
-      color: #64748b; font-weight: 650; text-decoration: none;
+      display: inline-flex; align-items: center; gap: .45rem;
+      color: #6c757d; font-size: .9rem; font-weight: 600; text-decoration: none;
     }
-    .report-choice-back:hover { color: var(--report-accent); }
-    .report-choice-hero {
-      display: flex; align-items: center; gap: 1rem; padding: clamp(1.35rem, 3vw, 2.25rem);
-      border: 1px solid #e5e7eb; border-radius: 1.25rem;
-      background: linear-gradient(135deg, #fff 0%, var(--report-soft) 140%);
-      box-shadow: 0 .35rem 1.2rem rgba(15, 23, 42, .06);
-    }
-    .report-choice-hero-icon, .report-choice-card-icon {
-      display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center;
-      color: var(--report-accent); background: var(--report-soft);
-    }
-    .report-choice-hero-icon { width: 64px; height: 64px; border-radius: 1rem; font-size: 1.5rem; }
-    .report-choice-eyebrow {
-      color: var(--report-accent); font-size: .76rem; font-weight: 800;
-      letter-spacing: .09em; text-transform: uppercase;
-    }
+    .report-choice-back:hover { color: #de710c; }
     .report-choice-title {
-      margin: .25rem 0 .35rem; color: #1f2937;
-      font-family: "Charis SIL Bold", Georgia, serif; font-size: clamp(1.65rem, 3vw, 2.25rem);
+      margin: 0 0 .3rem; color: #de710c;
+      font-family: "Charis SIL Bold", Georgia, serif;
     }
-    .report-choice-copy { max-width: 760px; margin: 0; color: #64748b; line-height: 1.6; }
-    .report-choice-heading { margin: 1.5rem 0 .85rem; color: #1f2937; font-size: 1.05rem; font-weight: 750; }
+    .report-choice-panel { padding: 1.25rem; border: 1px solid #dee2e6; border-radius: 1rem; background: #fff; box-shadow: 0 .125rem .25rem rgba(0,0,0,.075); }
+    .report-choice-panel-head { padding-bottom: .75rem; margin-bottom: .75rem; border-bottom: 1px solid #edf0f3; }
+    .report-choice-heading { margin: 0; color: #212529; font-size: 1.05rem; font-weight: 700; }
+    .report-choice-panel-copy { max-width: 760px; margin: .2rem 0 0; color: #6c757d; font-size: .9rem; }
     .report-choice-grid {
-      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem;
     }
     .report-choice-card {
-      display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start;
-      gap: .9rem; min-height: 150px; padding: 1.15rem; color: inherit; text-decoration: none;
-      border: 1px solid #e5e7eb; border-radius: 1rem; background: #fff;
-      box-shadow: 0 .2rem .8rem rgba(15, 23, 42, .045);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto; align-items: center;
+      gap: .9rem; min-width: 0; padding: .78rem 1rem; color: inherit; text-decoration: none;
+      border: 1px solid #e4e8ed; border-radius: .75rem; background: #fff;
+      transition: border-color .15s, box-shadow .15s, background-color .15s;
     }
-    .report-choice-card:hover {
-      color: inherit; transform: translateY(-2px); border-color: var(--report-accent);
-      box-shadow: 0 .7rem 1.4rem rgba(15, 23, 42, .08);
+    .report-choice-card:hover, .report-choice-card:focus-visible {
+      color: inherit; border-color: #f1b56d; background: #fffaf4;
+      box-shadow: 0 .25rem .75rem rgba(222,113,12,.08);
     }
-    .report-choice-card-icon { width: 42px; height: 42px; border-radius: .8rem; }
-    .report-choice-card h2 { margin: .15rem 0 .4rem; color: #1f2937; font-size: 1rem; font-weight: 750; }
-    .report-choice-card p { margin: 0; color: #64748b; font-size: .84rem; line-height: 1.5; }
-    .report-choice-arrow { align-self: center; color: var(--report-accent); }
-    @media (max-width: 991.98px) { .report-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .report-choice-card-icon { display: inline-grid; width: 2.6rem; height: 2.6rem; place-items: center; border-radius: .7rem; color: #de710c; background: #fff4e8; }
+    .report-choice-card-copy { min-width: 0; }
+    .report-choice-card h2 { margin: 0; color: #212529; font-size: .95rem; font-weight: 700; }
+    .report-choice-card p { margin: .12rem 0 0; color: #6c757d; font-size: .9rem; line-height: 1.3; }
+    .report-choice-arrow { color: #de710c; }
+    @media (max-width: 767.98px) { .report-choice-grid { grid-template-columns: 1fr; } }
     @media (max-width: 575.98px) {
-      .report-choice-grid { grid-template-columns: 1fr; }
-      .report-choice-hero { align-items: flex-start; flex-direction: column; }
+      .report-choice-panel { padding: .85rem; }
+      .report-choice-card { grid-template-columns: 2.4rem minmax(0,1fr) auto; padding: .85rem; gap: .7rem; }
+      .report-choice-card-icon { width: 2.4rem; height: 2.4rem; }
     }
   </style>
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height:100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
-  <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
-    <div class="report-choice-page" style="--report-accent:<?= htmlspecialchars($meta['accent'], ENT_QUOTES, 'UTF-8') ?>;--report-soft:<?= htmlspecialchars($meta['soft'], ENT_QUOTES, 'UTF-8') ?>">
-      <a class="report-choice-back" href="<?= htmlspecialchars($reportsBaseUrl, ENT_QUOTES, 'UTF-8') ?>">
-        <i class="fas fa-arrow-left" aria-hidden="true"></i>All report categories
-      </a>
-      <section class="report-choice-hero">
-        <span class="report-choice-hero-icon"><i class="fas <?= htmlspecialchars($meta['icon'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></i></span>
+  <main id="main-display" class="report-choice-main flex-grow-1 p-3 p-md-4 bg-light">
+    <div class="report-choice-page">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
-          <div class="report-choice-eyebrow">Select a report type</div>
-          <h1 class="report-choice-title"><?= htmlspecialchars($meta['title']) ?></h1>
-          <p class="report-choice-copy"><?= htmlspecialchars($meta['description']) ?></p>
+          <h1 class="report-choice-title h2"><?= htmlspecialchars($meta['title']) ?> Reports</h1>
+          <p class="mb-0 text-muted"><?= htmlspecialchars($meta['description']) ?></p>
         </div>
-      </section>
-      <h2 class="report-choice-heading">Available reports</h2>
-      <section class="report-choice-grid" aria-label="<?= htmlspecialchars($meta['title']) ?> report types">
+        <a class="report-choice-back" href="<?= htmlspecialchars($reportsBaseUrl, ENT_QUOTES, 'UTF-8') ?>">
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>All report categories
+        </a>
+      </div>
+      <hr class="mt-0 mb-4">
+      <section class="report-choice-panel" aria-labelledby="availableReportsHeading">
+        <div class="report-choice-panel-head">
+          <h2 class="report-choice-heading" id="availableReportsHeading">Available Reports</h2>
+          <p class="report-choice-panel-copy">Choose the report you want to review, customize, print, or download.</p>
+        </div>
+        <div class="report-choice-grid" aria-label="<?= htmlspecialchars($meta['title']) ?> report types">
         <?php foreach ($choices as $choice): ?>
           <a class="report-choice-card" href="<?= htmlspecialchars($reportsBaseUrl . '?' . http_build_query($choice['query']), ENT_QUOTES, 'UTF-8') ?>">
             <span class="report-choice-card-icon"><i class="fas <?= htmlspecialchars($choice['icon'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></i></span>
-            <span>
+            <span class="report-choice-card-copy">
               <h2><?= htmlspecialchars($choice['title']) ?></h2>
               <p><?= htmlspecialchars($choice['description']) ?></p>
             </span>
             <i class="fas fa-arrow-right report-choice-arrow" aria-hidden="true"></i>
           </a>
         <?php endforeach; ?>
+        </div>
       </section>
     </div>
   </main>
