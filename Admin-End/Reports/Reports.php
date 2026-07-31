@@ -6421,6 +6421,35 @@ window.__reportPaginationReady = (() => {
 
   const buildBlockDefinitions = (sourceDoc) => {
     const defs = [];
+    const TABLE_ROWS_PER_BLOCK = 12;
+
+    const createTableChunkWrapper = (table, startIndex, endIndex, options = {}) => {
+      const tableClone = cloneNodeWithCanvases(table);
+      const body = tableClone.querySelector(':scope > tbody');
+      if (body) {
+        Array.from(body.children).forEach((row, rowIndex) => {
+          if (rowIndex < startIndex || rowIndex >= endIndex) {
+            row.remove();
+          }
+        });
+      }
+
+      if (!options.isLastChunk) {
+        tableClone.querySelector(':scope > tfoot')?.remove();
+      }
+
+      const wrapper = document.createElement('section');
+      wrapper.className = 'rp-page-block rp-page-block--table';
+      if (options.sectionId) {
+        wrapper.dataset.sectionId = options.sectionId;
+      }
+      if (options.includeLabel && options.labelNode) {
+        wrapper.appendChild(cloneNodeWithCanvases(options.labelNode));
+      }
+      wrapper.appendChild(tableClone);
+      return wrapper;
+    };
+
     const header = sourceDoc.querySelector(':scope > .rp-doc-header');
     if (header) {
       defs.push({
@@ -6459,6 +6488,30 @@ window.__reportPaginationReady = (() => {
               sectionBlockIndex += 1;
             });
           return;
+        }
+
+        if (child.matches('.rp-table')) {
+          const rows = Array.from(child.querySelectorAll(':scope > tbody > tr'));
+          if (rows.length > TABLE_ROWS_PER_BLOCK) {
+            for (let startIndex = 0; startIndex < rows.length; startIndex += TABLE_ROWS_PER_BLOCK) {
+              const endIndex = Math.min(startIndex + TABLE_ROWS_PER_BLOCK, rows.length);
+              const localIndex = sectionBlockIndex;
+              defs.push({
+                type: 'section',
+                blockType: 'table',
+                sectionId,
+                indexInSection: localIndex,
+                build: (includeLabel) => createTableChunkWrapper(child, startIndex, endIndex, {
+                  includeLabel,
+                  labelNode: label,
+                  sectionId,
+                  isLastChunk: endIndex >= rows.length,
+                }),
+              });
+              sectionBlockIndex += 1;
+            }
+            return;
+          }
         }
 
         const blockType = child.matches('.rp-summary, .rp-table') ? 'table' : 'content';
