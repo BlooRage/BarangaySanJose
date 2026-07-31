@@ -71,64 +71,55 @@ $reportCards = [
     :root { --reports-accent: #de710c; }
     .reports-main { min-width: 0; overflow-x: hidden; }
     .reports-landing { width: 100%; max-width: none; margin: 0; }
-    .reports-panel {
-      padding: 1.25rem;
-      border: 1px solid #dee2e6;
-      border-radius: 1rem;
-      background: #fff;
-      box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075);
-    }
-    .reports-panel-head {
-      padding-bottom: .75rem;
-      margin-bottom: .75rem;
-      border-bottom: 1px solid #edf0f3;
-    }
-    .reports-panel-title { margin: 0; color: #212529; font-size: 1.05rem; font-weight: 700; }
-    .reports-panel-copy { max-width: 760px; margin: .2rem 0 0; color: #6c757d; font-size: .9rem; }
     .reports-card-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: .6rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
     }
     .reports-card {
-      display: grid;
-      grid-template-columns: 2.6rem minmax(0, 1fr) auto;
-      align-items: center;
-      gap: .9rem;
+      display: flex;
+      min-height: 230px;
+      flex-direction: column;
       min-width: 0;
-      padding: .78rem 1rem;
+      padding: 1.35rem;
       color: inherit;
       text-decoration: none;
-      border: 1px solid #e4e8ed;
-      border-radius: .75rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
       background: #fff;
-      transition: border-color .15s, box-shadow .15s, background-color .15s;
+      box-shadow: 0 .2rem .8rem rgba(15, 23, 42, .045);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
     .reports-card:hover, .reports-card:focus-visible {
       color: inherit;
-      border-color: #f1b56d;
-      background: #fffaf4;
-      box-shadow: 0 .25rem .75rem rgba(222, 113, 12, .08);
+      transform: translateY(-3px);
+      border-color: var(--report-accent);
+      box-shadow: 0 .75rem 1.5rem rgba(15, 23, 42, .09);
     }
     .reports-card-icon {
-      display: inline-grid;
-      width: 2.6rem;
-      height: 2.6rem;
-      place-items: center;
+      display: inline-flex;
+      width: 48px;
+      height: 48px;
       align-items: center;
       justify-content: center;
-      border-radius: .7rem;
-      color: var(--reports-accent);
-      background: #fff4e8;
-      font-size: 1rem;
+      margin-bottom: 1.15rem;
+      border-radius: .9rem;
+      color: var(--report-accent);
+      background: var(--report-soft);
+      font-size: 1.2rem;
     }
     .reports-card-copy { min-width: 0; }
-    .reports-card h2 { margin: 0; color: #212529; font-size: .95rem; font-weight: 700; }
-    .reports-card p { margin: .12rem 0 0; color: #6c757d; font-size: .9rem; line-height: 1.3; }
+    .reports-card h2 { margin: 0 0 .55rem; color: #1f2937; font-size: 1.08rem; font-weight: 750; }
+    .reports-card p { margin: 0 0 1.25rem; color: #64748b; font-size: .9rem; line-height: 1.55; }
     .reports-card-action {
-      color: var(--reports-accent);
-      font-size: .9rem;
-      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: auto;
+      color: var(--report-accent);
+      font-size: .85rem;
+      font-weight: 750;
     }
     .reports-empty {
       grid-column: 1 / -1;
@@ -139,14 +130,12 @@ $reportCards = [
       border-radius: 1rem;
       background: #fff;
     }
-    @media (max-width: 767.98px) {
-      .reports-card-grid { grid-template-columns: 1fr; }
+    @media (max-width: 991.98px) {
+      .reports-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 575.98px) {
-      .reports-panel { padding: .85rem; }
-      .reports-card { grid-template-columns: 2.4rem minmax(0, 1fr) auto; padding: .85rem; gap: .7rem; }
-      .reports-card-icon { width: 2.4rem; height: 2.4rem; }
-      .reports-card-action span { display: none; }
+      .reports-card-grid { grid-template-columns: 1fr; }
+      .reports-card { min-height: 205px; }
     }
   </style>
 </head>
@@ -158,12 +147,7 @@ $reportCards = [
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Reports</h2>
       <hr><br>
 
-      <section class="reports-panel" aria-labelledby="reportsCategoryHeading">
-        <div class="reports-panel-head">
-          <h2 class="reports-panel-title" id="reportsCategoryHeading">Report Categories</h2>
-          <p class="reports-panel-copy">Choose the operational area you want to review. Each category opens its available report types.</p>
-        </div>
-        <div class="reports-card-grid">
+      <section class="reports-card-grid" aria-label="Report categories">
         <?php $visibleCardCount = 0; ?>
         <?php foreach ($reportCards as $card): ?>
           <?php if (!$sbCan($card['permission'])) continue; ?>
@@ -171,19 +155,19 @@ $reportCards = [
           <a
             class="reports-card"
             href="<?= htmlspecialchars($reportsBaseUrl . '?module=' . rawurlencode($card['module']), ENT_QUOTES, 'UTF-8') ?>"
+            style="--report-accent:<?= htmlspecialchars($card['accent'], ENT_QUOTES, 'UTF-8') ?>;--report-soft:<?= htmlspecialchars($card['soft'], ENT_QUOTES, 'UTF-8') ?>"
           >
             <span class="reports-card-icon"><i class="fas <?= htmlspecialchars($card['icon'], ENT_QUOTES, 'UTF-8') ?>"></i></span>
             <span class="reports-card-copy">
               <h2><?= htmlspecialchars($card['title'], ENT_QUOTES, 'UTF-8') ?></h2>
               <p><?= htmlspecialchars($card['description'], ENT_QUOTES, 'UTF-8') ?></p>
             </span>
-            <span class="reports-card-action"><span class="me-2">Open</span><i class="fas fa-arrow-right"></i></span>
+            <span class="reports-card-action">Open report <i class="fas fa-arrow-right"></i></span>
           </a>
         <?php endforeach; ?>
         <?php if ($visibleCardCount === 0): ?>
           <div class="reports-empty">No report categories are available for your current role.</div>
         <?php endif; ?>
-        </div>
       </section>
     </div>
   </main>
