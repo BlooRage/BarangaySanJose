@@ -57,7 +57,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <?php endif; ?>
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix" />
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260801-vertical-center" />
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260801-vertical-center2" />
     <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
