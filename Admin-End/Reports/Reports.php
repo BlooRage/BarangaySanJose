@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../../PhpFiles/General/piiCrypto.php';
+require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function rp_table_exists(mysqli $conn, string $t): bool {
@@ -1429,8 +1430,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         $pStmt->close();
     }
 }
-$reportNotedByName = 'HON. GLENN S. EVANGELISTA';
-$reportNotedByRole = 'Punong Barangay';
+$currentBarangaySignatories = dms_current_barangay_signatories($conn);
+$reportNotedByName = trim((string)($currentBarangaySignatories['punong']['name'] ?? ''));
+$reportNotedByRole = trim((string)($currentBarangaySignatories['punong']['title'] ?? ''));
+if ($reportNotedByName === '') {
+    $reportNotedByName = 'HON. GLENN S. EVANGELISTA';
+}
+if ($reportNotedByRole === '') {
+    $reportNotedByRole = 'Punong Barangay';
+}
 $barangaySealUrl = appUrl('Images/San_Jose_LOGO.jpg');
 $municipalSealUrl = appUrl('Images/Montalban_Logo.png');
 
