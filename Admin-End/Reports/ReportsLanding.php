@@ -80,8 +80,11 @@ $reportCards = [
       display: flex;
       min-height: 230px;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
       min-width: 0;
       padding: 1.35rem;
+      text-align: center;
       color: inherit;
       text-decoration: none;
       border: 1px solid #e5e7eb;
@@ -108,19 +111,9 @@ $reportCards = [
       background: var(--report-soft);
       font-size: 1.2rem;
     }
-    .reports-card-copy { min-width: 0; }
+    .reports-card-copy { min-width: 0; width: 100%; }
     .reports-card h2 { margin: 0 0 .55rem; color: #1f2937; font-size: 1.08rem; font-weight: 750; }
     .reports-card p { margin: 0 0 1.25rem; color: #64748b; font-size: .9rem; line-height: 1.55; }
-    .reports-card-action {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      margin-top: auto;
-      color: var(--report-accent);
-      font-size: .85rem;
-      font-weight: 750;
-    }
     .reports-empty {
       grid-column: 1 / -1;
       padding: 2.5rem;
@@ -162,7 +155,6 @@ $reportCards = [
               <h2><?= htmlspecialchars($card['title'], ENT_QUOTES, 'UTF-8') ?></h2>
               <p><?= htmlspecialchars($card['description'], ENT_QUOTES, 'UTF-8') ?></p>
             </span>
-            <span class="reports-card-action">Open report <i class="fas fa-arrow-right"></i></span>
           </a>
         <?php endforeach; ?>
         <?php if ($visibleCardCount === 0): ?>
