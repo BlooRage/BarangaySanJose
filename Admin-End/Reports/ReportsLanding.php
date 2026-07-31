@@ -77,43 +77,74 @@ $reportCards = [
       gap: 1rem;
     }
     .reports-card {
+      position: relative;
       display: flex;
-      min-height: 230px;
+      min-height: 245px;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       min-width: 0;
-      padding: 1.35rem;
+      padding: 1.65rem 1.5rem;
+      overflow: hidden;
       text-align: center;
       color: inherit;
       text-decoration: none;
-      border: 1px solid #e5e7eb;
-      border-radius: 1rem;
-      background: #fff;
-      box-shadow: 0 .2rem .8rem rgba(15, 23, 42, .045);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      border: 1px solid color-mix(in srgb, var(--report-accent) 15%, #e5e7eb);
+      border-radius: 1.35rem;
+      background: linear-gradient(145deg, #fff 48%, var(--report-soft) 135%);
+      box-shadow: 0 .3rem 1rem rgba(15, 23, 42, .055);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .reports-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 4px;
+      background: var(--report-accent);
+      opacity: .75;
+    }
+    .reports-card::after {
+      content: "";
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      right: -54px;
+      bottom: -64px;
+      border-radius: 50%;
+      background: var(--report-soft);
+      opacity: .85;
+      transition: transform .25s ease;
     }
     .reports-card:hover, .reports-card:focus-visible {
       color: inherit;
-      transform: translateY(-3px);
+      transform: translateY(-5px);
       border-color: var(--report-accent);
-      box-shadow: 0 .75rem 1.5rem rgba(15, 23, 42, .09);
+      box-shadow: 0 .9rem 1.8rem rgba(15, 23, 42, .11);
+    }
+    .reports-card:hover::after, .reports-card:focus-visible::after {
+      transform: scale(1.15);
     }
     .reports-card-icon {
+      position: relative;
+      z-index: 1;
       display: inline-flex;
-      width: 48px;
-      height: 48px;
+      width: 64px;
+      height: 64px;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1.15rem;
-      border-radius: .9rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid color-mix(in srgb, var(--report-accent) 14%, transparent);
+      border-radius: 1.25rem;
       color: var(--report-accent);
       background: var(--report-soft);
-      font-size: 1.2rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 .4rem .9rem color-mix(in srgb, var(--report-accent) 12%, transparent);
+      font-size: 1.45rem;
+      transition: transform .2s ease;
     }
-    .reports-card-copy { min-width: 0; width: 100%; }
-    .reports-card h2 { margin: 0 0 .55rem; color: #1f2937; font-size: 1.08rem; font-weight: 750; }
-    .reports-card p { margin: 0 0 1.25rem; color: #64748b; font-size: .9rem; line-height: 1.55; }
+    .reports-card:hover .reports-card-icon, .reports-card:focus-visible .reports-card-icon { transform: translateY(-2px) scale(1.06); }
+    .reports-card-copy { position: relative; z-index: 1; min-width: 0; width: 100%; }
+    .reports-card h2 { margin: 0 0 .6rem; color: #1f2937; font-size: 1.12rem; font-weight: 750; }
+    .reports-card p { max-width: 340px; margin: 0 auto; color: #64748b; font-size: .9rem; line-height: 1.55; }
     .reports-empty {
       grid-column: 1 / -1;
       padding: 2.5rem;

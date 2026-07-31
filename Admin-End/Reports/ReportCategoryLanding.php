@@ -138,28 +138,28 @@ if ($issuanceConfig !== null) {
     .report-choice-heading { margin: 0; color: #212529; font-size: 1.05rem; font-weight: 700; }
     .report-choice-panel-copy { max-width: 760px; margin: .2rem 0 0; color: #6c757d; font-size: .9rem; }
     .report-choice-grid {
-      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;
     }
     .report-choice-card {
-      display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto; align-items: center;
-      gap: .9rem; min-width: 0; padding: .78rem 1rem; color: inherit; text-decoration: none;
-      border: 1px solid #e4e8ed; border-radius: .75rem; background: #fff;
-      transition: border-color .15s, box-shadow .15s, background-color .15s;
+      display: flex; min-height: 230px; flex-direction: column; align-items: center;
+      justify-content: center; min-width: 0; padding: 1.35rem; color: inherit;
+      text-align: center; text-decoration: none; border: 1px solid #e5e7eb;
+      border-radius: 1rem; background: #fff; box-shadow: 0 .2rem .8rem rgba(15,23,42,.045);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
     .report-choice-card:hover, .report-choice-card:focus-visible {
-      color: inherit; border-color: #f1b56d; background: #fffaf4;
-      box-shadow: 0 .25rem .75rem rgba(222,113,12,.08);
+      color: inherit; transform: translateY(-3px); border-color: var(--report-accent);
+      box-shadow: 0 .75rem 1.5rem rgba(15,23,42,.09);
     }
-    .report-choice-card-icon { display: inline-grid; width: 2.6rem; height: 2.6rem; place-items: center; border-radius: .7rem; color: #de710c; background: #fff4e8; }
-    .report-choice-card-copy { min-width: 0; }
-    .report-choice-card h2 { margin: 0; color: #212529; font-size: .95rem; font-weight: 700; }
-    .report-choice-card p { margin: .12rem 0 0; color: #6c757d; font-size: .9rem; line-height: 1.3; }
-    .report-choice-arrow { color: #de710c; }
-    @media (max-width: 767.98px) { .report-choice-grid { grid-template-columns: 1fr; } }
+    .report-choice-card-icon { display: inline-flex; width: 48px; height: 48px; flex: 0 0 auto; align-items: center; justify-content: center; margin-bottom: 1.15rem; border-radius: .9rem; color: var(--report-accent); background: var(--report-soft); font-size: 1.2rem; }
+    .report-choice-card-copy { min-width: 0; width: 100%; }
+    .report-choice-card h2 { margin: 0 0 .55rem; color: #1f2937; font-size: 1.08rem; font-weight: 750; }
+    .report-choice-card p { margin: 0; color: #64748b; font-size: .9rem; line-height: 1.55; }
+    @media (max-width: 991.98px) { .report-choice-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 575.98px) {
       .report-choice-panel { padding: .85rem; }
-      .report-choice-card { grid-template-columns: 2.4rem minmax(0,1fr) auto; padding: .85rem; gap: .7rem; }
-      .report-choice-card-icon { width: 2.4rem; height: 2.4rem; }
+      .report-choice-grid { grid-template-columns: 1fr; }
+      .report-choice-card { min-height: 205px; }
     }
   </style>
 </head>
@@ -167,7 +167,7 @@ if ($issuanceConfig !== null) {
 <div class="d-flex flex-column flex-md-row" style="min-height:100vh;">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
   <main id="main-display" class="report-choice-main flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
-    <div class="report-choice-page">
+    <div class="report-choice-page" style="--report-accent:<?= htmlspecialchars($meta['accent'], ENT_QUOTES, 'UTF-8') ?>;--report-soft:<?= htmlspecialchars($meta['soft'], ENT_QUOTES, 'UTF-8') ?>">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;"><?= htmlspecialchars($meta['title']) ?> Reports</h2>
         <a class="report-choice-back" href="<?= htmlspecialchars($reportsBaseUrl, ENT_QUOTES, 'UTF-8') ?>">
@@ -188,7 +188,6 @@ if ($issuanceConfig !== null) {
               <h2><?= htmlspecialchars($choice['title']) ?></h2>
               <p><?= htmlspecialchars($choice['description']) ?></p>
             </span>
-            <i class="fas fa-arrow-right report-choice-arrow" aria-hidden="true"></i>
           </a>
         <?php endforeach; ?>
         </div>
