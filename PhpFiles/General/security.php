@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/runtimeConfig.php';
 require_once __DIR__ . '/piiCrypto.php';
+require_once __DIR__ . '/websiteMaintenance.php';
 
 function applyBaselineSecurityHeaders(): void
 {
@@ -573,7 +574,13 @@ function requireAuthenticatedSession(bool $json = true): void {
     }
 
     enforceCurrentSessionAccountStatus($json);
-    enforceSessionInactivityTimeout(1800, $json);
+    $siteSettings = wms_load_settings(null);
+    $role = normalizeRoleName((string)($_SESSION['role'] ?? ''));
+    $adminRoles = ['superadmin', 'official', 'personnel'];
+    $minutes = in_array($role, $adminRoles, true)
+        ? (int)($siteSettings['admin_timeout_minutes'] ?? 30)
+        : (int)($siteSettings['resident_timeout_minutes'] ?? 30);
+    enforceSessionInactivityTimeout(max(5, $minutes) * 60, $json);
 }
 
 function requireRoleSession(array $allowedRoles, bool $json = true): void {

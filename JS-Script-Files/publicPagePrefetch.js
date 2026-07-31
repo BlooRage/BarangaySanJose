@@ -1,4 +1,5 @@
 (function () {
+  var runtimeScriptUrl = document.currentScript && document.currentScript.src ? document.currentScript.src : "";
   var CACHE_PREFIX = "public-page-prefetch:";
   var DEFAULT_MAX_AGE_MS = 2 * 60 * 1000;
   var routePreloadInFlight = Object.create(null);
@@ -254,5 +255,12 @@
     document.addEventListener("DOMContentLoaded", attachNavPrefetch, { once: true });
   } else {
     attachNavPrefetch();
+  }
+
+  if (runtimeScriptUrl) {
+    var preferenceScript = document.createElement("script");
+    preferenceScript.src = new URL("websitePreferences.js", runtimeScriptUrl).toString();
+    preferenceScript.dataset.endpoint = new URL("../PhpFiles/GET/getWebsitePreferences.php", runtimeScriptUrl).toString();
+    document.head.appendChild(preferenceScript);
   }
 })();

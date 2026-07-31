@@ -158,6 +158,7 @@ function rp_document_type_label(string $raw): string {
         'certificateofcohabitation' => 'Certificate of Cohabitation',
         'identity' => 'Certificate of Identity',
         'certificateofidentity' => 'Certificate of Identity',
+        'generalcertification' => 'General Certificate',
         'firsttimejobseeker' => 'First Time Job Seeker Certificate',
         'firsttimejobseekers' => 'First Time Job Seeker Certificate',
         'firsttimejobseekercertificate' => 'First Time Job Seeker Certificate',
@@ -236,9 +237,13 @@ function rp_document_request_key(string $raw): string {
         'certificateofresidence' => 'cert_residency',
         'indigency' => 'cert_indigency',
         'certificateofindigency' => 'cert_indigency',
+        'generalcertification' => 'cert_general',
     ];
     if (isset($map[$key])) {
         return $map[$key];
+    }
+    if (str_starts_with($key, 'generalcertificate')) {
+        return 'cert_general';
     }
     if (str_contains($key, 'businesspermit') || str_contains($key, 'businessclearance')) {
         return 'clr_business_permit';
@@ -275,6 +280,7 @@ function rp_issuance_module_config(string $module): ?array {
                 'cert_first_time_job_seeker' => 'First Time Job Seeker Certificate',
                 'cert_residency' => 'Certificate of Residency',
                 'cert_indigency' => 'Certificate of Indigency',
+                'cert_general' => 'General Certificate',
                 'barangay_id' => 'Barangay ID',
             ],
         ],
@@ -1332,8 +1338,8 @@ if (!in_array($module, $allowedModules, true)) $module = 'certificate_issuance';
 
 // ── Date range (shared) ───────────────────────────────────────────────────────
 $today      = date('Y-m-d');
-$monthStart = date('Y-m-01');
-$dateFrom   = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_from'] ?? '')) ? $_GET['date_from'] : $monthStart;
+$yearStart  = date('Y-01-01');
+$dateFrom   = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_from'] ?? '')) ? $_GET['date_from'] : $yearStart;
 $dateTo     = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_to']   ?? '')) ? $_GET['date_to']   : $today;
 if ($dateTo < $dateFrom) $dateTo = $dateFrom;
 
@@ -2653,6 +2659,14 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       border: none;
       border-radius: 18px;
       box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+      overflow: hidden;
+    }
+    .rp-filter-modal .rp-filter-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-height: 0;
+      max-height: calc(100vh - 1rem);
     }
     .rp-filter-modal .modal-header {
       border-bottom: 1px solid #e5e7eb;
@@ -2660,6 +2674,8 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     }
     .rp-filter-modal .modal-body {
       padding: 1.25rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
     .rp-filter-modal .modal-footer {
       border-top: 1px solid #e5e7eb;
@@ -3252,7 +3268,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       </div><!-- /.rp-controls -->
 
       <div class="modal fade rp-filter-modal" id="reportFilterModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
           <div class="modal-content">
             <form method="GET" class="rp-filter-form">
               <div class="modal-header">
@@ -3345,7 +3361,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       </div>
 
       <div class="modal fade rp-filter-modal" id="reportCustomizeModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
           <div class="modal-content">
             <form method="GET" class="rp-filter-form">
               <div class="modal-header">

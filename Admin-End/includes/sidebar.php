@@ -2238,3 +2238,4 @@ if ($sbSidebarUserId !== '') {
     syncMode();
   })();
 </script>
+<script src="<?= htmlspecialchars(appUrl('/JS-Script-Files/websitePreferences.js'), ENT_QUOTES, 'UTF-8') ?>" data-endpoint="<?= htmlspecialchars(appUrl('/PhpFiles/GET/getWebsitePreferences.php'), ENT_QUOTES, 'UTF-8') ?>"></script>

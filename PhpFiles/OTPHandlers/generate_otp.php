@@ -151,7 +151,7 @@ if (preg_match('/^09\d{9}$/', $rawRecipient)) {
     exit;
 }
 
-if (!in_array($purpose, ['signup', 'forgot', 'inactive', 'guest_appointment', 'guest_complaint'], true)) {
+if (!in_array($purpose, ['signup', 'forgot', 'inactive', 'admin_2fa', 'guest_appointment', 'guest_complaint'], true)) {
     echo json_encode(['success' => false, 'error' => 'Invalid OTP purpose.']);
     exit;
 }
@@ -172,10 +172,10 @@ if ($purpose === 'forgot') {
     }
 }
 
-if ($purpose === 'inactive') {
+if ($purpose === 'inactive' || $purpose === 'admin_2fa') {
     $pendingUserId = trim((string)($_SESSION['pending_user_id'] ?? ''));
     $pendingVerify = trim((string)($_SESSION['pending_verify'] ?? ''));
-    if ($pendingUserId === '' || $pendingVerify !== 'inactive') {
+    if ($pendingUserId === '' || $pendingVerify !== $purpose) {
         echo json_encode(['success' => false, 'error' => 'Session expired. Please login again.']);
         exit;
     }
@@ -193,6 +193,7 @@ if (recaptcha_v3_should_enforce()) {
         'signup' => 'login_signup_otp',
         'forgot' => 'login_forgot_otp',
         'inactive' => 'login_inactive_otp',
+        'admin_2fa' => 'login_admin_2fa_otp',
         'guest_appointment' => 'guest_appointment_otp',
         'guest_complaint' => 'guest_complaint_otp',
     ];

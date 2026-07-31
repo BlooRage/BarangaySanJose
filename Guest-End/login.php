@@ -21,6 +21,8 @@ $serviceLabel = residentServiceDisplayName($requestedService);
 $serviceAwareRedirect = appUrl('/account-redirect' . ($requestedService !== '' ? '?service=' . rawurlencode($requestedService) : ''));
 $loginRecaptchaEnabled = recaptcha_v3_frontend_enabled();
 $loginRecaptchaSiteKey = $loginRecaptchaEnabled ? recaptcha_v3_site_key() : '';
+$websiteOptions = wms_load_settings($conn);
+$registrationOpen = !empty($websiteOptions['registration_enabled']);
 
 $inviteToken = trim((string)($_GET['invite'] ?? ''));
 if ($inviteToken !== '') {
@@ -138,15 +140,19 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
             <p class="mt-3 text-center">
               Don't have an account?
-              <a href="javascript:void(0)" class="text-primary text-decoration-underline" onclick="switchToSignup()">Register</a>
-              now.
+              <?php if ($registrationOpen): ?>
+                <a href="javascript:void(0)" class="text-primary text-decoration-underline" onclick="switchToSignup()">Register</a> now.
+              <?php else: ?>
+                <span class="text-muted">Registration is currently closed.</span>
+              <?php endif; ?>
             </p>
           </form>
 
           <!-- =========================
                SIGNUP FORM (OLD IDs)
                ========================= -->
-          <form class="form-box" id="signupForm" action="../PhpFiles/Login/RegisterAccount.php" method="post" name="signupForm">
+          <form class="form-box" id="signupForm" action="../PhpFiles/Login/RegisterAccount.php" method="post" name="signupForm" <?= $registrationOpen ? '' : 'aria-disabled="true"' ?>>
+            <?php if (!$registrationOpen): ?><div class="alert alert-warning"><?= htmlspecialchars((string)$websiteOptions['registration_message'], ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
             <?php if ($serviceLabel !== ''): ?>
             <div class="alert alert-warning text-center py-2 mb-3" role="alert">
               Create an account to continue to <strong><?= htmlspecialchars($serviceLabel, ENT_QUOTES, 'UTF-8') ?></strong>.

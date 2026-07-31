@@ -6,6 +6,12 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 require_once __DIR__ . '/redirectDestination.php';
 
+$registrationSettings = wms_load_settings($conn);
+if (empty($registrationSettings['registration_enabled'])) {
+    echo json_encode(['success' => false, 'error' => (string)$registrationSettings['registration_message'], 'registration_closed' => true]);
+    exit;
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

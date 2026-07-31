@@ -17,6 +17,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
             'enabled' => isset($_POST['maintenance_enabled']),
             'message' => (string)($_POST['maintenance_message'] ?? ''),
             'subcopy' => (string)($_POST['maintenance_subcopy'] ?? ''),
+            'registration_enabled' => isset($_POST['registration_enabled']),
+            'registration_message' => (string)($_POST['registration_message'] ?? ''),
+            'resident_timeout_minutes' => (int)($_POST['resident_timeout_minutes'] ?? 30),
+            'admin_timeout_minutes' => (int)($_POST['admin_timeout_minutes'] ?? 30),
+            'admin_2fa_enabled' => isset($_POST['admin_2fa_enabled']),
+            'default_language' => (string)($_POST['default_language'] ?? 'en'),
+            'default_font_scale' => (string)($_POST['default_font_scale'] ?? '100'),
+            'high_contrast' => isset($_POST['high_contrast']),
+            'reduced_motion' => isset($_POST['reduced_motion']),
         ], $websiteSettingsUserId, isset($conn) && $conn instanceof mysqli ? $conn : null);
 
         if (isset($conn) && $conn instanceof mysqli) {
@@ -25,21 +34,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
                 $websiteSettingsUserId !== '' ? $websiteSettingsUserId : null,
                 $websiteSettingsRole !== '' ? $websiteSettingsRole : 'SuperAdmin',
                 'website_settings',
-                'maintenance_mode',
+                'website_configuration',
                 'public_site',
-                !empty($savedSettings['enabled']) ? 'enable_maintenance' : 'disable_maintenance',
-                'maintenance_configuration',
+                'update_website_settings',
+                'website_configuration',
                 json_encode($existingSettings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 json_encode($savedSettings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                !empty($savedSettings['enabled'])
-                    ? 'Enabled maintenance mode for public and resident-facing pages.'
-                    : 'Disabled maintenance mode and reopened the public and resident-facing pages.'
+                'Updated website maintenance, registration, security, language, and accessibility settings.'
             );
         }
 
-        $successMessage = !empty($savedSettings['enabled'])
-            ? 'Maintenance mode is now enabled.'
-            : 'Maintenance mode is now disabled.';
+        $successMessage = 'Website settings saved successfully.';
 
         header('Location: ' . $websiteSettingsPath . '?success=' . rawurlencode($successMessage));
         exit;
@@ -288,6 +293,37 @@ $websiteError = trim((string)($_GET['error'] ?? ''));
                   <?= htmlspecialchars((string)($websiteSettings['subcopy'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                 </p>
               </div>
+
+              <hr class="my-4">
+              <h3 class="h5 mb-3">Resident Registration</h3>
+              <div class="website-settings-toggle mb-3">
+                <div><h4 class="h6 mb-1">Allow online registration</h4><p class="text-muted mb-0">Turn this off to prevent new resident accounts while keeping login available.</p></div>
+                <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" role="switch" name="registration_enabled" <?= !empty($websiteSettings['registration_enabled']) ? 'checked' : '' ?>></div>
+              </div>
+              <div class="mb-4">
+                <label class="form-label fw-semibold" for="registrationMessage">Closed-registration message</label>
+                <textarea class="form-control" id="registrationMessage" name="registration_message" rows="2" maxlength="400"><?= htmlspecialchars((string)($websiteSettings['registration_message'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+              </div>
+
+              <hr class="my-4">
+              <h3 class="h5 mb-3">Security</h3>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6"><label class="form-label fw-semibold">Resident inactivity timeout</label><div class="input-group"><input class="form-control" type="number" name="resident_timeout_minutes" min="5" max="240" value="<?= (int)($websiteSettings['resident_timeout_minutes'] ?? 30) ?>"><span class="input-group-text">minutes</span></div></div>
+                <div class="col-md-6"><label class="form-label fw-semibold">Admin inactivity timeout</label><div class="input-group"><input class="form-control" type="number" name="admin_timeout_minutes" min="5" max="120" value="<?= (int)($websiteSettings['admin_timeout_minutes'] ?? 30) ?>"><span class="input-group-text">minutes</span></div></div>
+              </div>
+              <div class="website-settings-toggle mb-4">
+                <div><h4 class="h6 mb-1">Require administrator two-factor authentication</h4><p class="text-muted mb-0">Require an OTP after a valid password for administrator-side accounts.</p></div>
+                <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" role="switch" name="admin_2fa_enabled" <?= !empty($websiteSettings['admin_2fa_enabled']) ? 'checked' : '' ?>></div>
+              </div>
+
+              <hr class="my-4">
+              <h3 class="h5 mb-3">Language &amp; Accessibility</h3>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6"><label class="form-label fw-semibold">Default language</label><select class="form-select" name="default_language"><option value="en" <?= ($websiteSettings['default_language'] ?? 'en') === 'en' ? 'selected' : '' ?>>English</option><option value="fil" <?= ($websiteSettings['default_language'] ?? '') === 'fil' ? 'selected' : '' ?>>Filipino</option></select></div>
+                <div class="col-md-6"><label class="form-label fw-semibold">Default text size</label><select class="form-select" name="default_font_scale"><?php foreach (['90'=>'Small (90%)','100'=>'Standard (100%)','110'=>'Large (110%)','120'=>'Extra large (120%)'] as $value=>$label): ?><option value="<?= $value ?>" <?= (string)($websiteSettings['default_font_scale'] ?? '100') === $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></div>
+              </div>
+              <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="high_contrast" id="highContrast" <?= !empty($websiteSettings['high_contrast']) ? 'checked' : '' ?>><label class="form-check-label" for="highContrast">Use high-contrast colors by default</label></div>
+              <div class="form-check form-switch mb-4"><input class="form-check-input" type="checkbox" name="reduced_motion" id="reducedMotion" <?= !empty($websiteSettings['reduced_motion']) ? 'checked' : '' ?>><label class="form-check-label" for="reducedMotion">Reduce animations and transitions by default</label></div>
 
               <div class="website-settings-actions">
                 <button type="submit" class="btn btn-primary">

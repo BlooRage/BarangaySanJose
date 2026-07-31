@@ -15,7 +15,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
-if (!isset($_SESSION['pending_user_id']) || ($_SESSION['pending_verify'] ?? '') !== 'inactive') {
+$pendingPurpose = (string)($_SESSION['pending_verify'] ?? '');
+if (!isset($_SESSION['pending_user_id']) || !in_array($pendingPurpose, ['inactive', 'admin_2fa'], true)) {
   echo json_encode(['success' => false, 'error' => 'Session expired. Please login again.']);
   exit;
 }
@@ -44,7 +45,7 @@ if (!$recipient || strlen($recipient) !== 10) {
 }
 
 // Ensure latest OTP for this phone + purpose is VERIFIED (status_id_otp=7 in your verify_otp.php)
-$purpose = "inactive";
+$purpose = $pendingPurpose;
 $STATUS_VERIFIED = 7;
 
 $otpStmt = $conn->prepare("
@@ -89,10 +90,16 @@ if ($activeStatusId === null || $inactiveStatusId === null) {
 }
 
 // Activate if currently inactive
-if ((int)$user['status_id_account'] === (int)$inactiveStatusId) {
+if ($pendingPurpose === 'inactive' && (int)$user['status_id_account'] === (int)$inactiveStatusId) {
   $up = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, last_login = NOW() WHERE user_id = ?");
   $up->bind_param("is", $activeStatusId, $user_id);
   $up->execute();
+}
+if ($pendingPurpose === 'admin_2fa') {
+  $up = $conn->prepare("UPDATE useraccountstbl SET failed_logins = 0, last_login = NOW(), lock_start = NULL, lock_until = NULL, lock_type = NULL, lock_reason = NULL, locked_by_user_id = NULL WHERE user_id = ?");
+  $up->bind_param("s", $user_id);
+  $up->execute();
+  $up->close();
 }
 
 // Create real login session

@@ -14,7 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
-if (!isset($_SESSION['pending_user_id']) || ($_SESSION['pending_verify'] ?? '') !== 'inactive') {
+$pendingPurpose = (string)($_SESSION['pending_verify'] ?? '');
+if (!isset($_SESSION['pending_user_id']) || !in_array($pendingPurpose, ['inactive', 'admin_2fa'], true)) {
   echo json_encode(['success' => false, 'error' => 'Session expired. Please login again.']);
   exit;
 }
@@ -48,5 +49,6 @@ echo json_encode([
   'success' => true,
   'phone10' => $phone10,          // âœ… return real registered phone (10 digits)
   'phone_masked' => $masked
+  ,'purpose' => $pendingPurpose
 ]);
 exit;

@@ -8,6 +8,12 @@ require_once __DIR__ . '/../General/security.php';
 header('Content-Type: application/json');
 require '../General/connection.php';
 
+$registrationSettings = wms_load_settings($conn);
+if (empty($registrationSettings['registration_enabled'])) {
+    echo json_encode(['success' => false, 'error' => (string)$registrationSettings['registration_message'], 'registration_closed' => true]);
+    exit;
+}
+
 if (!isset($conn) || $conn->connect_error) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed']);
     exit;

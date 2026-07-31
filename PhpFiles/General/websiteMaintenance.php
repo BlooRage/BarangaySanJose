@@ -21,6 +21,15 @@ if (!function_exists('wms_default_settings')) {
             'enabled' => false,
             'message' => 'Our developers are currently upgrading the system to deliver a smoother, faster, and better experience for everyone.',
             'subcopy' => 'The public pages will be available again once the improvements are complete.',
+            'registration_enabled' => true,
+            'registration_message' => 'Online resident registration is temporarily unavailable. Please contact the barangay office for assistance.',
+            'resident_timeout_minutes' => 30,
+            'admin_timeout_minutes' => 30,
+            'admin_2fa_enabled' => false,
+            'default_language' => 'en',
+            'default_font_scale' => '100',
+            'high_contrast' => false,
+            'reduced_motion' => false,
             'updated_by_user_id' => '',
             'updated_at' => '',
         ];
@@ -36,11 +45,43 @@ if (!function_exists('wms_ensure_database_storage')) {
                 enabled TINYINT(1) NOT NULL DEFAULT 0,
                 maintenance_message TEXT NOT NULL,
                 maintenance_subcopy TEXT NOT NULL,
+                registration_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                registration_message VARCHAR(400) NOT NULL DEFAULT '',
+                resident_timeout_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+                admin_timeout_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+                admin_2fa_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                default_language VARCHAR(5) NOT NULL DEFAULT 'en',
+                default_font_scale VARCHAR(4) NOT NULL DEFAULT '100',
+                high_contrast TINYINT(1) NOT NULL DEFAULT 0,
+                reduced_motion TINYINT(1) NOT NULL DEFAULT 0,
                 updated_by_user_id VARCHAR(20) NULL,
                 updated_at VARCHAR(40) NULL,
                 PRIMARY KEY (setting_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    }
+}
+
+if (!function_exists('wms_ensure_extended_columns')) {
+    function wms_ensure_extended_columns(mysqli $conn): void
+    {
+        $columns = [
+            'registration_enabled' => "TINYINT(1) NOT NULL DEFAULT 1",
+            'registration_message' => "VARCHAR(400) NOT NULL DEFAULT ''",
+            'resident_timeout_minutes' => "SMALLINT UNSIGNED NOT NULL DEFAULT 30",
+            'admin_timeout_minutes' => "SMALLINT UNSIGNED NOT NULL DEFAULT 30",
+            'admin_2fa_enabled' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'default_language' => "VARCHAR(5) NOT NULL DEFAULT 'en'",
+            'default_font_scale' => "VARCHAR(4) NOT NULL DEFAULT '100'",
+            'high_contrast' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'reduced_motion' => "TINYINT(1) NOT NULL DEFAULT 0",
+        ];
+        foreach ($columns as $name => $definition) {
+            $result = $conn->query("SHOW COLUMNS FROM websitesettingstbl LIKE '" . $conn->real_escape_string($name) . "'");
+            $exists = $result && $result->num_rows > 0;
+            if ($result) $result->free();
+            if (!$exists) $conn->query("ALTER TABLE websitesettingstbl ADD COLUMN {$name} {$definition}");
+        }
     }
 }
 
@@ -50,9 +91,13 @@ if (!function_exists('wms_load_database_settings')) {
         if (!wms_ensure_database_storage($conn)) {
             return null;
         }
+        wms_ensure_extended_columns($conn);
 
         $result = $conn->query("
             SELECT enabled, maintenance_message, maintenance_subcopy,
+                   registration_enabled, registration_message, resident_timeout_minutes,
+                   admin_timeout_minutes, admin_2fa_enabled, default_language,
+                   default_font_scale, high_contrast, reduced_motion,
                    updated_by_user_id, updated_at
             FROM websitesettingstbl
             WHERE setting_id = 1
@@ -99,6 +144,15 @@ if (!function_exists('wms_load_database_settings')) {
             'enabled' => !empty($row['enabled']),
             'message' => (string)($row['maintenance_message'] ?? ''),
             'subcopy' => (string)($row['maintenance_subcopy'] ?? ''),
+            'registration_enabled' => !isset($row['registration_enabled']) || !empty($row['registration_enabled']),
+            'registration_message' => (string)($row['registration_message'] ?? ''),
+            'resident_timeout_minutes' => (int)($row['resident_timeout_minutes'] ?? 30),
+            'admin_timeout_minutes' => (int)($row['admin_timeout_minutes'] ?? 30),
+            'admin_2fa_enabled' => !empty($row['admin_2fa_enabled']),
+            'default_language' => (string)($row['default_language'] ?? 'en'),
+            'default_font_scale' => (string)($row['default_font_scale'] ?? '100'),
+            'high_contrast' => !empty($row['high_contrast']),
+            'reduced_motion' => !empty($row['reduced_motion']),
             'updated_by_user_id' => (string)($row['updated_by_user_id'] ?? ''),
             'updated_at' => (string)($row['updated_at'] ?? ''),
         ]);
@@ -111,16 +165,29 @@ if (!function_exists('wms_write_database_settings')) {
         if (!wms_ensure_database_storage($conn)) {
             throw new RuntimeException('Unable to prepare durable website settings storage.');
         }
+        wms_ensure_extended_columns($conn);
 
         $stmt = $conn->prepare("
             INSERT INTO websitesettingstbl
                 (setting_id, enabled, maintenance_message, maintenance_subcopy,
+                 registration_enabled, registration_message, resident_timeout_minutes,
+                 admin_timeout_minutes, admin_2fa_enabled, default_language,
+                 default_font_scale, high_contrast, reduced_motion,
                  updated_by_user_id, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 enabled = VALUES(enabled),
                 maintenance_message = VALUES(maintenance_message),
                 maintenance_subcopy = VALUES(maintenance_subcopy),
+                registration_enabled = VALUES(registration_enabled),
+                registration_message = VALUES(registration_message),
+                resident_timeout_minutes = VALUES(resident_timeout_minutes),
+                admin_timeout_minutes = VALUES(admin_timeout_minutes),
+                admin_2fa_enabled = VALUES(admin_2fa_enabled),
+                default_language = VALUES(default_language),
+                default_font_scale = VALUES(default_font_scale),
+                high_contrast = VALUES(high_contrast),
+                reduced_motion = VALUES(reduced_motion),
                 updated_by_user_id = VALUES(updated_by_user_id),
                 updated_at = VALUES(updated_at)
         ");
@@ -131,9 +198,18 @@ if (!function_exists('wms_write_database_settings')) {
         $enabled = !empty($settings['enabled']) ? 1 : 0;
         $message = (string)($settings['message'] ?? '');
         $subcopy = (string)($settings['subcopy'] ?? '');
+        $registrationEnabled = !empty($settings['registration_enabled']) ? 1 : 0;
+        $registrationMessage = (string)($settings['registration_message'] ?? '');
+        $residentTimeout = (int)($settings['resident_timeout_minutes'] ?? 30);
+        $adminTimeout = (int)($settings['admin_timeout_minutes'] ?? 30);
+        $admin2fa = !empty($settings['admin_2fa_enabled']) ? 1 : 0;
+        $language = (string)($settings['default_language'] ?? 'en');
+        $fontScale = (string)($settings['default_font_scale'] ?? '100');
+        $highContrast = !empty($settings['high_contrast']) ? 1 : 0;
+        $reducedMotion = !empty($settings['reduced_motion']) ? 1 : 0;
         $updatedBy = (string)($settings['updated_by_user_id'] ?? '');
         $updatedAt = (string)($settings['updated_at'] ?? '');
-        $stmt->bind_param('issss', $enabled, $message, $subcopy, $updatedBy, $updatedAt);
+        $stmt->bind_param('issisiiissiiss', $enabled, $message, $subcopy, $registrationEnabled, $registrationMessage, $residentTimeout, $adminTimeout, $admin2fa, $language, $fontScale, $highContrast, $reducedMotion, $updatedBy, $updatedAt);
         $saved = $stmt->execute();
         $stmt->close();
         if (!$saved) {
@@ -168,6 +244,15 @@ if (!function_exists('wms_normalize_settings')) {
             'enabled' => !empty($settings['enabled']),
             'message' => wms_normalize_text($settings['message'] ?? '', 600, (string)$defaults['message']),
             'subcopy' => wms_normalize_text($settings['subcopy'] ?? '', 400, (string)$defaults['subcopy']),
+            'registration_enabled' => !array_key_exists('registration_enabled', $settings) || !empty($settings['registration_enabled']),
+            'registration_message' => wms_normalize_text($settings['registration_message'] ?? '', 400, (string)$defaults['registration_message']),
+            'resident_timeout_minutes' => max(5, min(240, (int)($settings['resident_timeout_minutes'] ?? 30))),
+            'admin_timeout_minutes' => max(5, min(120, (int)($settings['admin_timeout_minutes'] ?? 30))),
+            'admin_2fa_enabled' => !empty($settings['admin_2fa_enabled']),
+            'default_language' => in_array((string)($settings['default_language'] ?? 'en'), ['en', 'fil'], true) ? (string)($settings['default_language'] ?? 'en') : 'en',
+            'default_font_scale' => in_array((string)($settings['default_font_scale'] ?? '100'), ['90', '100', '110', '120'], true) ? (string)($settings['default_font_scale'] ?? '100') : '100',
+            'high_contrast' => !empty($settings['high_contrast']),
+            'reduced_motion' => !empty($settings['reduced_motion']),
             'updated_by_user_id' => wms_normalize_text($settings['updated_by_user_id'] ?? '', 20, ''),
             'updated_at' => wms_normalize_text($settings['updated_at'] ?? '', 40, ''),
         ];

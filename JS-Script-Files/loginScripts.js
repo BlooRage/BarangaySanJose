@@ -715,6 +715,8 @@ function recaptchaActionForPurpose(purpose) {
       return "login_forgot_otp";
     case "inactive":
       return "login_inactive_otp";
+    case "admin_2fa":
+      return "login_admin_2fa_otp";
     default:
       return "";
   }
@@ -762,7 +764,7 @@ function updateOtpBackUI() {
     return;
   }
 
-  if (otpFrom === "inactive") {
+  if (otpFrom === "inactive" || otpFrom === "admin_2fa") {
     otpBackLink.textContent = "Back";
     otpBackLink.onclick = () => showStep("inactive-verify-step");
     return;
@@ -1134,7 +1136,7 @@ if (inactiveContinueBtn) {
       inactiveSession.phone10 = data.phone10 || inactiveSession.phone10;
       inactiveSession.phoneMasked = data.phone_masked || inactiveSession.phoneMasked;
 
-      showOTPForm("inactive", {
+      showOTPForm(otpFrom === "admin_2fa" ? "admin_2fa" : "inactive", {
         phone10: inactiveSession.phone10,
         phoneMasked: inactiveSession.phoneMasked,
       });
@@ -1177,7 +1179,7 @@ if (verifyOTPBtn) {
           return;
         }
         recipientPhone10 = phoneForDB(tempSignupData.phone);
-      } else if (otpFrom === "inactive") {
+      } else if (otpFrom === "inactive" || otpFrom === "admin_2fa") {
         recipientPhone10 = phoneForDB(inactiveSession.phone10);
         if (!recipientPhone10) {
           showOtpError("Session expired. Please go back and try again.");
@@ -1213,7 +1215,7 @@ if (verifyOTPBtn) {
       clearOtpUI();
 
       // ----- INACTIVE VERIFIED: activate + create session, then modal
-      if (otpFrom === "inactive") {
+      if (otpFrom === "inactive" || otpFrom === "admin_2fa") {
         // ✅ IMPORTANT: restore correct filename casing for Hostinger
         const vRes = await fetch("../PhpFiles/Login/userInactivity_update.php", {
           method: "POST",
@@ -1448,6 +1450,19 @@ if (loginForm) {
         inactiveSession.redirect = data.redirect || defaultLoginResolveRedirect;
 
         showInactiveWarningStep();
+        return;
+      }
+
+      if (data.status === "admin_2fa") {
+        otpFrom = "admin_2fa";
+        inactiveSession.userId = data.user_id || null;
+        inactiveSession.phoneMasked = data.phone_masked || "+63 •••••• XXXX";
+        inactiveSession.redirect = data.redirect || defaultLoginResolveRedirect;
+        showInactiveWarningStep();
+        var title = document.querySelector("#inactive-verify-step h1 strong");
+        var copy = document.querySelector("#inactive-verify-step .alert");
+        if (title) title.textContent = "Two-Factor Authentication";
+        if (copy) copy.textContent = "Enter the OTP sent to your registered mobile number to finish signing in.";
         return;
       }
 

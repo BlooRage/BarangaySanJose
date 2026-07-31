@@ -11,6 +11,10 @@ if (!isset($_POST['recipient']) || !isset($_POST['otp']) || !isset($_POST['purpo
 $rawRecipient = trim($_POST['recipient']);
 $otp_input    = trim($_POST['otp']);
 $purpose      = trim($_POST['purpose']);
+if ($purpose === 'admin_2fa' && (string)($_SESSION['pending_verify'] ?? '') !== 'admin_2fa') {
+    echo json_encode(['success' => false, 'error' => 'Two-factor session expired. Please login again.']);
+    exit;
+}
 
 // ===== Normalize recipient to 10-digit DB format =====
 // Accepts: 09XXXXXXXXX or 9XXXXXXXXX

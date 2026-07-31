@@ -266,6 +266,24 @@ if ($inactiveStatusId !== null && (int)$userData['status_id_account'] === (int)$
     exit;
 }
 
+// Require a second factor for administrator-side accounts when enabled.
+$loginWebsiteSettings = wms_load_settings($conn);
+$loginRole = normalizeRoleName((string)($userData['role_access'] ?? ''));
+if (!empty($loginWebsiteSettings['admin_2fa_enabled']) && in_array($loginRole, ['superadmin', 'official', 'personnel'], true)) {
+    $_SESSION['pending_user_id'] = $userData['user_id'];
+    $_SESSION['pending_verify'] = 'admin_2fa';
+    $_SESSION['pending_post_login_service'] = $requestedService;
+    $phoneDigits = preg_replace('/\D/', '', (string)($userData['phone_number'] ?? ''));
+    echo json_encode([
+        'success' => true,
+        'status' => 'admin_2fa',
+        'user_id' => $userData['user_id'],
+        'phone_masked' => '+63 •••••• ' . (strlen($phoneDigits) >= 4 ? substr($phoneDigits, -4) : 'XXXX'),
+        'redirect' => resolveRequestedPostLoginRedirect($conn, (string)$userData['user_id'], (string)$userData['role_access'], $requestedService),
+    ]);
+    exit;
+}
+
 /* =============================
    LOGIN SUCCESS (ACTIVE / OTHERS)
    NOTE: your original code forces status to Active on login.
