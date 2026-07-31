@@ -1458,11 +1458,11 @@ if (loginForm) {
         inactiveSession.userId = data.user_id || null;
         inactiveSession.phoneMasked = data.phone_masked || "+63 •••••• XXXX";
         inactiveSession.redirect = data.redirect || defaultLoginResolveRedirect;
-        showInactiveWarningStep();
         var title = document.querySelector("#inactive-verify-step h1 strong");
         var copy = document.querySelector("#inactive-verify-step .alert");
         if (title) title.textContent = "Two-Factor Authentication";
-        if (copy) copy.textContent = "Enter the OTP sent to your registered mobile number to finish signing in.";
+        if (copy) copy.textContent = "An OTP is required after your password. Continue to send it to your registered mobile number.";
+        showStep("inactive-verify-step");
         return;
       }
 

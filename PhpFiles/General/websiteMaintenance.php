@@ -76,11 +76,18 @@ if (!function_exists('wms_ensure_extended_columns')) {
             'high_contrast' => "TINYINT(1) NOT NULL DEFAULT 0",
             'reduced_motion' => "TINYINT(1) NOT NULL DEFAULT 0",
         ];
+        $existing = [];
+        $result = $conn->query("SHOW COLUMNS FROM websitesettingstbl");
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $existing[(string)($row['Field'] ?? '')] = true;
+            }
+            $result->free();
+        }
         foreach ($columns as $name => $definition) {
-            $result = $conn->query("SHOW COLUMNS FROM websitesettingstbl LIKE '" . $conn->real_escape_string($name) . "'");
-            $exists = $result && $result->num_rows > 0;
-            if ($result) $result->free();
-            if (!$exists) $conn->query("ALTER TABLE websitesettingstbl ADD COLUMN {$name} {$definition}");
+            if (!isset($existing[$name])) {
+                $conn->query("ALTER TABLE websitesettingstbl ADD COLUMN {$name} {$definition}");
+            }
         }
     }
 }
