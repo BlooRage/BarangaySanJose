@@ -4,10 +4,11 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260328-06";
+  const MODAL_VERSION = "20260801-01";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
+  const MODAL_ROOT_FLAG = "__bootstrapModalRootBound";
   const queuedRequests = [];
   let modalInstance = null;
   let activeRequest = null;
@@ -427,6 +428,26 @@
     };
   }
 
+  function bindBootstrapModalRoot() {
+    if (document[MODAL_ROOT_FLAG]) {
+      return;
+    }
+
+    document[MODAL_ROOT_FLAG] = true;
+    document.addEventListener("show.bs.modal", (event) => {
+      const modalEl = event.target instanceof HTMLElement
+        ? event.target.closest(".modal")
+        : null;
+
+      // Bootstrap inserts its backdrop directly under <body>. A modal nested
+      // inside a positioned/transformed admin content area can otherwise be
+      // trapped in a lower stacking context and become covered by that backdrop.
+      if (modalEl && modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+      }
+    }, true);
+  }
+
   function success(options = {}) {
     open({ tone: "success", ...options, forceTemplate: false });
   }
@@ -445,6 +466,7 @@
 
   function bootstrapOnceReady() {
     ensureStylesheet();
+    bindBootstrapModalRoot();
     upgradeVisibleAlerts(document);
     bindAlertObserver();
     wireGlobalAlertOverride();

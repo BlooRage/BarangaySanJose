@@ -674,7 +674,7 @@ if ($sbSidebarUserId !== '') {
 }
 ?>
 
-<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260801-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= htmlspecialchars(appUrl('CSS-Styles/Admin-End-CSS/TablePagination.css?v=20260726-1'), ENT_QUOTES, 'UTF-8') ?>">
 <script defer src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/tablePagination.js?v=20260726-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 
