@@ -7782,8 +7782,25 @@ if ($action === 'create_manual_request') {
             'business_name' => 'Business Name',
             'business_type' => 'Business Type',
             'business_approval_type' => 'Approval Type',
+            'business_address_line' => 'Business Address',
+            'business_area_number' => 'Business Area Number',
             'business_full_address' => 'Business Address',
         ]);
+        if (strcasecmp(trim((string)($payload['application_type'] ?? '')), 'Renewal') === 0) {
+            $requireManualPayloadFields([
+                'previous_plate_number' => 'Old Plate Number',
+            ]);
+            $payload['previous_plate_number'] = strtoupper(trim((string)$payload['previous_plate_number']));
+        }
+        $businessApprovalTypes = dra_normalize_business_approval_types((string)$payload['business_approval_type']);
+        if ($businessApprovalTypes === []) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Select at least one valid Approval Type.']);
+        }
+        $payload['business_approval_type'] = implode(',', $businessApprovalTypes);
+        $validBusinessAreas = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+        if (!in_array(trim((string)$payload['business_area_number']), $validBusinessAreas, true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Select a valid Business Area Number.']);
+        }
     } elseif (str_contains($documentToken, 'tricycle')) {
         $requireManualPayloadFields([
             'application_type' => 'Application Type',

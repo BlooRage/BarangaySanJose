@@ -8997,11 +8997,20 @@
     function manualValidateRequiredFields() {
       let firstInvalid = null;
       manualValidationTargets().forEach((field) => {
+        if (field.disabled || field.type === 'checkbox') return;
         const invalid = !field.checkValidity();
         manualSetFieldInvalidState(field, invalid);
         if (!firstInvalid && invalid && typeof field.focus === 'function') {
           firstInvalid = field;
         }
+      });
+      manualDynamicFields?.querySelectorAll('[data-manual-checklist-required="1"]').forEach((wrapper) => {
+        if (wrapper.classList.contains('d-none')) return;
+        const checkboxes = Array.from(wrapper.querySelectorAll('input[type="checkbox"]:not(:disabled)'));
+        const invalid = checkboxes.length > 0 && !checkboxes.some((checkbox) => checkbox.checked);
+        checkboxes.forEach((checkbox) => manualSetFieldInvalidState(checkbox, invalid));
+        wrapper.classList.toggle('is-invalid', invalid);
+        if (!firstInvalid && invalid) firstInvalid = checkboxes[0] || wrapper;
       });
       if (firstInvalid) {
         firstInvalid.focus();
@@ -10181,18 +10190,31 @@
               { value: 'Renewal', label: 'Renewal' }
             ] },
             { name: 'business_name', label: 'Business Name', type: 'text', required: true, col: 'col-md-8' },
+            { name: 'previous_plate_number', label: 'Old Plate Number', type: 'text', required: true, col: 'col-md-4', placeholder: 'Enter the old plate number', showWhen: { field: 'application_type', value: 'Renewal' } },
             { name: 'business_type', label: 'Business Type', type: 'select', required: true, allowOther: true, col: 'col-md-6', options: [
               { value: 'Retail', label: 'Retail' },
               { value: 'Food and Beverage', label: 'Food and Beverage' },
               { value: 'Services', label: 'Services' },
               { value: 'Manufacturing', label: 'Manufacturing' }
             ] },
-            { name: 'business_approval_type', label: 'Approval Type', type: 'select', required: true, col: 'col-md-6', options: [
+            { name: 'business_approval_type', label: 'Approval Type', type: 'checklist', required: true, col: 'col-12', options: [
               { value: 'not_banned', label: 'Not among banned business activities' },
               { value: 'no_objection', label: 'Interposes no objection' },
               { value: 'temporary_clearance', label: 'Temporary Barangay Clearance' }
             ] },
-            { name: 'business_full_address', label: 'Business Address', type: 'textarea', required: true, col: 'col-12', rows: 2 }
+            { name: 'business_address_line', label: 'Business Address', type: 'text', required: true, col: 'col-12', placeholder: 'House/unit, street, phase, or subdivision' },
+            { name: 'business_area_number', label: 'Area Number', type: 'select', required: true, col: 'col-md-6', options: [
+              { value: 'Area 01', label: 'Area 01 - San Jose Proper' },
+              { value: 'Area 1A', label: 'Area 1A - Litex Village and nearby communities' },
+              { value: 'Area 02', label: 'Area 02 - VFW, Amychelle, Christine Villa and nearby communities' },
+              { value: 'Area 03', label: 'Area 03 - Relocation' },
+              { value: 'Area 04', label: 'Area 04 - Kasiglahan Phase 1-B, 1-C, 1-D, 1-M, 1-A' },
+              { value: 'Area 05', label: 'Area 05 - Kasiglahan Phase 1-K, 1K1, 1K2, 1-E, 1-G' },
+              { value: 'Area 06', label: 'Area 06 - Sub-Urban and Metro Manila Hills' }
+            ] },
+            { name: 'business_barangay', label: 'Barangay', type: 'text', value: 'San Jose', readonly: true, col: 'col-md-6' },
+            { name: 'business_city', label: 'City / Municipality', type: 'text', value: 'Rodriguez (Montalban)', readonly: true, col: 'col-md-6' },
+            { name: 'business_province', label: 'Province', type: 'text', value: 'Rizal', readonly: true, col: 'col-md-6' }
           ];
         case 'tricycle_clearance':
           return [
@@ -10291,6 +10313,11 @@
     function manualFieldHtml(field) {
       const col = field.col || 'col-md-6';
       const required = field.required ? 'required' : '';
+      const readonly = field.readonly ? 'readonly' : '';
+      const conditionAttrs = field.showWhen
+        ? `data-manual-condition-field="${manualEscapeAttr(field.showWhen.field)}" data-manual-condition-value="${manualEscapeAttr(field.showWhen.value)}"`
+        : '';
+      const conditionClass = field.showWhen ? ' d-none' : '';
       const min = field.min !== undefined ? `min="${manualEscapeAttr(field.min)}"` : '';
       const placeholder = field.placeholder ? `placeholder="${manualEscapeAttr(field.placeholder)}"` : '';
       const valueAttr = field.value ? `value="${manualEscapeAttr(field.value)}"` : '';
@@ -10425,9 +10452,27 @@
 
       if (field.type === 'textarea') {
         return `
-          <div class="${col}">
+          <div class="${col}${conditionClass}" ${conditionAttrs}>
             <label class="form-label fw-semibold small">${label}</label>
             <textarea class="form-control" rows="${field.rows || 2}" data-manual-field="${manualEscapeAttr(field.name)}" ${required} ${placeholder}></textarea>
+          </div>
+        `;
+      }
+
+      if (field.type === 'checklist') {
+        const options = Array.isArray(field.options) ? field.options.map((option, index) => `
+          <label class="form-check border rounded-3 p-3 d-flex align-items-start gap-2 mb-2" for="manual_${manualEscapeAttr(field.name)}_${index}">
+            <input class="form-check-input mt-1" type="checkbox" id="manual_${manualEscapeAttr(field.name)}_${index}" data-manual-field="${manualEscapeAttr(field.name)}" value="${manualEscapeAttr(option.value)}">
+            <span class="form-check-label">${esc(option.label)}</span>
+          </label>
+        `).join('') : '';
+        return `
+          <div class="${col}${conditionClass}" ${conditionAttrs} data-manual-checklist-required="${field.required ? '1' : '0'}">
+            <fieldset>
+              <legend class="form-label fw-semibold small">${label}</legend>
+              ${options}
+              <div class="invalid-feedback">Select at least one ${esc(field.label.toLowerCase())}.</div>
+            </fieldset>
           </div>
         `;
       }
@@ -10437,7 +10482,7 @@
           <option value="${manualEscapeAttr(option.value)}">${esc(option.label)}</option>
         `).join('') : '';
         return `
-          <div class="${col}">
+          <div class="${col}${conditionClass}" ${conditionAttrs}>
             <label class="form-label fw-semibold small">${label}</label>
             <select class="form-select" data-manual-field="${manualEscapeAttr(field.name)}" ${required}>
               <option value="">Select ${esc(field.label.toLowerCase())}</option>
@@ -10450,11 +10495,28 @@
       }
 
       return `
-        <div class="${col}">
+        <div class="${col}${conditionClass}" ${conditionAttrs}>
           <label class="form-label fw-semibold small">${label}</label>
-          <input type="${manualEscapeAttr(field.type || 'text')}" class="form-control" data-manual-field="${manualEscapeAttr(field.name)}" ${required} ${placeholder} ${valueAttr} ${min}>
+          <input type="${manualEscapeAttr(field.type || 'text')}" class="form-control" data-manual-field="${manualEscapeAttr(field.name)}" ${required} ${readonly} ${placeholder} ${valueAttr} ${min}>
         </div>
       `;
+    }
+
+    function manualSyncConditionalFields() {
+      manualDynamicFields?.querySelectorAll('[data-manual-condition-field]').forEach((wrapper) => {
+        const sourceName = String(wrapper.dataset.manualConditionField || '').trim();
+        const expectedValue = String(wrapper.dataset.manualConditionValue || '').trim().toLowerCase();
+        const source = manualDynamicFields.querySelector(`[data-manual-field="${sourceName}"]`);
+        const show = String(source?.value || '').trim().toLowerCase() === expectedValue;
+        wrapper.classList.toggle('d-none', !show);
+        wrapper.querySelectorAll('input, select, textarea').forEach((input) => {
+          input.disabled = !show;
+          if (input.dataset.manualField === 'previous_plate_number') {
+            input.required = show;
+          }
+          if (!show && input.type !== 'hidden') input.value = '';
+        });
+      });
     }
 
     function manualRenderDocumentOptions() {
@@ -10577,6 +10639,7 @@
       } else {
         manualDynamicFields.innerHTML = fields.map(manualFieldHtml).join('');
       }
+      manualSyncConditionalFields();
       manualSyncIndigencyRecipientFields();
       if (config.kind === 'barangay_id' && manualBarangayIdPhotoStepMount) {
         const photoColumn = manualDynamicFields.querySelector('[data-manual-photo-field="barangay_id"]')?.closest('[class*="col-"]');
@@ -10869,13 +10932,35 @@
         }
       }
 
+      const dynamicValues = new Map();
       manualDynamicFields?.querySelectorAll('[data-manual-field]').forEach((field) => {
+        if (field.disabled) return;
         const key = String(field.getAttribute('data-manual-field') || '').trim();
         if (!key) return;
+        if (field.type === 'checkbox') {
+          if (!field.checked) return;
+          const values = dynamicValues.get(key) || [];
+          values.push(String(field.value || '').trim());
+          dynamicValues.set(key, values);
+          return;
+        }
         const value = String(field.value || '').trim();
         const otherField = manualDynamicFields.querySelector(`[data-manual-other-for="${key}"]`);
         payload[key] = value === '__other__' ? String(otherField?.value || '').trim() : value;
       });
+      dynamicValues.forEach((values, key) => {
+        payload[key] = values.filter(Boolean).join(',');
+      });
+      if (config.kind === 'business_clearance') {
+        const addressParts = [
+          payload.business_address_line,
+          payload.business_area_number,
+          payload.business_barangay,
+          payload.business_city,
+          payload.business_province,
+        ].map((part) => String(part || '').trim()).filter(Boolean);
+        payload.business_full_address = addressParts.join(', ');
+      }
 
       const purpose = config.kind === 'barangay_id' && manualCurrentMode() === 'renewal'
         ? 'Barangay ID Renewal / Re-issue'
@@ -11132,6 +11217,7 @@
       }
       if (key === 'application_type') {
         manualApplySuggestedPurpose();
+        manualSyncConditionalFields();
       }
       manualSyncIndigencyRecipientFields();
       manualMarkPreviewStale(true);
