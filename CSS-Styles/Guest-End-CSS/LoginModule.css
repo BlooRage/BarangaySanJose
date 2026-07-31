@@ -295,6 +295,11 @@ body {
     display: block;
 }
 
+/* Form-based verification steps retain the form box's vertical centering. */
+.form-box.fp-step.active {
+    display: flex;
+}
+
 /* ===== OTP Form Design ===== */
 #otp-form {
     position: absolute;

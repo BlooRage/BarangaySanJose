@@ -4,7 +4,7 @@ ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../General/security.php';
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=UTF-8');
 date_default_timezone_set('Asia/Manila');
 
 require __DIR__ . '/../General/connection.php';
@@ -22,7 +22,7 @@ if (!isset($_SESSION['pending_user_id']) || !in_array($pendingPurpose, ['inactiv
 
 $user_id = $_SESSION['pending_user_id'];
 
-// âœ… Query registered phone from DB
+// Query the registered phone number from the database.
 $stmt = $conn->prepare("SELECT phone_number FROM useraccountstbl WHERE user_id = ? LIMIT 1");
 $stmt->bind_param("s", $user_id);
 $stmt->execute();
@@ -43,11 +43,11 @@ if (!$phone10 || strlen($phone10) !== 10) {
   exit;
 }
 
-$masked = '+63 â€¢â€¢â€¢â€¢â€¢â€¢ ' . substr($phone10, -4);
+$masked = '+63 •••••• ' . substr($phone10, -4);
 
 echo json_encode([
   'success' => true,
-  'phone10' => $phone10,          // âœ… return real registered phone (10 digits)
+  'phone10' => $phone10,          // Return the registered phone (10 digits).
   'phone_masked' => $masked
   ,'purpose' => $pendingPurpose
 ]);
