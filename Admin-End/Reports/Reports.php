@@ -6421,7 +6421,9 @@ window.__reportPaginationReady = (() => {
 
   const buildBlockDefinitions = (sourceDoc) => {
     const defs = [];
-    const TABLE_ROWS_PER_BLOCK = 12;
+    // Tables flow one row at a time so pagination follows the real remaining
+    // page space. Adjacent row blocks are merged back into one visual table.
+    const TABLE_ROWS_PER_BLOCK = 1;
 
     const createTableChunkWrapper = (table, startIndex, endIndex, options = {}) => {
       const tableClone = cloneNodeWithCanvases(table);
@@ -6578,7 +6580,51 @@ window.__reportPaginationReady = (() => {
       ));
     };
 
+    const tryMergeTableContinuation = (page, node) => {
+      if (!node.classList.contains('rp-page-block--table') || !node.dataset.sectionId) {
+        return false;
+      }
+
+      const previous = page.content.lastElementChild;
+      if (!previous?.classList.contains('rp-page-block--table')
+          || previous.dataset.sectionId !== node.dataset.sectionId) {
+        return false;
+      }
+
+      const previousTable = previous.querySelector(':scope > .rp-table');
+      const nextTable = node.querySelector(':scope > .rp-table');
+      const previousBody = previousTable?.querySelector(':scope > tbody');
+      const nextBody = nextTable?.querySelector(':scope > tbody');
+      if (!previousTable || !nextTable || !previousBody || !nextBody) {
+        return false;
+      }
+
+      const candidate = previous.cloneNode(true);
+      const candidateTable = candidate.querySelector(':scope > .rp-table');
+      const candidateBody = candidateTable?.querySelector(':scope > tbody');
+      if (!candidateTable || !candidateBody) {
+        return false;
+      }
+
+      Array.from(nextBody.children).forEach((row) => candidateBody.appendChild(row.cloneNode(true)));
+      candidateTable.querySelector(':scope > tfoot')?.remove();
+      const nextFoot = nextTable.querySelector(':scope > tfoot');
+      if (nextFoot) {
+        candidateTable.appendChild(nextFoot.cloneNode(true));
+      }
+
+      previous.replaceWith(candidate);
+      if (page.content.scrollHeight <= CONTENT_HEIGHT_PX + 1) {
+        return true;
+      }
+      candidate.replaceWith(previous);
+      return false;
+    };
+
     const tryAppend = (page, node) => {
+      if (tryMergeTableContinuation(page, node)) {
+        return true;
+      }
       page.content.appendChild(node);
       if (page.content.scrollHeight <= CONTENT_HEIGHT_PX + 1) {
         page.count += 1;
@@ -6590,7 +6636,7 @@ window.__reportPaginationReady = (() => {
 
     const continueFitThreshold = (blockType) => {
       if (blockType === 'chart') return 0.84;
-      if (blockType === 'table') return 0.9;
+      if (blockType === 'table') return Number.POSITIVE_INFINITY;
       return 0.88;
     };
 
