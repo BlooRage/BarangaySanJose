@@ -352,7 +352,6 @@ $baseSelects = [
     dr_column_exists($conn, 'documentrequesttbl', 'request_details')
         ? 'd.request_details AS request_details'
         : 'NULL AS request_details',
-    "COALESCE(bms.establishment_status, 'operational') AS establishment_status",
 ];
 
 if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
@@ -425,7 +424,6 @@ $sql = "
         " . implode(",\n        ", $baseSelects)
         . ($extraSelects ? ",\n        " . implode(",\n        ", $extraSelects) : '') . "
     FROM documentrequesttbl d
-    LEFT JOIN businessmonitoringstatustbl bms ON bms.request_id = d.request_id
     " . ($extraJoins ? implode("\n    ", $extraJoins) : '') . "
 ";
 
@@ -443,6 +441,17 @@ if (!$stmt) {
 $stmt->execute();
 $result = $stmt->get_result();
 $items = [];
+$establishmentStatuses = [];
+$statusResult = $conn->query("SELECT request_id, establishment_status FROM businessmonitoringstatustbl");
+if ($statusResult) {
+    while ($statusRow = $statusResult->fetch_assoc()) {
+        $statusRequestId = trim((string)($statusRow['request_id'] ?? ''));
+        if ($statusRequestId !== '') {
+            $establishmentStatuses[$statusRequestId] = strtolower(trim((string)($statusRow['establishment_status'] ?? 'operational')));
+        }
+    }
+    $statusResult->free();
+}
 
 while ($row = $result->fetch_assoc()) {
     if (function_exists('pii_decrypt_assoc')) {
@@ -469,7 +478,8 @@ while ($row = $result->fetch_assoc()) {
     }
 
     $stage = strtolower(trim((string)($row['stage'] ?? '')));
-    $establishmentStatus = strtolower(trim((string)($row['establishment_status'] ?? 'operational')));
+    $rowRequestId = trim((string)($row['request_id'] ?? ''));
+    $establishmentStatus = $establishmentStatuses[$rowRequestId] ?? 'operational';
     if ($stage !== DR_STAGE_COMPLETED || $establishmentStatus !== 'operational') {
         continue;
     }
@@ -580,8 +590,8 @@ while ($row = $result->fetch_assoc()) {
         'stage' => $stage,
         'stage_label' => dr_stage_label($stage),
         'status_bucket' => bm_status_bucket($stage),
-        'establishment_status' => in_array(strtolower(trim((string)($row['establishment_status'] ?? ''))), ['operational', 'closed', 'archived'], true)
-            ? strtolower(trim((string)$row['establishment_status']))
+        'establishment_status' => in_array($establishmentStatus, ['operational', 'closed', 'archived'], true)
+            ? $establishmentStatus
             : 'operational',
     ];
 }

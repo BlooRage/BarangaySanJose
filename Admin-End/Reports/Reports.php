@@ -4267,7 +4267,7 @@ if ($issuanceModuleConfig !== null):
             <p class="rp-empty">No completed business establishments matched the selected period.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th>Plate Number</th><th>Business Establishment</th><th>Owner / Applicant</th><th>Business Type</th><th>Business Address</th><th class="text-center">Area</th><th>Application</th><th>Latest Clearance</th><th>Status</th></tr></thead>
+              <thead><tr><th>Plate Number</th><th>Business Establishment</th><th>Owner / Applicant</th><th>Business Type</th><th>Business Address</th><th class="text-center">Area</th><th>Latest Clearance</th><th>Status</th></tr></thead>
               <tbody>
                 <?php foreach ($businessEstablishmentRows as $establishmentRow): ?>
                 <tr>
@@ -4277,7 +4277,6 @@ if ($issuanceModuleConfig !== null):
                   <td><?= htmlspecialchars((string)(($establishmentRow['business_type'] ?? '') ?: '—')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['business_address'] ?? '') ?: '—')) ?></td>
                   <td class="text-center"><?= htmlspecialchars(rp_area_number_only($establishmentRow['area_number'] ?? '')) ?></td>
-                  <td><?= htmlspecialchars((string)(($establishmentRow['application_type'] ?? '') ?: '—')) ?></td>
                   <td><?= htmlspecialchars((string)($establishmentRow['clearance_date'] ?? 'N/A')) ?></td>
                   <td><?= htmlspecialchars((string)($establishmentRow['status_label'] ?? 'Completed')) ?></td>
                 </tr>
