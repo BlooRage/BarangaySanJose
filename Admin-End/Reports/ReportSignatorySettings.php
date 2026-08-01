@@ -26,6 +26,7 @@ foreach ([
     'signatory_one_position' => 'VARCHAR(180) NULL',
     'signatory_two_name' => 'VARCHAR(180) NULL',
     'signatory_two_position' => 'VARCHAR(180) NULL',
+    'print_header_enabled' => 'TINYINT(1) NOT NULL DEFAULT 1',
 ] as $column => $definition) {
     if (!rp_column_exists($conn, 'report_signatory_settings', $column)) {
         $conn->query("ALTER TABLE report_signatory_settings ADD COLUMN {$column} {$definition}");
@@ -38,7 +39,8 @@ $values = [
     'signatory_two_name' => '',
     'signatory_two_position' => 'Punong Barangay',
 ];
-$load = $conn->prepare('SELECT signatory_one_name, signatory_one_position, signatory_two_name, signatory_two_position FROM report_signatory_settings WHERE report_module=? LIMIT 1');
+$printHeaderEnabled = true;
+$load = $conn->prepare('SELECT signatory_one_name, signatory_one_position, signatory_two_name, signatory_two_position, print_header_enabled FROM report_signatory_settings WHERE report_module=? LIMIT 1');
 if ($load) {
     $load->bind_param('s', $module);
     $load->execute();
@@ -47,6 +49,7 @@ if ($load) {
         foreach ($values as $key => $fallback) {
             $values[$key] = trim((string)($row[$key] ?? ''));
         }
+        $printHeaderEnabled = (int)($row['print_header_enabled'] ?? 1) === 1;
     }
     $load->close();
 }
@@ -56,21 +59,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach (array_keys($values) as $key) {
         $values[$key] = trim((string)($_POST[$key] ?? ''));
     }
+    $printHeaderEnabled = isset($_POST['print_header_enabled']);
     if (in_array('', $values, true)) {
         $settingsError = 'Enter the name and position of both signatories.';
     } else {
         $save = $conn->prepare("INSERT INTO report_signatory_settings
-            (report_module, signatory_one_name, signatory_one_position, signatory_two_name, signatory_two_position, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (report_module, signatory_one_name, signatory_one_position, signatory_two_name, signatory_two_position, print_header_enabled, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 signatory_one_name=VALUES(signatory_one_name),
                 signatory_one_position=VALUES(signatory_one_position),
                 signatory_two_name=VALUES(signatory_two_name),
                 signatory_two_position=VALUES(signatory_two_position),
+                print_header_enabled=VALUES(print_header_enabled),
                 updated_by=VALUES(updated_by)");
         if ($save) {
             $updatedBy = (string)($_SESSION['user_id'] ?? '');
-            $save->bind_param('ssssss', $module, $values['signatory_one_name'], $values['signatory_one_position'], $values['signatory_two_name'], $values['signatory_two_position'], $updatedBy);
+            $printHeaderValue = $printHeaderEnabled ? 1 : 0;
+            $save->bind_param('sssssis', $module, $values['signatory_one_name'], $values['signatory_one_position'], $values['signatory_two_name'], $values['signatory_two_position'], $printHeaderValue, $updatedBy);
             if ($save->execute()) {
                 $save->close();
                 header('Location: ' . $settingsUrl . '&saved=1');
@@ -104,12 +110,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <a class="rss-back" href="<?= htmlspecialchars($categoryUrl) ?>"><i class="fas fa-arrow-left me-2"></i>Back to report options</a>
     </div>
     <hr><br>
-    <?php if (isset($_GET['saved'])): ?><div class="alert alert-success">Report signatories saved successfully.</div><?php endif; ?>
+    <?php if (isset($_GET['saved'])): ?><div class="alert alert-success">Report settings saved successfully.</div><?php endif; ?>
     <?php if (!empty($settingsError)): ?><div class="alert alert-danger"><?= htmlspecialchars($settingsError) ?></div><?php endif; ?>
     <section class="rss-panel">
       <div class="rss-panel-head"><h2 class="h6 fw-bold mb-1">Generated Report Signatories</h2><p class="text-muted small mb-0">These two names and positions appear in the signature area at the bottom of every generated report in this category.</p></div>
       <form method="POST" action="<?= htmlspecialchars($settingsUrl) ?>">
         <?= csrfTokenField() ?>
+        <div class="rss-card mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div><div class="rss-card-title">Printing Header</div><div class="small text-muted">Turn this off when printing on paper that already has the official barangay letterhead.</div></div>
+            <label class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="print_header_enabled" value="1" <?= $printHeaderEnabled ? 'checked' : '' ?>>
+              <span class="ms-2 fw-semibold">Add barangay header when printed</span>
+            </label>
+          </div>
+        </div>
         <div class="rss-grid">
           <?php foreach ([1 => ['one', 'Signatory 1'], 2 => ['two', 'Signatory 2']] as [$key, $label]): ?>
           <fieldset class="rss-card">
@@ -119,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </fieldset>
           <?php endforeach; ?>
         </div>
-        <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" href="<?= htmlspecialchars($categoryUrl) ?>">Cancel</a><button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>Save Signatories</button></div>
+        <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" href="<?= htmlspecialchars($categoryUrl) ?>">Cancel</a><button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>Save Settings</button></div>
       </form>
     </section>
   </main>

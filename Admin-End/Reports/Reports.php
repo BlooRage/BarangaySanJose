@@ -1451,6 +1451,7 @@ $requiredSignatoryColumns = [
     'signatory_one_position' => 'VARCHAR(180) NULL',
     'signatory_two_name' => 'VARCHAR(180) NULL',
     'signatory_two_position' => 'VARCHAR(180) NULL',
+    'print_header_enabled' => 'TINYINT(1) NOT NULL DEFAULT 1',
 ];
 foreach ($requiredSignatoryColumns as $column => $definition) {
     if (!rp_column_exists($conn, 'report_signatory_settings', $column)) {
@@ -1460,7 +1461,7 @@ foreach ($requiredSignatoryColumns as $column => $definition) {
 
 $savedSignatoryRow = [];
 if ($reportSignatorySettingsReady) {
-    $loadSignatory = $conn->prepare('SELECT signatory_one_name, signatory_one_position, signatory_two_name, signatory_two_position FROM report_signatory_settings WHERE report_module=? LIMIT 1');
+    $loadSignatory = $conn->prepare('SELECT signatory_one_name, signatory_one_position, signatory_two_name, signatory_two_position, print_header_enabled FROM report_signatory_settings WHERE report_module=? LIMIT 1');
     if ($loadSignatory) {
         $loadSignatory->bind_param('s', $module);
         $loadSignatory->execute();
@@ -1468,6 +1469,8 @@ if ($reportSignatorySettingsReady) {
         $loadSignatory->close();
     }
 }
+$reportPrintHeaderEnabled = !array_key_exists('print_header_enabled', $savedSignatoryRow)
+    || (int)$savedSignatoryRow['print_header_enabled'] === 1;
 
 $preparedByName = trim((string)($savedSignatoryRow['signatory_one_name'] ?? '')) ?: $preparedByName;
 $preparedByRole = trim((string)($savedSignatoryRow['signatory_one_position'] ?? '')) ?: 'Prepared by';
@@ -2908,6 +2911,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       border-bottom: 2px solid #4b5563;
       margin-top: 12px;
     }
+    .rp-letterhead-block--hidden { visibility: hidden; }
     .rp-doc-header .rp-report-title {
       font-size: 17px;
       font-weight: 800;
@@ -3528,17 +3532,19 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
 
         <!-- Document header -->
         <div class="rp-doc-header">
-          <div class="rp-letterhead">
-            <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportLeftLogo) ?>" alt="Barangay San Jose Logo">
-            <div class="rp-letterhead-center">
-              <p class="rp-letterhead-rep">REPUBLIKA NG PILIPINAS</p>
-              <p>LALAWIGAN NG RIZAL</p>
-              <p>BAYAN NG RODRIGUEZ</p>
-              <p class="rp-letterhead-barangay">BARANGAY SAN JOSE</p>
+          <div class="rp-letterhead-block<?= $reportPrintHeaderEnabled ? '' : ' rp-letterhead-block--hidden' ?>">
+            <div class="rp-letterhead">
+              <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportLeftLogo) ?>" alt="Barangay San Jose Logo">
+              <div class="rp-letterhead-center">
+                <p class="rp-letterhead-rep">REPUBLIKA NG PILIPINAS</p>
+                <p>LALAWIGAN NG RIZAL</p>
+                <p>BAYAN NG RODRIGUEZ</p>
+                <p class="rp-letterhead-barangay">BARANGAY SAN JOSE</p>
+              </div>
+              <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportRightLogo) ?>" alt="Montalban Logo" onerror="this.onerror=null;this.src='<?= htmlspecialchars($reportLeftLogo) ?>';">
             </div>
-            <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportRightLogo) ?>" alt="Montalban Logo" onerror="this.onerror=null;this.src='<?= htmlspecialchars($reportLeftLogo) ?>';">
+            <div class="rp-letterhead-line"></div>
           </div>
-          <div class="rp-letterhead-line"></div>
           <div class="rp-report-title"><?= htmlspecialchars(strtoupper((string)preg_replace('/\s+Report$/i', '', $currentLabel))) ?> STATISTICAL REPORT</div>
           <?php if ($module !== 'residents'): ?>
           <div class="rp-period">
