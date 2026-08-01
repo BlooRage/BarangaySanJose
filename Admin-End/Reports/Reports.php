@@ -3739,6 +3739,7 @@ if ($issuanceModuleConfig !== null):
   );
   $issuanceSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
   $showIssuanceRevenue = $showReportSection('revenue');
+  $showIssuanceExemptColumn = $module === 'certificate_issuance';
 ?>
         <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
@@ -4058,6 +4059,7 @@ if ($issuanceModuleConfig !== null):
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('revenue')) ?></div>
           <table class="rp-table">
+            <?php if ($showIssuanceExemptColumn): ?>
             <colgroup>
               <col style="width:38%">
               <col style="width:18%">
@@ -4065,12 +4067,22 @@ if ($issuanceModuleConfig !== null):
               <col style="width:12%">
               <col style="width:20%">
             </colgroup>
+            <?php else: ?>
+            <colgroup>
+              <col style="width:38%">
+              <col style="width:18%">
+              <col style="width:14%">
+              <col style="width:30%">
+            </colgroup>
+            <?php endif; ?>
             <thead>
               <tr>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Request Type</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Paid</th>
+                <?php if ($showIssuanceExemptColumn): ?>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Free / Exempt</th>
+                <?php endif; ?>
                 <th class="text-end">Amount Collected</th>
               </tr>
             </thead>
@@ -4080,7 +4092,9 @@ if ($issuanceModuleConfig !== null):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($row['request_type_label'] ?? '')) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['paid'] ?? 0)) ?></td>
+                <?php if ($showIssuanceExemptColumn): ?>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['free_exempt'] ?? 0)) ?></td>
+                <?php endif; ?>
                 <td class="text-end">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
               </tr>
               <?php endforeach; ?>
@@ -4090,12 +4104,16 @@ if ($issuanceModuleConfig !== null):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['total']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['paid']) ?></td>
+                <?php if ($showIssuanceExemptColumn): ?>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['free_exempt']) ?></td>
+                <?php endif; ?>
                 <td class="text-end">&#8369;<?= number_format((float)$revenueAccountingTotals['revenue'], 2) ?></td>
               </tr>
             </tfoot>
           </table>
+          <?php if ($showIssuanceExemptColumn): ?>
           <p class="rp-chart-note">Free / Exempt includes requests whose effective fee is zero, such as qualified PWD, senior citizen, First Time Job Seeker, and inherently free document requests.</p>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
 
