@@ -1374,7 +1374,7 @@ $reportFilterAreas = rp_parse_query_list($rawFilterAreaParam);
 $reportFilterSectors = rp_parse_query_list($rawFilterSectorParam, 'rp_normalize_sector_label');
 $reportFilterStatuses = rp_parse_query_list($rawFilterStatusParam, static fn(string $value): string => strtolower(trim($value)));
 $issuanceModuleConfig = rp_issuance_module_config($module);
-$defaultReportStatusSelection = $module === 'certificate_issuance' ? ['completed'] : [];
+$defaultReportStatusSelection = $issuanceModuleConfig !== null ? ['completed'] : [];
 $officialReportAreaOptions = rp_official_area_options();
 $officialReportSectorOptions = rp_official_sector_options();
 if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialReportAreaOptions)) {
