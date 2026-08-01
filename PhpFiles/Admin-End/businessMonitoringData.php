@@ -293,11 +293,27 @@ function bm_is_business_monitoring_request(array $row, array $payload): bool
     return false;
 }
 
+function bm_is_commercial_establishment_request(array $row, array $payload): bool
+{
+    $docType = bm_non_empty([$row['document_type'] ?? '', $payload['document_type'] ?? '']);
+    $docKey = dr_canonical_document_type_key(dr_normalize_document_type($docType));
+    return in_array($docKey, [
+        'barangayclearanceforcommercialpermit',
+        'clearanceforcommercialpermit',
+        'commercialpermit',
+        'barangayclearanceforcommercialbuildingpermit',
+        'clearanceforcommercialbuildingpermit',
+        'commercialbuildingpermit',
+    ], true);
+}
+
 if (!dr_table_exists($conn, 'documentrequesttbl')) {
     dr_respond_json(200, ['success' => true, 'items' => []]);
 }
 
 bm_ensure_establishment_status_table($conn);
+$monitoringKind = strtolower(trim((string)($_GET['kind'] ?? 'business')));
+$isCommercialDirectory = $monitoringKind === 'commercial';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken(true);
@@ -405,6 +421,14 @@ if (dr_table_exists($conn, 'residentaddresstbl')) {
 }
 
 $whereParts = [];
+if ($isCommercialDirectory) {
+    if (dr_column_exists($conn, 'documentrequesttbl', 'document_type')) {
+        $whereParts[] = "LOWER(COALESCE(d.document_type, '')) LIKE '%commercial%permit%'";
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+        $whereParts[] = "d.request_details LIKE '%establishment_name%'";
+    }
+} else {
 if (dr_column_exists($conn, 'documentrequesttbl', 'document_type')) {
     $whereParts[] = "LOWER(COALESCE(d.document_type, '')) LIKE '%business%'";
 }
@@ -413,6 +437,7 @@ if (dr_column_exists($conn, 'documentrequesttbl', 'purpose')) {
 }
 if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
     $whereParts[] = "d.request_details LIKE '%business_name%'";
+}
 }
 
 $orderCol = dr_column_exists($conn, 'documentrequesttbl', 'submitted_at')
@@ -469,7 +494,9 @@ while ($row = $result->fetch_assoc()) {
     }
 
     $payload = bm_decode_payload($row);
-    if (!bm_is_business_monitoring_request($row, $payload)) {
+    if ($isCommercialDirectory
+        ? !bm_is_commercial_establishment_request($row, $payload)
+        : !bm_is_business_monitoring_request($row, $payload)) {
         continue;
     }
 
@@ -480,7 +507,7 @@ while ($row = $result->fetch_assoc()) {
     $stage = strtolower(trim((string)($row['stage'] ?? '')));
     $rowRequestId = trim((string)($row['request_id'] ?? ''));
     $establishmentStatus = $establishmentStatuses[$rowRequestId] ?? 'operational';
-    if ($stage !== DR_STAGE_COMPLETED || $establishmentStatus !== 'operational') {
+    if ($stage !== DR_STAGE_COMPLETED) {
         continue;
     }
 
@@ -593,6 +620,19 @@ while ($row = $result->fetch_assoc()) {
         'establishment_status' => in_array($establishmentStatus, ['operational', 'closed', 'archived'], true)
             ? $establishmentStatus
             : 'operational',
+        'establishment_name' => bm_non_empty([$payload['establishment_name'] ?? '', $businessName]),
+        'establishment_address' => bm_non_empty([
+            $payload['location'] ?? '',
+            $payload['lot_full_address'] ?? '',
+            $payload['business_full_address'] ?? '',
+            $businessAddress,
+        ]),
+        'establishment_area' => bm_non_empty([
+            $payload['area_number'] ?? '',
+            $payload['lot_area_number'] ?? '',
+            $row['_area_number_by_user'] ?? '',
+            $row['_area_number_by_resident'] ?? '',
+        ]),
     ];
 }
 

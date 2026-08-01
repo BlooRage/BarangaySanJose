@@ -197,7 +197,7 @@ $isClearanceIssuanceSectionActive = $isClearanceIssuanceActive
     || $isBusinessMonitoringSettingsActive;
 $isClearanceIssuanceTrackerActive = $isClearanceIssuanceSectionActive
     && !$isBusinessMonitoringSettingsActive;
-$isEstablishmentMonitoringActive = $isClearanceCommercialPermitActive;
+$isEstablishmentMonitoringActive = $current === 'EstablishmentMonitoring.php';
 $isBusinessMonitoringTrackerActive = $current === 'CertificateTracker.php'
     && !$isIdIssuanceActive
     && (
@@ -1505,7 +1505,7 @@ if ($sbSidebarUserId !== '') {
       </li>
       <?php if ($sbCan('business_monitoring')): ?>
       <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clr_commercial_permit__')) ?>"
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/EstablishmentMonitoring.php')) ?>"
            class="btn btn-toggle sidebar-direct-link rounded <?= $isEstablishmentMonitoringActive ? 'active' : '' ?>"
            style="<?= $isEstablishmentMonitoringActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <span class="sidebar-icon-wrap"><i class="fas fa-store"></i></span>
