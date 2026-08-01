@@ -118,7 +118,11 @@
           color: #2563eb;
         }
         .resident-date-modal {
-          z-index: 2060;
+          /* This picker can open from inside another Bootstrap modal. */
+          z-index: 2080 !important;
+        }
+        .resident-date-modal.show ~ .modal-backdrop {
+          z-index: 2070 !important;
         }
         .resident-date-modal .modal-content {
           border-radius: 18px;

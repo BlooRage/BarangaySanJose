@@ -52,12 +52,10 @@ $choices = [[
     'icon' => 'fa-chart-column',
     'query' => ['module' => $module, 'report' => 'complete'],
 ]];
-$choices[] = [
-    'title' => 'Report Signatory Settings',
-    'description' => 'Set the names and positions of the two signatories shown on generated reports for this category.',
-    'icon' => 'fa-signature',
-    'query' => ['module' => $module, 'report' => 'signatory_settings'],
-];
+$settingsUrl = $reportsBaseUrl . '?' . http_build_query([
+    'module' => $module,
+    'report' => 'signatory_settings',
+]);
 
 $issuanceConfig = rp_issuance_module_config($module);
 if ($issuanceConfig !== null) {
@@ -134,9 +132,18 @@ if ($issuanceConfig !== null) {
     }
     .report-choice-back:hover { color: #de710c; }
     .report-choice-panel { padding: 1.25rem; border: 1px solid #dee2e6; border-radius: 1rem; background: #fff; box-shadow: 0 .125rem .25rem rgba(0,0,0,.075); }
-    .report-choice-panel-head { padding-bottom: .75rem; margin-bottom: .75rem; border-bottom: 1px solid #edf0f3; }
+    .report-choice-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: .75rem; margin-bottom: .75rem; border-bottom: 1px solid #edf0f3; }
     .report-choice-heading { margin: 0; color: #212529; font-size: 1.05rem; font-weight: 700; }
     .report-choice-panel-copy { max-width: 760px; margin: .2rem 0 0; color: #6c757d; font-size: .9rem; }
+    .report-choice-settings {
+      display: inline-flex; flex: 0 0 auto; align-items: center; gap: .45rem; padding: .55rem .9rem;
+      color: var(--report-accent); font-size: .875rem; font-weight: 700; text-decoration: none;
+      border: 1px solid var(--report-accent); border-radius: .65rem; background: #fff;
+      transition: color .18s ease, background-color .18s ease, box-shadow .18s ease;
+    }
+    .report-choice-settings:hover, .report-choice-settings:focus-visible {
+      color: #fff; background: var(--report-accent); box-shadow: 0 .35rem .8rem rgba(15,23,42,.12);
+    }
     .report-choice-grid {
       display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;
     }
@@ -158,6 +165,7 @@ if ($issuanceConfig !== null) {
     @media (max-width: 991.98px) { .report-choice-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 575.98px) {
       .report-choice-panel { padding: .85rem; }
+      .report-choice-panel-head { align-items: center; }
       .report-choice-grid { grid-template-columns: 1fr; }
       .report-choice-card { min-height: 205px; }
     }
@@ -177,8 +185,13 @@ if ($issuanceConfig !== null) {
       <hr><br>
       <section class="report-choice-panel" aria-labelledby="availableReportsHeading">
         <div class="report-choice-panel-head">
-          <h2 class="report-choice-heading" id="availableReportsHeading">Available Reports</h2>
-          <p class="report-choice-panel-copy">Choose the report you want to review, customize, print, or download.</p>
+          <div>
+            <h2 class="report-choice-heading" id="availableReportsHeading">Available Reports</h2>
+            <p class="report-choice-panel-copy">Choose the report you want to review, customize, print, or download.</p>
+          </div>
+          <a class="report-choice-settings" href="<?= htmlspecialchars($settingsUrl, ENT_QUOTES, 'UTF-8') ?>">
+            <i class="fas fa-gear" aria-hidden="true"></i><span>Settings</span>
+          </a>
         </div>
         <div class="report-choice-grid" aria-label="<?= htmlspecialchars($meta['title']) ?> report types">
         <?php foreach ($choices as $choice): ?>
