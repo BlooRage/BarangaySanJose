@@ -6,6 +6,7 @@ require_once __DIR__ . '/includes/admin_guard.php';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="<?= htmlspecialchars(ensureCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Monitoring</title>
@@ -44,6 +45,21 @@ require_once __DIR__ . '/includes/admin_guard.php';
         .business-status-badge.denied {
             color: #8b1e2d;
             background: #fde2e6;
+        }
+
+        .business-status-badge.operational {
+            color: #0b5d32;
+            background: #d7f5e6;
+        }
+
+        .business-status-badge.closed {
+            color: #8b1e2d;
+            background: #fde2e6;
+        }
+
+        .business-status-badge.archived {
+            color: #4b5563;
+            background: #e5e7eb;
         }
 
         .business-view-grid {
@@ -186,7 +202,7 @@ require_once __DIR__ . '/includes/admin_guard.php';
         <div class="bg-white p-4 rounded-4 shadow-sm border business-monitoring-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <div class="text-muted small">Shows business permit clearance requests only.</div>
+                    <div class="text-muted small">Shows completed business permit clearances for operational establishments only.</div>
                 </div>
 
                 <div class="admin-list-actions">
@@ -395,6 +411,6 @@ require_once __DIR__ . '/includes/admin_guard.php';
 </script>
 <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/businessMonitoring.js?v=20260322-3"></script>
+<script src="../JS-Script-Files/Admin-End/businessMonitoring.js?v=20260801-1"></script>
 </body>
 </html>

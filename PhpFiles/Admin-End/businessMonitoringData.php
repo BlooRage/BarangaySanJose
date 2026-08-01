@@ -13,6 +13,20 @@ requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personn
 
 header('Content-Type: application/json; charset=utf-8');
 
+function bm_ensure_establishment_status_table(mysqli $conn): void
+{
+    $sql = "CREATE TABLE IF NOT EXISTS businessmonitoringstatustbl (
+        request_id VARCHAR(64) NOT NULL,
+        establishment_status ENUM('operational', 'closed', 'archived') NOT NULL DEFAULT 'operational',
+        updated_by VARCHAR(64) NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (request_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    if (!$conn->query($sql)) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to prepare establishment status storage.']);
+    }
+}
+
 function bm_select_or_null(mysqli $conn, string $table, string $column, string $alias, string $tableAlias = 'd'): string
 {
     return dr_column_exists($conn, $table, $column)
@@ -283,6 +297,48 @@ if (!dr_table_exists($conn, 'documentrequesttbl')) {
     dr_respond_json(200, ['success' => true, 'items' => []]);
 }
 
+bm_ensure_establishment_status_table($conn);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken(true);
+    $action = strtolower(trim((string)($_POST['action'] ?? '')));
+    if ($action !== 'set_establishment_status') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Unsupported business monitoring action.']);
+    }
+
+    $requestId = trim((string)($_POST['request_id'] ?? ''));
+    $status = strtolower(trim((string)($_POST['status'] ?? '')));
+    if ($requestId === '' || !in_array($status, ['operational', 'closed', 'archived'], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Select a valid establishment status.']);
+    }
+
+    $requestRow = dr_fetch_request($conn, $requestId);
+    if (!$requestRow || !bm_is_business_monitoring_request($requestRow, bm_decode_payload($requestRow))) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Business establishment record not found.']);
+    }
+
+    $updatedBy = trim((string)($_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? ''));
+    $stmtStatus = $conn->prepare("INSERT INTO businessmonitoringstatustbl (request_id, establishment_status, updated_by, updated_at)
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE establishment_status=VALUES(establishment_status), updated_by=VALUES(updated_by), updated_at=NOW()");
+    if (!$stmtStatus) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to prepare the establishment status update.']);
+    }
+    $stmtStatus->bind_param('sss', $requestId, $status, $updatedBy);
+    $saved = $stmtStatus->execute();
+    $stmtStatus->close();
+    if (!$saved) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to update the establishment status.']);
+    }
+
+    dr_respond_json(200, [
+        'success' => true,
+        'message' => 'Establishment marked as ' . ucfirst($status) . '.',
+        'request_id' => $requestId,
+        'establishment_status' => $status,
+    ]);
+}
+
 $baseSelects = [
     'd.request_id AS request_id',
     bm_select_or_null($conn, 'documentrequesttbl', 'resident_user_id', 'resident_user_id'),
@@ -296,6 +352,7 @@ $baseSelects = [
     dr_column_exists($conn, 'documentrequesttbl', 'request_details')
         ? 'd.request_details AS request_details'
         : 'NULL AS request_details',
+    "COALESCE(bms.establishment_status, 'operational') AS establishment_status",
 ];
 
 if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
@@ -368,6 +425,7 @@ $sql = "
         " . implode(",\n        ", $baseSelects)
         . ($extraSelects ? ",\n        " . implode(",\n        ", $extraSelects) : '') . "
     FROM documentrequesttbl d
+    LEFT JOIN businessmonitoringstatustbl bms ON bms.request_id = d.request_id
     " . ($extraJoins ? implode("\n    ", $extraJoins) : '') . "
 ";
 
@@ -408,6 +466,12 @@ while ($row = $result->fetch_assoc()) {
 
     if (trim((string)($row['stage'] ?? '')) === '') {
         dr_sync_stage_from_status_lookup($conn, $row);
+    }
+
+    $stage = strtolower(trim((string)($row['stage'] ?? '')));
+    $establishmentStatus = strtolower(trim((string)($row['establishment_status'] ?? 'operational')));
+    if ($stage !== DR_STAGE_COMPLETED || $establishmentStatus !== 'operational') {
+        continue;
     }
 
     $documentType = bm_non_empty([
@@ -516,6 +580,9 @@ while ($row = $result->fetch_assoc()) {
         'stage' => $stage,
         'stage_label' => dr_stage_label($stage),
         'status_bucket' => bm_status_bucket($stage),
+        'establishment_status' => in_array(strtolower(trim((string)($row['establishment_status'] ?? ''))), ['operational', 'closed', 'archived'], true)
+            ? strtolower(trim((string)$row['establishment_status']))
+            : 'operational',
     ];
 }
 

@@ -7,6 +7,7 @@
   })();
 
   const endpoint = `${appBase}/PhpFiles/Admin-End/businessMonitoringData.php`;
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
   const tableBody = document.getElementById("businessMonitoringTbody");
   const searchInput = document.getElementById("searchInput");
   const btnApplyFilter = document.getElementById("btnBusinessFilterApply");
@@ -165,6 +166,14 @@
     return `<span class="business-status-badge ${esc(bucket)}">${esc(label)}</span>`;
   }
 
+  function establishmentStatusBadge(row) {
+    const status = ["operational", "closed", "archived"].includes(String(row?.establishment_status || "").toLowerCase())
+      ? String(row.establishment_status).toLowerCase()
+      : "operational";
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    return `<span class="business-status-badge ${esc(status)}">${esc(label)}</span>`;
+  }
+
   function detailField(label, value, options = {}) {
     const { raw = false, fullWidth = false } = options;
     return `
@@ -312,6 +321,7 @@
   }
 
   function buildRow(row) {
+    const requestId = esc(text(row.request_id, ""));
     return `
       <tr>
         <td>${esc(text(row.plate_number))}</td>
@@ -319,9 +329,19 @@
         <td>${esc(text(row.business_type))}</td>
         <td>${esc(text(row.business_address))}</td>
         <td>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-view-id="${esc(text(row.request_id, ""))}">
-            View
-          </button>
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            ${establishmentStatusBadge(row)}
+            <div class="dropdown">
+              <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><button class="dropdown-item" type="button" data-view-id="${requestId}"><i class="fa-regular fa-eye me-2"></i>View</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item" type="button" data-establishment-status="operational" data-request-id="${requestId}"><i class="fa-solid fa-store me-2 text-success"></i>Operational</button></li>
+                <li><button class="dropdown-item" type="button" data-establishment-status="closed" data-request-id="${requestId}"><i class="fa-solid fa-store-slash me-2 text-danger"></i>Closed</button></li>
+                <li><button class="dropdown-item" type="button" data-establishment-status="archived" data-request-id="${requestId}"><i class="fa-solid fa-box-archive me-2 text-secondary"></i>Archived</button></li>
+              </ul>
+            </div>
+          </div>
         </td>
       </tr>
     `;
@@ -386,6 +406,7 @@
 
     tableBody.innerHTML = pageRows.map(buildRow).join("");
     bindViewButtons();
+    bindStatusButtons();
   }
 
   function renderViewModal(row) {
@@ -402,6 +423,7 @@
         ${detailField("Owner Type", row?.owner_type)}
         ${detailField("Owner Name", row?.owner_name)}
         ${detailField("Status", statusBadge(row), { raw: true })}
+        ${detailField("Establishment Status", establishmentStatusBadge(row), { raw: true })}
         ${detailField("Submitted At", row?.submitted_at_display || row?.submitted_at)}
         ${detailField("Business Address", row?.business_address, { fullWidth: true })}
       </div>
@@ -422,6 +444,43 @@
     tableBody.querySelectorAll("button[data-view-id]").forEach((button) => {
       button.addEventListener("click", () => {
         openViewModal(String(button.getAttribute("data-view-id") || ""));
+      });
+    });
+  }
+
+  async function updateEstablishmentStatus(requestId, status, button) {
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    if ((status === "closed" || status === "archived") && !window.confirm(`Mark this establishment as ${label}?`)) return;
+
+    const body = new FormData();
+    body.append("action", "set_establishment_status");
+    body.append("request_id", requestId);
+    body.append("status", status);
+    body.append("csrf_token", csrfToken);
+    if (button) button.disabled = true;
+    try {
+      const response = await fetch(endpoint, { method: "POST", body, headers: { Accept: "application/json" } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.success === false) throw new Error(data.message || "Unable to update establishment status.");
+      const row = state.rowsRaw.find((item) => String(item?.request_id || "") === requestId);
+      if (row) row.establishment_status = status;
+      renderTableAfterFilter();
+    } catch (error) {
+      window.alert(error?.message || "Unable to update establishment status.");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  function bindStatusButtons() {
+    if (!tableBody) return;
+    tableBody.querySelectorAll("button[data-establishment-status]").forEach((button) => {
+      button.addEventListener("click", () => {
+        updateEstablishmentStatus(
+          String(button.getAttribute("data-request-id") || ""),
+          String(button.getAttribute("data-establishment-status") || ""),
+          button
+        );
       });
     });
   }
