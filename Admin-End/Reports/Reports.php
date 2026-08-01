@@ -4165,6 +4165,9 @@ if ($issuanceModuleConfig !== null):
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>">Area</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Channel</th>
+                <?php if ($module === 'clearance_issuance'): ?>
+                <th class="text-end">Amount Paid</th>
+                <?php endif; ?>
               </tr>
             </thead>
             <tbody>
@@ -4177,6 +4180,9 @@ if ($issuanceModuleConfig !== null):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars((string)($requesterRow['status_label'] ?? '')) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>"><?= htmlspecialchars((string)(($requesterRow['area_number'] ?? '') ?: 'Unspecified')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_source'] ?? '')) ?></td>
+                <?php if ($module === 'clearance_issuance'): ?>
+                <td class="text-end">&#8369;<?= number_format((float)($requesterRow['revenue'] ?? 0), 2) ?></td>
+                <?php endif; ?>
               </tr>
               <?php endforeach; ?>
             </tbody>
