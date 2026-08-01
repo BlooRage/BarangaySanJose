@@ -2909,14 +2909,14 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       margin-top: 12px;
     }
     .rp-doc-header .rp-report-title {
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 17px;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: .04em;
       color: #000;
-      margin-top: 16px;
+      margin-top: 18px;
     }
-    .rp-doc-header .rp-period { font-size: 12px; color: #4b5563; margin-top: 4px; }
+    .rp-doc-header .rp-period { font-size: 12px; font-weight: 400; color: #4b5563; margin-top: 6px; }
     .rp-filter-summary {
       margin-top: 6px;
       font-size: 11px;
@@ -3062,7 +3062,10 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       padding-top: 18px;
       border-top: 1.5px solid #4b5563;
     }
-    .rp-footer-meta { font-size: 11.5px; color: #555; margin-bottom: 28px; }
+    .rp-footer-meta {
+      margin-top: 24px; padding-top: 8px; border-top: 1px solid #d1d5db;
+      color: #6b7280; font-size: 9px; line-height: 1.35; text-align: center;
+    }
     .rp-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
     .rp-sig-block { text-align: center; }
     .rp-sig-block .rp-sig-line { border-top: 1px solid #333; padding-top: 4px; margin-top: 36px; }
@@ -3115,7 +3118,8 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
       .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
       .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
-      .rp-doc-header .rp-report-title { font-size: 12px !important; color: #000 !important; font-weight: 700 !important; }
+      .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 800 !important; }
+      .rp-doc-header .rp-period { font-size: 12px !important; font-weight: 400 !important; margin-top: 6px !important; }
       .rp-section {
         margin-top: 14pt !important;
         page-break-inside: auto !important;
@@ -3198,7 +3202,8 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
     .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
     .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
-    .rp-doc-header .rp-report-title { font-size: 12px !important; color: #000 !important; font-weight: 700 !important; }
+    .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 800 !important; }
+    .rp-doc-header .rp-period { font-size: 12px !important; font-weight: 400 !important; margin-top: 6px !important; }
     .rp-section {
       margin-top: 14pt !important;
       page-break-inside: auto !important;
@@ -5580,13 +5585,6 @@ elseif ($module === 'complaints'):
 
         <!-- ── Certification / Signature block ─────────────────────────── -->
         <div class="rp-footer">
-          <div class="rp-footer-meta">
-            Report generated on <strong><?= date('F j, Y \a\t g:i A') ?></strong>
-            <?php if ($module !== 'residents'): ?>
-            &nbsp;|&nbsp; Period covered: <strong><?= rp_date_label($dateFrom) ?></strong> to <strong><?= rp_date_label($dateTo) ?></strong>
-            <?php endif; ?>
-            &nbsp;|&nbsp; System: Barangay San Jose Information Management System
-          </div>
           <div class="rp-sig-grid">
             <div class="rp-sig-block">
               <div style="height:40px;"></div>
@@ -5602,6 +5600,13 @@ elseif ($module === 'complaints'):
                 <div class="rp-sig-role"><?= htmlspecialchars($reportNotedByRole) ?></div>
               </div>
             </div>
+          </div>
+          <div class="rp-footer-meta">
+            Report generated on <strong><?= date('F j, Y \a\t g:i A') ?></strong>
+            <?php if ($module !== 'residents'): ?>
+            &nbsp;|&nbsp; Period covered: <strong><?= rp_date_label($dateFrom) ?></strong> to <strong><?= rp_date_label($dateTo) ?></strong>
+            <?php endif; ?>
+            &nbsp;|&nbsp; System: Barangay San Jose Information Management System
           </div>
         </div>
 
