@@ -3060,7 +3060,6 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-footer {
       margin-top: 36px;
       padding-top: 18px;
-      border-top: 1.5px solid #4b5563;
     }
     .rp-footer-meta {
       margin-top: 24px; padding-top: 8px; border-top: 1px solid #d1d5db;
