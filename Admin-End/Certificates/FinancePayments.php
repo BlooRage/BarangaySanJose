@@ -138,6 +138,7 @@ function fp_ensure_manual_transactions_table(mysqli $conn): void
       resident_email VARCHAR(191) DEFAULT NULL,
       transaction_description TEXT NOT NULL,
       department_handle VARCHAR(120) NOT NULL,
+      area_number VARCHAR(40) NOT NULL DEFAULT 'Barangay Wide',
       transaction_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
       or_number_receipt VARCHAR(80) NOT NULL,
       created_by_user_id VARCHAR(12) DEFAULT NULL,
@@ -162,6 +163,9 @@ function fp_ensure_manual_transactions_table(mysqli $conn): void
   }
   if (fp_table_exists($conn, 'manualfinancetransactiontbl') && !fp_column_exists($conn, 'manualfinancetransactiontbl', 'resident_email')) {
     $conn->query("ALTER TABLE manualfinancetransactiontbl ADD COLUMN resident_email VARCHAR(191) DEFAULT NULL AFTER resident_phone_number");
+  }
+  if (fp_table_exists($conn, 'manualfinancetransactiontbl') && !fp_column_exists($conn, 'manualfinancetransactiontbl', 'area_number')) {
+    $conn->query("ALTER TABLE manualfinancetransactiontbl ADD COLUMN area_number VARCHAR(40) NOT NULL DEFAULT 'Barangay Wide' AFTER department_handle");
   }
 
   $done = true;
@@ -236,6 +240,17 @@ function fp_or_number_exists(mysqli $conn, string $orNumber): bool
   return false;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && trim((string)($_GET['ajax'] ?? '')) === 'check_or_number') {
+  fp_ensure_manual_transactions_table($conn);
+  $orNumber = strtoupper(trim((string)($_GET['or_number'] ?? '')));
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode([
+    'success' => true,
+    'exists' => $orNumber !== '' && fp_or_number_exists($conn, $orNumber),
+  ]);
+  exit;
+}
+
 function fp_fetch_manual_transactions(mysqli $conn, int $limit = 20): array
 {
   fp_ensure_manual_transactions_table($conn);
@@ -264,6 +279,7 @@ function fp_fetch_manual_transactions(mysqli $conn, int $limit = 20): array
       mt.resident_email,
       mt.transaction_description,
       mt.department_handle,
+      mt.area_number,
       mt.transaction_amount,
       mt.or_number_receipt,
       mt.created_by_user_id,
@@ -321,6 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $residentEmail = trim((string)($_POST['resident_email'] ?? ''));
       $transactionDescription = trim((string)($_POST['transaction_description'] ?? ''));
       $departmentHandle = trim((string)($_POST['department_handle'] ?? ''));
+      $areaNumber = trim((string)($_POST['area_number'] ?? ''));
       $orNumberReceipt = strtoupper(trim((string)($_POST['or_number_receipt'] ?? '')));
       $createdByUserId = trim((string)($_SESSION['user_id'] ?? ''));
       $departmentOptions = fp_fetch_department_options($conn);
@@ -342,6 +359,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       if (!in_array($departmentHandle, $departmentOptions, true)) {
         throw new RuntimeException('Please choose a valid barangay department handle.');
+      }
+      $areaOptions = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06', 'Barangay Wide'];
+      if (!in_array($areaNumber, $areaOptions, true)) {
+        throw new RuntimeException('Please choose a valid area number or Barangay Wide.');
       }
 
       $amount = fp_parse_amount($_POST['transaction_amount'] ?? null);
@@ -365,17 +386,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           resident_email,
           transaction_description,
           department_handle,
+          area_number,
           transaction_amount,
           or_number_receipt,
           created_by_user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
       if (!$insertStmt) {
         error_log('[FinancePayments][create_manual_transaction][prepare] ' . $conn->error);
         throw new RuntimeException('Failed to prepare the transaction insert statement.');
       }
       $insertStmt->bind_param(
-        'sssssssdss',
+        'ssssssssdss',
         $transactionId,
         $transactionName,
         $residentAddress,
@@ -383,12 +405,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $residentEmail,
         $transactionDescription,
         $departmentHandle,
+        $areaNumber,
         $amount,
         $orNumberReceipt,
         $createdByUserId
       );
       if (!$insertStmt->execute()) {
+        $insertErrorNumber = $insertStmt->errno;
         $insertStmt->close();
+        if ($insertErrorNumber === 1062) {
+          throw new RuntimeException('OR number receipt already exists. Please enter a different OR number.');
+        }
         throw new RuntimeException('Failed to create the transaction.');
       }
       $insertStmt->close();
@@ -769,16 +796,17 @@ if ($financeSection === 'fees') {
       scrollbar-gutter: stable;
     }
     .manual-transactions-table {
-      min-width: 1120px;
+      min-width: 1240px;
       table-layout: fixed;
     }
-    .manual-transactions-table th:nth-child(1) { width: 12%; }
-    .manual-transactions-table th:nth-child(2) { width: 22%; }
+    .manual-transactions-table th:nth-child(1) { width: 10%; }
+    .manual-transactions-table th:nth-child(2) { width: 20%; }
     .manual-transactions-table th:nth-child(3) { width: 14%; }
     .manual-transactions-table th:nth-child(4) { width: 13%; }
-    .manual-transactions-table th:nth-child(5) { width: 12%; }
+    .manual-transactions-table th:nth-child(5) { width: 11%; }
     .manual-transactions-table th:nth-child(6) { width: 10%; }
-    .manual-transactions-table th:nth-child(7) { width: 17%; }
+    .manual-transactions-table th:nth-child(7) { width: 9%; }
+    .manual-transactions-table th:nth-child(8) { width: 13%; }
     .manual-transactions-table th,
     .manual-transactions-table td {
       overflow-wrap: anywhere;
@@ -1391,13 +1419,15 @@ if ($financeSection === 'fees') {
 
     <?php elseif ($financeSection === 'create' || $financeSection === 'transactions'): ?>
       <div class="finance-fee-shell">
-        <?php if ($pageFlash): ?>
-          <div class="alert alert-<?= htmlspecialchars((string)($pageFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
-            <?= htmlspecialchars((string)($pageFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-          </div>
-        <?php endif; ?>
-
         <div class="row g-4 finance-fee-card transaction-tab-panel p-4 mx-0 mt-0">
+          <?php if ($pageFlash): ?>
+          <div class="col-12">
+            <div class="alert alert-<?= htmlspecialchars((string)($pageFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm mb-0" role="alert">
+              <?= htmlspecialchars((string)($pageFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+            </div>
+          </div>
+          <?php endif; ?>
+
           <?php if ($financeSection === 'create'): ?>
           <div class="col-12">
             <div class="finance-fee-editor">
@@ -1444,6 +1474,22 @@ if ($financeSection === 'fees') {
                 </div>
 
                 <div class="manual-transaction-field">
+                  <label for="manualTransactionArea" class="form-label fw-semibold">Area coverage <span class="manual-transaction-required" aria-hidden="true">*</span></label>
+                  <select id="manualTransactionArea" name="area_number" class="form-select" required>
+                    <option value="" selected disabled>Select an area</option>
+                    <option value="Area 01">Area 01</option>
+                    <option value="Area 1A">Area 1A</option>
+                    <option value="Area 02">Area 02</option>
+                    <option value="Area 03">Area 03</option>
+                    <option value="Area 04">Area 04</option>
+                    <option value="Area 05">Area 05</option>
+                    <option value="Area 06">Area 06</option>
+                    <option value="Barangay Wide">Barangay Wide</option>
+                  </select>
+                  <div class="form-text">Choose Barangay Wide when the collection is not tied to one area.</div>
+                </div>
+
+                <div class="manual-transaction-field">
                   <label for="manualTransactionAmount" class="form-label fw-semibold">Amount <span class="manual-transaction-required" aria-hidden="true">*</span></label>
                   <div class="input-group">
                     <span class="input-group-text">₱</span>
@@ -1451,9 +1497,10 @@ if ($financeSection === 'fees') {
                   </div>
                 </div>
 
-                <div class="manual-transaction-field manual-transaction-field--wide">
+                <div class="manual-transaction-field">
                   <label for="manualTransactionOrNumber" class="form-label fw-semibold">Official receipt (OR) number <span class="manual-transaction-required" aria-hidden="true">*</span></label>
-                  <input id="manualTransactionOrNumber" type="text" name="or_number_receipt" class="form-control" placeholder="Enter the official receipt number" autocomplete="off" required>
+                  <input id="manualTransactionOrNumber" type="text" name="or_number_receipt" class="form-control" placeholder="Enter the official receipt number" autocomplete="off" aria-describedby="manualTransactionOrNumberFeedback" required>
+                  <div id="manualTransactionOrNumberFeedback" class="invalid-feedback">This OR number is already in use.</div>
                 </div>
 
                 <div class="manual-transaction-actions">
@@ -1492,6 +1539,7 @@ if ($financeSection === 'fees') {
                         <th>Name</th>
                         <th>Description</th>
                         <th>Department</th>
+                        <th>Area Coverage</th>
                         <th>Amount</th>
                         <th>OR Receipt</th>
                         <th>Created</th>
@@ -1528,6 +1576,7 @@ if ($financeSection === 'fees') {
                           </td>
                           <td class="manual-transaction-desc"><?= htmlspecialchars((string)($transactionRow['transaction_description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                           <td><?= htmlspecialchars((string)($transactionRow['department_handle'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td><?= htmlspecialchars((string)($transactionRow['area_number'] ?? 'Barangay Wide'), ENT_QUOTES, 'UTF-8') ?></td>
                           <td class="finance-fee-amount">₱<?= number_format((float)($transactionRow['transaction_amount'] ?? 0), 2) ?></td>
                           <td class="fw-semibold"><?= htmlspecialchars((string)($transactionRow['or_number_receipt'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                           <td>
@@ -2245,6 +2294,46 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(modalElement);
     }
   });
+
+  const orNumberInput = document.getElementById('manualTransactionOrNumber');
+  if (orNumberInput) {
+    let checkSequence = 0;
+    const checkUrl = <?= json_encode($financeBaseUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    const clearDuplicateState = () => {
+      checkSequence += 1;
+      orNumberInput.setCustomValidity('');
+      orNumberInput.classList.remove('is-invalid');
+    };
+
+    orNumberInput.addEventListener('input', clearDuplicateState);
+    orNumberInput.addEventListener('blur', async () => {
+      const orNumber = orNumberInput.value.trim().toUpperCase();
+      orNumberInput.value = orNumber;
+      clearDuplicateState();
+      if (orNumber === '') return;
+
+      const sequence = checkSequence;
+      try {
+        const params = new URLSearchParams({
+          section: 'create',
+          ajax: 'check_or_number',
+          or_number: orNumber,
+        });
+        const response = await fetch(`${checkUrl}?${params.toString()}`, {
+          headers: { Accept: 'application/json' },
+        });
+        const result = await response.json();
+        if (sequence !== checkSequence) return;
+        if (result.success && result.exists) {
+          orNumberInput.setCustomValidity('This OR number is already in use.');
+          orNumberInput.classList.add('is-invalid');
+        }
+      } catch (error) {
+        // Submission still performs the authoritative server-side check.
+      }
+    });
+  }
 });
 </script>
 </body>

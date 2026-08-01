@@ -365,6 +365,34 @@ function rp_decode_json_assoc($raw): array {
     return is_array($decoded) ? $decoded : [];
 }
 
+function rp_request_payload_person_name(array $payload): string {
+    foreach (['resident_name', 'applicant_name', 'owner_name', 'full_name'] as $fullNameKey) {
+        $fullName = trim((string)($payload[$fullNameKey] ?? ''));
+        if ($fullName !== '') {
+            return $fullName;
+        }
+    }
+
+    $fieldSets = [
+        ['first_name', 'middle_name', 'last_name', 'suffix'],
+        ['firstname', 'middlename', 'lastname', 'suffix'],
+        ['applicant_first_name', 'applicant_middle_name', 'applicant_last_name', 'applicant_suffix'],
+        ['owner_first_name', 'owner_middle_name', 'owner_last_name', 'owner_suffix'],
+        ['o_fn', 'o_mn', 'o_ln', 'o_sfx'],
+    ];
+    foreach ($fieldSets as $fields) {
+        $parts = array_values(array_filter(array_map(
+            static fn(string $field): string => trim((string)($payload[$field] ?? '')),
+            $fields
+        ), static fn(string $value): bool => $value !== ''));
+        if ($parts !== []) {
+            return implode(' ', $parts);
+        }
+    }
+
+    return '';
+}
+
 function rp_first_existing_datetime_expr(mysqli $conn, string $table, string $alias, array $columns): string {
     $parts = [];
     foreach ($columns as $column) {
@@ -502,6 +530,11 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
     $residentJoin = $residentParts['joins'] !== '' ? "\n        {$residentParts['joins']}" : '';
     $areaExpr = $residentParts['area_expr'] !== 'NULL' ? $residentParts['area_expr'] : "'Unspecified'";
     $sectorExpr = $residentParts['sector_expr'] !== 'NULL' ? $residentParts['sector_expr'] : "''";
+    $residentNameExprs = (array)($residentParts['name_exprs'] ?? []);
+    $residentFirstNameExpr = $residentNameExprs['firstname'] ?? "''";
+    $residentMiddleNameExpr = $residentNameExprs['middlename'] ?? "''";
+    $residentLastNameExpr = $residentNameExprs['lastname'] ?? "''";
+    $residentSuffixExpr = $residentNameExprs['suffix'] ?? "''";
     // fee_amount is not present in every documentrequesttbl schema. The
     // effective-fee helper can fall back to the configured fee when it is
     // absent, so keep the financial query valid by selecting NULL.
@@ -521,6 +554,10 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
             COALESCE(d.resident_user_id, '') AS resident_user_id,
             {$feeAmountExpr} AS fee_amount,
             COALESCE(d.request_details, '') AS request_details,
+            {$residentFirstNameExpr} AS profile_firstname,
+            {$residentMiddleNameExpr} AS profile_middlename,
+            {$residentLastNameExpr} AS profile_lastname,
+            {$residentSuffixExpr} AS profile_suffix,
             COALESCE({$areaExpr}, 'Unspecified') AS area_number,
             COALESCE({$sectorExpr}, '') AS sector_membership,
             TRIM(CONCAT_WS(
@@ -543,10 +580,28 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
         ORDER BY {$financeDateExpr} ASC, d.request_id ASC
     ");
 
-    return array_values(array_filter($rows, static function (array $row) use ($conn): bool {
+    $rows = array_values(array_filter($rows, static function (array $row) use ($conn): bool {
         $effectiveFee = rp_document_request_effective_fee($conn, $row);
         return !($effectiveFee !== null && $effectiveFee <= 0.0);
     }));
+
+    foreach ($rows as &$row) {
+        $financeName = trim((string)($row['resident_name'] ?? ''));
+        $profileName = trim(implode(' ', array_filter([
+            trim(pii_decrypt_string((string)($row['profile_firstname'] ?? ''))),
+            trim(pii_decrypt_string((string)($row['profile_middlename'] ?? ''))),
+            trim(pii_decrypt_string((string)($row['profile_lastname'] ?? ''))),
+            trim(pii_decrypt_string((string)($row['profile_suffix'] ?? ''))),
+        ], static fn(string $value): bool => $value !== '')));
+        $payloadName = rp_request_payload_person_name(rp_decode_json_assoc($row['request_details'] ?? ''));
+        $row['resident_name'] = $financeName !== ''
+            ? $financeName
+            : ($profileName !== '' ? $profileName : ($payloadName !== '' ? $payloadName : '—'));
+        unset($row['profile_firstname'], $row['profile_middlename'], $row['profile_lastname'], $row['profile_suffix']);
+    }
+    unset($row);
+
+    return $rows;
 }
 
 function rp_fetch_manual_financial_rows(mysqli $conn, string $dateFrom, string $dateTo): array {
@@ -575,13 +630,16 @@ function rp_fetch_manual_financial_rows(mysqli $conn, string $dateFrom, string $
 
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
+    $manualAreaExpr = rp_column_exists($conn, 'manualfinancetransactiontbl', 'area_number')
+        ? "COALESCE(NULLIF(TRIM(mt.area_number), ''), 'Barangay Wide')"
+        : "'Barangay Wide'";
 
     return rp_safe_query($conn, "
         SELECT
             'manual' AS record_source,
             mt.transaction_id AS source_id,
             COALESCE(NULLIF(TRIM(mt.transaction_description), ''), 'Manual Finance Transaction') AS document_type,
-            'Unspecified' AS area_number,
+            {$manualAreaExpr} AS area_number,
             '' AS sector_membership,
             COALESCE(NULLIF(TRIM(mt.transaction_name), ''), '—') AS resident_name,
             'Manual' AS certificate_number,
@@ -1430,7 +1488,11 @@ $issuanceModuleConfig = rp_issuance_module_config($module);
 $defaultReportStatusSelection = $issuanceModuleConfig !== null ? ['completed'] : [];
 $officialReportAreaOptions = rp_official_area_options();
 $officialReportSectorOptions = rp_official_sector_options();
-if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialReportAreaOptions)) {
+if (
+    $reportFilterArea !== ''
+    && !array_key_exists($reportFilterArea, $officialReportAreaOptions)
+    && !($module === 'financial' && $reportFilterArea === 'Barangay Wide')
+) {
     $reportFilterArea = '';
 }
 if ($reportFilterSector !== '' && !array_key_exists($reportFilterSector, $officialReportSectorOptions)) {
@@ -1449,14 +1511,18 @@ if ($issuanceModuleConfig !== null) {
     $reportFilterSector = '';
     $reportFilterSectors = [];
 }
+$reportAreaFilterOptions = $officialReportAreaOptions;
+if ($module === 'financial') {
+    $reportAreaFilterOptions['Barangay Wide'] = 'Barangay Wide';
+}
 $reportFilterOptions = [
     'type' => [],
-    'area' => $officialReportAreaOptions,
+    'area' => $reportAreaFilterOptions,
     'sector' => $officialReportSectorOptions,
 ];
 $reportFilterStatusOptions = $issuanceModuleConfig !== null ? rp_request_status_options() : [];
 $reportFilterTypes = array_values(array_unique($reportFilterTypes));
-$reportFilterAreas = array_values(array_intersect($reportFilterAreas, array_keys($officialReportAreaOptions)));
+$reportFilterAreas = array_values(array_intersect($reportFilterAreas, array_keys($reportAreaFilterOptions)));
 $reportFilterSectors = array_values(array_intersect($reportFilterSectors, array_keys($officialReportSectorOptions)));
 if ($issuanceModuleConfig !== null) {
     $reportFilterTypes = array_values(array_intersect($reportFilterTypes, array_keys($issuanceModuleConfig['request_types'])));
