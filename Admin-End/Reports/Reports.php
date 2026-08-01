@@ -273,7 +273,7 @@ function rp_issuance_module_config(string $module): ?array {
         'certificate_issuance' => [
             'label' => 'Certificate Issuance Report',
             'summary_label' => 'Certificate Issuance Requests',
-            'show_breakdown_sectors' => true,
+            'show_breakdown_sectors' => false,
             'request_types' => [
                 'cert_cohabitation' => 'Certificate of Cohabitation',
                 'cert_good_moral' => 'Certificate of Good Moral',
@@ -967,11 +967,6 @@ function rp_issuance_customize_column_groups(bool $includeBreakdownSectors = tru
 
     return [
         [
-            'label' => 'Requester Masterlist',
-            'sections' => ['requesters'],
-            'columns' => ['identifier', 'resident', 'date', 'type', 'status', 'area', 'channel', 'revenue'],
-        ],
-        [
             'label' => 'Breakdown',
             'sections' => ['breakdown'],
             'columns' => $breakdownColumns,
@@ -995,6 +990,11 @@ function rp_issuance_customize_column_groups(bool $includeBreakdownSectors = tru
             'label' => 'Monthly Trend',
             'sections' => ['trend'],
             'columns' => ['date', 'count'],
+        ],
+        [
+            'label' => 'Requester Masterlist',
+            'sections' => ['requesters'],
+            'columns' => ['identifier', 'resident', 'date', 'type', 'status', 'area', 'channel', 'revenue'],
         ],
     ];
 }
@@ -1073,27 +1073,27 @@ function rp_report_customize_config(string $module): array {
         'certificate_issuance' => [
             'sections' => [
                 'summary' => 'Summary',
-                'requesters' => 'Requester Masterlist',
                 'breakdown' => 'Breakdown',
                 'charts' => 'Charts',
                 'tables' => 'Tables',
                 'channel' => 'Request Type',
                 'revenue' => 'Revenue',
                 'trend' => 'Monthly Trend',
+                'requesters' => 'Requester Masterlist',
             ],
-            'columns' => rp_issuance_customize_columns(true),
-            'column_groups' => rp_issuance_customize_column_groups(true),
+            'columns' => rp_issuance_customize_columns(false),
+            'column_groups' => rp_issuance_customize_column_groups(false),
         ],
         'clearance_issuance' => [
             'sections' => [
                 'summary' => 'Summary',
-                'requesters' => 'Requester Masterlist',
                 'breakdown' => 'Breakdown',
                 'charts' => 'Charts',
                 'tables' => 'Tables',
                 'channel' => 'Request Type',
                 'revenue' => 'Revenue',
                 'trend' => 'Monthly Trend',
+                'requesters' => 'Requester Masterlist',
             ],
             'columns' => rp_issuance_customize_columns(false),
             'column_groups' => rp_issuance_customize_column_groups(false),
@@ -1523,6 +1523,11 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
     $amountExpr = $hasFinanceTable && rp_column_exists($conn, 'financetransactiontbl', 'transaction_amount')
         ? "COALESCE(f.transaction_amount, 0)"
         : "0";
+    $residentIdExpr = rp_column_exists($conn, 'documentrequesttbl', 'resident_id') ? 'd.resident_id' : "''";
+    $residentUserIdExpr = rp_column_exists($conn, 'documentrequesttbl', 'resident_user_id')
+        ? 'd.resident_user_id'
+        : (rp_column_exists($conn, 'documentrequesttbl', 'user_id') ? 'd.user_id' : "''");
+    $requestFeeExpr = rp_column_exists($conn, 'documentrequesttbl', 'fee_amount') ? 'd.fee_amount' : 'NULL';
     $hasRequestData = $requestDateExpr !== 'NULL';
     $requestDateFilter = $hasRequestData
         ? "DATE({$requestDateExpr}) BETWEEN '{$df}' AND '{$dt}'"
@@ -1531,6 +1536,8 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
     $rows = rp_safe_query($conn, "
         SELECT
           d.request_id,
+          {$residentIdExpr} AS resident_id,
+          {$residentUserIdExpr} AS resident_user_id,
           {$requestDateExpr} AS request_date,
           COALESCE(NULLIF(TRIM(d.document_type), ''), '') AS document_type,
           COALESCE(NULLIF(TRIM(d.stage), ''), 'submitted') AS stage,
@@ -1541,6 +1548,7 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
           {$residentSuffixExpr} AS resident_suffix,
           {$areaExpr} AS area_number,
           {$sectorExpr} AS sector_membership,
+          {$requestFeeExpr} AS fee_amount,
           {$amountExpr} AS revenue_amount
         FROM documentrequesttbl d
         {$financeJoin}
@@ -1579,6 +1587,9 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'pending' => 0,
             'rejected' => 0,
             'total' => 0,
+            'paid' => 0,
+            'free_exempt' => 0,
+            'waived' => 0.0,
             'revenue' => 0.0,
         ];
     }
@@ -1611,8 +1622,13 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             array_unique(array_map('rp_normalize_sector_label', rp_parse_csv_values((string)($row['sector_membership'] ?? '')))),
             $officialSectors
         ));
+        $payloadSectorKeys = dr_parse_sector_membership_csv((string)($payload['sector_membership'] ?? ''));
+        $hasPayloadExemption = in_array('pwd', $payloadSectorKeys, true) || in_array('seniorcitizen', $payloadSectorKeys, true);
         $requestSource = rp_request_channel_label($payload);
         $revenueAmount = (float)($row['revenue_amount'] ?? 0);
+        $effectiveFee = rp_document_request_effective_fee($conn, $row);
+        $standardFee = dr_get_fee_amount_for_document_type($conn, $rawDocumentType);
+        $isFreeOrExempt = $hasPayloadExemption || ($effectiveFee !== null && $effectiveFee <= 0.0);
 
         if ($reportFilterTypes !== [] && !in_array($requestTypeKey, $reportFilterTypes, true)) {
             continue;
@@ -1671,6 +1687,13 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
         if (isset($revenueRows[$requestTypeKey])) {
             $revenueRows[$requestTypeKey][$statusKey]++;
             $revenueRows[$requestTypeKey]['total']++;
+            if ($revenueAmount > 0.0) {
+                $revenueRows[$requestTypeKey]['paid']++;
+            }
+            if ($isFreeOrExempt) {
+                $revenueRows[$requestTypeKey]['free_exempt']++;
+                $revenueRows[$requestTypeKey]['waived'] += max(0.0, (float)($standardFee ?? 0.0));
+            }
             $revenueRows[$requestTypeKey]['revenue'] += $revenueAmount;
         }
 
@@ -3232,6 +3255,9 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
       <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Reports</h2>
       <div class="d-flex gap-2 d-print-none">
+        <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars($baseUrl . '?module=' . rawurlencode($module), ENT_QUOTES, 'UTF-8') ?>">
+          <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Available Reports
+        </a>
         <button class="btn btn-danger btn-sm" id="btnDownloadPdf" onclick="downloadPdf()">
           <i class="fas fa-file-pdf me-1"></i>Download PDF
         </button>
@@ -3606,6 +3632,14 @@ if ($issuanceModuleConfig !== null):
     $trendTotals['rejected'] += (int)($row['rejected'] ?? 0);
     $trendTotals['revenue'] += (float)($row['revenue'] ?? 0);
   }
+  $revenueAccountingTotals = ['total' => 0, 'paid' => 0, 'free_exempt' => 0, 'waived' => 0.0, 'revenue' => 0.0];
+  foreach ($issuanceRevenue as $row) {
+    $revenueAccountingTotals['total'] += (int)($row['total'] ?? 0);
+    $revenueAccountingTotals['paid'] += (int)($row['paid'] ?? 0);
+    $revenueAccountingTotals['free_exempt'] += (int)($row['free_exempt'] ?? 0);
+    $revenueAccountingTotals['waived'] += (float)($row['waived'] ?? 0);
+    $revenueAccountingTotals['revenue'] += (float)($row['revenue'] ?? 0);
+  }
   $issuanceAreaTotals = [];
   foreach ($officialAreas as $areaKey) {
     $issuanceAreaTotals[$areaKey] = [
@@ -3716,42 +3750,6 @@ if ($issuanceModuleConfig !== null):
               <?php endif; ?>
             </tbody>
           </table>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($showReportSection('requesters')): ?>
-        <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('requesters')) ?></div>
-          <?php if ($issuanceRows === []): ?>
-            <p class="rp-empty">No requester records matched the selected document and filters.</p>
-          <?php else: ?>
-          <table class="rp-table">
-            <thead>
-              <tr>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Request ID</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Requester</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Requested</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th>
-                <th class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>">Area</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Channel</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($issuanceRows as $requesterRow): ?>
-              <tr>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_id'] ?? '')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($requesterRow['resident_name'] ?? 'Unavailable')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_type_label'] ?? '')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_date_label'] ?? 'N/A')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars((string)($requesterRow['status_label'] ?? '')) ?></td>
-                <td class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>"><?= htmlspecialchars((string)(($requesterRow['area_number'] ?? '') ?: 'Unspecified')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_source'] ?? '')) ?></td>
-              </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-          <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -4040,8 +4038,11 @@ if ($issuanceModuleConfig !== null):
             <thead>
               <tr>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Request Type</th>
-                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Request Quantity</th>
-                <th class="text-end">Total Accumulated</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Paid</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Free / Exempt</th>
+                <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Waived</th>
+                <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Collected</th>
               </tr>
             </thead>
             <tbody>
@@ -4049,18 +4050,25 @@ if ($issuanceModuleConfig !== null):
               <tr>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($row['request_type_label'] ?? '')) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['paid'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['free_exempt'] ?? 0)) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($row['waived'] ?? 0), 2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
-                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($issuanceSummary['total'] ?? 0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($issuanceSummary['revenue'] ?? 0), 2) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['total']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['paid']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['free_exempt']) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$revenueAccountingTotals['waived'], 2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$revenueAccountingTotals['revenue'], 2) ?></td>
               </tr>
             </tfoot>
           </table>
+          <p class="rp-chart-note">Free / Exempt includes requests whose effective fee is zero, such as qualified PWD, senior citizen, First Time Job Seeker, and inherently free document requests. Amount Waived shows the configured fee that was not collected.</p>
         </div>
         <?php endif; ?>
 
@@ -4091,6 +4099,42 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$trendTotals['total']) ?></td>
               </tr>
             </tfoot>
+          </table>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('requesters')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('requesters')) ?></div>
+          <?php if ($issuanceRows === []): ?>
+            <p class="rp-empty">No requester records matched the selected document and filters.</p>
+          <?php else: ?>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Request ID</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Requester</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Requested</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>">Area</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Channel</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($issuanceRows as $requesterRow): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_id'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($requesterRow['resident_name'] ?? 'Unavailable')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_type_label'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_date_label'] ?? 'N/A')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars((string)($requesterRow['status_label'] ?? '')) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>"><?= htmlspecialchars((string)(($requesterRow['area_number'] ?? '') ?: 'Unspecified')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_source'] ?? '')) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
           </table>
           <?php endif; ?>
         </div>
