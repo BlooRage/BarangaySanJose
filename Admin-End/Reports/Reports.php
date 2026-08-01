@@ -3108,13 +3108,13 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       }
       .rp-doc-header,
       .rp-footer { display: block !important; }
-      .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
-      .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
+      .rp-doc-header { padding: 14pt 0 0 !important; margin-bottom: 14pt !important; }
+      .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; margin-left: 3% !important; margin-right: 3% !important; }
       .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
       .rp-letterhead-center p { font-size: 13pt !important; font-weight: 400 !important; }
-      .rp-letterhead-rep { font-size: 16pt !important; font-weight: 900 !important; }
-      .rp-letterhead-barangay { font-size: 24pt !important; font-weight: 900 !important; margin-top: 8pt !important; }
-      .rp-letterhead-line { margin-top: 8pt !important; border-color: #4b5563 !important; }
+      .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
+      .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
+      .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
       .rp-doc-header .rp-report-title { font-size: 11pt !important; }
       .rp-section {
         margin-top: 14pt !important;
@@ -3191,13 +3191,13 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
         box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14) !important;
       }
     }
-    .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
-    .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
+    .rp-doc-header { padding: 14pt 0 0 !important; margin-bottom: 14pt !important; }
+    .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; margin-left: 3% !important; margin-right: 3% !important; }
     .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
     .rp-letterhead-center p { font-size: 13pt !important; font-weight: 400 !important; }
-    .rp-letterhead-rep { font-size: 16pt !important; font-weight: 900 !important; }
-    .rp-letterhead-barangay { font-size: 24pt !important; font-weight: 900 !important; margin-top: 8pt !important; }
-    .rp-letterhead-line { margin-top: 8pt !important; border-color: #4b5563 !important; }
+    .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
+    .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
+    .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
     .rp-doc-header .rp-report-title { font-size: 11pt !important; }
     .rp-section {
       margin-top: 14pt !important;
