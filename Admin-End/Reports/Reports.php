@@ -657,6 +657,15 @@ function rp_official_area_options(): array {
     return array_combine($areas, $areas) ?: [];
 }
 
+function rp_area_number_only($value): string {
+    $area = trim((string)$value);
+    if ($area === '' || strcasecmp($area, 'Unspecified') === 0) {
+        return '—';
+    }
+    $numberOnly = preg_replace('/^Area\s*/i', '', $area);
+    return trim((string)$numberOnly) !== '' ? trim((string)$numberOnly) : $area;
+}
+
 function rp_normalize_sector_label(string $value): string {
     $raw = trim($value);
     if ($raw === '') {
@@ -3078,13 +3087,17 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       font-size: 11.5px;
       text-transform: uppercase;
       letter-spacing: .02em;
-      overflow-wrap: anywhere;
+      word-break: normal;
+      overflow-wrap: normal;
+      hyphens: none;
     }
     .rp-table td {
       padding: 6px 10px;
       border: 1px solid #d0d7de;
       vertical-align: middle;
-      overflow-wrap: anywhere;
+      word-break: normal;
+      overflow-wrap: normal;
+      hyphens: none;
     }
     .rp-table tr:nth-child(even) td { background: #fafbfc; }
     .rp-table tfoot td {
@@ -3100,7 +3113,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       max-width: 18%;
       white-space: normal;
       word-break: normal;
-      overflow-wrap: anywhere;
+      overflow-wrap: normal;
     }
     .rp-table--issuance-breakdown th,
     .rp-table--issuance-breakdown td {
@@ -3230,10 +3243,11 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
         break-after: avoid-page !important;
       }
       .rp-summary td, .rp-table th, .rp-table td { font-size: 9pt !important; padding: 4pt 6pt !important; }
-      .rp-table th { white-space: normal !important; word-break: break-word !important; vertical-align: bottom !important; }
+      .rp-table th, .rp-table td { white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; hyphens: none !important; }
+      .rp-table th { vertical-align: bottom !important; }
       .rp-table--issuance-breakdown { table-layout: fixed !important; width: 100% !important; }
       .rp-table--issuance-breakdown th,
-      .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: break-word !important; overflow-wrap: break-word !important; vertical-align: top !important; }
+      .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; vertical-align: top !important; }
       .rp-breakdown-document-type { width: 20% !important; }
       .rp-table tr { page-break-inside: avoid; }
       .rp-two-col, .rp-three-col, .rp-chart-grid {
@@ -3314,10 +3328,11 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       break-after: avoid-page !important;
     }
     .rp-summary td, .rp-table th, .rp-table td { font-size: 9pt !important; padding: 4pt 6pt !important; }
-    .rp-table th { white-space: normal !important; word-break: break-word !important; vertical-align: bottom !important; }
+    .rp-table th, .rp-table td { white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; hyphens: none !important; }
+    .rp-table th { vertical-align: bottom !important; }
     .rp-table--issuance-breakdown { table-layout: fixed !important; width: 100% !important; }
     .rp-table--issuance-breakdown th,
-    .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: break-word !important; overflow-wrap: break-word !important; vertical-align: top !important; }
+    .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; vertical-align: top !important; }
     .rp-breakdown-document-type { width: 20% !important; }
     .rp-table tr { page-break-inside: avoid; }
     .rp-two-col, .rp-three-col, .rp-chart-grid {
@@ -4261,7 +4276,7 @@ if ($issuanceModuleConfig !== null):
                   <td><?= htmlspecialchars((string)($establishmentRow['owner_name'] ?? '')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['business_type'] ?? '') ?: '—')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['business_address'] ?? '') ?: '—')) ?></td>
-                  <td class="text-center"><?= htmlspecialchars((string)($establishmentRow['area_number'] ?? 'Unspecified')) ?></td>
+                  <td class="text-center"><?= htmlspecialchars(rp_area_number_only($establishmentRow['area_number'] ?? '')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['application_type'] ?? '') ?: '—')) ?></td>
                   <td><?= htmlspecialchars((string)($establishmentRow['clearance_date'] ?? 'N/A')) ?></td>
                   <td><?= htmlspecialchars((string)($establishmentRow['status_label'] ?? 'Completed')) ?></td>
@@ -4282,7 +4297,7 @@ if ($issuanceModuleConfig !== null):
                   <td><?= htmlspecialchars((string)($establishmentRow['establishment_name'] ?? 'Commercial Establishment / Property')) ?></td>
                   <td><?= htmlspecialchars((string)($establishmentRow['owner_name'] ?? '')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['commercial_address'] ?? '') ?: '—')) ?></td>
-                  <td class="text-center"><?= htmlspecialchars((string)($establishmentRow['area_number'] ?? 'Unspecified')) ?></td>
+                  <td class="text-center"><?= htmlspecialchars(rp_area_number_only($establishmentRow['area_number'] ?? '')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['property_type'] ?? '') ?: '—')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['property_reference'] ?? '') ?: '—')) ?></td>
                   <td><?= htmlspecialchars((string)(($establishmentRow['clearance_number'] ?? '') ?: '—')) ?></td>
@@ -4320,7 +4335,7 @@ if ($issuanceModuleConfig !== null):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_type_label'] ?? '')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_date_label'] ?? 'N/A')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars((string)($requesterRow['status_label'] ?? '')) ?></td>
-                <td class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>"><?= htmlspecialchars((string)(($requesterRow['area_number'] ?? '') ?: 'Unspecified')) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('area')) ?>"><?= htmlspecialchars(rp_area_number_only($requesterRow['area_number'] ?? '')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars((string)($requesterRow['request_source'] ?? '')) ?></td>
                 <?php if ($module === 'clearance_issuance'): ?>
                 <td class="text-end">&#8369;<?= number_format((float)($requesterRow['revenue'] ?? 0), 2) ?></td>
