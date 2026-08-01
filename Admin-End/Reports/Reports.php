@@ -1374,7 +1374,7 @@ $reportFilterAreas = rp_parse_query_list($rawFilterAreaParam);
 $reportFilterSectors = rp_parse_query_list($rawFilterSectorParam, 'rp_normalize_sector_label');
 $reportFilterStatuses = rp_parse_query_list($rawFilterStatusParam, static fn(string $value): string => strtolower(trim($value)));
 $issuanceModuleConfig = rp_issuance_module_config($module);
-$defaultReportStatusSelection = [];
+$defaultReportStatusSelection = $module === 'certificate_issuance' ? ['completed'] : [];
 $officialReportAreaOptions = rp_official_area_options();
 $officialReportSectorOptions = rp_official_sector_options();
 if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialReportAreaOptions)) {
@@ -1579,6 +1579,7 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'walkin' => 0,
             'online' => 0,
             'total' => 0,
+            'revenue' => 0.0,
         ];
         $revenueRows[$typeKey] = [
             'request_type_key' => $typeKey,
@@ -1704,6 +1705,7 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
                 $channels[$requestTypeKey]['online']++;
             }
             $channels[$requestTypeKey]['total']++;
+            $channels[$requestTypeKey]['revenue'] += $revenueAmount;
         }
 
         if ($requestDateRaw !== '') {
@@ -3618,11 +3620,12 @@ if ($issuanceModuleConfig !== null):
     $breakdownTotals['revenue'] += (float)($row['revenue'] ?? 0);
     $breakdownTotals['total'] += (int)($row['total'] ?? 0);
   }
-  $channelTotals = ['walkin' => 0, 'online' => 0, 'total' => 0];
+  $channelTotals = ['walkin' => 0, 'online' => 0, 'total' => 0, 'revenue' => 0.0];
   foreach ($issuanceChannels as $row) {
     $channelTotals['walkin'] += (int)($row['walkin'] ?? 0);
     $channelTotals['online'] += (int)($row['online'] ?? 0);
     $channelTotals['total'] += (int)($row['total'] ?? 0);
+    $channelTotals['revenue'] += (float)($row['revenue'] ?? 0);
   }
   $trendTotals = ['total' => 0, 'completed' => 0, 'pending' => 0, 'rejected' => 0, 'revenue' => 0.0];
   foreach ($issuanceTrend as $row) {
@@ -3680,20 +3683,26 @@ if ($issuanceModuleConfig !== null):
       'revenue' => (float)($row['revenue'] ?? 0),
     ];
   }
-  $issuanceStatusTotals = [
-    [
+  $issuanceStatusTotalsByKey = [
+    'completed' => [
       'status_label' => 'Completed',
       'total' => (int)($issuanceSummary['completed'] ?? 0),
     ],
-    [
+    'pending' => [
       'status_label' => 'Pending',
       'total' => (int)($issuanceSummary['pending'] ?? 0),
     ],
-    [
+    'rejected' => [
       'status_label' => 'Rejected',
       'total' => (int)($issuanceSummary['rejected'] ?? 0),
     ],
   ];
+  $issuanceStatusTotals = [];
+  foreach ($filterModalStatuses as $statusKey) {
+    if (isset($issuanceStatusTotalsByKey[$statusKey])) {
+      $issuanceStatusTotals[] = $issuanceStatusTotalsByKey[$statusKey];
+    }
+  }
   $issuanceChannelSummary = [
     [
       'channel_label' => 'Walk-in',
@@ -4007,6 +4016,7 @@ if ($issuanceModuleConfig !== null):
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>">Walk-in</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>">Online</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th>
+                <th class="text-end">Total Price</th>
               </tr>
             </thead>
             <tbody>
@@ -4016,6 +4026,7 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)($row['walkin'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)($row['online'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
@@ -4025,6 +4036,7 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)$channelTotals['walkin']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)$channelTotals['online']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$channelTotals['total']) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)$channelTotals['revenue'], 2) ?></td>
               </tr>
             </tfoot>
           </table>
@@ -4041,8 +4053,8 @@ if ($issuanceModuleConfig !== null):
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Paid</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Free / Exempt</th>
-                <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Waived</th>
-                <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Collected</th>
+                <th class="text-end">Amount Waived</th>
+                <th class="text-end">Amount Collected</th>
               </tr>
             </thead>
             <tbody>
@@ -4052,8 +4064,8 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['paid'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['free_exempt'] ?? 0)) ?></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($row['waived'] ?? 0), 2) ?></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)($row['waived'] ?? 0), 2) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
@@ -4063,8 +4075,8 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['total']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['paid']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['free_exempt']) ?></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$revenueAccountingTotals['waived'], 2) ?></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$revenueAccountingTotals['revenue'], 2) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)$revenueAccountingTotals['waived'], 2) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)$revenueAccountingTotals['revenue'], 2) ?></td>
               </tr>
             </tfoot>
           </table>
