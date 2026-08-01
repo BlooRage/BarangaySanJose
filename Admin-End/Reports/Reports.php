@@ -4741,7 +4741,7 @@ elseif ($module === 'financial'):
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('or_log')) ?></div>
           <table class="rp-table">
             <thead>
-              <tr><th class="rp-or-log-index<?= htmlspecialchars($reportColumnClass('identifier')) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Price</th></tr>
+              <tr><th class="rp-or-log-index<?= htmlspecialchars($reportColumnClass('identifier')) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th><th class="text-end">Price</th></tr>
             </thead>
             <tbody>
               <?php $i = 1; foreach ($fin['or_log'] as $r): ?>
@@ -4752,7 +4752,7 @@ elseif ($module === 'financial'):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><?= htmlspecialchars($r['payment_method']) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars($r['finance_decision_at'] ?? '') ?></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$r['fee_amount'],2) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)$r['fee_amount'],2) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
@@ -4764,7 +4764,7 @@ elseif ($module === 'financial'):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($fin['or_log_total'] ?? 0),2) ?></td>
+                <td class="text-end">&#8369;<?= number_format((float)($fin['or_log_total'] ?? 0),2) ?></td>
               </tr>
             </tfoot>
           </table>
