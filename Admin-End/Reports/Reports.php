@@ -1336,6 +1336,8 @@ if ($module === 'document_requests') {
     $module = 'certificate_issuance';
 }
 if (!in_array($module, $allowedModules, true)) $module = 'certificate_issuance';
+$reportMode = strtolower(trim((string)($_GET['report'] ?? '')));
+$isBusinessEstablishmentsReport = $module === 'clearance_issuance' && $reportMode === 'business_establishments';
 
 // ── Date range (shared) ───────────────────────────────────────────────────────
 $today      = date('Y-m-d');
@@ -1504,6 +1506,7 @@ $issuanceReport = [
     'channels' => [],
     'trend' => [],
 ];
+$businessEstablishmentRows = [];
 if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl')) {
     $reportFilterOptions['type'] = $issuanceModuleConfig['request_types'];
     $reportFilterStatusOptions = rp_request_status_options();
@@ -1535,6 +1538,9 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
     $requestDateFilter = $hasRequestData
         ? "DATE({$requestDateExpr}) BETWEEN '{$df}' AND '{$dt}'"
         : '1 = 0';
+    if ($isBusinessEstablishmentsReport) {
+        $requestDateFilter = '1 = 1';
+    }
 
     $rows = rp_safe_query($conn, "
         SELECT
@@ -1597,7 +1603,9 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
     }
 
     foreach ($rows as $row) {
-        $payload = rp_decode_json_assoc((string)($row['request_details'] ?? ''));
+        $payload = function_exists('dr_decode_request_payload')
+            ? dr_decode_request_payload($row)
+            : rp_decode_json_assoc((string)($row['request_details'] ?? ''));
         $residentName = trim(implode(' ', array_filter([
             trim(pii_decrypt_string((string)($row['resident_firstname'] ?? ''))),
             trim(pii_decrypt_string((string)($row['resident_middlename'] ?? ''))),
@@ -1662,6 +1670,37 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'revenue' => $revenueAmount,
         ];
         $issuanceReport['rows'][] = $issuanceRow;
+
+        if ($isBusinessEstablishmentsReport && $requestTypeKey === 'clr_business_permit' && $statusKey === 'completed') {
+            $businessName = trim((string)($payload['business_name'] ?? $payload['businessName'] ?? $payload['establishment_name'] ?? ''));
+            $plateNumber = trim((string)($payload['_preview_plate_number'] ?? $payload['business_plate_number'] ?? $payload['plate_number'] ?? ''));
+            $ownerName = trim((string)($payload['owner_name'] ?? ''));
+            if ($ownerName === '' && strcasecmp(trim((string)($payload['owner_type'] ?? '')), 'Renter') === 0) {
+                $ownerName = trim(implode(' ', array_filter([
+                    trim((string)($payload['ro_fn'] ?? '')),
+                    trim((string)($payload['ro_mn'] ?? '')),
+                    trim((string)($payload['ro_ln'] ?? '')),
+                    trim((string)($payload['ro_suffix'] ?? '')),
+                ], static fn(string $part): bool => $part !== '')));
+            }
+            if ($ownerName === '') {
+                $ownerName = $residentName !== '' ? $residentName : 'Unavailable';
+            }
+            $businessAddress = trim((string)($payload['business_full_address'] ?? $payload['business_address'] ?? $payload['business_address_line'] ?? ''));
+            $businessArea = trim((string)($payload['business_area_number'] ?? $payload['full_area_number'] ?? $payload['area_number'] ?? $areaNumber));
+            $businessEstablishmentRows[] = [
+                'plate_number' => $plateNumber,
+                'business_name' => $businessName !== '' ? $businessName : 'Unnamed Establishment',
+                'owner_name' => $ownerName,
+                'business_type' => trim((string)($payload['business_type'] ?? $payload['businessType'] ?? '')),
+                'business_address' => $businessAddress,
+                'area_number' => $businessArea !== '' ? $businessArea : 'Unspecified',
+                'application_type' => trim((string)($payload['application_type'] ?? '')),
+                'clearance_date' => $requestDateLabel,
+                'clearance_date_raw' => $requestDateRaw,
+                'status_label' => $reportFilterStatusOptions[$statusKey] ?? 'Completed',
+            ];
+        }
 
         $issuanceReport['summary']['total']++;
         $issuanceReport['summary'][$statusKey]++;
@@ -1732,6 +1771,20 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
     $issuanceReport['channels'] = array_values($channels);
     $issuanceReport['revenue'] = array_values($revenueRows);
     $issuanceReport['trend'] = array_values($issuanceReport['trend']);
+
+    if ($isBusinessEstablishmentsReport) {
+        $deduplicatedEstablishments = [];
+        foreach ($businessEstablishmentRows as $establishmentRow) {
+            $plateKey = strtolower(preg_replace('/[^a-z0-9]+/i', '', (string)$establishmentRow['plate_number']));
+            $nameKey = strtolower(preg_replace('/[^a-z0-9]+/i', '', (string)$establishmentRow['business_name']));
+            $dedupeKey = $plateKey !== '' ? 'plate:' . $plateKey : 'name:' . $nameKey;
+            if ($dedupeKey === 'name:' || isset($deduplicatedEstablishments[$dedupeKey])) {
+                continue;
+            }
+            $deduplicatedEstablishments[$dedupeKey] = $establishmentRow;
+        }
+        $businessEstablishmentRows = array_values($deduplicatedEstablishments);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2520,6 +2573,9 @@ $moduleLabels = [
     'complaints'        => ['label' => 'Complaints & Grievances', 'icon' => 'fa-comments'],
 ];
 $currentLabel = $moduleLabels[$module]['label'];
+if ($isBusinessEstablishmentsReport) {
+    $currentLabel = 'Business Establishments Masterlist';
+}
 $isPrintView  = ($_GET['format'] ?? '') === 'print';
 $isPdfDownloadView = $isPrintView && strtolower(trim((string)($_GET['download'] ?? ''))) === 'pdf';
 $shouldAutoPrint = $isPrintView && !$isPdfDownloadView && (($_GET['autoprint'] ?? '1') !== '0');
@@ -2607,7 +2663,7 @@ if ($issuanceModuleConfig !== null && $reportFilterStatuses !== []) {
     $activeReportFilters[] = $reportFilterLabels['status'] . ': ' . implode(', ', $labels);
 }
 $reportFilterStateQuery = ['module' => $module];
-if ($module !== 'residents') {
+if ($module !== 'residents' && !$isBusinessEstablishmentsReport) {
     $reportFilterStateQuery['date_from'] = $dateFrom;
     $reportFilterStateQuery['date_to'] = $dateTo;
 }
@@ -3283,7 +3339,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
           $hasStatusFilter = !empty($reportFilterStatusOptions);
           $reportResetUrl = $baseUrl . '?module=' . rawurlencode($module);
           $screenReportFilters = [];
-          if ($module !== 'residents') {
+          if ($module !== 'residents' && !$isBusinessEstablishmentsReport) {
             $screenReportFilters[] = 'From: ' . rp_date_label($dateFrom);
             $screenReportFilters[] = 'To: ' . rp_date_label($dateTo);
           } else {
@@ -3365,7 +3421,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
                 <?php rp_render_hidden_inputs('show_section', $visibleReportSections); ?>
                 <?php rp_render_hidden_inputs('show_column', $visibleReportColumns); ?>
                 <div class="rp-filter-grid mb-3">
-                  <?php if ($module !== 'residents'): ?>
+                  <?php if ($module !== 'residents' && !$isBusinessEstablishmentsReport): ?>
                   <div>
                     <label class="form-label small fw-semibold mb-1">From</label>
                     <input type="date" name="date_from" class="form-control form-control-sm" value="<?= htmlspecialchars($dateFrom) ?>">
@@ -3454,7 +3510,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
               </div>
               <div class="modal-body">
                 <input type="hidden" name="module" value="<?= htmlspecialchars($module) ?>">
-                <?php if ($module !== 'residents'): ?>
+                <?php if ($module !== 'residents' && !$isBusinessEstablishmentsReport): ?>
                 <?php rp_render_hidden_input('date_from', $dateFrom); ?>
                 <?php rp_render_hidden_input('date_to', $dateTo); ?>
                 <?php endif; ?>
@@ -3545,8 +3601,8 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
             </div>
             <div class="rp-letterhead-line"></div>
           </div>
-          <div class="rp-report-title"><?= htmlspecialchars(strtoupper((string)preg_replace('/\s+Report$/i', '', $currentLabel))) ?> STATISTICAL REPORT</div>
-          <?php if ($module !== 'residents'): ?>
+          <div class="rp-report-title"><?php if ($isBusinessEstablishmentsReport): ?>BUSINESS ESTABLISHMENTS MASTERLIST<?php else: ?><?= htmlspecialchars(strtoupper((string)preg_replace('/\s+Report$/i', '', $currentLabel))) ?> STATISTICAL REPORT<?php endif; ?></div>
+          <?php if ($module !== 'residents' && !$isBusinessEstablishmentsReport): ?>
           <div class="rp-period">
             For the period: <strong><?= rp_date_label($dateFrom) ?></strong>
             &nbsp;to&nbsp;
@@ -4151,7 +4207,31 @@ if ($issuanceModuleConfig !== null):
 
         <?php if ($showReportSection('requesters')): ?>
         <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('requesters')) ?></div>
+          <div class="rp-section-label"><?= $isBusinessEstablishmentsReport ? 'I. BUSINESS ESTABLISHMENTS MASTERLIST' : htmlspecialchars($issuanceSectionLabel('requesters')) ?></div>
+          <?php if ($isBusinessEstablishmentsReport): ?>
+            <?php if ($businessEstablishmentRows === []): ?>
+            <p class="rp-empty">No completed business establishments matched the selected period.</p>
+            <?php else: ?>
+            <table class="rp-table">
+              <thead><tr><th>Plate Number</th><th>Business Establishment</th><th>Owner / Applicant</th><th>Business Type</th><th>Business Address</th><th class="text-center">Area</th><th>Application</th><th>Latest Clearance</th><th>Status</th></tr></thead>
+              <tbody>
+                <?php foreach ($businessEstablishmentRows as $establishmentRow): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string)(($establishmentRow['plate_number'] ?? '') ?: '—')) ?></td>
+                  <td><?= htmlspecialchars((string)($establishmentRow['business_name'] ?? '')) ?></td>
+                  <td><?= htmlspecialchars((string)($establishmentRow['owner_name'] ?? '')) ?></td>
+                  <td><?= htmlspecialchars((string)(($establishmentRow['business_type'] ?? '') ?: '—')) ?></td>
+                  <td><?= htmlspecialchars((string)(($establishmentRow['business_address'] ?? '') ?: '—')) ?></td>
+                  <td class="text-center"><?= htmlspecialchars((string)($establishmentRow['area_number'] ?? 'Unspecified')) ?></td>
+                  <td><?= htmlspecialchars((string)(($establishmentRow['application_type'] ?? '') ?: '—')) ?></td>
+                  <td><?= htmlspecialchars((string)($establishmentRow['clearance_date'] ?? 'N/A')) ?></td>
+                  <td><?= htmlspecialchars((string)($establishmentRow['status_label'] ?? 'Completed')) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+            <?php endif; ?>
+          <?php else: ?>
           <?php if ($issuanceRows === []): ?>
             <p class="rp-empty">No requester records matched the selected document and filters.</p>
           <?php else: ?>
@@ -4187,6 +4267,7 @@ if ($issuanceModuleConfig !== null):
               <?php endforeach; ?>
             </tbody>
           </table>
+          <?php endif; ?>
           <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -5641,7 +5722,7 @@ elseif ($module === 'complaints'):
           </div>
           <div class="rp-footer-meta">
             Report generated on <strong><?= date('F j, Y \a\t g:i A') ?></strong>
-            <?php if ($module !== 'residents'): ?>
+            <?php if ($module !== 'residents' && !$isBusinessEstablishmentsReport): ?>
             &nbsp;|&nbsp; Period covered: <strong><?= rp_date_label($dateFrom) ?></strong> to <strong><?= rp_date_label($dateTo) ?></strong>
             <?php endif; ?>
             &nbsp;|&nbsp; System: Barangay San Jose Information Management System
@@ -6963,7 +7044,7 @@ window.__reportPaginationReady = (() => {
       }
 
       const filenameBase = <?= json_encode(strtolower(preg_replace('/[^A-Za-z0-9]+/', '-', $currentLabel) ?: 'report'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-      const periodSuffix = <?= json_encode(($module !== 'residents')
+      const periodSuffix = <?= json_encode(($module !== 'residents' && !$isBusinessEstablishmentsReport)
           ? (trim($dateFrom) !== '' && trim($dateTo) !== '' ? ('_' . preg_replace('/[^0-9-]/', '', $dateFrom) . '_to_' . preg_replace('/[^0-9-]/', '', $dateTo)) : '')
           : ('_' . date('Y-m-d')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
       const filename = `${filenameBase}${periodSuffix || ''}.pdf`;

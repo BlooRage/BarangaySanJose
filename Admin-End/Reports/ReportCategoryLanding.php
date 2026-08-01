@@ -59,6 +59,19 @@ $settingsUrl = $reportsBaseUrl . '?' . http_build_query([
 
 $issuanceConfig = rp_issuance_module_config($module);
 if ($issuanceConfig !== null) {
+    if ($module === 'clearance_issuance') {
+        $choices[] = [
+            'title' => 'Business Establishments Masterlist',
+            'description' => 'List registered business establishments using their latest completed business-clearance record.',
+            'icon' => 'fa-building',
+            'query' => [
+                'module' => $module,
+                'report' => 'business_establishments',
+                'filter_type' => ['clr_business_permit'],
+                'show_section' => ['requesters'],
+            ],
+        ];
+    }
     $choices[] = [
         'title' => 'All Requesters Masterlist',
         'description' => 'Generate one masterlist of everyone who requested any document in this category.',
