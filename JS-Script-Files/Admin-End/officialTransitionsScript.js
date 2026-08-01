@@ -1429,7 +1429,7 @@
           if (inviteEmailError) {
             showToast(`Invite email failed: ${inviteEmailError}`, 'warning');
           }
-          window.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link));
+          await window.UniversalModal.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link), { title: 'Onboarding Link' });
         }
         if (inviteSmsFailed) {
           showToast(
@@ -1456,7 +1456,7 @@
   // ══════════════════════════════════════════════════════════════════════════
   window.otCancelTransition = async function (transitionId) {
     try {
-      const reason = prompt(`Cancel transition ${transitionId}?\n\nOptional reason:`);
+      const reason = await UniversalModal.prompt(`Cancel transition ${transitionId}?\n\nOptional reason:`, '', { title: 'Cancel Transition' });
       if (reason === null) return;
       const secureConfirmation = await requestSecureConfirmation(
         'cancel_transition',
@@ -1579,7 +1579,7 @@
 
   window.otRestoreOfficial = async function (officialId, name) {
     try {
-      if (!confirm(`Restore access for ${name}?`)) return;
+      if (!(await UniversalModal.confirm(`Restore access for ${name}?`, { confirmLabel: 'Restore', confirmClass: 'btn btn-success' }))) return;
       const secureConfirmation = await requestSecureConfirmation(
         'restore_access',
         { official_id: officialId },
@@ -1685,13 +1685,13 @@
       return;
     }
     const names = actingOfficials.map((o, i) => `${i + 1}. ${o.lastname}, ${o.firstname} (${o.position || ''})`).join('\n');
-    const choice = prompt(`Acting officials:\n${names}\n\nEnter the number of the acting official to end:`);
+    const choice = await UniversalModal.prompt(`Acting officials:\n${names}\n\nEnter the number of the acting official to end:`, '', { title: 'End Acting Assignment' });
     if (!choice) return;
     const idx = parseInt(choice) - 1;
     if (isNaN(idx) || !actingOfficials[idx]) { showToast('Invalid selection.', 'warning'); return; }
     const picked = actingOfficials[idx];
     try {
-      if (!confirm(`End acting assignment for ${picked.lastname}, ${picked.firstname}?`)) return;
+      if (!(await UniversalModal.confirm(`End acting assignment for ${picked.lastname}, ${picked.firstname}?`))) return;
       const secureConfirmation = await requestSecureConfirmation(
         'end_acting',
         { acting_official_id: picked.official_id },
@@ -1713,7 +1713,7 @@
   // ══════════════════════════════════════════════════════════════════════════
   window.otDeleteSchedule = async function (batchLabel) {
     try {
-      if (!confirm(`Delete governance cycle "${batchLabel}"?\n\nThis will remove the schedule and all linked transition rows for that cycle.`)) return;
+      if (!(await UniversalModal.confirm(`Delete governance cycle "${batchLabel}"?\n\nThis will remove the schedule and all linked transition rows for that cycle.`, { confirmLabel: 'Delete', confirmClass: 'btn btn-danger' }))) return;
       const secureConfirmation = await requestSecureConfirmation(
         'delete_schedule',
         { batch_label: batchLabel },
@@ -1734,7 +1734,7 @@
 
   window.otDemoteOfficial = async function (officialId, name) {
     try {
-      const reason = prompt(`Demote ${name}?\n\nOptional reason:`);
+      const reason = await UniversalModal.prompt(`Demote ${name}?\n\nOptional reason:`, '', { title: 'Demote Official' });
       if (reason === null) return;
       const secureConfirmation = await requestSecureConfirmation(
         'demote_official',
@@ -1763,8 +1763,8 @@
 
   window.otDemoteBatch = async function (batchLabel) {
     try {
-      if (!confirm(`Demote all outgoing officials for governance cycle "${batchLabel}"?\n\nThis is intended for governance-cycle turnover.`)) return;
-      const reason = prompt(`Optional reason for demoting governance cycle "${batchLabel}":`) ?? '';
+      if (!(await UniversalModal.confirm(`Demote all outgoing officials for governance cycle "${batchLabel}"?\n\nThis is intended for governance-cycle turnover.`, { confirmLabel: 'Demote All', confirmClass: 'btn btn-danger' }))) return;
+      const reason = (await UniversalModal.prompt(`Optional reason for demoting governance cycle "${batchLabel}":`, '', { title: 'Demote Governance Cycle' })) ?? '';
       const secureConfirmation = await requestSecureConfirmation(
         'demote_batch',
         { batch_label: batchLabel },

@@ -1974,7 +1974,7 @@ $previewCssAssets = [
         const config = options || {};
         if (!appDialogModal || !appDialogTitle || !appDialogMessage || !appDialogConfirmBtn || !appDialogCancelBtn) {
           if (config.cancelText) {
-            return Promise.resolve(window.confirm(config.message || ""));
+            return window.UniversalModal.confirm(config.message || "", { title: config.title || "Confirm Action", confirmLabel: config.confirmText || "Confirm" });
           }
           window.alert(config.message || "");
           return Promise.resolve(true);

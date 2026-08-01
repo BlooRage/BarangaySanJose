@@ -215,8 +215,8 @@ document.addEventListener("DOMContentLoaded", () => {
     scheduleAutoRefresh();
 });
 
-function restoreResident(residentId) {
-    if (!confirm("Restore this resident?")) return;
+async function restoreResident(residentId) {
+    if (!(await UniversalModal.confirm("Restore this resident?", { confirmLabel: "Restore", confirmClass: "btn btn-success" }))) return;
 
     fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
         method: "POST",
@@ -230,8 +230,8 @@ function restoreResident(residentId) {
     });
 }
 
-function deleteResident(residentId) {
-    if (!confirm("Permanently delete this resident? This cannot be undone.")) return;
+async function deleteResident(residentId) {
+    if (!(await UniversalModal.confirm("Permanently delete this resident? This cannot be undone.", { confirmLabel: "Delete", confirmClass: "btn btn-danger" }))) return;
 
     fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
         method: "POST",

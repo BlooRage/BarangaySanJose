@@ -727,7 +727,7 @@ $sharedMeta = [
       function showAppDialog(options = {}) {
         if (!appDialogModal || !appDialogTitle || !appDialogMessage || !appDialogConfirmBtn || !appDialogCancelBtn) {
           if (options.cancelText) {
-            return Promise.resolve(window.confirm(options.message || ""));
+            return window.UniversalModal.confirm(options.message || "", { title: options.title || "Confirm Action", confirmLabel: options.confirmText || "Confirm" });
           }
           window.alert(options.message || "");
           return Promise.resolve(true);
@@ -1494,7 +1494,6 @@ $sharedMeta = [
   <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 </body>
 </html>
-
 
 
 

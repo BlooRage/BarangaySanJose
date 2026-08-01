@@ -206,7 +206,7 @@
     confirmTone = "primary",
   } = {}) => new Promise((resolve) => {
     if (!confirmModalEl || !confirmTitleEl || !confirmMessageEl || !confirmCancelBtn || !confirmOkBtn) {
-      resolve(window.confirm(message || title));
+      window.UniversalModal.confirm(message || title, { title }).then(resolve);
       return;
     }
 
@@ -858,7 +858,7 @@
   };
 
   const requestSecureOtpChallenge = async (secureAction, officialId = "", actionLabel = "this action") => {
-    const actorPassword = window.prompt(`Enter your current password to continue with ${actionLabel}:`);
+    const actorPassword = await window.UniversalModal.prompt(`Enter your current password to continue with ${actionLabel}:`, "", { title: "Security Confirmation", type: "password", confirmLabel: "Continue" });
     if (actorPassword === null) {
       return null;
     }
@@ -886,10 +886,12 @@
     }
 
     const deliveryLabel = String(data.delivery_label || "").trim();
-    const otpCode = window.prompt(
+    const otpCode = await window.UniversalModal.prompt(
       deliveryLabel
         ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
-        : "Enter the 6-digit OTP sent to your verified contact:"
+        : "Enter the 6-digit OTP sent to your verified contact:",
+      "",
+      { title: "OTP Verification", confirmLabel: "Verify" }
     );
     if (otpCode === null) {
       return null;

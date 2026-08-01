@@ -189,20 +189,17 @@ require_once __DIR__ . '/includes/admin_guard.php';
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div class="mb-4">
             <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
                 Business Monitoring
             </h2>
-            <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoringSettings.php'), ENT_QUOTES, 'UTF-8') ?>">
-                <i class="fa-solid fa-gear me-2"></i>Monitoring Settings
-            </a>
         </div>
         <hr><br>
 
         <div class="bg-white p-4 rounded-4 shadow-sm border business-monitoring-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <div class="text-muted small">Shows completed business permit clearances for operational establishments only.</div>
+                    <div class="text-muted small">Shows completed business permit clearances and establishment records.</div>
                 </div>
 
                 <div class="admin-list-actions">
@@ -340,6 +337,24 @@ require_once __DIR__ . '/includes/admin_guard.php';
                         <label class="d-flex align-items-center gap-2">
                             <input class="form-check-input m-0 business-filter-checkbox" type="checkbox" value="denied" data-field="status_bucket">
                             <span>Denied</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold small mb-2">Establishment Status</label>
+                    <div class="d-flex flex-column gap-2">
+                        <label class="d-flex align-items-center gap-2">
+                            <input class="form-check-input m-0 business-filter-checkbox" type="checkbox" value="operational" data-field="establishment_status">
+                            <span>Operational</span>
+                        </label>
+                        <label class="d-flex align-items-center gap-2">
+                            <input class="form-check-input m-0 business-filter-checkbox" type="checkbox" value="closed" data-field="establishment_status">
+                            <span>Closed</span>
+                        </label>
+                        <label class="d-flex align-items-center gap-2">
+                            <input class="form-check-input m-0 business-filter-checkbox" type="checkbox" value="archived" data-field="establishment_status">
+                            <span>Archived</span>
                         </label>
                     </div>
                 </div>

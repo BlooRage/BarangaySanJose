@@ -71,7 +71,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
     <!-- ✅ OLD ORDER (keep this) -->
     <script src="../JS-Script-Files/loginScripts.js?v=20260801-admin-2fa-fix2" defer></script>
-    <script src="../JS-Script-Files/modalHandler.js?v=20260328-01" defer></script>
+    <script src="../JS-Script-Files/modalHandler.js?v=20260801-02" defer></script>
   </head>
 
   <body data-cms-page="login" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">

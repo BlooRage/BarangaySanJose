@@ -441,7 +441,7 @@
     const row = findRow(userId);
     if (!row || state.auto.inFlight || state.lock.busy) return;
 
-    const confirmed = window.confirm(`Archive ${safe(row.display_name)}? You can permanently delete the account later from User Archive.`);
+    const confirmed = await window.UniversalModal.confirm(`Archive ${safe(row.display_name)}? You can permanently delete the account later from User Archive.`, { confirmLabel: "Archive", confirmClass: "btn btn-danger" });
     if (!confirmed) return;
 
     const formData = new FormData();

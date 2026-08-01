@@ -220,7 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             });
         }
-        return Promise.resolve(window.confirm(message));
+        return window.UniversalModal.confirm(message);
     };
 
     const handleRemove = async (residentId, infoMemberId) => {

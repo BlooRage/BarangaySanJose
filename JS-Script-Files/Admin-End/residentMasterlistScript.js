@@ -2207,8 +2207,8 @@ function hasFormChanges(form) {
   // ========================
   // ARCHIVE RESIDENT
   // ========================
-  function archiveEntry(row) {
-    if (!confirm(`Archive Resident #${row.resident_id}? This can be restored later.`)) return;
+  async function archiveEntry(row) {
+    if (!(await UniversalModal.confirm(`Archive Resident #${row.resident_id}? This can be restored later.`, { confirmLabel: "Archive", confirmClass: "btn btn-danger" }))) return;
 
     fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
       method: "POST",

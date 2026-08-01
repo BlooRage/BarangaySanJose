@@ -2635,8 +2635,8 @@ if ($hasCouncilTbl) {
         renderGroups();
       });
 
-      resetBtn?.addEventListener('click', () => {
-        if (!window.confirm('Reset this official access template back to the default modules?')) return;
+      resetBtn?.addEventListener('click', async () => {
+        if (!(await window.UniversalModal.confirm('Reset this official access template back to the default modules?'))) return;
         state.permissionMap = {};
         defaultKeys.forEach((key) => {
           state.permissionMap[String(key)] = true;

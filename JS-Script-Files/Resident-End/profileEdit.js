@@ -731,7 +731,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 return;
             }
-            resolve(window.confirm("Saving changes will send a request for review. Continue?"));
+            window.UniversalModal.confirm("Saving changes will send a request for review. Continue?").then(resolve);
         });
 
     const getCurrentValues = () => ({
@@ -886,7 +886,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const req = getUploadRequirements();
         if (!req.requiresAnyDoc) {
-            const confirmSubmit = window.confirm("Submit this profile update request now?");
+            const confirmSubmit = await window.UniversalModal.confirm("Submit this profile update request now?", { confirmLabel: "Submit" });
             if (!confirmSubmit) {
                 if (formWasOpen) {
                     profileStage = "form";

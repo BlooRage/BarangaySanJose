@@ -2044,7 +2044,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function financeDeleteFee(id, name) {
-    if (!confirm(`Delete fee type "${name}"?\n\nThis cannot be undone.`)) return;
+    if (!(await UniversalModal.confirm(`Delete fee type "${name}"?\n\nThis cannot be undone.`, { confirmLabel: 'Delete', confirmClass: 'btn btn-danger' }))) return;
     try {
       const body = new FormData();
       body.append('action', 'delete_fee_type');
@@ -2181,7 +2181,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function financeApproveFcr(id) {
-    if (!confirm('Approve this fee change request? The catalog will be updated automatically.')) return;
+    if (!(await UniversalModal.confirm('Approve this fee change request? The catalog will be updated automatically.', { confirmLabel: 'Approve', confirmClass: 'btn btn-success' }))) return;
     try {
       const fd = new FormData();
       fd.append('action', 'process_fee_change_request');
@@ -2195,7 +2195,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function financeRejectFcr(id) {
-    const reviewNotes = prompt('Reason for rejection (optional):') ?? '';
+    const reviewNotes = (await UniversalModal.prompt('Reason for rejection (optional):')) ?? '';
     try {
       const fd = new FormData();
       fd.append('action', 'process_fee_change_request');

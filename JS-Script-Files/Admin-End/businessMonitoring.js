@@ -450,7 +450,10 @@
 
   async function updateEstablishmentStatus(requestId, status, button) {
     const label = status.charAt(0).toUpperCase() + status.slice(1);
-    if ((status === "closed" || status === "archived") && !window.confirm(`Mark this establishment as ${label}?`)) return;
+    if ((status === "closed" || status === "archived") && !(await window.UniversalModal.confirm(`Mark this establishment as ${label}?`, {
+      confirmLabel: `Mark as ${label}`,
+      confirmClass: "btn btn-danger",
+    }))) return;
 
     const body = new FormData();
     body.append("action", "set_establishment_status");

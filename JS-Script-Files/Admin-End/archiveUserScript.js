@@ -171,7 +171,7 @@
     const message = action === "restore"
       ? `Restore ${safe(row.display_name)} from the archive?`
       : `Delete ${safe(row.display_name)} from the archive? This will hide the account from User Management.`;
-    if (!window.confirm(message)) return;
+    if (!(await window.UniversalModal.confirm(message, { confirmLabel: "Continue", confirmClass: "btn btn-danger" }))) return;
 
     if (refreshBtn) {
       refreshBtn.classList.add("is-loading");

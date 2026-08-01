@@ -508,7 +508,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const proceed = window.confirm("Review complete. Continue to document upload?");
+        const proceed = await window.UniversalModal.confirm("Review complete. Continue to document upload?", { confirmLabel: "Continue" });
         if (proceed) {
             setUploadMessage("Upload the required supporting document(s) before submitting.");
             openUploadModal();

@@ -291,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const updateRequestStatus = async (requestId, action) => {
-    const ok = window.confirm(`Are you sure you want to ${action} this request?`);
+    const ok = await window.UniversalModal.confirm(`Are you sure you want to ${action} this request?`);
     if (!ok) return;
     try {
       const res = await fetch("../PhpFiles/Admin-End/edit_requests.php", {

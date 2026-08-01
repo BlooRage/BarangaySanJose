@@ -6978,7 +6978,7 @@
   };
 
   window.deleteFeeType = async function(id, name) {
-    if (!confirm(`Delete fee type "${name}"?`)) return;
+    if (!(await UniversalModal.confirm(`Delete fee type "${name}"?`, { confirmLabel: 'Delete', confirmClass: 'btn btn-danger' }))) return;
     const body = new FormData();
     body.append('action', 'delete_fee_type');
     body.append('fee_type_id', id);

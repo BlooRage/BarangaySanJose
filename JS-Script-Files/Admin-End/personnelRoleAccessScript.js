@@ -673,7 +673,7 @@
   const resetProfile = async () => {
     const row = state.modal.row;
     if (!row) return;
-    if (!window.confirm("Reset this position permission profile back to the default permissions?")) return;
+    if (!(await window.UniversalModal.confirm("Reset this position permission profile back to the default permissions?"))) return;
 
     await postProfileAction("reset_profile_permissions", {
       department: row.department || "",

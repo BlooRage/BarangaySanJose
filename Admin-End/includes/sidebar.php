@@ -196,8 +196,11 @@ $isClearanceIssuanceSectionActive = $isClearanceIssuanceActive
     || $isClearanceWaterPermitActive
     || $isClearanceResidentialPermitActive
     || $isClearanceCommercialPermitActive
-    || $isBusinessMonitoringSettingsActive;
-$isClearanceIssuanceTrackerActive = $isClearanceIssuanceSectionActive && !$isBusinessMonitoringSettingsActive;
+    || $isBusinessMonitoringSettingsActive
+    || $current === 'BusinessMonitoring.php';
+$isClearanceIssuanceTrackerActive = $isClearanceIssuanceSectionActive
+    && !$isBusinessMonitoringSettingsActive
+    && $current !== 'BusinessMonitoring.php';
 $isBusinessMonitoringActive = $current === 'BusinessMonitoring.php'
     || (
         $current === 'CertificateTracker.php'
@@ -674,7 +677,7 @@ if ($sbSidebarUserId !== '') {
 }
 ?>
 
-<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260801-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260801-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= htmlspecialchars(appUrl('CSS-Styles/Admin-End-CSS/TablePagination.css?v=20260726-1'), ENT_QUOTES, 'UTF-8') ?>">
 <script defer src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/tablePagination.js?v=20260726-1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 
@@ -1468,7 +1471,6 @@ if ($sbSidebarUserId !== '') {
 
       <?php if ($sbCan('clearance_issuance') || $sbCan('business_monitoring')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Monitoring</li>
-      <?php if ($sbCan('clearance_issuance')): ?>
       <li class="mb-2">
         <button type="button"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceSectionActive ? '' : 'collapsed' ?>"
@@ -1487,6 +1489,7 @@ if ($sbSidebarUserId !== '') {
         </button>
         <div class="collapse <?= $isClearanceIssuanceSectionActive ? 'show' : '' ?>" id="clearance-issuance-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('clearance_issuance')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
                  class="link-dark rounded sidebar-subnav-link <?= $isClearanceIssuanceTrackerActive ? 'active' : '' ?>">
@@ -1500,22 +1503,18 @@ if ($sbSidebarUserId !== '') {
                 <span class="sidebar-subnav-text">Settings</span>
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('business_monitoring')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
+                 class="link-dark rounded sidebar-subnav-link <?= $isBusinessMonitoringActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Establishments Monitoring</span>
+              </a>
+            </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
-      <?php endif; ?>
-      <?php if ($sbCan('business_monitoring')): ?>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $isBusinessMonitoringActive ? 'active' : '' ?>"
-           style="<?= $isBusinessMonitoringActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-store"></i>
-          </span>
-          <span class="sidebar-button-label">Business Monitoring</span>
-        </a>
-      </li>
-      <?php endif; ?>
       <?php endif; ?>
 
       <?php if ($sbHasAny($sbFinanceKeys)): ?>

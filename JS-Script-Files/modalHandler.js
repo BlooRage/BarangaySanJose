@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260801-01";
+  const MODAL_VERSION = "20260801-02";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -202,6 +202,60 @@
 
       actionsEl.appendChild(buttonEl);
     });
+  }
+
+  function confirmDialog(message, options = {}) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      open({
+        tone: options.tone || "warning",
+        title: options.title || "Confirm Action",
+        message: String(message ?? ""),
+        forceTemplate: false,
+        buttons: [
+          { label: options.cancelLabel || "Cancel", class: "btn btn-outline-secondary", onClick: () => finish(false) },
+          { label: options.confirmLabel || "Confirm", class: options.confirmClass || "btn btn-primary", onClick: () => finish(true) },
+        ],
+      });
+    });
+  }
+
+  function promptDialog(message, defaultValue = "", options = {}) {
+    return new Promise((resolve) => {
+      const inputId = `umPromptInput-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+      const readValue = () => document.getElementById(inputId)?.value ?? "";
+
+      open({
+        tone: options.tone || "info",
+        title: options.title || "Input Required",
+        messageHtml: `<p class="mb-3">${escapeHtml(String(message ?? ""))}</p><input id="${inputId}" class="form-control" type="${options.type === "password" ? "password" : "text"}" value="${escapeHtml(String(defaultValue ?? ""))}" autocomplete="${options.type === "password" ? "current-password" : "off"}">`,
+        forceTemplate: false,
+        buttons: [
+          { label: options.cancelLabel || "Cancel", class: "btn btn-outline-secondary", onClick: () => finish(null) },
+          { label: options.confirmLabel || "OK", class: options.confirmClass || "btn btn-primary", onClick: () => finish(readValue()) },
+        ],
+      });
+
+      window.setTimeout(() => document.getElementById(inputId)?.focus(), 350);
+    });
+  }
+
+  function escapeHtml(value) {
+    return value.replace(/[&<>'"]/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
+    })[character]);
   }
 
   function renderAndShow(request) {
@@ -470,6 +524,19 @@
     upgradeVisibleAlerts(document);
     bindAlertObserver();
     wireGlobalAlertOverride();
+    document.addEventListener("submit", async (event) => {
+      const form = event.target instanceof HTMLFormElement ? event.target : null;
+      if (!form?.dataset.modalConfirm || form.dataset.modalConfirmed === "true") return;
+      event.preventDefault();
+      const confirmed = await confirmDialog(form.dataset.modalConfirm, {
+        confirmLabel: form.dataset.modalConfirmLabel || "Confirm",
+        confirmClass: "btn btn-danger",
+      });
+      if (!confirmed) return;
+      form.dataset.modalConfirmed = "true";
+      form.requestSubmit();
+      delete form.dataset.modalConfirmed;
+    }, true);
   }
 
   if (document.readyState === "loading") {
@@ -485,6 +552,8 @@
     info,
     warning,
     danger,
+    confirm: confirmDialog,
+    prompt: promptDialog,
     upgradeVisibleAlerts,
   };
 })();
