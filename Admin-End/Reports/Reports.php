@@ -2909,11 +2909,11 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       margin-top: 12px;
     }
     .rp-doc-header .rp-report-title {
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 12px;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .04em;
-      color: #9a3412;
+      color: #000;
       margin-top: 16px;
     }
     .rp-doc-header .rp-period { font-size: 12px; color: #4b5563; margin-top: 4px; }
@@ -3115,7 +3115,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
       .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
       .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
-      .rp-doc-header .rp-report-title { font-size: 11pt !important; }
+      .rp-doc-header .rp-report-title { font-size: 12px !important; color: #000 !important; font-weight: 700 !important; }
       .rp-section {
         margin-top: 14pt !important;
         page-break-inside: auto !important;
@@ -3198,7 +3198,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
     .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
     .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
-    .rp-doc-header .rp-report-title { font-size: 11pt !important; }
+    .rp-doc-header .rp-report-title { font-size: 12px !important; color: #000 !important; font-weight: 700 !important; }
     .rp-section {
       margin-top: 14pt !important;
       page-break-inside: auto !important;
@@ -3535,7 +3535,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
             <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportRightLogo) ?>" alt="Montalban Logo" onerror="this.onerror=null;this.src='<?= htmlspecialchars($reportLeftLogo) ?>';">
           </div>
           <div class="rp-letterhead-line"></div>
-          <div class="rp-report-title"><?= htmlspecialchars(strtoupper($currentLabel)) ?> Statistical Report</div>
+          <div class="rp-report-title"><?= htmlspecialchars(strtoupper((string)preg_replace('/\s+Report$/i', '', $currentLabel))) ?> STATISTICAL REPORT</div>
           <?php if ($module !== 'residents'): ?>
           <div class="rp-period">
             For the period: <strong><?= rp_date_label($dateFrom) ?></strong>
@@ -3550,9 +3550,6 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
             Filters: <strong><?= htmlspecialchars(implode(' | ', $activeReportFilters)) ?></strong>
           </div>
           <?php endif; ?>
-          <div class="rp-report-meta">
-            Generated: <?= date('F j, Y \a\t g:i A') ?> &nbsp;·&nbsp; Prepared by: <?= htmlspecialchars($preparedByName) ?>
-          </div>
         </div>
 
 <?php
