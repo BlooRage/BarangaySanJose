@@ -644,7 +644,7 @@ function rp_fetch_manual_financial_rows(mysqli $conn, string $dateFrom, string $
             COALESCE(NULLIF(TRIM(mt.transaction_name), ''), '—') AS resident_name,
             'Manual' AS certificate_number,
             COALESCE(mt.transaction_amount, 0) AS transaction_amount,
-            'unspecified' AS payment_method,
+            'barangay' AS payment_method,
             COALESCE(NULLIF(TRIM(mt.or_number_receipt), ''), '') AS or_number,
             {$manualDateExpr} AS finance_event_at,
             COALESCE(NULLIF(TRIM(mt.department_handle), ''), 'Unspecified') AS department_handle
@@ -4717,19 +4717,18 @@ elseif ($module === 'financial'):
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('or_log')) ?></div>
           <table class="rp-table">
             <thead>
-              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Cert./Ref.</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th></tr>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Price</th></tr>
             </thead>
             <tbody>
               <?php $i = 1; foreach ($fin['or_log'] as $r): ?>
               <tr>
                 <td class="pct<?= htmlspecialchars($reportColumnClass('identifier')) ?>"><?= $i++ ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong><?= htmlspecialchars($r['or_number']) ?></strong></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars($r['certificate_number'] ?? '—') ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars($r['resident_name'] ?: '—') ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><?= htmlspecialchars($r['payment_method']) ?></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$r['fee_amount'],2) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars($r['finance_decision_at'] ?? '') ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$r['fee_amount'],2) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
@@ -4737,12 +4736,11 @@ elseif ($module === 'financial'):
               <tr>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong>TOTAL</strong></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($fin['or_log_total'] ?? 0),2) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($fin['or_log_total'] ?? 0),2) ?></td>
               </tr>
             </tfoot>
           </table>
