@@ -3685,6 +3685,7 @@ if ($issuanceModuleConfig !== null):
       'revenue' => (float)($row['revenue'] ?? 0),
     ];
   }
+  $showIssuanceTypeAnalysis = count($requestTypesForOutput) !== 1;
   $issuanceStatusTotalsByKey = [
     'completed' => [
       'status_label' => 'Completed',
@@ -3723,9 +3724,13 @@ if ($issuanceModuleConfig !== null):
   $issuanceAreaChartData = array_values(array_filter($issuanceAreaTotals, static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
-  $issuanceTypeChartData = array_values(array_filter($issuanceTypeTotals, static function (array $row): bool {
-    return (int)($row['total'] ?? 0) > 0;
-  }));
+  $issuanceTypeChartData = $showIssuanceTypeAnalysis
+    ? array_values(array_filter($issuanceTypeTotals, static function (array $row): bool {
+        return (int)($row['total'] ?? 0) > 0;
+      }))
+    : [];
+  $issuanceChartCardCount = 2 + ($showIssuanceTypeAnalysis ? 1 : 0) + ($showIssuanceStatusAnalysis ? 1 : 0);
+  $expandIssuanceChannelChart = ($issuanceChartCardCount % 2) === 1;
   $shouldLoadIssuanceCharts = $showReportSection('charts') && (
     $issuanceAreaChartData !== []
     || $issuanceTypeChartData !== []
@@ -3836,6 +3841,7 @@ if ($issuanceModuleConfig !== null):
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by area number.</div>
             </div>
+            <?php if ($showIssuanceTypeAnalysis): ?>
             <div class="rp-chart-card">
               <div class="rp-subsection-title">Total Requests by Document Type</div>
               <div class="rp-chart-wrap">
@@ -3843,6 +3849,7 @@ if ($issuanceModuleConfig !== null):
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by document type.</div>
             </div>
+            <?php endif; ?>
             <?php if ($showIssuanceStatusAnalysis): ?>
             <div class="rp-chart-card">
               <div class="rp-subsection-title">Total Requests by Status</div>
@@ -3852,7 +3859,7 @@ if ($issuanceModuleConfig !== null):
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by status.</div>
             </div>
             <?php endif; ?>
-            <div class="rp-chart-card"<?= $showIssuanceStatusAnalysis ? '' : ' style="grid-column:1 / -1;"' ?>>
+            <div class="rp-chart-card"<?= $expandIssuanceChannelChart ? ' style="grid-column:1 / -1;"' : '' ?>>
               <div class="rp-subsection-title">Total Requests by Channel</div>
               <div class="rp-chart-wrap">
                 <canvas id="issuanceChannelTotalsChart"></canvas>
@@ -3870,7 +3877,7 @@ if ($issuanceModuleConfig !== null):
           <?php if ($issuanceTotal <= 0): ?>
             <p class="rp-empty">No requests matched the selected filters.</p>
           <?php else: ?>
-          <div class="rp-two-col">
+          <div class="rp-two-col"<?= $showIssuanceTypeAnalysis ? '' : ' style="grid-template-columns:1fr;"' ?>>
             <div>
               <div class="rp-subsection-title">Total Requests by Area Number</div>
               <table class="rp-table">
@@ -3908,6 +3915,7 @@ if ($issuanceModuleConfig !== null):
                 </tfoot>
               </table>
             </div>
+            <?php if ($showIssuanceTypeAnalysis): ?>
             <div>
               <div class="rp-subsection-title">Total Requests by Document Type</div>
               <table class="rp-table">
@@ -3945,6 +3953,7 @@ if ($issuanceModuleConfig !== null):
                 </tfoot>
               </table>
             </div>
+            <?php endif; ?>
           </div>
 
           <div class="rp-two-col" style="margin-top:18px;<?= $showIssuanceStatusAnalysis ? '' : 'grid-template-columns:1fr;' ?>">
