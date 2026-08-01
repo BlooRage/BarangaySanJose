@@ -2890,18 +2890,18 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     }
     .rp-letterhead-center p {
       margin: 0;
-      font-size: 16px;
+      font-size: 19px;
       font-weight: 400;
       text-transform: uppercase;
     }
     .rp-letterhead-rep {
-      font-size: 20px !important;
-      font-weight: 800 !important;
+      font-size: 23px !important;
+      font-weight: 900 !important;
     }
     .rp-letterhead-barangay {
-      font-size: 29px !important;
-      font-weight: 800 !important;
-      margin-top: 10px !important;
+      font-size: 34px !important;
+      font-weight: 900 !important;
+      margin-top: 12px !important;
       letter-spacing: .02em;
     }
     .rp-letterhead-line {
@@ -3111,9 +3111,9 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
       .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
       .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
-      .rp-letterhead-center p { font-size: 10.5pt !important; font-weight: 400 !important; }
-      .rp-letterhead-rep { font-size: 14pt !important; font-weight: 800 !important; }
-      .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 6pt !important; }
+      .rp-letterhead-center p { font-size: 13pt !important; font-weight: 400 !important; }
+      .rp-letterhead-rep { font-size: 16pt !important; font-weight: 900 !important; }
+      .rp-letterhead-barangay { font-size: 24pt !important; font-weight: 900 !important; margin-top: 8pt !important; }
       .rp-letterhead-line { margin-top: 8pt !important; border-color: #4b5563 !important; }
       .rp-doc-header .rp-report-title { font-size: 11pt !important; }
       .rp-section {
@@ -3194,9 +3194,9 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
     .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
     .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
-    .rp-letterhead-center p { font-size: 10.5pt !important; font-weight: 400 !important; }
-    .rp-letterhead-rep { font-size: 14pt !important; font-weight: 800 !important; }
-    .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 6pt !important; }
+    .rp-letterhead-center p { font-size: 13pt !important; font-weight: 400 !important; }
+    .rp-letterhead-rep { font-size: 16pt !important; font-weight: 900 !important; }
+    .rp-letterhead-barangay { font-size: 24pt !important; font-weight: 900 !important; margin-top: 8pt !important; }
     .rp-letterhead-line { margin-top: 8pt !important; border-color: #4b5563 !important; }
     .rp-doc-header .rp-report-title { font-size: 11pt !important; }
     .rp-section {
