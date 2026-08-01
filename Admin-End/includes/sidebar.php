@@ -190,25 +190,20 @@ $isClearanceCommercialPermitActive = $current === 'CertificateTracker.php'
         || $certificateFilterDocumentKey === 'clearanceforcommercialpermit'
     );
 $isClearanceIssuanceSectionActive = $isClearanceIssuanceActive
-    || $isClearanceBusinessPermitActive
     || $isClearanceTricyclePermitActive
     || $isClearanceElectricPermitActive
     || $isClearanceWaterPermitActive
     || $isClearanceResidentialPermitActive
     || $isClearanceCommercialPermitActive
-    || $isBusinessMonitoringSettingsActive
-    || $current === 'BusinessMonitoring.php';
+    || $isBusinessMonitoringSettingsActive;
 $isClearanceIssuanceTrackerActive = $isClearanceIssuanceSectionActive
-    && !$isBusinessMonitoringSettingsActive
-    && $current !== 'BusinessMonitoring.php';
-$isBusinessMonitoringActive = $current === 'BusinessMonitoring.php'
-    || (
-        $current === 'CertificateTracker.php'
-        && !$isIdIssuanceActive
-        && (
-            in_array($certificateFilterDocumentToken, ['__business__', 'business', 'business_monitoring', 'businessclearance'], true)
-            || strcasecmp($certificateFilterDocument, 'Barangay Clearance for Business Permit') === 0
-        )
+    && !$isBusinessMonitoringSettingsActive;
+$isEstablishmentMonitoringActive = $current === 'BusinessMonitoring.php';
+$isBusinessMonitoringActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        in_array($certificateFilterDocumentToken, ['__business__', 'business', 'business_monitoring', 'businessclearance'], true)
+        || strcasecmp($certificateFilterDocument, 'Barangay Clearance for Business Permit') === 0
     );
 $isCertificateIssuanceSectionActive = $current === 'CertificateTracker.php'
     && !$isIdIssuanceActive
@@ -1504,17 +1499,27 @@ if ($sbSidebarUserId !== '') {
               </a>
             </li>
             <?php endif; ?>
-            <?php if ($sbCan('business_monitoring')): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
-                 class="link-dark rounded sidebar-subnav-link <?= $isBusinessMonitoringActive ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Establishments Monitoring</span>
-              </a>
-            </li>
-            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php if ($sbCan('business_monitoring')): ?>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isEstablishmentMonitoringActive ? 'active' : '' ?>"
+           style="<?= $isEstablishmentMonitoringActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <span class="sidebar-icon-wrap"><i class="fas fa-store"></i></span>
+          <span class="sidebar-button-label">Establishment Monitoring</span>
+        </a>
+      </li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__business__')) ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isBusinessMonitoringActive ? 'active' : '' ?>"
+           style="<?= $isBusinessMonitoringActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <span class="sidebar-icon-wrap"><i class="fas fa-building"></i></span>
+          <span class="sidebar-button-label">Business Monitoring</span>
+        </a>
+      </li>
+      <?php endif; ?>
       <?php endif; ?>
 
       <?php if ($sbHasAny($sbFinanceKeys)): ?>
