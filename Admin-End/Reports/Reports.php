@@ -541,6 +541,20 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
     $feeAmountExpr = rp_column_exists($conn, 'documentrequesttbl', 'fee_amount')
         ? 'd.fee_amount'
         : 'NULL';
+    $verifiedTransactionCondition = '1 = 1';
+    if (
+        rp_column_exists($conn, 'financetransactiontbl', 'transaction_status_id')
+        && rp_table_exists($conn, 'statuslookuptbl')
+        && rp_column_exists($conn, 'statuslookuptbl', 'status_id')
+        && rp_column_exists($conn, 'statuslookuptbl', 'status_name')
+    ) {
+        $verifiedTransactionCondition = "EXISTS (
+            SELECT 1
+            FROM statuslookuptbl payment_status
+            WHERE payment_status.status_id = ft.transaction_status_id
+              AND LOWER(REPLACE(TRIM(payment_status.status_name), ' ', '')) = 'verified'
+        )";
+    }
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
 
@@ -574,7 +588,8 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
             '' AS department_handle
         FROM documentrequesttbl d
         INNER JOIN financetransactiontbl ft ON ft.request_id = d.request_id" . $residentJoin . "
-        WHERE LOWER(COALESCE(d.stage, '')) NOT IN ('rejected', 'cancelled', 'interview_failed', 'inspection_failed', 'payment_rejected')
+        WHERE LOWER(COALESCE(d.stage, '')) IN ('payment_verified', 'ready_for_claim', 'completed')
+          AND {$verifiedTransactionCondition}
           AND COALESCE(ft.transaction_amount, 0) > 0
           AND DATE({$financeDateExpr}) BETWEEN '{$df}' AND '{$dt}'
         ORDER BY {$financeDateExpr} ASC, d.request_id ASC
@@ -3262,6 +3277,15 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-table .text-end { text-align: right; }
     .rp-table .text-center { text-align: center; }
     .rp-table .pct { color: #6b7280; font-size: 11px; }
+    .rp-table .rp-or-log-index {
+      width: 42px;
+      min-width: 42px;
+      max-width: 42px;
+      padding-left: 4px;
+      padding-right: 4px;
+      text-align: center;
+      white-space: nowrap;
+    }
     .rp-col-hidden { display: none !important; }
 
     /* Two-column layout for side-by-side tables */
@@ -4717,12 +4741,12 @@ elseif ($module === 'financial'):
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('or_log')) ?></div>
           <table class="rp-table">
             <thead>
-              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Price</th></tr>
+              <tr><th class="rp-or-log-index<?= htmlspecialchars($reportColumnClass('identifier')) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Price</th></tr>
             </thead>
             <tbody>
               <?php $i = 1; foreach ($fin['or_log'] as $r): ?>
               <tr>
-                <td class="pct<?= htmlspecialchars($reportColumnClass('identifier')) ?>"><?= $i++ ?></td>
+                <td class="rp-or-log-index pct<?= htmlspecialchars($reportColumnClass('identifier')) ?>"><?= $i++ ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong><?= htmlspecialchars($r['or_number']) ?></strong></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars($r['resident_name'] ?: '—') ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
@@ -4734,8 +4758,8 @@ elseif ($module === 'financial'):
             </tbody>
             <tfoot>
               <tr>
+                <td class="rp-or-log-index<?= htmlspecialchars($reportColumnClass('identifier')) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong>TOTAL</strong></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"></td>
