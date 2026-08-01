@@ -7860,6 +7860,11 @@ if ($action === 'create_manual_request') {
         $requireManualPayloadFields([
             'location' => 'Project / Permit Location',
         ]);
+        if (str_contains($documentToken, 'commercialpermit') || str_contains($documentToken, 'commercialbuildingpermit')) {
+            $requireManualPayloadFields([
+                'establishment_name' => 'Establishment / Building Name',
+            ]);
+        }
     } elseif (str_contains($documentToken, 'indigency')) {
         $requireManualPayloadFields([
             'request_officer_line1' => 'Recipient Name',

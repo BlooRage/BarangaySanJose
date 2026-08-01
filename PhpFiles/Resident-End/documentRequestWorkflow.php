@@ -1722,10 +1722,15 @@ if ($action === 'submit_request') {
             'requires_sec_certificate' => true,
             'requires_sec_for_ownership' => false,
             'site_photo_label' => 'Picture of establishment / property',
+            'requires_establishment_name' => true,
         ];
     }
 
     if ($generalPermitConfig !== null) {
+        if (($generalPermitConfig['requires_establishment_name'] ?? false)
+            && trim((string)($_POST['establishment_name'] ?? '')) === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Establishment / Building Name is required.']);
+        }
         $sameAddress = strtolower(trim((string)($_POST['lot_same_address'] ?? '')));
         $usesApplicantAddress = in_array($sameAddress, ['1', 'true', 'yes', 'on'], true);
         $lotAddressSystem = strtolower(trim((string)($_POST['lot_address_system'] ?? '')));

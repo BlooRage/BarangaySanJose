@@ -199,6 +199,14 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 </div>
 
                 <h2 class="section-title text-center text-dark">Lot Information</h2>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="establishment_name">Establishment / Building Name <span class="required-asterisk">*</span></label>
+                            <input type="text" id="establishment_name" name="establishment_name" required placeholder="Enter the commercial establishment or building name">
+                        </div>
+                    </div>
+                </div>
                 <div id="lotAddressSystemRow" class="form-row">
                     <div class="full-width">
                         <div class="input-stack">

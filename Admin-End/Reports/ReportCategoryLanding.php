@@ -71,6 +71,17 @@ if ($issuanceConfig !== null) {
                 'show_section' => ['requesters'],
             ],
         ];
+        $choices[] = [
+            'title' => 'Commercial Establishments Masterlist',
+            'description' => 'List commercial properties and establishments using their latest completed commercial-permit clearance.',
+            'icon' => 'fa-city',
+            'query' => [
+                'module' => $module,
+                'report' => 'commercial_establishments',
+                'filter_type' => ['clr_commercial_permit'],
+                'show_section' => ['requesters'],
+            ],
+        ];
     }
     $choices[] = [
         'title' => 'All Requesters Masterlist',

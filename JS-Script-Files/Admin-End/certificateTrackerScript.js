@@ -10192,6 +10192,9 @@
       switch (config.kind) {
         case 'general_clearance':
           return [
+            ...(String(config.id || '').includes('commercial')
+              ? [{ name: 'establishment_name', label: 'Establishment / Building Name', type: 'text', required: true, col: 'col-12' }]
+              : []),
             { name: 'location', label: 'Project / Permit Location', type: 'text', required: true, col: 'col-md-6' },
             { name: 'remarks', label: 'Remarks', type: 'text', col: 'col-md-6' }
           ];
