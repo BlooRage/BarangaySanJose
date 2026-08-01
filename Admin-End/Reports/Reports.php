@@ -1590,7 +1590,6 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'total' => 0,
             'paid' => 0,
             'free_exempt' => 0,
-            'waived' => 0.0,
             'revenue' => 0.0,
         ];
     }
@@ -1628,7 +1627,6 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
         $requestSource = rp_request_channel_label($payload);
         $revenueAmount = (float)($row['revenue_amount'] ?? 0);
         $effectiveFee = rp_document_request_effective_fee($conn, $row);
-        $standardFee = dr_get_fee_amount_for_document_type($conn, $rawDocumentType);
         $isFreeOrExempt = $hasPayloadExemption || ($effectiveFee !== null && $effectiveFee <= 0.0);
 
         if ($reportFilterTypes !== [] && !in_array($requestTypeKey, $reportFilterTypes, true)) {
@@ -1693,7 +1691,6 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             }
             if ($isFreeOrExempt) {
                 $revenueRows[$requestTypeKey]['free_exempt']++;
-                $revenueRows[$requestTypeKey]['waived'] += max(0.0, (float)($standardFee ?? 0.0));
             }
             $revenueRows[$requestTypeKey]['revenue'] += $revenueAmount;
         }
@@ -3635,12 +3632,11 @@ if ($issuanceModuleConfig !== null):
     $trendTotals['rejected'] += (int)($row['rejected'] ?? 0);
     $trendTotals['revenue'] += (float)($row['revenue'] ?? 0);
   }
-  $revenueAccountingTotals = ['total' => 0, 'paid' => 0, 'free_exempt' => 0, 'waived' => 0.0, 'revenue' => 0.0];
+  $revenueAccountingTotals = ['total' => 0, 'paid' => 0, 'free_exempt' => 0, 'revenue' => 0.0];
   foreach ($issuanceRevenue as $row) {
     $revenueAccountingTotals['total'] += (int)($row['total'] ?? 0);
     $revenueAccountingTotals['paid'] += (int)($row['paid'] ?? 0);
     $revenueAccountingTotals['free_exempt'] += (int)($row['free_exempt'] ?? 0);
-    $revenueAccountingTotals['waived'] += (float)($row['waived'] ?? 0);
     $revenueAccountingTotals['revenue'] += (float)($row['revenue'] ?? 0);
   }
   $issuanceAreaTotals = [];
@@ -3703,6 +3699,7 @@ if ($issuanceModuleConfig !== null):
       $issuanceStatusTotals[] = $issuanceStatusTotalsByKey[$statusKey];
     }
   }
+  $showIssuanceStatusAnalysis = array_intersect(['pending', 'rejected'], $filterModalStatuses) !== [];
   $issuanceChannelSummary = [
     [
       'channel_label' => 'Walk-in',
@@ -3713,9 +3710,7 @@ if ($issuanceModuleConfig !== null):
       'total' => (int)($issuanceSummary['online'] ?? 0),
     ],
   ];
-  $issuanceStatusChartData = array_values(array_filter($issuanceStatusTotals, static function (array $row): bool {
-    return (int)($row['total'] ?? 0) > 0;
-  }));
+  $issuanceStatusChartData = $showIssuanceStatusAnalysis ? $issuanceStatusTotals : [];
   $issuanceChannelChartData = array_values(array_filter($issuanceChannelSummary, static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
@@ -3842,6 +3837,7 @@ if ($issuanceModuleConfig !== null):
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by document type.</div>
             </div>
+            <?php if ($showIssuanceStatusAnalysis): ?>
             <div class="rp-chart-card">
               <div class="rp-subsection-title">Total Requests by Status</div>
               <div class="rp-chart-wrap">
@@ -3849,6 +3845,7 @@ if ($issuanceModuleConfig !== null):
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by status.</div>
             </div>
+            <?php endif; ?>
             <div class="rp-chart-card">
               <div class="rp-subsection-title">Total Requests by Channel</div>
               <div class="rp-chart-wrap">
@@ -3944,7 +3941,8 @@ if ($issuanceModuleConfig !== null):
             </div>
           </div>
 
-          <div class="rp-two-col" style="margin-top:18px;">
+          <div class="rp-two-col" style="margin-top:18px;<?= $showIssuanceStatusAnalysis ? '' : 'grid-template-columns:1fr;' ?>">
+            <?php if ($showIssuanceStatusAnalysis): ?>
             <div>
               <div class="rp-subsection-title">Total Requests by Status</div>
               <table class="rp-table">
@@ -3973,6 +3971,7 @@ if ($issuanceModuleConfig !== null):
                 </tfoot>
               </table>
             </div>
+            <?php endif; ?>
             <div>
               <div class="rp-subsection-title">Total Requests by Channel</div>
               <table class="rp-table">
@@ -4053,7 +4052,6 @@ if ($issuanceModuleConfig !== null):
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Paid</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Free / Exempt</th>
-                <th class="text-end">Amount Waived</th>
                 <th class="text-end">Amount Collected</th>
               </tr>
             </thead>
@@ -4064,7 +4062,6 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['paid'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['free_exempt'] ?? 0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($row['waived'] ?? 0), 2) ?></td>
                 <td class="text-end">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
               </tr>
               <?php endforeach; ?>
@@ -4075,12 +4072,11 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['total']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['paid']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$revenueAccountingTotals['free_exempt']) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)$revenueAccountingTotals['waived'], 2) ?></td>
                 <td class="text-end">&#8369;<?= number_format((float)$revenueAccountingTotals['revenue'], 2) ?></td>
               </tr>
             </tfoot>
           </table>
-          <p class="rp-chart-note">Free / Exempt includes requests whose effective fee is zero, such as qualified PWD, senior citizen, First Time Job Seeker, and inherently free document requests. Amount Waived shows the configured fee that was not collected.</p>
+          <p class="rp-chart-note">Free / Exempt includes requests whose effective fee is zero, such as qualified PWD, senior citizen, First Time Job Seeker, and inherently free document requests.</p>
         </div>
         <?php endif; ?>
 
