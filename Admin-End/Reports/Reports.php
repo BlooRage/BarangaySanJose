@@ -502,6 +502,12 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
     $residentJoin = $residentParts['joins'] !== '' ? "\n        {$residentParts['joins']}" : '';
     $areaExpr = $residentParts['area_expr'] !== 'NULL' ? $residentParts['area_expr'] : "'Unspecified'";
     $sectorExpr = $residentParts['sector_expr'] !== 'NULL' ? $residentParts['sector_expr'] : "''";
+    // fee_amount is not present in every documentrequesttbl schema. The
+    // effective-fee helper can fall back to the configured fee when it is
+    // absent, so keep the financial query valid by selecting NULL.
+    $feeAmountExpr = rp_column_exists($conn, 'documentrequesttbl', 'fee_amount')
+        ? 'd.fee_amount'
+        : 'NULL';
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
 
@@ -513,7 +519,7 @@ function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string
             COALESCE(NULLIF(TRIM(d.stage), ''), 'submitted') AS stage,
             COALESCE(d.resident_id, '') AS resident_id,
             COALESCE(d.resident_user_id, '') AS resident_user_id,
-            COALESCE(d.fee_amount, NULL) AS fee_amount,
+            {$feeAmountExpr} AS fee_amount,
             COALESCE(d.request_details, '') AS request_details,
             COALESCE({$areaExpr}, 'Unspecified') AS area_number,
             COALESCE({$sectorExpr}, '') AS sector_membership,
