@@ -3883,8 +3883,8 @@ if ($certificateLaunchStage === 'release') {
         </div>
 
         <div id="actionPlateWrap" class="d-none mb-3">
-          <label class="form-label">Plate Number</label>
-          <input id="actionPlate" name="plate_number" type="text" class="form-control" placeholder="Enter plate number if applicable">
+          <label class="form-label">Plate Number <span class="text-danger">*</span></label>
+          <input id="actionPlate" name="plate_number" type="text" class="form-control" placeholder="Enter the plate number to issue" autocomplete="off">
         </div>
 
         <div id="actionModalError" class="alert alert-danger d-none mb-0"></div>

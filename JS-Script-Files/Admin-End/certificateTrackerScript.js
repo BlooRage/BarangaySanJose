@@ -6416,7 +6416,7 @@
       actionPlateWrap.classList.remove('d-none');
     }
     if (actionPlate) {
-      actionPlate.required = false;
+      actionPlate.required = true;
       actionPlate.value = String(plateValue || '').trim().toUpperCase();
     }
     if (actionSubmitBtn) {
@@ -7887,6 +7887,12 @@
         modalError.classList.remove('d-none');
         return;
       }
+      if (!selectedPlateNumber) {
+        modalError.textContent = 'Please enter the plate number before continuing.';
+        modalError.classList.remove('d-none');
+        actionPlate?.focus();
+        return;
+      }
       if (actionForm) {
         actionForm.dataset.businessApprovalType = selectedApprovalType;
         actionForm.dataset.businessPlateNumber = selectedPlateNumber;
@@ -7946,6 +7952,12 @@
         if (!selectedApprovalType) {
           modalError.textContent = 'Please select at least one approval type first.';
           modalError.classList.remove('d-none');
+          return;
+        }
+        if (!selectedPlateNumber) {
+          modalError.textContent = 'Please enter the plate number before continuing.';
+          modalError.classList.remove('d-none');
+          actionPlate?.focus();
           return;
         }
         if (!viewPreviewState || typeof viewPreviewState !== 'object') {
@@ -10190,6 +10202,7 @@
               { value: 'Renewal', label: 'Renewal' }
             ] },
             { name: 'business_name', label: 'Business Name', type: 'text', required: true, col: 'col-md-8' },
+            { name: 'plate_number', label: 'Plate Number', type: 'text', required: true, col: 'col-md-4', placeholder: 'Enter the plate number to issue' },
             { name: 'previous_plate_number', label: 'Old Plate Number', type: 'text', required: true, col: 'col-md-4', placeholder: 'Enter the old plate number', showWhen: { field: 'application_type', value: 'Renewal' } },
             { name: 'business_type', label: 'Business Type', type: 'select', required: true, allowOther: true, col: 'col-md-6', options: [
               { value: 'Retail', label: 'Retail' },

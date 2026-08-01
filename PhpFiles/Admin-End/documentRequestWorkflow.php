@@ -2408,6 +2408,43 @@ function dra_decode_request_payload(array $requestRow): array
     return is_array($payload) ? $payload : [];
 }
 
+function dra_is_business_permit_clearance(array $requestRow): bool
+{
+    $documentType = trim((string)($requestRow['document_type'] ?? ''));
+    if ($documentType === '') {
+        $payload = dra_decode_request_payload($requestRow);
+        $documentType = trim((string)($payload['document_type'] ?? ''));
+    }
+    $token = strtolower((string)(preg_replace('/[^a-z0-9]+/', '', $documentType) ?? ''));
+    return in_array($token, [
+        'barangayclearanceforbusinesspermit',
+        'barangaybusinessclearance',
+        'businessclearance',
+        'clearanceforbusinesspermit',
+    ], true);
+}
+
+function dra_business_permit_plate_number(array $requestRow): string
+{
+    $payload = dra_decode_request_payload($requestRow);
+    return strtoupper(trim((string)(
+        $payload['_preview_plate_number']
+        ?? $payload['plate_number']
+        ?? $payload['business_plate_number']
+        ?? ''
+    )));
+}
+
+function dra_require_business_permit_plate(array $requestRow): void
+{
+    if (dra_is_business_permit_clearance($requestRow) && dra_business_permit_plate_number($requestRow) === '') {
+        dr_respond_json(422, [
+            'success' => false,
+            'message' => 'Plate Number is required before a Barangay Clearance for Business Permit can be issued.',
+        ]);
+    }
+}
+
 function dra_barangay_id_generated_number(array $payload, string $requestId, DateTimeInterface $issuedDateObj): string
 {
     $override = trim((string)($payload['barangay_id_number'] ?? $payload['resident_id_number'] ?? $payload['resident_id_no'] ?? ''));
@@ -7780,12 +7817,14 @@ if ($action === 'create_manual_request') {
         $requireManualPayloadFields([
             'application_type' => 'Application Type',
             'business_name' => 'Business Name',
+            'plate_number' => 'Plate Number',
             'business_type' => 'Business Type',
             'business_approval_type' => 'Approval Type',
             'business_address_line' => 'Business Address',
             'business_area_number' => 'Business Area Number',
             'business_full_address' => 'Business Address',
         ]);
+        $payload['plate_number'] = strtoupper(trim((string)$payload['plate_number']));
         if (strcasecmp(trim((string)($payload['application_type'] ?? '')), 'Renewal') === 0) {
             $requireManualPayloadFields([
                 'previous_plate_number' => 'Old Plate Number',
@@ -9125,6 +9164,8 @@ if ($action === 'personnel_approve') {
         $row = dr_fetch_request($conn, $requestId) ?? $row;
     }
 
+    dra_require_business_permit_plate($row);
+
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker($row);
     $isClearanceDoc = dr_is_clearance_document_type((string)($row['document_type'] ?? ''));
     $hasCertificatePaymentExemption = dr_request_has_certificate_payment_exemption($conn, $row, (string)($row['document_type'] ?? ''));
@@ -9426,6 +9467,7 @@ if ($action === 'interview_fail') {
 }
 
 if ($action === 'inspection_pass') {
+    dra_require_business_permit_plate($row);
     if (!dr_requires_clearance_inspection((string)($row['document_type'] ?? ''))) {
         dr_respond_json(422, ['success' => false, 'message' => 'Inspection approval is not available for this request type.']);
     }
@@ -9561,6 +9603,7 @@ if ($action === 'inspection_fail') {
 }
 
 if ($action === 'finance_verify') {
+    dra_require_business_permit_plate($row);
     if (dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))) {
         dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID is free and does not go through finance verification.']);
     }
@@ -9825,6 +9868,7 @@ if ($action === 'finance_reject') {
 }
 
 if ($action === 'mark_ready') {
+    dra_require_business_permit_plate($row);
     $isBarangayIdRequest = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
     if (!dr_is_manual_issuance_request($row) && !$isBarangayIdRequest) {
         dr_respond_json(422, ['success' => false, 'message' => 'Release tagging is only available for manual issuance requests and Barangay IDs.']);
@@ -9932,6 +9976,7 @@ if ($action === 'mark_ready') {
 }
 
 if ($action === 'mark_completed') {
+    dra_require_business_permit_plate($row);
     $isBarangayIdRequest = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
     if (!dr_is_manual_issuance_request($row) && !$isBarangayIdRequest) {
         dr_respond_json(422, ['success' => false, 'message' => 'Claim completion is only available for manual issuance requests and Barangay IDs.']);
