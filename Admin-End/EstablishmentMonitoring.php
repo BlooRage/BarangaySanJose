@@ -13,7 +13,7 @@ require_once __DIR__ . '/includes/admin_guard.php';
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <style>
-    .establishment-monitoring-shell{max-width:1540px;margin:0 auto}.establishment-area-tabs{display:flex;flex-wrap:wrap;gap:.5rem}.establishment-area-tab{border-radius:999px;font-weight:650}.establishment-area-tab.active{color:#fff;background:#0d6efd;border-color:#0d6efd}.establishment-name{font-weight:700;color:#1f2937}
+    .establishment-monitoring-shell{max-width:1540px;margin:0 auto}.establishment-name{font-weight:700;color:#1f2937}
   </style>
 </head>
 <body>
@@ -24,10 +24,7 @@ require_once __DIR__ . '/includes/admin_guard.php';
     <hr><br>
     <div class="bg-white p-4 rounded-4 shadow-sm border establishment-monitoring-shell resident-masterlist-shell">
       <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
-        <div>
-          <div class="fw-semibold mb-2">Commercial Establishments</div>
-          <div class="establishment-area-tabs" id="establishmentAreaTabs" aria-label="Filter commercial establishments by area"></div>
-        </div>
+        <div class="fw-semibold">Commercial Establishments</div>
         <div class="admin-list-actions">
           <div class="input-group admin-search"><input type="text" id="establishmentSearch" class="form-control" placeholder="Establishment, owner, address"><span class="input-group-text bg-white"><i class="fas fa-search"></i></span></div>
           <button class="btn btn-outline-secondary btn-icon" type="button" id="establishmentRefresh" title="Refresh"><i class="fa-solid fa-arrows-rotate"></i></button>
@@ -47,6 +44,6 @@ require_once __DIR__ . '/includes/admin_guard.php';
   </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../JS-Script-Files/Admin-End/establishmentMonitoring.js?v=20260801-1"></script>
+<script src="../JS-Script-Files/Admin-End/establishmentMonitoring.js?v=20260801-2"></script>
 </body>
 </html>

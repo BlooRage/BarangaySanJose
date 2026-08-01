@@ -1,25 +1,17 @@
 (() => {
   const endpoint = "../PhpFiles/Admin-End/businessMonitoringData.php?kind=commercial";
   const tbody = document.getElementById("establishmentMonitoringTbody");
-  const tabs = document.getElementById("establishmentAreaTabs");
   const search = document.getElementById("establishmentSearch");
   const refresh = document.getElementById("establishmentRefresh");
   const entries = document.getElementById("establishmentEntries");
   const pagination = document.getElementById("establishmentPagination");
-  const officialAreas = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
-  const state = { rows: [], area: "All", search: "", page: 1, perPage: 20 };
+  const state = { rows: [], search: "", page: 1, perPage: 20 };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const value = (row, ...keys) => keys.map((key) => String(row?.[key] ?? "").trim()).find(Boolean) || "—";
-
-  function renderTabs() {
-    tabs.innerHTML = ["All", ...officialAreas].map((area) => `<button type="button" class="btn btn-sm btn-outline-primary establishment-area-tab${state.area === area ? " active" : ""}" data-area="${esc(area)}">${esc(area)}</button>`).join("");
-    tabs.querySelectorAll("[data-area]").forEach((button) => button.addEventListener("click", () => { state.area = button.dataset.area || "All"; state.page = 1; renderTabs(); render(); }));
-  }
 
   function filteredRows() {
     return state.rows.filter((row) => {
       const area = value(row, "establishment_area", "area_number");
-      if (state.area !== "All" && area !== state.area) return false;
       if (!state.search) return true;
       return [row.establishment_name, row.applicant_name, row.owner_name, area, row.establishment_address, row.request_id].some((item) => String(item || "").toLowerCase().includes(state.search));
     });
@@ -60,5 +52,5 @@
   search.addEventListener("input",()=>{state.search=search.value.trim().toLowerCase();state.page=1;render();});
   entries.addEventListener("change",()=>{state.perPage=Math.max(1,parseInt(entries.value,10)||20);state.page=1;render();});
   refresh.addEventListener("click",load);
-  renderTabs(); load();
+  load();
 })();
