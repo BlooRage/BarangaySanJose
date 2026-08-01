@@ -159,7 +159,7 @@ function rp_document_type_label(string $raw): string {
         'certificateofcohabitation' => 'Certificate of Cohabitation',
         'identity' => 'Certificate of Identity',
         'certificateofidentity' => 'Certificate of Identity',
-        'generalcertification' => 'General Certificate',
+        'generalcertification' => 'General Certification',
         'firsttimejobseeker' => 'First Time Job Seeker Certificate',
         'firsttimejobseekers' => 'First Time Job Seeker Certificate',
         'firsttimejobseekercertificate' => 'First Time Job Seeker Certificate',
@@ -620,6 +620,41 @@ function rp_financial_payment_method_key(string $method): string {
     return $normalized !== '' ? $normalized : 'unspecified';
 }
 
+function rp_financial_document_type_value(string $documentType): string {
+    $value = trim($documentType);
+    if ($value !== '' && rp_document_request_key($value) === 'cert_general') {
+        return 'General Certification';
+    }
+    return $value !== '' ? $value : 'Unspecified';
+}
+
+function rp_normalize_area_label(string $area): string {
+    $value = trim($area);
+    if ($value === '' || strcasecmp($value, 'Unspecified') === 0) {
+        return 'Unspecified';
+    }
+
+    $compact = strtoupper((string)preg_replace('/\s+/', '', $value));
+    $compact = (string)preg_replace('/^AREA/', '', $compact);
+    $map = [
+        '1' => 'Area 01',
+        '01' => 'Area 01',
+        '1A' => 'Area 1A',
+        '2' => 'Area 02',
+        '02' => 'Area 02',
+        '3' => 'Area 03',
+        '03' => 'Area 03',
+        '4' => 'Area 04',
+        '04' => 'Area 04',
+        '5' => 'Area 05',
+        '05' => 'Area 05',
+        '6' => 'Area 06',
+        '06' => 'Area 06',
+    ];
+
+    return $map[$compact] ?? $value;
+}
+
 function rp_financial_department_value(array $row): string {
     $department = trim((string)($row['department_handle'] ?? ''));
     if ($department !== '') {
@@ -634,8 +669,7 @@ function rp_financial_matches_filters(array $row, array $typeFilters, array $are
         return false;
     }
 
-    $areaValue = trim((string)($row['area_number'] ?? ''));
-    $areaValue = $areaValue !== '' ? $areaValue : 'Unspecified';
+    $areaValue = rp_normalize_area_label((string)($row['area_number'] ?? ''));
     if ($areaFilters !== [] && !in_array($areaValue, $areaFilters, true)) {
         return false;
     }
@@ -1845,6 +1879,26 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
 $fin = [];
 if ($module === 'financial') {
     $financialSourceRows = rp_fetch_financial_collection_rows($conn, $dateFrom, $dateTo);
+    foreach ($financialSourceRows as &$financialSourceRow) {
+        $financialSourceRow['document_type'] = rp_financial_document_type_value(
+            (string)($financialSourceRow['document_type'] ?? '')
+        );
+        $financialSourceRow['area_number'] = rp_normalize_area_label(
+            (string)($financialSourceRow['area_number'] ?? '')
+        );
+    }
+    unset($financialSourceRow);
+
+    // Old bookmarked filter URLs may still contain an individual General
+    // Certificate purpose. Treat all of them as the single report category.
+    $reportFilterTypes = array_values(array_unique(array_map(
+        static fn(string $value): string => rp_financial_document_type_value($value),
+        $reportFilterTypes
+    )));
+    $reportFilterAreas = array_values(array_unique(array_map(
+        static fn(string $value): string => rp_normalize_area_label($value),
+        $reportFilterAreas
+    )));
     $reportFilterOptions['type'] = rp_options_from_rows($financialSourceRows, 'document_type', 'rp_document_type_label');
 
     $filteredFinancialRows = array_values(array_filter(
@@ -1873,10 +1927,8 @@ if ($module === 'financial') {
         $amount = (float)($row['transaction_amount'] ?? 0);
         $methodKey = rp_financial_payment_method_key((string)($row['payment_method'] ?? ''));
         $orNumber = trim((string)($row['or_number'] ?? ''));
-        $documentType = trim((string)($row['document_type'] ?? ''));
-        $documentType = $documentType !== '' ? $documentType : 'Unspecified';
-        $areaLabel = trim((string)($row['area_number'] ?? ''));
-        $areaLabel = $areaLabel !== '' ? $areaLabel : 'Unspecified';
+        $documentType = rp_financial_document_type_value((string)($row['document_type'] ?? ''));
+        $areaLabel = rp_normalize_area_label((string)($row['area_number'] ?? ''));
         $departmentLabel = rp_financial_department_value($row);
         $departmentLabel = $departmentLabel !== '' ? $departmentLabel : 'Unspecified';
         $eventAt = trim((string)($row['finance_event_at'] ?? ''));
@@ -3690,6 +3742,7 @@ $shouldLoadBlotterCharts = false;
 $shouldLoadComplaintCharts = false;
 $financialTypeRevenueChartData = [];
 $financialAreaRevenueChartData = [];
+$financialDepartmentRevenueChartData = [];
 $residentGenderChartData = [];
 $residentAgeChartData = [];
 $residentAreaChartData = [];
@@ -4371,9 +4424,13 @@ elseif ($module === 'financial'):
     return (float)($row['amount'] ?? 0) > 0;
   }));
   $financialAreaRevenueChartData = array_values($fin['by_area'] ?? []);
+  $financialDepartmentRevenueChartData = array_values(array_filter($fin['by_department'] ?? [], static function (array $row): bool {
+    return (float)($row['amount'] ?? 0) > 0;
+  }));
   $shouldLoadFinancialCharts = $showFinancialSection('charts') && (
     $financialTypeRevenueChartData !== []
     || $financialAreaRevenueChartData !== []
+    || $financialDepartmentRevenueChartData !== []
   );
   $financialSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $financialVisibleSections, $key);
 ?>
@@ -4397,7 +4454,7 @@ elseif ($module === 'financial'):
         <?php if ($showFinancialSection('charts')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('charts')) ?></div>
-          <?php if ($financialTypeRevenueChartData === [] && $financialAreaRevenueChartData === []): ?>
+          <?php if ($financialTypeRevenueChartData === [] && $financialAreaRevenueChartData === [] && $financialDepartmentRevenueChartData === []): ?>
             <p class="rp-empty">No revenue stream chart data for the selected period.</p>
           <?php else: ?>
           <div class="rp-chart-grid">
@@ -4414,6 +4471,13 @@ elseif ($module === 'financial'):
                 <canvas id="financialAreaRevenueChart"></canvas>
               </div>
               <div class="rp-chart-note">Bar graph view of revenue by area.</div>
+            </div>
+            <div class="rp-chart-card" style="grid-column: 1 / -1;">
+              <div class="rp-subsection-title">By Department Revenue Stream</div>
+              <div class="rp-chart-wrap">
+                <canvas id="financialDepartmentRevenueChart"></canvas>
+              </div>
+              <div class="rp-chart-note">Bar graph view of revenue collected by department.</div>
             </div>
           </div>
           <?php endif; ?>
@@ -6119,6 +6183,12 @@ window.__rpChartHelpers = (() => {
       title: 'By Area Revenue Stream',
       includeZeroValues: true,
       preserveOrder: true
+    },
+    {
+      canvasId: 'financialDepartmentRevenueChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['department'] ?? ''), $financialDepartmentRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): float => (float)($row['amount'] ?? 0), $financialDepartmentRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'By Department Revenue Stream'
     }
   ];
 
