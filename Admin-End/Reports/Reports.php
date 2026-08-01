@@ -1579,7 +1579,6 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
             'walkin' => 0,
             'online' => 0,
             'total' => 0,
-            'revenue' => 0.0,
         ];
         $revenueRows[$typeKey] = [
             'request_type_key' => $typeKey,
@@ -1702,7 +1701,6 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
                 $channels[$requestTypeKey]['online']++;
             }
             $channels[$requestTypeKey]['total']++;
-            $channels[$requestTypeKey]['revenue'] += $revenueAmount;
         }
 
         if ($requestDateRaw !== '') {
@@ -2872,14 +2870,14 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     }
     .rp-letterhead {
       display: grid;
-      grid-template-columns: 110px 1fr 110px;
+      grid-template-columns: 120px 1fr 120px;
       align-items: center;
-      gap: 14px;
+      gap: 18px;
       margin-bottom: 0;
     }
     .rp-letterhead-logo {
-      width: 98px;
-      height: 98px;
+      width: 108px;
+      height: 108px;
       object-fit: contain;
       justify-self: center;
       display: block;
@@ -2887,26 +2885,28 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-center {
       text-align: center;
       color: #000;
-      line-height: 1.18;
-      font-family: "Times New Roman", Times, serif;
+      line-height: 1.22;
+      font-family: Arial, Helvetica, sans-serif;
     }
     .rp-letterhead-center p {
       margin: 0;
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 400;
       text-transform: uppercase;
     }
     .rp-letterhead-rep {
-      font-size: 18px !important;
+      font-size: 20px !important;
+      font-weight: 800 !important;
     }
     .rp-letterhead-barangay {
-      font-size: 28px !important;
-      margin-top: 8px !important;
-      letter-spacing: .03em;
+      font-size: 29px !important;
+      font-weight: 800 !important;
+      margin-top: 10px !important;
+      letter-spacing: .02em;
     }
     .rp-letterhead-line {
-      border-bottom: 2px solid #9ca3af;
-      margin-top: 10px;
+      border-bottom: 2px solid #4b5563;
+      margin-top: 12px;
     }
     .rp-doc-header .rp-report-title {
       font-size: 15px;
@@ -3109,12 +3109,12 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-doc-header,
       .rp-footer { display: block !important; }
       .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
-      .rp-letterhead { grid-template-columns: 74pt 1fr 74pt !important; gap: 8pt !important; }
-      .rp-letterhead-logo { width: 64pt !important; height: 64pt !important; }
-      .rp-letterhead-center p { font-size: 10pt !important; }
-      .rp-letterhead-rep { font-size: 12pt !important; }
-      .rp-letterhead-barangay { font-size: 20pt !important; margin-top: 4pt !important; }
-      .rp-letterhead-line { margin-top: 6pt !important; }
+      .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
+      .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
+      .rp-letterhead-center p { font-size: 10.5pt !important; font-weight: 400 !important; }
+      .rp-letterhead-rep { font-size: 14pt !important; font-weight: 800 !important; }
+      .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 6pt !important; }
+      .rp-letterhead-line { margin-top: 8pt !important; border-color: #4b5563 !important; }
       .rp-doc-header .rp-report-title { font-size: 11pt !important; }
       .rp-section {
         margin-top: 14pt !important;
@@ -3192,12 +3192,12 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       }
     }
     .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
-    .rp-letterhead { grid-template-columns: 74pt 1fr 74pt !important; gap: 8pt !important; }
-    .rp-letterhead-logo { width: 64pt !important; height: 64pt !important; }
-    .rp-letterhead-center p { font-size: 10pt !important; }
-    .rp-letterhead-rep { font-size: 12pt !important; }
-    .rp-letterhead-barangay { font-size: 20pt !important; margin-top: 4pt !important; }
-    .rp-letterhead-line { margin-top: 6pt !important; }
+    .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
+    .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
+    .rp-letterhead-center p { font-size: 10.5pt !important; font-weight: 400 !important; }
+    .rp-letterhead-rep { font-size: 14pt !important; font-weight: 800 !important; }
+    .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 6pt !important; }
+    .rp-letterhead-line { margin-top: 8pt !important; border-color: #4b5563 !important; }
     .rp-doc-header .rp-report-title { font-size: 11pt !important; }
     .rp-section {
       margin-top: 14pt !important;
@@ -3617,12 +3617,11 @@ if ($issuanceModuleConfig !== null):
     $breakdownTotals['revenue'] += (float)($row['revenue'] ?? 0);
     $breakdownTotals['total'] += (int)($row['total'] ?? 0);
   }
-  $channelTotals = ['walkin' => 0, 'online' => 0, 'total' => 0, 'revenue' => 0.0];
+  $channelTotals = ['walkin' => 0, 'online' => 0, 'total' => 0];
   foreach ($issuanceChannels as $row) {
     $channelTotals['walkin'] += (int)($row['walkin'] ?? 0);
     $channelTotals['online'] += (int)($row['online'] ?? 0);
     $channelTotals['total'] += (int)($row['total'] ?? 0);
-    $channelTotals['revenue'] += (float)($row['revenue'] ?? 0);
   }
   $trendTotals = ['total' => 0, 'completed' => 0, 'pending' => 0, 'rejected' => 0, 'revenue' => 0.0];
   foreach ($issuanceTrend as $row) {
@@ -3846,7 +3845,7 @@ if ($issuanceModuleConfig !== null):
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by status.</div>
             </div>
             <?php endif; ?>
-            <div class="rp-chart-card">
+            <div class="rp-chart-card"<?= $showIssuanceStatusAnalysis ? '' : ' style="grid-column:1 / -1;"' ?>>
               <div class="rp-subsection-title">Total Requests by Channel</div>
               <div class="rp-chart-wrap">
                 <canvas id="issuanceChannelTotalsChart"></canvas>
@@ -4015,7 +4014,6 @@ if ($issuanceModuleConfig !== null):
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>">Walk-in</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>">Online</th>
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th>
-                <th class="text-end">Total Price</th>
               </tr>
             </thead>
             <tbody>
@@ -4025,7 +4023,6 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)($row['walkin'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)($row['online'] ?? 0)) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
@@ -4035,7 +4032,6 @@ if ($issuanceModuleConfig !== null):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)$channelTotals['walkin']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)$channelTotals['online']) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$channelTotals['total']) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)$channelTotals['revenue'], 2) ?></td>
               </tr>
             </tfoot>
           </table>
@@ -4046,6 +4042,13 @@ if ($issuanceModuleConfig !== null):
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('revenue')) ?></div>
           <table class="rp-table">
+            <colgroup>
+              <col style="width:38%">
+              <col style="width:18%">
+              <col style="width:12%">
+              <col style="width:12%">
+              <col style="width:20%">
+            </colgroup>
             <thead>
               <tr>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Request Type</th>
