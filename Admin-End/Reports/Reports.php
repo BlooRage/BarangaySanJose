@@ -1288,9 +1288,11 @@ function rp_report_customize_config(string $module): array {
                 'employment' => 'Employed and Unemployed',
                 'gender' => 'Gender',
                 'age' => 'Age Distribution',
-                'monthly' => 'Monthly Registration Count',
+                'monthly' => 'List of Registered Residents',
             ],
             'columns' => [
+                'identifier' => $sharedColumns['identifier'],
+                'resident' => $sharedColumns['resident'],
                 'date' => $sharedColumns['date'],
                 'area' => $sharedColumns['area'],
                 'sector' => $sharedColumns['sector'],
@@ -1337,9 +1339,9 @@ function rp_report_customize_config(string $module): array {
                     'columns' => ['type', 'count', 'percentage'],
                 ],
                 [
-                    'label' => 'Monthly Registration Count',
+                    'label' => 'List of Registered Residents',
                     'sections' => ['monthly'],
-                    'columns' => ['date', 'count'],
+                    'columns' => ['identifier', 'resident', 'area', 'date'],
                 ],
             ],
         ],
@@ -2216,6 +2218,7 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         SELECT COALESCE(LOWER(ri.sex),'unspecified') AS gender, COUNT(*) AS total
         FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
         WHERE {$residentVerifiedWhere}
         {$residentFilterSql}
         GROUP BY gender ORDER BY total DESC
@@ -2332,6 +2335,34 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         {$residentFilterSql}
         GROUP BY month ORDER BY month ASC
     ");
+
+    $res['registered_residents'] = rp_safe_query($conn, "
+        SELECT
+          ri.resident_id,
+          ri.firstname,
+          ri.middlename,
+          ri.lastname,
+          ri.suffix,
+          " . ($residentAreaExpr !== 'NULL' ? "COALESCE({$residentAreaExpr}, 'Unspecified')" : "'Unspecified'") . " AS area,
+          ri.created_at
+        FROM residentinformationtbl ri
+        JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
+        WHERE {$residentVerifiedWhere}
+        {$residentFilterSql}
+        ORDER BY ri.lastname ASC, ri.firstname ASC, ri.resident_id ASC
+    ");
+    foreach ($res['registered_residents'] as &$registeredResident) {
+        $nameParts = array_values(array_filter([
+            trim(pii_decrypt_string((string)($registeredResident['firstname'] ?? ''))),
+            trim(pii_decrypt_string((string)($registeredResident['middlename'] ?? ''))),
+            trim(pii_decrypt_string((string)($registeredResident['lastname'] ?? ''))),
+            trim(pii_decrypt_string((string)($registeredResident['suffix'] ?? ''))),
+        ], static fn(string $part): bool => $part !== ''));
+        $registeredResident['resident_name'] = implode(' ', $nameParts);
+        $registeredResident['area'] = pii_decrypt_string((string)($registeredResident['area'] ?? 'Unspecified'));
+    }
+    unset($registeredResident);
 
     $res['household_kpi'] = rp_safe_query($conn, "
         SELECT COUNT(DISTINCT ri.resident_id) AS total
@@ -3292,6 +3323,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
     .rp-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start; }
     .rp-chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .rp-chart-grid > .rp-chart-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .rp-chart-card {
       border: 1px solid #dbe4ee;
       border-radius: 14px;
@@ -4810,6 +4842,7 @@ elseif ($module === 'residents'):
     ];
   }, $res['monthly_reg'] ?? []));
   $residentMonthlyTotal = array_sum(array_column($residentMonthlyRows, 'total'));
+  $registeredResidentRows = $res['registered_residents'] ?? [];
   $residentHouseholdTotal = (int)($res['household_kpi']['total'] ?? 0);
   $residentHouseholdRows = $res['household_by_area_complete'] ?? [];
   $residentHouseholdAreaTotal = array_sum(array_column($residentHouseholdRows, 'total'));
@@ -4876,7 +4909,7 @@ elseif ($module === 'residents'):
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Verified Residents</td><td><?= number_format($total) ?></td></tr>
-              <tr><td>Total Verified Households (HOF)</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
+              <tr><td>Total Verified Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
             </tbody>
           </table>
         </div>
@@ -4918,7 +4951,7 @@ elseif ($module === 'residents'):
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('household')) ?></div>
           <table class="rp-summary" style="margin-bottom:18px;">
             <tbody>
-              <tr><td>Total Verified Households (HOF)</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
+              <tr><td>Total Verified Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
             </tbody>
           </table>
           <table class="rp-table">
@@ -5181,21 +5214,37 @@ elseif ($module === 'residents'):
 
         <?php if ($showReportSection('monthly')): ?>
         <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('monthly')) ?> (Verified, Last 12 Months)</div>
-          <?php if ($residentMonthlyRows === []): ?>
-            <p class="rp-empty">No data.</p>
+          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('monthly')) ?></div>
+          <?php if ($registeredResidentRows === []): ?>
+            <p class="rp-empty">No verified registered residents matched the selected filters.</p>
           <?php else: ?>
           <table class="rp-table">
-            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Month</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">New Verified Residents</th></tr></thead>
-            <tbody>
-              <?php foreach ($residentMonthlyRows as $row): ?>
+            <thead>
               <tr>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars((string)($row['label'] ?? 'Unspecified')) ?></td>
-                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Resident ID</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident Name</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Registration Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($registeredResidentRows as $row): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars((string)($row['resident_id'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(rp_date_label((string)($row['created_at'] ?? ''))) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
-            <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($residentMonthlyTotal) ?></td></tr></tfoot>
+            <tfoot>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong>TOTAL</strong></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= number_format(count($registeredResidentRows)) ?> residents</td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"></td>
+              </tr>
+            </tfoot>
           </table>
           <?php endif; ?>
         </div>
