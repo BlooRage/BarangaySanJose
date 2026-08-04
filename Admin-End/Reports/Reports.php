@@ -3004,6 +3004,12 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
   <title><?= $isPrintView ? htmlspecialchars($currentLabel).' — Barangay San Jose' : 'Reports' ?></title>
+  <script>
+    (() => {
+      const platform = String(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '');
+      if (/win/i.test(platform)) document.documentElement.classList.add('rp-platform-windows');
+    })();
+  </script>
   <?php if (!$isPrintView): ?>
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -3570,7 +3576,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
 
     /* Standalone print view — applied directly (no @media wrapper needed) */
     <?php if ($isPrintView): ?>
-    html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     @media screen {
       html, body { background: #dfe4ea; }
       body { padding: 18px 0 28px; }
@@ -3588,6 +3594,13 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
     .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 700 !important; }
     .rp-doc-header .rp-period { font-size: 12px !important; font-weight: 400 !important; margin-top: 6px !important; }
+    /* Windows Arial has visibly wider metrics than macOS Arial at these large
+       sizes. Normalize only the letterhead so both exports match the approved
+       compact macOS header. */
+    .rp-platform-windows .rp-letterhead-center p { font-size: 11pt !important; }
+    .rp-platform-windows .rp-letterhead-center .rp-letterhead-rep { font-size: 12.5pt !important; }
+    .rp-platform-windows .rp-letterhead-center .rp-letterhead-barangay { font-size: 17.5pt !important; margin-top: 7pt !important; }
+    .rp-platform-windows .rp-doc-header .rp-report-title { font-size: 15px !important; }
     .rp-section {
       margin-top: 14pt !important;
       page-break-inside: auto !important;
