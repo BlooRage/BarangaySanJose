@@ -1280,7 +1280,7 @@ function rp_report_customize_config(string $module): array {
         'residents' => [
             'sections' => [
                 'summary' => 'Overall Summary',
-                'breakdown' => 'Residents Breakdown',
+                'breakdown' => 'Area Resident Summary',
                 'household' => 'Household Data',
                 'charts' => 'Graphs',
                 'tables' => 'Tables (Supporting the Graphs)',
@@ -1304,7 +1304,7 @@ function rp_report_customize_config(string $module): array {
             ],
             'column_groups' => [
                 [
-                    'label' => 'Residents Breakdown',
+                    'label' => 'Area Resident Summary',
                     'sections' => ['breakdown'],
                     'columns' => ['area', 'count', 'percentage'],
                 ],
@@ -1341,7 +1341,7 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'List of Registered Residents',
                     'sections' => ['monthly'],
-                    'columns' => ['identifier', 'resident', 'type', 'area', 'sector'],
+                    'columns' => ['count', 'resident', 'type', 'area'],
                 ],
             ],
         ],
@@ -2349,6 +2349,7 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
           ri.lastname,
           ri.suffix,
           ri.sex,
+          ri.head_of_family,
           ri.sector_membership,
           " . ($residentAreaExpr !== 'NULL' ? "COALESCE({$residentAreaExpr}, 'Unspecified')" : "'Unspecified'") . " AS area
         FROM residentinformationtbl ri
@@ -4849,6 +4850,50 @@ elseif ($module === 'residents'):
   }, $res['monthly_reg'] ?? []));
   $residentMonthlyTotal = array_sum(array_column($residentMonthlyRows, 'total'));
   $registeredResidentRows = $res['registered_residents'] ?? [];
+  $registeredHouseholdHeadRows = array_values(array_filter(
+    $registeredResidentRows,
+    static fn(array $row): bool => (int)($row['head_of_family'] ?? 0) === 1
+  ));
+  $registeredSectorMemberRows = array_values(array_filter(
+    $registeredResidentRows,
+    static fn(array $row): bool => trim((string)($row['sector_membership'] ?? '')) !== ''
+  ));
+  $renderResidentRoster = static function (array $rows, bool $showSector = false): void {
+    if ($rows === []) {
+      echo '<p class="rp-empty">No verified residents matched the selected filters.</p>';
+      return;
+    }
+    ?>
+    <table class="rp-table" style="margin-top:18px;">
+      <thead>
+        <tr>
+          <th class="text-center">No.</th>
+          <th>Resident Name</th>
+          <th>Gender</th>
+          <th>Area</th>
+          <?php if ($showSector): ?><th>Sector Membership</th><?php endif; ?>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($rows as $index => $row): ?>
+        <tr>
+          <td class="text-center"><?= number_format($index + 1) ?></td>
+          <td><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
+          <td><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
+          <td><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
+          <?php if ($showSector): ?><td><?= htmlspecialchars((string)($row['sector_membership'] ?? '')) ?></td><?php endif; ?>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="<?= $showSector ? 4 : 3 ?>"><strong>TOTAL RESIDENTS</strong></td>
+          <td class="text-center"><strong><?= number_format(count($rows)) ?></strong></td>
+        </tr>
+      </tfoot>
+    </table>
+    <?php
+  };
   $residentHouseholdTotal = (int)($res['household_kpi']['total'] ?? 0);
   $residentHouseholdRows = $res['household_by_area_complete'] ?? [];
   $residentHouseholdAreaTotal = array_sum(array_column($residentHouseholdRows, 'total'));
@@ -4891,7 +4936,7 @@ elseif ($module === 'residents'):
     ];
   };
   $residentSupportRows = [
-    $residentSupportRow('Residents Breakdown', $residentAreaRows, 'area', $residentAreaTotal),
+    $residentSupportRow('Area Resident Summary', $residentAreaRows, 'area', $residentAreaTotal),
     $residentSupportRow('Household Data', $residentHouseholdRows, 'area', $residentHouseholdAreaTotal),
     $residentSupportRow('Sector Membership', $residentSectorRows, 'sector', $residentSectorTotal),
     $residentSupportRow('Employed and Unemployed', $residentEmploymentRows, 'employment', $residentEmploymentTotal),
@@ -4949,6 +4994,8 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
+          <h3 style="margin:20px 0 0;">Verified Residents in Selected Area</h3>
+          <?php $renderResidentRoster($registeredResidentRows); ?>
         </div>
         <?php endif; ?>
 
@@ -4988,6 +5035,8 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
+          <h3 style="margin:20px 0 0;">Heads of Family in Selected Area</h3>
+          <?php $renderResidentRoster($registeredHouseholdHeadRows); ?>
         </div>
         <?php endif; ?>
 
@@ -5118,6 +5167,8 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
+          <h3 style="margin:20px 0 0;">Sector Members in Selected Area</h3>
+          <?php $renderResidentRoster($registeredSectorMemberRows, true); ?>
         </div>
         <?php endif; ?>
 
@@ -5227,31 +5278,26 @@ elseif ($module === 'residents'):
           <table class="rp-table">
             <thead>
               <tr>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Resident ID</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">No.</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident Name</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Gender</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector Membership</th>
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($registeredResidentRows as $row): ?>
+              <?php foreach ($registeredResidentRows as $index => $row): ?>
               <tr>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars((string)($row['resident_id'] ?? '')) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($index + 1) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)($row['sector_membership'] ?? 'None')) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong>TOTAL</strong></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= number_format(count($registeredResidentRows)) ?> residents</td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"></td>
+                <td colspan="3"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
+                <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
               </tr>
             </tfoot>
           </table>
