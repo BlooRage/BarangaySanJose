@@ -2848,6 +2848,10 @@ if ($issuanceModuleConfig !== null && in_array('breakdown_total', $availableRepo
 }
 $showReportSection = static fn(string $key): bool => in_array($key, $visibleReportSections, true);
 $showReportColumn = static fn(string $key): bool => in_array($key, $visibleReportColumns, true);
+$isCompleteResidentReport = $module === 'residents' && (
+    $reportMode === 'complete'
+    || ($reportMode === '' && count($visibleReportSections) === count($availableReportSections))
+);
 $reportColumnClass = static fn(string $key): string => $showReportColumn($key) ? '' : ' rp-col-hidden';
 $reportBreakdownAreaClass = static fn(string $area): string => $showReportColumn(rp_breakdown_area_column_key($area)) ? '' : ' rp-col-hidden';
 $reportBreakdownSectorClass = static fn(string $sector): string => $showReportColumn(rp_breakdown_sector_column_key($sector)) ? '' : ' rp-col-hidden';
@@ -2894,6 +2898,9 @@ if ($issuanceModuleConfig !== null && $reportFilterStatuses !== []) {
     $activeReportFilters[] = $reportFilterLabels['status'] . ': ' . implode(', ', $labels);
 }
 $reportFilterStateQuery = ['module' => $module];
+if ($reportMode !== '') {
+    $reportFilterStateQuery['report'] = $reportMode;
+}
 if ($module !== 'residents' && !$isEstablishmentsMasterlistReport) {
     $reportFilterStateQuery['date_from'] = $dateFrom;
     $reportFilterStateQuery['date_to'] = $dateTo;
@@ -5003,8 +5010,10 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
-          <h3 style="margin:20px 0 0;">Verified Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
-          <?php $renderResidentRoster($registeredResidentRows); ?>
+          <?php if (!$isCompleteResidentReport): ?>
+            <h3 style="margin:20px 0 0;">Verified Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <?php $renderResidentRoster($registeredResidentRows); ?>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -5044,8 +5053,10 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
-          <h3 style="margin:20px 0 0;">Heads of Family — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
-          <?php $renderResidentRoster($registeredHouseholdHeadRows); ?>
+          <?php if (!$isCompleteResidentReport): ?>
+            <h3 style="margin:20px 0 0;">Heads of Family — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <?php $renderResidentRoster($registeredHouseholdHeadRows); ?>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -5176,8 +5187,10 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
-          <h3 style="margin:20px 0 0;">Sector Members — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
-          <?php $renderResidentRoster($registeredSectorMemberRows, true); ?>
+          <?php if (!$isCompleteResidentReport): ?>
+            <h3 style="margin:20px 0 0;">Sector Members — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <?php $renderResidentRoster($registeredSectorMemberRows, true); ?>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -5209,6 +5222,7 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
+          <?php if (!$isCompleteResidentReport): ?>
           <h3 style="margin:20px 0 0;">Employment List — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
           <?php if ($registeredResidentRows === []): ?>
             <p class="rp-empty">No verified residents matched the selected filters.</p>
@@ -5243,6 +5257,7 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
+          <?php endif; ?>
           <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -5313,7 +5328,7 @@ elseif ($module === 'residents'):
         </div>
         <?php endif; ?>
 
-        <?php if ($showReportSection('monthly')): ?>
+        <?php if ($showReportSection('monthly') && !$isCompleteResidentReport): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('monthly')) ?></div>
           <?php if ($registeredResidentRows === []): ?>
