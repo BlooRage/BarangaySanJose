@@ -121,7 +121,7 @@
           /* This picker can open from inside another Bootstrap modal. */
           z-index: 2080 !important;
         }
-        .resident-date-modal.show ~ .modal-backdrop {
+        .modal-backdrop.resident-date-modal-backdrop {
           z-index: 2070 !important;
         }
         .resident-date-modal .modal-content {
@@ -468,6 +468,7 @@
     document.body.appendChild(modalHost.firstElementChild);
 
     const modalEl = document.getElementById("residentDateModal");
+    modalEl.style.setProperty("z-index", "2080", "important");
     const modal = new bootstrap.Modal(modalEl);
     const modalTitle = document.getElementById("residentDateModalTitle");
     const modalSubtitle = document.getElementById("residentDateModalSubtitle");
@@ -1096,7 +1097,22 @@
       modal.hide();
     });
 
+    modalEl.addEventListener("show.bs.modal", () => {
+      window.requestAnimationFrame(() => {
+        const backdrops = document.querySelectorAll("body > .modal-backdrop");
+        const pickerBackdrop = backdrops[backdrops.length - 1];
+        if (pickerBackdrop) {
+          pickerBackdrop.classList.add("resident-date-modal-backdrop");
+          pickerBackdrop.style.setProperty("z-index", "2070", "important");
+        }
+      });
+    });
+
     modalEl.addEventListener("hidden.bs.modal", () => {
+      document.querySelectorAll(".resident-date-modal-backdrop").forEach((backdrop) => {
+        backdrop.classList.remove("resident-date-modal-backdrop");
+        backdrop.style.removeProperty("z-index");
+      });
       activeInput = null;
       activeProxy = null;
       calendarSelectedIso = "";
