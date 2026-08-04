@@ -3525,7 +3525,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-table th { vertical-align: bottom !important; }
       .rp-table--issuance-breakdown { table-layout: fixed !important; width: 100% !important; }
       .rp-table--issuance-breakdown th,
-      .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; vertical-align: top !important; }
+      .rp-table--issuance-breakdown td { font-size: 8pt !important; padding: 3pt !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; vertical-align: top !important; }
       .rp-breakdown-document-type { width: 20% !important; }
       .rp-table tr { page-break-inside: avoid; }
       .rp-two-col, .rp-three-col, .rp-chart-grid {
@@ -3594,13 +3594,13 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
     .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 700 !important; }
     .rp-doc-header .rp-period { font-size: 12px !important; font-weight: 400 !important; margin-top: 6px !important; }
-    /* Windows Arial has visibly wider metrics than macOS Arial at these large
-       sizes. Normalize only the letterhead so both exports match the approved
-       compact macOS header. */
-    .rp-platform-windows .rp-letterhead-center p { font-size: 11pt !important; }
-    .rp-platform-windows .rp-letterhead-center .rp-letterhead-rep { font-size: 12.5pt !important; }
-    .rp-platform-windows .rp-letterhead-center .rp-letterhead-barangay { font-size: 17.5pt !important; margin-top: 7pt !important; }
-    .rp-platform-windows .rp-doc-header .rp-report-title { font-size: 15px !important; }
+    /* Preserve the approved point sizes while compensating for Windows Arial's
+       wider large-heading metrics. */
+    .rp-platform-windows .rp-letterhead-center,
+    .rp-platform-windows .rp-doc-header .rp-report-title {
+      font-family: 'Arial Narrow', Arial, Helvetica, sans-serif !important;
+      font-stretch: condensed;
+    }
     .rp-section {
       margin-top: 14pt !important;
       page-break-inside: auto !important;
@@ -3617,7 +3617,13 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-table th { vertical-align: bottom !important; }
     .rp-table--issuance-breakdown { table-layout: fixed !important; width: 100% !important; }
     .rp-table--issuance-breakdown th,
-    .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; vertical-align: top !important; }
+    .rp-table--issuance-breakdown td { font-size: 8pt !important; padding: 3pt !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; vertical-align: top !important; }
+    .rp-platform-windows .rp-summary td,
+    .rp-platform-windows .rp-table th,
+    .rp-platform-windows .rp-table td {
+      font-size: 10pt !important;
+      padding: 4pt 5pt !important;
+    }
     .rp-breakdown-document-type { width: 20% !important; }
     .rp-table tr { page-break-inside: avoid; }
     .rp-two-col, .rp-three-col, .rp-chart-grid {
