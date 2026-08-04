@@ -306,7 +306,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['view'])) {
             ri.occupation,
             ri.occupation_detail,
             ri.sector_membership,
-            ri.voter_status
+            ri.voter_status,
+            ri.head_of_family
         FROM resident_edit_requesttbl r
         INNER JOIN residentinformationtbl ri ON ri.resident_id = r.resident_id
         LEFT JOIN statuslookuptbl s ON s.status_id = r.status_id
@@ -399,6 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['view'])) {
                 'occupation_detail' => $row['occupation_detail'],
                 'sector_membership' => $row['sector_membership'],
                 'voter_status' => (int)$row['voter_status'] === 1 ? 'Registered' : 'Not Registered',
+                'head_of_family' => (int)$row['head_of_family'] === 1 ? 'Head of the Family' : 'Resident',
             ],
             'address' => $address,
             'emergency' => $emergency,

@@ -232,6 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
       occupation: "Occupation",
       occupation_detail: "Occupation Detail",
       voter_status: "Voter Status",
+      head_of_family: "Resident Role",
     };
     return map[key] || key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
   };
@@ -435,7 +436,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 { label: "Religion", value: current.profile?.religion, key: "religion" },
                 { label: "Occupation", value: current.profile?.occupation_detail || current.profile?.occupation, key: "occupation_detail" },
                 { label: "Sector Membership", value: current.profile?.sector_membership, key: "sector_membership" },
-                { label: "Voter Status", value: current.profile?.voter_status, key: "voter_status" }
+                { label: "Voter Status", value: current.profile?.voter_status, key: "voter_status" },
+                { label: "Resident Role", value: current.profile?.head_of_family, key: "head_of_family" }
               );
             }
             const changeKeys = new Set(Object.keys(changes || {}));
@@ -461,6 +463,10 @@ document.addEventListener("DOMContentLoaded", () => {
               if (key === "occupation") {
                 if (value === 1 || value === "1") return "Employed";
                 if (value === 0 || value === "0") return "Unemployed";
+              }
+              if (key === "head_of_family") {
+                if (value === 1 || value === "1") return "Head of the Family";
+                if (value === 0 || value === "0") return "Resident";
               }
               return value;
             };
