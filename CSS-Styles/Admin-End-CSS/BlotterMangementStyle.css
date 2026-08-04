@@ -131,10 +131,6 @@
     word-break: break-all;
 }
 
-#narrativeSignatureModal .modal-body {
-    padding: 1rem 1.2rem;
-}
-
 .signature-fullscreen-modal .modal-content {
     border-radius: 0;
 }
@@ -282,4 +278,3 @@
         height: calc(100vh - 185px);
     }
 }
-

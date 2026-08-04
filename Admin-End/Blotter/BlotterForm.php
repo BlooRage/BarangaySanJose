@@ -475,45 +475,30 @@ $defaultFiledTime = date('H:i');
                     </div>
                 </div>
 
-                <div class="row g-3 mb-4 d-none" id="narrativeEditorLauncherRow">
-                    <div class="col-12">
-                        <button type="button" class="btn btn-outline-primary" id="openNarrativeSignatureModal">
-                            Open Narrative Editor
-                        </button>
+                <section class="border rounded-3 bg-light p-3 p-md-4 mb-4 d-none" id="narrativeContentSection" aria-labelledby="narrativeContentHeading">
+                    <h3 class="section-title mb-3" id="narrativeContentHeading">Narrative and Signatures</h3>
+                    <div class="row g-3 mb-4" id="narrativeTextWrapper">
+                        <div class="col-12">
+                            <label class="form-label">Narrative Report (Salaysay ng Pangyayari) <span class="required-asterisk">*</span></label>
+                            <textarea class="form-control" id="narrativeReport" name="narrative_report" form="blotterForm" rows="8" required minlength="10" maxlength="5000"></textarea>
+                        </div>
                     </div>
-                </div>
 
-
-                <div class="modal fade" id="narrativeSignatureModal" tabindex="-1" aria-labelledby="narrativeSignatureModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="narrativeSignatureModalLabel">Narrative and Signatures</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="row g-3 mb-4 d-none" id="narrativeFileWrapper">
+                        <div class="col-12">
+                            <label class="form-label">Narrative File (PDF or Image) <span class="required-asterisk">*</span></label>
+                            <div class="upload-box" id="narrativeUploadBox" role="button" tabindex="0">
+                                <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                                <div class="upload-text">Drag and drop file here</div>
+                                <div class="upload-subtext">or click to choose manually</div>
+                                <div class="upload-subtext mt-1">Accepted: PDF, JPG, JPEG, PNG, WEBP</div>
+                                <input type="file" id="narrativeFileInput" name="narrative_file" form="blotterForm" accept=".pdf,image/*" class="d-none">
                             </div>
-                            <div class="modal-body">
-                                <div class="row g-3 mb-4" id="narrativeTextWrapper">
-                                    <div class="col-12">
-                                        <label class="form-label">Narrative Report (Salaysay ng Pangyayari) <span class="required-asterisk">*</span></label>
-                                        <textarea class="form-control" name="narrative_report" rows="8" required minlength="10" maxlength="5000"></textarea>
-                                    </div>
-                                </div>
+                            <div id="narrativeFileName" class="upload-file-name d-none"></div>
+                        </div>
+                    </div>
 
-                                <div class="row g-3 mb-4 d-none" id="narrativeFileWrapper">
-                                    <div class="col-12">
-                                        <label class="form-label">Narrative File (PDF or Image) <span class="required-asterisk">*</span></label>
-                                        <div class="upload-box" id="narrativeUploadBox" role="button" tabindex="0">
-                                            <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-                                            <div class="upload-text">Drag and drop file here</div>
-                                            <div class="upload-subtext">or click to choose manually</div>
-                                            <div class="upload-subtext mt-1">Accepted: PDF, JPG, JPEG, PNG, WEBP</div>
-                                            <input type="file" id="narrativeFileInput" name="narrative_file" accept=".pdf,image/*" class="d-none">
-                                        </div>
-                                        <div id="narrativeFileName" class="upload-file-name d-none"></div>
-                                    </div>
-                                </div>
-
-                                <div class="row g-3 mb-2" id="signatureSection">
+                    <div class="row g-3 mb-2" id="signatureSection">
                                     <div class="col-12 col-md-6">
                                         <label class="form-label">Complainant Signature <span class="required-asterisk">*</span></label>
                                         <canvas
@@ -521,7 +506,7 @@ $defaultFiledTime = date('H:i');
                                             class="w-100 rounded border bg-white"
                                             style="height: 170px; touch-action: none;"
                                         ></canvas>
-                                        <input type="hidden" id="complainantSignatureData" name="complainant_signature">
+                                        <input type="hidden" id="complainantSignatureData" name="complainant_signature" form="blotterForm">
                                         <div id="complainantSignatureError" class="invalid-feedback d-block d-none">Please provide complainant signature.</div>
                                         <div class="d-flex flex-wrap gap-2 mt-2">
                                             <button type="button" class="btn btn-outline-secondary btn-sm" id="clearComplainantSignature">Clear Signature</button>
@@ -535,21 +520,15 @@ $defaultFiledTime = date('H:i');
                                             class="w-100 rounded border bg-white"
                                             style="height: 170px; touch-action: none;"
                                         ></canvas>
-                                        <input type="hidden" id="respondentSignatureData" name="respondent_signature">
+                                        <input type="hidden" id="respondentSignatureData" name="respondent_signature" form="blotterForm">
                                         <div id="respondentSignatureError" class="invalid-feedback d-block d-none">Please provide respondent signature.</div>
                                         <div class="d-flex flex-wrap gap-2 mt-2">
                                             <button type="button" class="btn btn-outline-secondary btn-sm" id="clearRespondentSignature">Clear Signature</button>
                                             <button type="button" class="btn btn-outline-primary btn-sm" id="openRespondentSignatureFullscreen">Open Fullscreen</button>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
-                            </div>
-                        </div>
                     </div>
-                </div>
+                </section>
 
                 <div class="text-end">
                     <button type="submit" id="blotterSubmit" class="btn btn-primary px-5">Submit</button>
@@ -614,6 +593,6 @@ $defaultFiledTime = date('H:i');
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260722-init-recursion-fix" defer></script>
+<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-inline-narrative" defer></script>
 </body>
 </html>

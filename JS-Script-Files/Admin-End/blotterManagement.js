@@ -56,15 +56,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const signatureFullscreenCanvas = document.getElementById("signatureFullscreenCanvas");
     const signatureFullscreenClearBtn = document.getElementById("signatureFullscreenClear");
     const signatureFullscreenSaveBtn = document.getElementById("signatureFullscreenSave");
-    const narrativeSignatureModalEl = document.getElementById("narrativeSignatureModal");
-    const openNarrativeSignatureModalBtn = document.getElementById("openNarrativeSignatureModal");
-    const narrativeEditorLauncherRow = document.getElementById("narrativeEditorLauncherRow");
+    const narrativeContentSection = document.getElementById("narrativeContentSection");
     if (!form || !submitBtn) return;
 
     const confirmModal = confirmSubmitModalEl ? new bootstrap.Modal(confirmSubmitModalEl) : null;
     const successModal = successSubmitModalEl ? new bootstrap.Modal(successSubmitModalEl) : null;
     const signatureFullscreenModal = signatureFullscreenModalEl ? new bootstrap.Modal(signatureFullscreenModalEl) : null;
-    const narrativeSignatureModal = narrativeSignatureModalEl ? new bootstrap.Modal(narrativeSignatureModalEl) : null;
     let submitConfirmed = false;
 
     const setNarrativeMode = () => {
@@ -75,15 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
         textWrapper?.classList.toggle("d-none", !useText);
         fileWrapper?.classList.toggle("d-none", !useFile);
         signatureSection?.classList.toggle("d-none", !useText);
-        narrativeEditorLauncherRow?.classList.toggle("d-none", !(useText || useFile));
-
-        if (openNarrativeSignatureModalBtn) {
-            openNarrativeSignatureModalBtn.textContent = useText
-                ? "Open Narrative and Signatures"
-                : useFile
-                    ? "Open Narrative Attachment"
-                    : "Open Narrative Editor";
-        }
+        narrativeContentSection?.classList.toggle("d-none", !(useText || useFile));
 
         if (narrativeText) narrativeText.required = useText;
         if (fileInput) fileInput.required = useFile;
@@ -483,16 +472,6 @@ document.addEventListener("DOMContentLoaded", () => {
         openSignatureFullscreen(respondentSignaturePad, "Respondent");
     });
 
-    openNarrativeSignatureModalBtn?.addEventListener("click", () => {
-        narrativeSignatureModal?.show();
-    });
-
-    narrativeSignatureModalEl?.addEventListener("shown.bs.modal", () => {
-        complainantSignaturePad?.resize();
-        respondentSignaturePad?.resize();
-        updateState();
-    });
-
     const renderAllValidity = () => {
         form.querySelectorAll("input, select, textarea").forEach((el) => {
             if (el.disabled) return;
@@ -662,9 +641,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     inputMethod?.addEventListener("change", () => {
         updateState();
-        if ((inputMethod?.value || "") !== "") {
-            narrativeSignatureModal?.show();
-        }
+        window.requestAnimationFrame(() => {
+            complainantSignaturePad?.resize();
+            respondentSignaturePad?.resize();
+        });
     });
     form.querySelectorAll("input, select, textarea").forEach((el) => {
         el.addEventListener("input", () => {
