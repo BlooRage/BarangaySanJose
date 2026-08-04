@@ -2350,6 +2350,8 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
           ri.suffix,
           ri.sex,
           ri.head_of_family,
+          ri.occupation,
+          ri.occupation_detail,
           ri.sector_membership,
           " . ($residentAreaExpr !== 'NULL' ? "COALESCE({$residentAreaExpr}, 'Unspecified')" : "'Unspecified'") . " AS area
         FROM residentinformationtbl ri
@@ -2368,6 +2370,10 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         ], static fn(string $part): bool => $part !== ''));
         $registeredResident['resident_name'] = implode(' ', $nameParts);
         $registeredResident['area'] = pii_decrypt_string((string)($registeredResident['area'] ?? 'Unspecified'));
+        $registeredResident['occupation_detail'] = pii_decrypt_string((string)($registeredResident['occupation_detail'] ?? ''));
+        $registeredResident['employment_status'] = (int)($registeredResident['occupation'] ?? 0) === 1
+            ? 'Employed'
+            : 'Unemployed';
     }
     unset($registeredResident);
 
@@ -4858,6 +4864,9 @@ elseif ($module === 'residents'):
     $registeredResidentRows,
     static fn(array $row): bool => trim((string)($row['sector_membership'] ?? '')) !== ''
   ));
+  $residentAreaScopeLabel = $reportFilterAreas !== []
+    ? implode(', ', $reportFilterAreas)
+    : 'All Areas';
   $renderResidentRoster = static function (array $rows, bool $showSector = false): void {
     if ($rows === []) {
       echo '<p class="rp-empty">No verified residents matched the selected filters.</p>';
@@ -4994,7 +5003,7 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
-          <h3 style="margin:20px 0 0;">Verified Residents in Selected Area</h3>
+          <h3 style="margin:20px 0 0;">Verified Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
           <?php $renderResidentRoster($registeredResidentRows); ?>
         </div>
         <?php endif; ?>
@@ -5035,7 +5044,7 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
-          <h3 style="margin:20px 0 0;">Heads of Family in Selected Area</h3>
+          <h3 style="margin:20px 0 0;">Heads of Family — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
           <?php $renderResidentRoster($registeredHouseholdHeadRows); ?>
         </div>
         <?php endif; ?>
@@ -5167,7 +5176,7 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
-          <h3 style="margin:20px 0 0;">Sector Members in Selected Area</h3>
+          <h3 style="margin:20px 0 0;">Sector Members — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
           <?php $renderResidentRoster($registeredSectorMemberRows, true); ?>
         </div>
         <?php endif; ?>
@@ -5200,6 +5209,41 @@ elseif ($module === 'residents'):
               </tr>
             </tfoot>
           </table>
+          <h3 style="margin:20px 0 0;">Employment List — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+          <?php if ($registeredResidentRows === []): ?>
+            <p class="rp-empty">No verified residents matched the selected filters.</p>
+          <?php else: ?>
+          <table class="rp-table" style="margin-top:18px;">
+            <thead>
+              <tr>
+                <th class="text-center">No.</th>
+                <th>Resident Name</th>
+                <th>Gender</th>
+                <th>Area</th>
+                <th>Employment Status</th>
+                <th>Occupation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($registeredResidentRows as $index => $row): ?>
+              <tr>
+                <td class="text-center"><?= number_format($index + 1) ?></td>
+                <td><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
+                <td><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
+                <td><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
+                <td><?= htmlspecialchars((string)($row['employment_status'] ?? 'Unemployed')) ?></td>
+                <td><?= htmlspecialchars(trim((string)($row['occupation_detail'] ?? '')) ?: '—') ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5"><strong>TOTAL RESIDENTS</strong></td>
+                <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
+              </tr>
+            </tfoot>
+          </table>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
 
