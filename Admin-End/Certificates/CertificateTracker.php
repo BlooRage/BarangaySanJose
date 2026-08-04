@@ -3105,7 +3105,7 @@ if ($certificateLaunchStage === 'release') {
         <div class="manual-step">
           <div class="manual-step-index">1</div>
           <div class="manual-step-title">Receive Form</div>
-          <p class="manual-step-copy">Use the residentâ€™s handwritten submission as the source document for this encoding flow.</p>
+          <p class="manual-step-copy">Use the resident’s handwritten submission as the source document for this encoding flow.</p>
         </div>
         <div class="manual-step">
           <div class="manual-step-index">2</div>
@@ -3250,7 +3250,7 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card" data-manual-step-panel="2">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information â€” Basic Info' : '2. Personal Basic Information' ?></h6>
+                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '2. Personal Basic Information' ?></h6>
                 <span><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Enter the resident details exactly as they should appear on the certificate.' ?></span>
               </div>
               <div class="row g-3">
@@ -3369,7 +3369,7 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card" data-manual-step-panel="2">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information â€” Sector Membership' : '2. Sector Membership' ?></h6>
+                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Sector Membership' : '2. Sector Membership' ?></h6>
                 <span>Select every applicable sector. Linked residents retain the membership recorded in the masterlist.</span>
               </div>
               <div class="row g-2" id="manualSectorMembershipWrap">
@@ -3394,7 +3394,7 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card" data-manual-step-panel="<?= $isIdIssuanceTrackerView ? '2' : '3' ?>">
               <div class="manual-issuance-card-title">
-                <h6 id="manualSpecificFieldsTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information â€” Emergency Contact' : '3. Document Specific Details' ?></h6>
+                <h6 id="manualSpecificFieldsTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information — Emergency Contact' : '3. Document Specific Details' ?></h6>
                 <span id="manualSpecificFieldsHint">Select a certificate or clearance type to load its manual encoding fields.</span>
               </div>
               <?php if (!$isIdIssuanceTrackerView): ?>
@@ -3499,7 +3499,7 @@ if ($certificateLaunchStage === 'release') {
               </div>
             <?php if ($isIdIssuanceTrackerView): ?>
               <div class="manual-id-inline-preview" id="manualIdInlinePreview" aria-live="polite">
-                <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing ID previewâ€¦</div>
+                <div class="manual-id-inline-preview-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Preparing ID preview…</div>
               </div>
             <?php else: ?>
             <div class="manual-id-inline-preview mb-3" id="manualDocumentInlinePreview" aria-live="polite">
@@ -3612,7 +3612,7 @@ if ($certificateLaunchStage === 'release') {
                   </tr>
                 </thead>
                 <tbody id="fcrEditCatalogBody">
-                  <tr><td colspan="4" class="text-center text-muted py-3">Loadingâ€¦</td></tr>
+                  <tr><td colspan="4" class="text-center text-muted py-3">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -3645,7 +3645,7 @@ if ($certificateLaunchStage === 'release') {
               </tr>
             </thead>
             <tbody id="fcrListBody">
-              <tr><td colspan="7" class="text-center text-muted py-3">Loadingâ€¦</td></tr>
+              <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4219,7 +4219,7 @@ if ($certificateLaunchStage === 'release') {
       <div class="modal-body">
         <input type="hidden" id="feeTaggingRequestId">
         <input type="hidden" id="feeTaggingMode">
-        <div id="feeTaggingBody">Loadingâ€¦</div>
+        <div id="feeTaggingBody">Loading…</div>
       </div>
       <div class="modal-footer justify-content-between">
         <span class="text-muted small">Check the fees that apply, adjust amounts as needed, then confirm.</span>
@@ -4250,7 +4250,7 @@ if ($certificateLaunchStage === 'release') {
                   <tr><th>Name</th><th>Default Amount</th><th>Status</th><th class="text-end">Actions</th></tr>
                 </thead>
                 <tbody id="feeCatalogTableBody">
-                  <tr><td colspan="4" class="text-muted text-center py-3">Loadingâ€¦</td></tr>
+                  <tr><td colspan="4" class="text-muted text-center py-3">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
