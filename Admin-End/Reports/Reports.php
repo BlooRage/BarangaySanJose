@@ -2358,6 +2358,7 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
           ri.lastname,
           ri.suffix,
           ri.sex,
+          ri.birthdate,
           ri.head_of_family,
           ri.occupation,
           ri.occupation_detail,
@@ -2375,6 +2376,7 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         {$residentFilterSql}
         ORDER BY ri.lastname ASC, ri.firstname ASC, ri.resident_id ASC
     ");
+    $residentAgeAsOf = new DateTimeImmutable('today');
     foreach ($res['registered_residents'] as &$registeredResident) {
         $nameParts = array_values(array_filter([
             trim(pii_decrypt_string((string)($registeredResident['firstname'] ?? ''))),
@@ -2385,6 +2387,18 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         $registeredResident['resident_name'] = implode(' ', $nameParts);
         $registeredResident['area'] = pii_decrypt_string((string)($registeredResident['area'] ?? 'Unspecified'));
         $registeredResident['occupation_detail'] = pii_decrypt_string((string)($registeredResident['occupation_detail'] ?? ''));
+        $registeredResident['age'] = null;
+        $registeredBirthdate = trim(pii_decrypt_string((string)($registeredResident['birthdate'] ?? '')));
+        if ($registeredBirthdate !== '') {
+            try {
+                $registeredBirthDateValue = new DateTimeImmutable($registeredBirthdate);
+                if ($registeredBirthDateValue <= $residentAgeAsOf) {
+                    $registeredResident['age'] = (int)$residentAgeAsOf->diff($registeredBirthDateValue)->y;
+                }
+            } catch (Throwable $exception) {
+                $registeredResident['age'] = null;
+            }
+        }
         $addressParts = [];
         foreach (['unit_number', 'street_number', 'street_name', 'phase_number', 'subdivision'] as $addressField) {
             $addressPart = trim(pii_decrypt_string((string)($registeredResident[$addressField] ?? '')));
@@ -5397,6 +5411,7 @@ elseif ($module === 'residents'):
                 <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">No.</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident Name</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Gender</th>
+                <th class="text-center">Age</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>">Address</th>
               </tr>
@@ -5407,6 +5422,7 @@ elseif ($module === 'residents'):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($index + 1) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
+                <td class="text-center"><?= $row['age'] !== null ? number_format((int)$row['age']) : '—' ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>"><?= htmlspecialchars((string)($row['address'] ?? '—')) ?></td>
               </tr>
@@ -5414,7 +5430,7 @@ elseif ($module === 'residents'):
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="<?= $showReportColumn('address') ? 4 : 3 ?>"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
+                <td colspan="<?= $showReportColumn('address') ? 5 : 4 ?>"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
                 <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
               </tr>
             </tfoot>
