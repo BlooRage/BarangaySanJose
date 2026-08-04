@@ -1350,8 +1350,8 @@ function rp_report_customize_config(string $module): array {
             'sections' => [
                 'summary' => 'Overall Summary',
                 'charts' => 'Graphs',
-                'type' => 'Complaint Type Breakdown',
-                'status' => 'Status Breakdown',
+                'type' => 'Blotter Case Summary',
+                'status' => 'Blotter Level Breakdown',
                 'area' => 'Cases by Area',
                 'sector' => 'Cases by Sector Membership',
                 'trend' => 'Monthly Trend',
@@ -1359,21 +1359,21 @@ function rp_report_customize_config(string $module): array {
             'columns' => [
                 'date' => $sharedColumns['date'],
                 'type' => 'Complaint Type',
-                'status' => $sharedColumns['status'],
+                'status' => 'Blotter Level',
                 'area' => $sharedColumns['area'],
                 'sector' => $sharedColumns['sector'],
                 'count' => $sharedColumns['count'],
                 'percentage' => $sharedColumns['percentage'],
-                'result' => 'Resolved / Resolution Rate',
+                'result' => 'Settled / Settlement Rate',
             ],
             'column_groups' => [
                 [
-                    'label' => 'Complaint Type Breakdown',
+                    'label' => 'Blotter Case Summary',
                     'sections' => ['type'],
                     'columns' => ['type', 'count', 'result', 'percentage'],
                 ],
                 [
-                    'label' => 'Status Breakdown',
+                    'label' => 'Blotter Level Breakdown',
                     'sections' => ['status'],
                     'columns' => ['status', 'count', 'percentage'],
                 ],
@@ -2585,7 +2585,11 @@ if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
 // MODULE: BLOTTER
 // ═══════════════════════════════════════════════════════════════════════════════
 $blot = [];
-if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
+if (
+    $module === 'blotter'
+    && rp_table_exists($conn, 'casereportstbl')
+    && rp_table_exists($conn, 'barangayblottertbl')
+) {
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
     $caseDateExpr = rp_first_existing_datetime_expr($conn, 'casereportstbl', 'c', ['report_timestamp', 'created_at']);
@@ -2593,6 +2597,9 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         ? rp_user_resident_parts($conn, 'c.resident_user_id', 'blt')
         : ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
     $caseJoin = $caseResidentParts['joins'] !== '' ? $caseResidentParts['joins'] : '';
+    // A case report can represent either a complaint or a blotter. Requiring the
+    // blotter-specific row prevents complaint-only cases from entering this report.
+    $blotterJoin = 'INNER JOIN barangayblottertbl b ON b.case_id = c.case_id';
     $caseAreaExpr = $caseResidentParts['area_expr'];
     $caseSectorExpr = $caseResidentParts['sector_expr'];
     $complaintTypeExpr = "COALESCE(NULLIF(TRIM(c.complaint_type), ''), 'Not specified')";
@@ -2610,6 +2617,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
         SELECT {$complaintTypeExpr} AS value
         FROM casereportstbl c
+        {$blotterJoin}
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'
         GROUP BY {$complaintTypeExpr}
@@ -2619,6 +2627,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
             SELECT {$caseAreaExpr} AS value
             FROM casereportstbl c
+            {$blotterJoin}
             {$caseJoin}
             WHERE DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'
               AND {$caseAreaExpr} IS NOT NULL
@@ -2631,6 +2640,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
             SELECT {$caseSectorExpr} AS sector_membership
             FROM casereportstbl c
+            {$blotterJoin}
             {$caseJoin}
             WHERE DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'
               AND {$caseSectorExpr} IS NOT NULL
@@ -2640,12 +2650,11 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
 
     $blot['kpi'] = rp_safe_query($conn, "
         SELECT COUNT(*) AS total,
-          SUM(CASE WHEN LOWER(s.status_name) IN ('active','open','ongoing') THEN 1 ELSE 0 END) AS active,
-          SUM(CASE WHEN LOWER(s.status_name) IN ('resolved','closed','settled') THEN 1 ELSE 0 END) AS resolved,
-          SUM(CASE WHEN report_type='Blotter' THEN 1 ELSE 0 END) AS blotter_count,
-          SUM(CASE WHEN report_type='Complaint' THEN 1 ELSE 0 END) AS complaint_count
+          SUM(CASE WHEN LOWER(l.status_name) = 'blotter only' THEN 1 ELSE 0 END) AS blotter_only,
+          SUM(CASE WHEN LOWER(l.status_name) = 'settled' THEN 1 ELSE 0 END) AS settled
         FROM casereportstbl c
-        JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        {$blotterJoin}
+        JOIN statuslookuptbl l ON l.status_id = c.case_level_id
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE {$blotterWhere}
     ");
@@ -2653,28 +2662,43 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
 
     $blot['by_type'] = rp_safe_query($conn, "
         SELECT {$complaintTypeExpr} AS complaint_type,
-          COUNT(*) AS total,
-          SUM(CASE WHEN LOWER(s.status_name) IN ('resolved','closed','settled') THEN 1 ELSE 0 END) AS resolved
+          SUM(CASE WHEN LOWER(l.status_name) = 'blotter only' THEN 1 ELSE 0 END) AS blotter_only,
+          SUM(CASE WHEN LOWER(l.status_name) = 'settled' THEN 1 ELSE 0 END) AS settled,
+          SUM(CASE WHEN LOWER(l.status_name) = 'unsettled' THEN 1 ELSE 0 END) AS unsettled,
+          SUM(CASE WHEN LOWER(l.status_name) = 'endorsed to lupon' THEN 1 ELSE 0 END) AS endorsed_lupon,
+          SUM(CASE WHEN LOWER(l.status_name) = 'endorsed to pnp' THEN 1 ELSE 0 END) AS endorsed_pnp,
+          COUNT(*) AS total
         FROM casereportstbl c
-        JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        {$blotterJoin}
+        JOIN statuslookuptbl l ON l.status_id = c.case_level_id
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE {$blotterWhere}
-        GROUP BY complaint_type ORDER BY total DESC LIMIT 20
+        GROUP BY complaint_type ORDER BY total DESC, complaint_type ASC
     ");
 
     $blot['by_status'] = rp_safe_query($conn, "
-        SELECT s.status_name AS status, COUNT(*) AS total
+        SELECT l.status_name AS status, COUNT(*) AS total
         FROM casereportstbl c
-        JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        {$blotterJoin}
+        JOIN statuslookuptbl l ON l.status_id = c.case_level_id
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE {$blotterWhere}
-        GROUP BY s.status_name ORDER BY total DESC
+        GROUP BY l.status_name
+        ORDER BY FIELD(
+          l.status_name,
+          'Blotter Only',
+          'Settled',
+          'Unsettled',
+          'Endorsed to Lupon',
+          'Endorsed to PNP'
+        ), l.status_name ASC
     ");
 
     if ($caseAreaExpr !== 'NULL') {
         $blot['by_area'] = rp_safe_query($conn, "
             SELECT COALESCE({$caseAreaExpr}, 'Unspecified') AS area, COUNT(*) AS total
             FROM casereportstbl c
+            {$blotterJoin}
             {$caseJoin}
             WHERE {$blotterWhere}
             GROUP BY area
@@ -2686,6 +2710,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         $blotterSectorRows = rp_safe_query($conn, "
             SELECT {$caseSectorExpr} AS sector_membership
             FROM casereportstbl c
+            {$blotterJoin}
             {$caseJoin}
             WHERE {$blotterWhere}
               AND {$caseSectorExpr} IS NOT NULL
@@ -2697,6 +2722,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     $blot['trend'] = rp_safe_query($conn, "
         SELECT DATE_FORMAT({$caseDateExpr},'%Y-%m') AS month, COUNT(*) AS total
         FROM casereportstbl c
+        {$blotterJoin}
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE {$caseDateExpr} >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $caseSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
@@ -5738,11 +5764,9 @@ elseif ($module === 'blotter'):
           <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('summary')) ?></div>
           <table class="rp-summary">
             <tbody>
-              <tr><td>Total Cases Filed</td><td><?= number_format($total) ?></td></tr>
-              <tr><td>Active / Open Cases</td><td><?= number_format((int)($kpi['active']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['active']??0),$total) ?>)</span></td></tr>
-              <tr><td>Resolved / Closed / Settled</td><td><?= number_format((int)($kpi['resolved']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['resolved']??0),$total) ?>)</span></td></tr>
-              <tr><td>Blotter Cases</td><td><?= number_format((int)($kpi['blotter_count']??0)) ?></td></tr>
-              <tr><td>Complaint Cases</td><td><?= number_format((int)($kpi['complaint_count']??0)) ?></td></tr>
+              <tr><td>Total Blotters Filed</td><td><?= number_format($total) ?></td></tr>
+              <tr><td>Blotter Only</td><td><?= number_format((int)($kpi['blotter_only']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['blotter_only']??0),$total) ?>)</span></td></tr>
+              <tr><td>Settled</td><td><?= number_format((int)($kpi['settled']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['settled']??0),$total) ?>)</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -5766,11 +5790,11 @@ elseif ($module === 'blotter'):
             <?php endif; ?>
             <?php if ($blotterStatusChartData !== []): ?>
             <div class="rp-chart-card">
-              <div class="rp-subsection-title">Status Breakdown</div>
+              <div class="rp-subsection-title">Blotter Level Breakdown</div>
               <div class="rp-chart-wrap">
                 <canvas id="blotterStatusChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter case statuses.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter levels.</div>
             </div>
             <?php endif; ?>
             <?php if ($blotterAreaChartData !== []): ?>
@@ -5806,37 +5830,52 @@ elseif ($module === 'blotter'):
         <?php endif; ?>
 
         <?php if ($showReportSection('type') || $showReportSection('status')): ?>
-        <div class="rp-two-col" style="margin-top:22px;">
+        <div style="margin-top:22px;">
           <?php if ($showReportSection('type')): ?>
           <div>
-            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('type')) ?> (Top 20)</div>
+            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('type')) ?></div>
             <?php if (empty($blot['by_type'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
+            <div style="overflow-x:auto;">
             <table class="rp-table">
-              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Complaint Type</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th><th class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>">Resolved</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">Res. Rate</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Cases</th>
+                  <th class="text-center">Blotter Only</th>
+                  <th class="text-center">Settled</th>
+                  <th class="text-center">Unsettled</th>
+                  <th class="text-center">Endorsed to Lupon</th>
+                  <th class="text-center">Endorsed to PNP</th>
+                  <th class="text-center">Total</th>
+                </tr>
+              </thead>
               <tbody>
                 <?php foreach ($blot['by_type'] as $r): ?>
                 <tr>
-                  <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars($r['complaint_type']) ?></td>
-                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format((int)$r['resolved']) ?></td>
-                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['resolved'],(int)$r['total']) ?></td>
+                  <td><?= htmlspecialchars($r['complaint_type']) ?></td>
+                  <td class="text-center"><?= (int)$r['blotter_only'] > 0 ? number_format((int)$r['blotter_only']) : '-' ?></td>
+                  <td class="text-center"><?= (int)$r['settled'] > 0 ? number_format((int)$r['settled']) : '-' ?></td>
+                  <td class="text-center"><?= (int)$r['unsettled'] > 0 ? number_format((int)$r['unsettled']) : '-' ?></td>
+                  <td class="text-center"><?= (int)$r['endorsed_lupon'] > 0 ? number_format((int)$r['endorsed_lupon']) : '-' ?></td>
+                  <td class="text-center"><?= (int)$r['endorsed_pnp'] > 0 ? number_format((int)$r['endorsed_pnp']) : '-' ?></td>
+                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
+            </div>
             <?php endif; ?>
           </div>
           <?php endif; ?>
           <?php if ($showReportSection('status')): ?>
-          <div>
+          <div style="margin-top:22px;">
             <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('status')) ?></div>
             <?php if (empty($blot['by_status'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Blotter Level</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($blot['by_status'] as $r): ?>
                 <tr>
@@ -6283,6 +6322,13 @@ window.__rpChartHelpers = (() => {
     }
 
     const colors = colorsFor(entries.length);
+    const isHorizontalBar = chartType !== 'pie' && source.horizontal === true;
+    if (isHorizontalBar) {
+      const chartWrap = canvas.closest('.rp-chart-wrap');
+      if (chartWrap) {
+        chartWrap.style.minHeight = `${Math.max(280, entries.length * 48)}px`;
+      }
+    }
     const labels = chartType === 'pie'
       ? entries.map((entry) => entry.label)
       : entries.map((entry) => wrapLabel(entry.label, source.maxLabelChars ?? 18));
@@ -6324,9 +6370,28 @@ window.__rpChartHelpers = (() => {
             }],
           },
           options: {
+            indexAxis: isHorizontalBar ? 'y' : 'x',
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
+            scales: isHorizontalBar ? {
+              x: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0,
+                },
+              },
+              y: {
+                ticks: {
+                  autoSkip: false,
+                  font: {
+                    size: 10,
+                  },
+                },
+                grid: {
+                  display: false,
+                },
+              },
+            } : {
               x: {
                 ticks: {
                   autoSkip: false,
@@ -6936,7 +7001,7 @@ window.__rpChartHelpers = (() => {
       canvasId: 'blotterStatusChart',
       labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['status'] ?? ''), $blotterStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'Status Breakdown',
+      title: 'Blotter Level Breakdown',
       datasetLabel: 'Cases Filed',
     },
     {
@@ -6964,7 +7029,10 @@ window.__rpChartHelpers = (() => {
     }
   ];
 
-  const initCharts = () => helpers.initCategoricalCharts(sources, chartType);
+  const initCharts = () => helpers.initCategoricalCharts(
+    sources.map((source) => ({ ...source, horizontal: true })),
+    chartType
+  );
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCharts, { once: true });
   } else {
@@ -7031,7 +7099,10 @@ window.__rpChartHelpers = (() => {
     }
   ];
 
-  const initCharts = () => helpers.initCategoricalCharts(sources, chartType);
+  const initCharts = () => helpers.initCategoricalCharts(
+    sources.map((source) => ({ ...source, horizontal: true })),
+    chartType
+  );
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCharts, { once: true });
   } else {
