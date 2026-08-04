@@ -282,6 +282,8 @@ $respondentSex = str_field($_POST['respondent_sex'] ?? '');
 $incidentDate = str_field($_POST['incident_date'] ?? '');
 $incidentTime = str_field($_POST['incident_time'] ?? '');
 $incidentPlace = str_field($_POST['incident_place'] ?? '');
+$incidentAreaNumber = str_field($_POST['incident_area_number'] ?? '');
+$allowedIncidentAreas = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
 $complaintTypeSelected = str_field($_POST['complaint_type'] ?? '');
 $complaintTypeOther = str_field($_POST['complaint_type_other'] ?? '');
 $complaintType = $complaintTypeSelected === 'Other' ? $complaintTypeOther : $complaintTypeSelected;
@@ -295,9 +297,14 @@ if (!$blotterNumber || !$complainantLast || !$complainantFirst || !$respondentLa
     exit("Missing required fields.");
 }
 
-if ($narrativeMethod !== 'file' && (!$incidentDate || !$incidentTime || !$incidentPlace || !$complaintType)) {
+if ($narrativeMethod !== 'file' && (!$incidentDate || !$incidentTime || !$incidentPlace || !$incidentAreaNumber || !$complaintType)) {
     http_response_code(400);
     exit("Incident details are required for typed narratives.");
+}
+
+if ($narrativeMethod !== 'file' && !in_array($incidentAreaNumber, $allowedIncidentAreas, true)) {
+    http_response_code(400);
+    exit("Select a valid incident area number.");
 }
 
 if ($narrativeMethod !== 'file') {
@@ -306,6 +313,7 @@ if ($narrativeMethod !== 'file') {
     $incidentDate = null;
     $incidentTime = null;
     $incidentPlace = null;
+    $incidentAreaNumber = null;
     $complaintType = null;
     $complaintTypeOther = null;
 }
@@ -437,20 +445,21 @@ try {
 
     $stmtCase = $conn->prepare("
         INSERT INTO casereportstbl
-            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
+            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, incident_area_number, complaint_type,
              case_details, case_remarks, case_status_id, case_level_id, user_id_official_update_by, user_id_official_reviewed_by, user_id_official_record_by)
         VALUES
-            (?, NULL, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+            (?, NULL, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     ");
     if (!$stmtCase) {
         throw new Exception("Prepare failed (case insert): " . $conn->error);
     }
     $stmtCase->bind_param(
-        "sssssssiiss",
+        "ssssssssiiss",
         $caseId,
         $incidentDate,
         $incidentTime,
         $incidentPlace,
+        $incidentAreaNumber,
         $complaintType,
         $caseDetails,
         $caseRemarks,

@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const incidentDateInput = document.getElementById("incidentDate");
     const incidentTimeInput = document.getElementById("incidentTime");
     const incidentPlaceInput = document.getElementById("incidentPlace");
+    const incidentAreaNumberInput = document.getElementById("incidentAreaNumber");
     const incidentDateError = document.getElementById("incidentDateError");
     const complainantSignatureCanvas = document.getElementById("complainantSignatureCanvas");
     const complainantSignatureData = document.getElementById("complainantSignatureData");
@@ -100,6 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
         incidentDateInput,
         incidentTimeInput,
         incidentPlaceInput,
+        incidentAreaNumberInput,
         blotterComplaintType,
         blotterComplaintTypeOther
     ].filter(Boolean);

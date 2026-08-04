@@ -978,6 +978,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
           { label: 'Incident Date', value: d.incident_date || '-' },
           { label: 'Incident Time', value: d.incident_time || '-' },
           { label: 'Incident Place', value: d.incident_place || '-' },
+          { label: 'Area Number', value: d.incident_area_number || '-' },
           { label: 'Complaint Type', value: d.complaint_type || '-' }
         ], 2);
 

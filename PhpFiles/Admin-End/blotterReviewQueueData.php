@@ -141,24 +141,27 @@ function createBlotterFromComplaint(mysqli $conn, array $complaintRow, string $a
         $endorsementNote .= '. Review notes: ' . $remarks;
     }
     $caseRemarks = appendMultilineNote($caseRemarks, $endorsementNote);
+    $parsedComplaintDetails = complaintTypeParseCaseDetails((string)($complaintRow['case_details'] ?? ''));
+    $incidentAreaNumber = trim((string)($parsedComplaintDetails['incident_area_number'] ?? ''));
 
     $insertCaseStmt = $conn->prepare("
         INSERT INTO casereportstbl
-            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
+            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, incident_area_number, complaint_type,
              case_details, case_remarks, case_status_id, case_level_id, user_id_official_update_by, user_id_official_reviewed_by, user_id_official_record_by)
         VALUES
-            (?, ?, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+            (?, ?, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     ");
     if (!$insertCaseStmt) {
         throw new Exception('Failed to prepare blotter case insert.');
     }
     $insertCaseStmt->bind_param(
-        'ssssssssiiss',
+        'sssssssssiiss',
         $blotterCaseId,
         $residentUserId,
         $complaintRow['incident_date'],
         $complaintRow['incident_time'],
         $complaintRow['incident_place'],
+        $incidentAreaNumber,
         $complaintRow['complaint_type'],
         $complaintRow['case_details'],
         $caseRemarks,

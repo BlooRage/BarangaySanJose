@@ -266,11 +266,11 @@ $defaultFiledTime = date('H:i');
                 </div>
 
                 <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <label class="form-label">Contact Number (Numero ng Telepono)</label>
                         <input type="text" class="form-control" name="complainant_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <label class="form-label">Age (Edad)</label>
                         <input type="number" min="1" max="120" class="form-control" name="complainant_age">
                     </div>
@@ -424,9 +424,22 @@ $defaultFiledTime = date('H:i');
                         <label class="form-label">Time of Incident <span class="required-asterisk">*</span></label>
                         <input type="time" class="form-control" id="incidentTime" name="incident_time" required>
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <label class="form-label">Place of Incident <span class="required-asterisk">*</span></label>
                         <input type="text" class="form-control" id="incidentPlace" name="incident_place" required maxlength="255">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="incidentAreaNumber">Area Number <span class="required-asterisk">*</span></label>
+                        <select class="form-select" id="incidentAreaNumber" name="incident_area_number" required>
+                            <option value="">Select area</option>
+                            <option value="Area 01">Area 01</option>
+                            <option value="Area 1A">Area 1A</option>
+                            <option value="Area 02">Area 02</option>
+                            <option value="Area 03">Area 03</option>
+                            <option value="Area 04">Area 04</option>
+                            <option value="Area 05">Area 05</option>
+                            <option value="Area 06">Area 06</option>
+                        </select>
                     </div>
                 </div>
 
@@ -593,6 +606,6 @@ $defaultFiledTime = date('H:i');
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-inline-narrative" defer></script>
+<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-incident-area" defer></script>
 </body>
 </html>

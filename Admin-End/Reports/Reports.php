@@ -2718,7 +2718,10 @@ if (
     $blot['records'] = rp_safe_query($conn, "
         SELECT
           b.blotter_id,
-          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cp.firstname, cp.middlename, cp.lastname, cp.suffix)), ''), 'Not specified') AS name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', rp.firstname, rp.middlename, rp.lastname, rp.suffix)), ''), 'Not specified') AS complainee_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cp.firstname, cp.middlename, cp.lastname, cp.suffix)), ''), 'Not specified') AS complainant_name,
+          COALESCE(NULLIF(TRIM(c.incident_place), ''), 'Not specified') AS incident_address,
+          COALESCE(NULLIF(TRIM(c.incident_area_number), ''), 'Not specified') AS area_number,
           {$complaintTypeExpr} AS case_name,
           COALESCE(NULLIF(TRIM(l.status_name), ''), 'Not specified') AS blotter_level
         FROM casereportstbl c
@@ -2735,6 +2738,17 @@ if (
           WHERE participant_role = 'Complainant'
           GROUP BY case_id
         ) cp ON cp.case_id = c.case_id
+        LEFT JOIN (
+          SELECT
+            case_id,
+            MAX(firstname) AS firstname,
+            MAX(middlename) AS middlename,
+            MAX(lastname) AS lastname,
+            MAX(suffix) AS suffix
+          FROM caseparticipantstbl
+          WHERE participant_role = 'Respondent'
+          GROUP BY case_id
+        ) rp ON rp.case_id = c.case_id
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE {$blotterWhere}
         ORDER BY {$caseDateExpr} DESC, b.blotter_id DESC
@@ -5951,7 +5965,10 @@ elseif ($module === 'blotter'):
               <thead>
                 <tr>
                   <th>Blotter ID</th>
-                  <th>Name</th>
+                  <th>Complainee Name</th>
+                  <th>Complainant Name</th>
+                  <th>Incident Address</th>
+                  <th>Area Number</th>
                   <th>Case</th>
                   <th>Blotter Level</th>
                 </tr>
@@ -5960,7 +5977,10 @@ elseif ($module === 'blotter'):
                 <?php foreach ($blot['records'] as $record): ?>
                 <tr>
                   <td><?= htmlspecialchars((string)($record['blotter_id'] ?? '')) ?></td>
-                  <td><?= htmlspecialchars((string)($record['name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['complainee_name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['complainant_name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['incident_address'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars(rp_area_number_only($record['area_number'] ?? '')) ?: 'Not specified' ?></td>
                   <td><?= htmlspecialchars((string)($record['case_name'] ?? 'Not specified')) ?></td>
                   <td><?= htmlspecialchars((string)($record['blotter_level'] ?? 'Not specified')) ?></td>
                 </tr>
