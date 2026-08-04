@@ -665,7 +665,9 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         setRequired(complainantAddressSystem, true);
         setRequired(respondentAddressSystem, true);
-        submitBtn.disabled = hasInvalidRequiredVisibleFields();
+        // Keep Submit clickable so an attempted submission can reveal every
+        // missing field. It is disabled only while a server request is active.
+        submitBtn.disabled = submitting;
         // Only show errors for fields the user has touched.
         form.querySelectorAll("input, select, textarea").forEach((el) => {
             if (el.disabled) return;
@@ -827,12 +829,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     form.addEventListener("input", handleFormStateEvent);
     form.addEventListener("change", handleFormStateEvent);
+    submitBtn.addEventListener("click", (event) => {
+        if (submitting || submitConfirmed) return;
+        updateState();
+        renderAllValidity();
+
+        const requiresSignature = (inputMethod?.value || "") === "text";
+        const complainantSignatureValid = !requiresSignature || !complainantSignaturePad || complainantSignaturePad.validate();
+        const respondentSignatureValid = !requiresSignature || !respondentSignaturePad || respondentSignaturePad.validate();
+        const signaturesValid = complainantSignatureValid && respondentSignatureValid;
+        const firstInvalid = Array.from(form.elements || []).find((field) =>
+            isVisibleField(field) && !field.checkValidity()
+        );
+
+        if (firstInvalid || !signaturesValid) {
+            event.preventDefault();
+            const target = firstInvalid?.type === "hidden"
+                ? firstInvalid.closest(".col-12")?.querySelector("canvas, input:not([type='hidden']), select, textarea")
+                : firstInvalid;
+            target?.scrollIntoView({ behavior: "smooth", block: "center" });
+            target?.focus?.({ preventScroll: true });
+        }
+    });
     form.addEventListener("submit", (e) => {
         const requiresSignature = (inputMethod?.value || "") === "text";
-        const signaturesValid =
-            !requiresSignature ||
-            ((!complainantSignaturePad || complainantSignaturePad.validate()) &&
-            (!respondentSignaturePad || respondentSignaturePad.validate()));
+        const complainantSignatureValid = !requiresSignature || !complainantSignaturePad || complainantSignaturePad.validate();
+        const respondentSignatureValid = !requiresSignature || !respondentSignaturePad || respondentSignaturePad.validate();
+        const signaturesValid = complainantSignatureValid && respondentSignatureValid;
         if (!submitConfirmed) {
             e.preventDefault();
             e.stopPropagation();
