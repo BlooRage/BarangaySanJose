@@ -3011,6 +3011,15 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <?php endif; ?>
   <style>
+    /* Keep report metrics and PDF output independent of fonts installed on the
+       device running the browser. The variable font file is served by the app. */
+    @font-face {
+      font-family: 'Report Sans';
+      src: url('../../Fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: block;
+    }
     :root {
       --rp-letter-width: 8.5in;
       --rp-letter-height: 11in;
@@ -3183,6 +3192,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       font-size: 13px;
       line-height: 1.45;
       color: #1a1a1a;
+      font-family: 'Report Sans', sans-serif;
     }
     .rp-doc--source { display: none !important; }
     .rp-print-pages {
@@ -3199,6 +3209,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       border: 1.5px solid #2f2f2f;
       box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
       overflow: hidden;
+      font-family: 'Report Sans', sans-serif;
     }
     .rp-print-page-content {
       display: flex;
@@ -3250,7 +3261,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       text-align: center;
       color: #000;
       line-height: 1.22;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: 'Report Sans', sans-serif;
     }
     .rp-letterhead-center p {
       margin: 0;
@@ -3566,7 +3577,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
 
     /* Standalone print view — applied directly (no @media wrapper needed) */
     <?php if ($isPrintView): ?>
-    html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: 'Report Sans', sans-serif; }
     @media screen {
       html, body { background: #dfe4ea; }
       body { padding: 18px 0 28px; }
@@ -7252,6 +7263,19 @@ window.__reportPaginationReady = (() => {
     const sourceDoc = document.querySelector('.rp-doc');
     if (!sourceDoc) {
       return null;
+    }
+
+    if (document.fonts) {
+      try {
+        await Promise.all([
+          document.fonts.load("400 13px 'Report Sans'"),
+          document.fonts.load("700 13px 'Report Sans'"),
+          document.fonts.load("900 21px 'Report Sans'"),
+          document.fonts.ready,
+        ]);
+      } catch (err) {
+        console.warn('Report font failed to load before pagination:', err);
+      }
     }
 
     await nextFrame();
