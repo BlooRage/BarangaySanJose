@@ -341,13 +341,14 @@ try {
     $newSurname = cleanString($_POST['new_surname'] ?? '');
     $religion = cleanString($_POST['religion'] ?? '');
     $voterStatusRaw = cleanString($_POST['voter_status'] ?? '');
+    $headOfFamilyRaw = cleanString($_POST['head_of_family'] ?? '');
     $employmentStatus = cleanString($_POST['employment_status'] ?? '');
     $occupation = cleanString($_POST['occupation'] ?? '');
     $sectorMembership = cleanString($_POST['sector_membership'] ?? '');
     $studentStopped = cleanString($_POST['student_stopped'] ?? '0') === '1';
 
     $stmt = $conn->prepare("
-        SELECT firstname, middlename, lastname, suffix, sex, civil_status, religion, voter_status, occupation, occupation_detail, sector_membership
+        SELECT firstname, middlename, lastname, suffix, sex, civil_status, religion, voter_status, head_of_family, occupation, occupation_detail, sector_membership
         FROM residentinformationtbl
         WHERE resident_id = ?
         LIMIT 1
@@ -400,6 +401,19 @@ try {
         }
         if ($voterValue !== null && (int)($current['voter_status'] ?? 0) !== $voterValue) {
             $changes['voter_status'] = $voterValue;
+        }
+    }
+    if ($headOfFamilyRaw !== '') {
+        if (!in_array($headOfFamilyRaw, ['0', '1'], true)) {
+            throw new Exception('Invalid resident role selection.');
+        }
+        $currentHeadOfFamily = (int)($current['head_of_family'] ?? 0);
+        $requestedHeadOfFamily = (int)$headOfFamilyRaw;
+        if ($currentHeadOfFamily === 1 && $requestedHeadOfFamily === 0) {
+            throw new Exception('The head of the family role cannot be removed through profile editing.');
+        }
+        if ($currentHeadOfFamily === 0 && $requestedHeadOfFamily === 1) {
+            $changes['head_of_family'] = 1;
         }
     }
     if ($employmentStatus !== '') {

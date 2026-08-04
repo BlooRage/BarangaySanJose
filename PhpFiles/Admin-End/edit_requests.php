@@ -543,6 +543,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $types .= 'i';
                 }
 
+                if (array_key_exists('head_of_family', $changes)) {
+                    $set[] = "head_of_family = ?";
+                    $params[] = (int)$changes['head_of_family'];
+                    $types .= 'i';
+                }
+
                 if (array_key_exists('occupation', $changes)) {
                     $set[] = "occupation = ?";
                     $params[] = (int)$changes['occupation'];

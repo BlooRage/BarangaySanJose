@@ -359,7 +359,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 	  <script src="../JS-Script-Files/Resident-End/profileChangePhone.js?v=20260215-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileChangeEmail.js?v=20260215-1" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileUploadedDocuments.js?v=20260623-1" defer></script>
-	  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
+	  <script src="../JS-Script-Files/Resident-End/profileEdit.js?v=20260804-head-of-family" defer></script>
 	    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <style>
       .resident-avatar-wrap {
@@ -1211,6 +1211,21 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         </select>
                         </div>
 
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="editHeadOfFamily">Resident Role</label>
+                            <select class="form-select" name="head_of_family" id="editHeadOfFamily" <?= $isHeadOfFamily ? 'disabled' : '' ?>>
+                                <option value="0" <?= !$isHeadOfFamily ? 'selected' : '' ?>>Resident</option>
+                                <option value="1" <?= $isHeadOfFamily ? 'selected' : '' ?>>Head of the Family</option>
+                            </select>
+                            <div class="form-text">
+                                <?= $isHeadOfFamily
+                                    ? 'You are already registered as the head of the family.'
+                                    : 'Changing this role requires administrator verification.' ?>
+                            </div>
+                        </div>
                     </div>
 
                      <div class="row mb-3" id="occupationRow" style="display: none;">

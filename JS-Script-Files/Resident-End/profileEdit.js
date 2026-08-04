@@ -52,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const occupation = document.getElementById("editOccupation");
     const voterStatus = document.getElementById("editVoterStatus");
     const voterStatusHelp = document.getElementById("voterStatusHelp");
+    const headOfFamily = document.getElementById("editHeadOfFamily");
     const modalTrigger =
         document.getElementById("btnOpenEditProfile") ||
         document.querySelector('[data-bs-target="#editProfileModal"]');
@@ -102,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
         employmentStatus: employmentStatus ? employmentStatus.value.trim() : "",
         occupation: occupation ? occupation.value.trim() : "",
         voterStatus: voterStatus ? voterStatus.value.trim() : "",
+        headOfFamily: headOfFamily ? headOfFamily.value.trim() : "0",
         sectorMembership: getSectorValues(),
     };
 
@@ -224,12 +226,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const currentEmployment = employmentStatus ? employmentStatus.value.trim() : "";
         const currentOccupation = occupation ? occupation.value.trim() : "";
         const currentVoter = voterStatus ? voterStatus.value.trim() : "";
+        const currentHeadOfFamily = headOfFamily ? headOfFamily.value.trim() : "0";
         const currentSector = getSectorValues();
         return (
             currentReligion !== initial.religion ||
             currentEmployment !== initial.employmentStatus ||
             currentOccupation !== initial.occupation ||
             currentVoter !== initial.voterStatus ||
+            currentHeadOfFamily !== initial.headOfFamily ||
             currentSector !== initial.sectorMembership
         );
     };
@@ -582,6 +586,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (employmentStatus) employmentStatus.value = initial.employmentStatus;
         if (occupation) occupation.value = initial.occupation;
         if (voterStatus) voterStatus.value = initial.voterStatus;
+        if (headOfFamily) headOfFamily.value = initial.headOfFamily;
 
         document.querySelectorAll("input[name='sectorMembership[]']").forEach((el) => {
             el.checked = initial.sectorMembership.split(",").includes(el.value.trim());
@@ -637,6 +642,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (employmentStatus) employmentStatus.addEventListener("change", updateSections);
     if (occupation) occupation.addEventListener("input", updateSections);
     if (voterStatus) voterStatus.addEventListener("change", updateSections);
+    if (headOfFamily) headOfFamily.addEventListener("change", updateSections);
     document.querySelectorAll("input[name='sectorMembership[]']").forEach((el) => {
         el.addEventListener("change", updateSections);
     });
@@ -748,6 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
         employmentStatus: employmentStatus ? employmentStatus.value.trim() : "",
         occupation: occupation ? occupation.value.trim() : "",
         voterStatus: voterStatus ? voterStatus.value.trim() : "",
+        headOfFamily: headOfFamily ? headOfFamily.value.trim() : "0",
         sectorMembership: getSectorValues(),
     });
 
@@ -787,6 +794,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         pushIfChanged("Voter Status", initial.voterStatus, current.voterStatus);
+        pushIfChanged(
+            "Resident Role",
+            initial.headOfFamily === "1" ? "Head of the Family" : "Resident",
+            current.headOfFamily === "1" ? "Head of the Family" : "Resident"
+        );
         pushIfChanged("Sector Membership", initial.sectorMembership, current.sectorMembership);
 
         return rows;
@@ -948,6 +960,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const occupationEl = document.getElementById("editOccupation");
         if (occupationEl) form.append("occupation", occupationEl.value.trim());
         if (voterStatus) form.append("voter_status", voterStatus.value.trim());
+        if (headOfFamily) form.append("head_of_family", headOfFamily.value.trim());
 
         const sectors = Array.from(document.querySelectorAll("input[name='sectorMembership[]']:checked"))
             .map((el) => el.value.trim())
