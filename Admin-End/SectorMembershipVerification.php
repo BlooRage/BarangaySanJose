@@ -357,6 +357,6 @@ include 'includes/sidebar.php';
 </script>
 <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260804-1"></script>
+<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260804-2"></script>
 </body>
 </html>

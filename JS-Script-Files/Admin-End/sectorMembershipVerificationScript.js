@@ -511,20 +511,28 @@
 	    if (actions) {
 	      actions.innerHTML = "";
 
-      const approve = document.createElement("button");
-      approve.className = "btn btn-success doc-viewer-action-btn flex-fill";
-      approve.innerText = "Verify";
-      approve.disabled = status === "Verified";
-      approve.addEventListener("click", () => showApproveConfirm());
+      if (status === "Verified") {
+        const verifiedStatus = document.createElement("div");
+        verifiedStatus.className = "alert alert-success text-center fw-semibold w-100 mb-0";
+        verifiedStatus.setAttribute("role", "status");
+        verifiedStatus.innerHTML = '<i class="fa-solid fa-circle-check me-2" aria-hidden="true"></i>Verified';
+        actions.appendChild(verifiedStatus);
+      } else {
 
-      const deny = document.createElement("button");
-      deny.className = "btn btn-danger doc-viewer-action-btn flex-fill";
-      deny.innerText = "Decline";
-      deny.disabled = status === "Rejected";
-      deny.addEventListener("click", () => showDenyConfirm());
+        const approve = document.createElement("button");
+        approve.className = "btn btn-success doc-viewer-action-btn flex-fill";
+        approve.innerText = "Verify";
+        approve.addEventListener("click", () => showApproveConfirm());
 
-      actions.appendChild(deny);
-      actions.appendChild(approve);
+        const deny = document.createElement("button");
+        deny.className = "btn btn-danger doc-viewer-action-btn flex-fill";
+        deny.innerText = "Decline";
+        deny.disabled = status === "Rejected";
+        deny.addEventListener("click", () => showDenyConfirm());
+
+        actions.appendChild(deny);
+        actions.appendChild(approve);
+      }
     }
 
     const modalEl = el("modal-sectorDocViewer");
