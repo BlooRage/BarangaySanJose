@@ -3011,15 +3011,6 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <?php endif; ?>
   <style>
-    /* Keep report metrics and PDF output independent of fonts installed on the
-       device running the browser. The variable font file is served by the app. */
-    @font-face {
-      font-family: 'Report Sans';
-      src: url('../../Fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
-      font-style: normal;
-      font-weight: 100 900;
-      font-display: block;
-    }
     :root {
       --rp-letter-width: 8.5in;
       --rp-letter-height: 11in;
@@ -3192,7 +3183,8 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       font-size: 13px;
       line-height: 1.45;
       color: #1a1a1a;
-      font-family: 'Report Sans', sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
+      font-synthesis: none;
     }
     .rp-doc--source { display: none !important; }
     .rp-print-pages {
@@ -3209,7 +3201,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       border: 1.5px solid #2f2f2f;
       box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
       overflow: hidden;
-      font-family: 'Report Sans', sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
     }
     .rp-print-page-content {
       display: flex;
@@ -3261,7 +3253,8 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       text-align: center;
       color: #000;
       line-height: 1.22;
-      font-family: 'Report Sans', sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
+      font-synthesis: none;
     }
     .rp-letterhead-center p {
       margin: 0;
@@ -3271,11 +3264,11 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     }
     .rp-letterhead-rep {
       font-size: 23px !important;
-      font-weight: 900 !important;
+      font-weight: 700 !important;
     }
     .rp-letterhead-barangay {
       font-size: 34px !important;
-      font-weight: 900 !important;
+      font-weight: 700 !important;
       margin-top: 12px !important;
       letter-spacing: .02em;
     }
@@ -3286,7 +3279,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-block--hidden { visibility: hidden; }
     .rp-doc-header .rp-report-title {
       font-size: 17px;
-      font-weight: 800;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .04em;
       color: #000;
@@ -3505,10 +3498,10 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; margin-left: 3% !important; margin-right: 3% !important; }
       .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
       .rp-letterhead-center p { font-size: 13pt !important; font-weight: 400 !important; }
-      .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
-      .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
+      .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 700 !important; }
+      .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 700 !important; margin-top: 8pt !important; }
       .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
-      .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 800 !important; }
+      .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 700 !important; }
       .rp-doc-header .rp-period { font-size: 12px !important; font-weight: 400 !important; margin-top: 6px !important; }
       .rp-section {
         margin-top: 14pt !important;
@@ -3577,7 +3570,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
 
     /* Standalone print view — applied directly (no @media wrapper needed) */
     <?php if ($isPrintView): ?>
-    html, body { margin: 0; padding: 0; background: #fff; font-family: 'Report Sans', sans-serif; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
     @media screen {
       html, body { background: #dfe4ea; }
       body { padding: 18px 0 28px; }
@@ -3590,10 +3583,10 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; margin-left: 3% !important; margin-right: 3% !important; }
     .rp-letterhead-logo { width: 76pt !important; height: 76pt !important; }
     .rp-letterhead-center p { font-size: 13pt !important; font-weight: 400 !important; }
-    .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 800 !important; }
-    .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 800 !important; margin-top: 8pt !important; }
+    .rp-letterhead-center .rp-letterhead-rep { font-size: 15pt !important; font-weight: 700 !important; }
+    .rp-letterhead-center .rp-letterhead-barangay { font-size: 21pt !important; font-weight: 700 !important; margin-top: 8pt !important; }
     .rp-letterhead-line { margin: 8pt 3% 0 !important; border-color: #4b5563 !important; }
-    .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 800 !important; }
+    .rp-doc-header .rp-report-title { font-size: 17px !important; color: #000 !important; font-weight: 700 !important; }
     .rp-doc-header .rp-period { font-size: 12px !important; font-weight: 400 !important; margin-top: 6px !important; }
     .rp-section {
       margin-top: 14pt !important;
@@ -7265,19 +7258,6 @@ window.__reportPaginationReady = (() => {
       return null;
     }
 
-    if (document.fonts) {
-      try {
-        await Promise.all([
-          document.fonts.load("400 13px 'Report Sans'"),
-          document.fonts.load("700 13px 'Report Sans'"),
-          document.fonts.load("900 21px 'Report Sans'"),
-          document.fonts.ready,
-        ]);
-      } catch (err) {
-        console.warn('Report font failed to load before pagination:', err);
-      }
-    }
-
     await nextFrame();
     await wait(160);
     await nextFrame();
@@ -7585,6 +7565,7 @@ function downloadPdf() {
   url.searchParams.set('format', 'print');
   url.searchParams.set('autoprint', '0');
   url.searchParams.set('download', 'pdf');
+  url.searchParams.set('_pdf_v', String(Date.now()));
   const popup = window.open(url.toString(), '_blank', 'width=1100,height=900,scrollbars=yes');
   if (!popup) {
     alert('Please allow popups for this site, then click Download PDF again.');
