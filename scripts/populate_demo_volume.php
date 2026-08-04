@@ -77,16 +77,17 @@ try {
         $phone = '0918' . str_pad((string)(1000000 + $i), 7, '0', STR_PAD_LEFT);
         $email = "resident{$i}@demo.test";
         $contacts = pii_prepare_useraccount_contacts($email, $phone);
-        $accountStatus = $st['account'][($i - 1) % count($st['account'])];
-        $residentStatus = $st['resident'][($i - 1) % count($st['resident'])];
+        // Keep every seeded resident eligible for operational tracker joins.
+        $accountStatus = 1;
+        $residentStatus = 11;
         runq($conn, 'INSERT INTO useraccountstbl (user_id,phone_number,phone_lookup_hash,phoneNum_verify,email,email_lookup_hash,email_verify,password_hash,status_id_account,role_access,account_created,last_login,last_password_changed,failed_logins) VALUES (?,?,?,?,?,?,?,?,?,\'Resident\',?,?,?,?)', [
-            $userId,$contacts['phone_number'],$contacts['phone_lookup_hash'],$i % 4 ? 1 : 0,$contacts['email'],$contacts['email_lookup_hash'],$i % 3 ? 1 : 0,$password,(string)$accountStatus,dt(-90 + $i),dt(-($i % 20)),day(-30),$accountStatus === 3 ? 3 : 0
+            $userId,$contacts['phone_number'],$contacts['phone_lookup_hash'],1,$contacts['email'],$contacts['email_lookup_hash'],1,$password,(string)$accountStatus,dt(-90 + $i),dt(-($i % 20)),day(-30),0
         ])->close();
         runq($conn, 'INSERT INTO residentinformationtbl (resident_id,user_id,lastname,firstname,middlename,sex,birthdate,birthplace,baranagayresidency,civil_status,family_role,head_of_family,voter_status,occupation,occupation_detail,religion,sector_membership,privacy_consent,status_id_resident) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
             $residentId,$userId,enc($last),enc($first),enc('Demo'),$sex,enc(sprintf('%04d-%02d-%02d', 1955 + ($i % 48), 1 + ($i % 12), 1 + ($i % 27))),enc('Rodriguez, Rizal'),enc(($i % 15 + 1).' years'),enc($i % 3 ? 'Single' : 'Married'),enc($i % 12 === 1 ? 'Household Head' : 'Member'),$i <= 12 ? 1 : 0,$i % 4 ? 1 : 0,1,enc(['Teacher','Driver','Vendor','Student','Office Worker','Farmer'][$i % 6]),enc('Roman Catholic'),enc($sectors[$i % count($sectors)]),1,$residentStatus
         ])->close();
         runq($conn, 'INSERT INTO residentaddresstbl (address_id,resident_id,unit_number,street_number,street_name,phase_number,subdivision,area_number,house_type,house_ownership,residency_duration,status_id_residency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [
-            'A1'.str_pad((string)$i,8,'0',STR_PAD_LEFT),$residentId,enc((string)$i),enc((string)(100+$i)),enc(['Mabini','Rizal','Luna','Bonifacio','Del Pilar'][$i%5].' Street'),enc((string)(1+$i%3)),enc('San Jose Village'),$areas[$i%count($areas)],enc($i%3?'Concrete':'Semi-concrete'),enc($i%2?'Owned':'Rented'),enc(($i%20+1).' years'),$st['address'][$i%3]
+            'A1'.str_pad((string)$i,8,'0',STR_PAD_LEFT),$residentId,enc((string)$i),enc((string)(100+$i)),enc(['Mabini','Rizal','Luna','Bonifacio','Del Pilar'][$i%5].' Street'),enc((string)(1+$i%3)),enc('San Jose Village'),$areas[$i%count($areas)],enc($i%3?'Concrete':'Semi-concrete'),enc($i%2?'Owned':'Rented'),enc(($i%20+1).' years'),12
         ])->close();
         runq($conn, 'INSERT INTO emergencycontacttbl (emergency_id,user_id,last_name,first_name,phone_number,relationship,address) VALUES (?,?,?,?,?,?,?)', [
             110000+$i,$userId,enc($last),enc('Emergency '.$first),enc('0919'.str_pad((string)(2000000+$i),7,'0',STR_PAD_LEFT)),enc($i%2?'Sibling':'Parent'),enc('Barangay San Jose, Rodriguez, Rizal')
