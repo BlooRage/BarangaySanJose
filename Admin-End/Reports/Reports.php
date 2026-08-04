@@ -1400,7 +1400,6 @@ function rp_report_customize_config(string $module): array {
                 'summary' => 'Overall Summary',
                 'charts' => 'Graphs',
                 'type' => 'Complaint Type Breakdown',
-                'origin' => 'Origin',
                 'kind' => 'Subject Kind',
                 'area' => 'Complaints by Area',
                 'trend' => 'Monthly Trend',
@@ -1409,7 +1408,6 @@ function rp_report_customize_config(string $module): array {
             'columns' => [
                 'date' => $sharedColumns['date'],
                 'type' => 'Complaint Type',
-                'channel' => 'Origin',
                 'status' => 'Subject Kind',
                 'area' => $sharedColumns['area'],
                 'sector' => $sharedColumns['sector'],
@@ -1422,11 +1420,6 @@ function rp_report_customize_config(string $module): array {
                     'label' => 'Complaint Type Breakdown',
                     'sections' => ['type'],
                     'columns' => ['type', 'count', 'result', 'percentage'],
-                ],
-                [
-                    'label' => 'Origin',
-                    'sections' => ['origin'],
-                    'columns' => ['channel', 'count', 'percentage'],
                 ],
                 [
                     'label' => 'Subject Kind',
@@ -2824,24 +2817,13 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
     $comp['kpi'] = rp_safe_query($conn, "
         SELECT COUNT(*) AS total,
           SUM(CASE WHEN escalated_to_blotter=1 THEN 1 ELSE 0 END) AS escalated,
-          SUM(CASE WHEN escalated_to_blotter=0 OR escalated_to_blotter IS NULL THEN 1 ELSE 0 END) AS unescalated,
-          SUM(CASE WHEN complaint_origin='walk_in' OR complaint_origin='Walk-in' THEN 1 ELSE 0 END) AS walkin,
-          SUM(CASE WHEN complaint_origin='online' OR complaint_origin='Online' THEN 1 ELSE 0 END) AS online_count
+          SUM(CASE WHEN escalated_to_blotter=0 OR escalated_to_blotter IS NULL THEN 1 ELSE 0 END) AS unescalated
         FROM complaintstbl ct
         {$complaintCaseJoin}
         " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
         WHERE {$complaintWhere}
     ");
     $comp['kpi'] = $comp['kpi'][0] ?? [];
-
-    $comp['by_origin'] = rp_safe_query($conn, "
-        SELECT COALESCE(complaint_origin,'Unknown') AS origin, COUNT(*) AS total
-        FROM complaintstbl ct
-        {$complaintCaseJoin}
-        " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
-        WHERE {$complaintWhere}
-        GROUP BY complaint_origin ORDER BY total DESC
-    ");
 
     if ($hasCaseTable) {
         $comp['by_type'] = rp_safe_query($conn, "
@@ -2859,12 +2841,19 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
     }
 
     $comp['by_kind'] = rp_safe_query($conn, "
-        SELECT COALESCE(subject_kind,'Unknown') AS kind, COUNT(*) AS total
+        SELECT
+          CASE
+            WHEN LOWER(COALESCE(NULLIF(TRIM(subject_kind), ''), 'Unknown')) = 'unknown' THEN 'Unknown Person'
+            WHEN LOWER(TRIM(subject_kind)) = 'nonresident' THEN 'Non-Resident'
+            WHEN LOWER(TRIM(subject_kind)) = 'generalconcern' THEN 'General Concern'
+            ELSE COALESCE(NULLIF(TRIM(subject_kind), ''), 'Unknown Person')
+          END AS kind,
+          COUNT(*) AS total
         FROM complaintstbl ct
         {$complaintCaseJoin}
         " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
         WHERE {$complaintWhere}
-        GROUP BY subject_kind ORDER BY total DESC
+        GROUP BY kind ORDER BY total DESC
     ");
 
     if ($complaintAreaExpr !== 'NULL') {
@@ -4069,7 +4058,6 @@ $blotterStatusChartData = [];
 $blotterAreaChartData = [];
 $blotterTrendChartData = [];
 $complaintTypeChartData = [];
-$complaintOriginChartData = [];
 $complaintKindChartData = [];
 $complaintAreaChartData = [];
 $complaintTrendChartData = [];
@@ -6027,9 +6015,6 @@ elseif ($module === 'complaints'):
   $complaintTypeChartData = array_values(array_filter($comp['by_type'] ?? [], static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
-  $complaintOriginChartData = array_values(array_filter($comp['by_origin'] ?? [], static function (array $row): bool {
-    return (int)($row['total'] ?? 0) > 0;
-  }));
   $complaintKindChartData = array_values(array_filter($comp['by_kind'] ?? [], static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
@@ -6047,7 +6032,6 @@ elseif ($module === 'complaints'):
   }));
   $shouldLoadComplaintCharts = $showReportSection('charts') && (
     $complaintTypeChartData !== []
-    || $complaintOriginChartData !== []
     || $complaintKindChartData !== []
     || $complaintAreaChartData !== []
     || $complaintTrendChartData !== []
@@ -6061,8 +6045,6 @@ elseif ($module === 'complaints'):
               <tr><td>Total Complaints Filed</td><td><?= number_format($total) ?></td></tr>
               <tr><td>Escalated to Blotter</td><td><?= number_format((int)($kpi['escalated']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['escalated']??0),$total) ?>)</span></td></tr>
               <tr><td>Not Escalated</td><td><?= number_format((int)($kpi['unescalated']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['unescalated']??0),$total) ?>)</span></td></tr>
-              <tr><td>Walk-in Complaints</td><td><?= number_format((int)($kpi['walkin']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['walkin']??0),$total) ?>)</span></td></tr>
-              <tr><td>Online Complaints</td><td><?= number_format((int)($kpi['online_count']??0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['online_count']??0),$total) ?>)</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -6071,7 +6053,7 @@ elseif ($module === 'complaints'):
         <?php if ($showReportSection('charts')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('charts')) ?></div>
-          <?php if ($complaintTypeChartData === [] && $complaintOriginChartData === [] && $complaintKindChartData === [] && $complaintAreaChartData === [] && $complaintTrendChartData === []): ?>
+          <?php if ($complaintTypeChartData === [] && $complaintKindChartData === [] && $complaintAreaChartData === [] && $complaintTrendChartData === []): ?>
             <p class="rp-empty">No chart data is available for the selected filters.</p>
           <?php else: ?>
           <div class="rp-chart-grid">
@@ -6082,15 +6064,6 @@ elseif ($module === 'complaints'):
                 <canvas id="complaintTypeChart"></canvas>
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by complaint type.</div>
-            </div>
-            <?php endif; ?>
-            <?php if ($complaintOriginChartData !== []): ?>
-            <div class="rp-chart-card">
-              <div class="rp-subsection-title">By Origin</div>
-              <div class="rp-chart-wrap">
-                <canvas id="complaintOriginChart"></canvas>
-              </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by origin.</div>
             </div>
             <?php endif; ?>
             <?php if ($complaintKindChartData !== []): ?>
@@ -6148,31 +6121,8 @@ elseif ($module === 'complaints'):
         </div>
         <?php endif; ?>
 
-        <?php if ($showReportSection('origin') || $showReportSection('kind')): ?>
-        <div class="rp-two-col" style="margin-top:22px;">
-          <?php if ($showReportSection('origin')): ?>
-          <div>
-            <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('origin')) ?></div>
-            <?php if (empty($comp['by_origin'])): ?>
-              <p class="rp-empty">No data.</p>
-            <?php else: ?>
-            <table class="rp-table">
-              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Origin</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
-              <tbody>
-                <?php foreach ($comp['by_origin'] as $r): ?>
-                <tr>
-                  <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars(ucwords(str_replace('_',' ',$r['origin']))) ?></td>
-                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'],$total) ?></td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($total) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
-            </table>
-            <?php endif; ?>
-          </div>
-          <?php endif; ?>
-          <?php if ($showReportSection('kind')): ?>
+        <?php if ($showReportSection('kind')): ?>
+        <div style="margin-top:22px;">
           <div>
             <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('kind')) ?></div>
             <?php if (empty($comp['by_kind'])): ?>
@@ -6193,7 +6143,6 @@ elseif ($module === 'complaints'):
             </table>
             <?php endif; ?>
           </div>
-          <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -7106,13 +7055,6 @@ window.__rpChartHelpers = (() => {
       title: 'Complaint Type Breakdown',
       datasetLabel: 'Complaints Filed',
       maxLabelChars: 22,
-    },
-    {
-      canvasId: 'complaintOriginChart',
-      labels: <?= json_encode(array_map(static fn(array $row): string => ucwords(str_replace('_', ' ', (string)($row['origin'] ?? ''))), $complaintOriginChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintOriginChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'By Origin',
-      datasetLabel: 'Complaints Filed',
     },
     {
       canvasId: 'complaintKindChart',
