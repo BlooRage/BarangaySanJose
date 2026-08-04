@@ -1242,7 +1242,6 @@ function rp_report_customize_config(string $module): array {
                 'revenue' => $sharedColumns['revenue'],
                 'payment' => 'Payment Type',
                 'resident' => $sharedColumns['resident'],
-                'address' => 'Resident Address (Optional)',
                 'channel' => 'GCash / Walk-in',
             ],
             'column_groups' => [
@@ -1294,6 +1293,7 @@ function rp_report_customize_config(string $module): array {
             'columns' => [
                 'identifier' => $sharedColumns['identifier'],
                 'resident' => $sharedColumns['resident'],
+                'address' => 'Resident Address (Optional)',
                 'date' => $sharedColumns['date'],
                 'area' => $sharedColumns['area'],
                 'sector' => $sharedColumns['sector'],
@@ -1307,12 +1307,12 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'Area Resident Summary',
                     'sections' => ['breakdown'],
-                    'columns' => ['area', 'count', 'percentage', 'address'],
+                    'columns' => ['area', 'count', 'percentage'],
                 ],
                 [
                     'label' => 'Household Data',
                     'sections' => ['household'],
-                    'columns' => ['area', 'household', 'count', 'percentage', 'address'],
+                    'columns' => ['area', 'household', 'count', 'percentage'],
                 ],
                 [
                     'label' => 'Tables (Supporting the Graphs)',
@@ -1322,12 +1322,12 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'Sector Membership',
                     'sections' => ['sector'],
-                    'columns' => ['sector', 'count', 'percentage', 'address'],
+                    'columns' => ['sector', 'count', 'percentage'],
                 ],
                 [
                     'label' => 'Employed and Unemployed',
                     'sections' => ['employment'],
-                    'columns' => ['type', 'count', 'percentage', 'address'],
+                    'columns' => ['type', 'count', 'percentage'],
                 ],
                 [
                     'label' => 'Gender',
@@ -1342,7 +1342,7 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'List of Registered Residents',
                     'sections' => ['monthly'],
-                    'columns' => ['count', 'resident', 'type', 'area', 'address'],
+                    'columns' => ['count', 'resident', 'type', 'area'],
                 ],
             ],
         ],

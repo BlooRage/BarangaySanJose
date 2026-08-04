@@ -2729,6 +2729,14 @@ function dr_resident_has_certificate_payment_exemption(mysqli $conn, ?string $re
         }
     }
 
+    // A normalized PWD/Senior Citizen record is authoritative. If its latest
+    // status is still pending, rejected, or otherwise unverified, do not let
+    // the legacy sector_membership text grant a payment exemption.
+    if ($foundNormalizedTarget) {
+        $cache[$residentId] = false;
+        return false;
+    }
+
     if (!dr_table_exists($conn, 'residentinformationtbl') || !dr_column_exists($conn, 'residentinformationtbl', 'sector_membership')) {
         $cache[$residentId] = false;
         return false;
