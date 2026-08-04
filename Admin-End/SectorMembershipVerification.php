@@ -230,9 +230,11 @@ include 'includes/sidebar.php';
 
         <div id="sector-docViewer-body" class="w-100 mb-3"></div>
       </div>
-      <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
-        <div id="sector-docViewer-actions" class="d-flex flex-wrap gap-2"></div>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      <div class="modal-footer border-0 d-flex flex-column align-items-stretch gap-4">
+        <div id="sector-docViewer-actions" class="d-flex flex-nowrap w-100 gap-2"></div>
+        <div class="d-flex justify-content-start w-100">
+          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>
@@ -355,6 +357,6 @@ include 'includes/sidebar.php';
 </script>
 <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260322-1"></script>
+<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260804-1"></script>
 </body>
 </html>

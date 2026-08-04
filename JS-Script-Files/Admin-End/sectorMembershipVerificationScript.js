@@ -512,19 +512,19 @@
 	      actions.innerHTML = "";
 
       const approve = document.createElement("button");
-      approve.className = "btn btn-success flex-fill";
+      approve.className = "btn btn-success doc-viewer-action-btn flex-fill";
       approve.innerText = "Verify";
       approve.disabled = status === "Verified";
       approve.addEventListener("click", () => showApproveConfirm());
 
       const deny = document.createElement("button");
-      deny.className = "btn btn-danger flex-fill";
+      deny.className = "btn btn-danger doc-viewer-action-btn flex-fill";
       deny.innerText = "Decline";
       deny.disabled = status === "Rejected";
       deny.addEventListener("click", () => showDenyConfirm());
 
-      actions.appendChild(approve);
       actions.appendChild(deny);
+      actions.appendChild(approve);
     }
 
     const modalEl = el("modal-sectorDocViewer");
