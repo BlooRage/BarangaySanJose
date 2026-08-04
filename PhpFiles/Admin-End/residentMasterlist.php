@@ -775,27 +775,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) 
             (int)$statusId
         );
 
-        // Update archived_at if column exists
-        $colExists = 0;
-        $stmt = $conn->prepare("
-            SELECT COUNT(*)
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'useraccountstbl'
-              AND COLUMN_NAME = 'archived_at'
-        ");
-        $stmt->execute();
-        $stmt->bind_result($colExists);
-        $stmt->fetch();
-        $stmt->close();
+        // An archived resident is also an archived user and must not be able to sign in.
+        if ($userId) {
+            require_once __DIR__ . '/../General/userAccountLocks.php';
+            $archiveSupport = ual_ensure_archive_support($conn);
+            $accountStatuses = is_array($archiveSupport['status_ids'] ?? null)
+                ? $archiveSupport['status_ids']
+                : ual_load_status_ids($conn);
+            $archivedAccountStatusId = (int)($archiveSupport['archived_status_id'] ?? $accountStatuses['archived'] ?? 0);
+            if ($archivedAccountStatusId <= 0) {
+                throw new Exception('Archived account status not found.');
+            }
 
-        if ($colExists && $userId) {
             $stmt = $conn->prepare("
                 UPDATE useraccountstbl
-                SET archived_at = NOW()
+                SET archived_prev_status_id = CASE
+                        WHEN status_id_account <> ? THEN status_id_account
+                        ELSE archived_prev_status_id
+                    END,
+                    status_id_account = ?,
+                    archived_at = NOW(),
+                    updated_at = NOW()
                 WHERE user_id = ?
             ");
-            $stmt->bind_param("s", $userId);
+            $stmt->bind_param("iis", $archivedAccountStatusId, $archivedAccountStatusId, $userId);
             $stmt->execute();
             $stmt->close();
         }

@@ -44,6 +44,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
+$residentSiteSettings = function_exists('wms_load_settings') ? wms_load_settings(null) : [];
+$residentIdleTimeoutMinutes = max(5, (int)($residentSiteSettings['resident_timeout_minutes'] ?? 30));
+$residentIdleCsrfToken = function_exists('ensureCsrfToken') ? ensureCsrfToken() : '';
+
 $current = basename((string)($_SERVER['PHP_SELF'] ?? ''));
 
 function activeLink($page, $current) {
@@ -773,6 +777,97 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       }
     });
   });
+</script>
+
+<script>
+  // Keep the server session aligned with real resident activity and expire the
+  // open page when no keyboard, pointer, touch, or scroll activity occurs.
+  (() => {
+    const IDLE_TIMEOUT_MS = <?= json_encode($residentIdleTimeoutMinutes * 60 * 1000) ?>;
+    const TOUCH_THROTTLE_MS = 60 * 1000;
+    const SESSION_TOUCH_URL = <?= json_encode(appUrl('/PhpFiles/Resident-End/session_touch.php'), JSON_UNESCAPED_SLASHES) ?>;
+    const LOGOUT_URL = <?= json_encode(appUrl('/logout?reason=expired'), JSON_UNESCAPED_SLASHES) ?>;
+    const CSRF_TOKEN = <?= json_encode($residentIdleCsrfToken) ?>;
+    const ACTIVITY_KEY = "barangay-resident-last-activity";
+    let lastActivityAt = Date.now();
+    let lastTouchAt = Date.now();
+    let expiryTimer = null;
+    let expiring = false;
+
+    const expireSession = () => {
+      if (expiring) return;
+      expiring = true;
+      window.location.replace(LOGOUT_URL);
+    };
+
+    const scheduleExpiry = () => {
+      window.clearTimeout(expiryTimer);
+      const remaining = IDLE_TIMEOUT_MS - (Date.now() - lastActivityAt);
+      if (remaining <= 0) {
+        expireSession();
+        return;
+      }
+      expiryTimer = window.setTimeout(expireSession, remaining + 50);
+    };
+
+    const touchServer = async () => {
+      if (!CSRF_TOKEN || expiring) return;
+      try {
+        const response = await fetch(SESSION_TOUCH_URL, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json",
+            "X-CSRF-Token": CSRF_TOKEN
+          }
+        });
+        if (response.status === 401 || response.status === 403) {
+          expireSession();
+        }
+      } catch (_) {
+        // A temporary network failure must not turn into a forced logout.
+      }
+    };
+
+    const recordActivity = () => {
+      if (expiring) return;
+      const now = Date.now();
+      lastActivityAt = now;
+      scheduleExpiry();
+      try { localStorage.setItem(ACTIVITY_KEY, String(now)); } catch (_) {}
+
+      if (now - lastTouchAt >= TOUCH_THROTTLE_MS) {
+        lastTouchAt = now;
+        touchServer();
+      }
+    };
+
+    ["pointerdown", "pointermove", "keydown", "scroll", "touchstart"].forEach((eventName) => {
+      window.addEventListener(eventName, recordActivity, { passive: true });
+    });
+
+    window.addEventListener("storage", (event) => {
+      if (event.key !== ACTIVITY_KEY) return;
+      const sharedActivityAt = Number(event.newValue || 0);
+      if (Number.isFinite(sharedActivityAt) && sharedActivityAt > lastActivityAt) {
+        lastActivityAt = sharedActivityAt;
+        scheduleExpiry();
+      }
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) scheduleExpiry();
+    });
+
+    try {
+      const sharedActivityAt = Number(localStorage.getItem(ACTIVITY_KEY) || 0);
+      if (Number.isFinite(sharedActivityAt) && sharedActivityAt > lastActivityAt - IDLE_TIMEOUT_MS) {
+        lastActivityAt = Math.max(lastActivityAt, sharedActivityAt);
+      }
+      localStorage.setItem(ACTIVITY_KEY, String(lastActivityAt));
+    } catch (_) {}
+    scheduleExpiry();
+  })();
 </script>
 
 <script src="<?= htmlspecialchars(appUrl('/JS-Script-Files/websitePreferences.js'), ENT_QUOTES, 'UTF-8') ?>" data-endpoint="<?= htmlspecialchars(appUrl('/PhpFiles/GET/getWebsitePreferences.php'), ENT_QUOTES, 'UTF-8') ?>"></script>

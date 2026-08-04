@@ -2240,7 +2240,15 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
     $now = new DateTimeImmutable();
     foreach ($allBirthdays as $b) {
         try {
-            $age = (int)$now->diff(new DateTimeImmutable($b['birthdate']))->y;
+            $birthdateValue = trim(pii_decrypt_string((string)($b['birthdate'] ?? '')));
+            if ($birthdateValue === '') {
+                continue;
+            }
+            $birthdate = new DateTimeImmutable($birthdateValue);
+            if ($birthdate > $now) {
+                continue;
+            }
+            $age = (int)$now->diff($birthdate)->y;
             if ($age <= 17) $ageBuckets['0-17']++;
             elseif ($age <= 30) $ageBuckets['18-30']++;
             elseif ($age <= 59) $ageBuckets['31-59']++;
@@ -2876,6 +2884,15 @@ $visibleReportColumns = $visibleReportColumns === []
 if ($visibleReportSections === []) {
     $visibleReportSections = $defaultVisibleReportSections;
 }
+
+// The resident supporting table summarizes the graph datasets, so keep the
+// graph section visible whenever that table is included in a custom layout.
+if ($module === 'residents'
+    && in_array('tables', $visibleReportSections, true)
+    && !in_array('charts', $visibleReportSections, true)) {
+    $visibleReportSections[] = 'charts';
+}
+
 if ($visibleReportColumns === []) {
     $visibleReportColumns = $defaultVisibleReportColumns;
 }

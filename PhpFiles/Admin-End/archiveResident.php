@@ -10,12 +10,10 @@ requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personn
 $sql = "
     SELECT
         r.resident_id,
-        CONCAT(
-            r.firstname, ' ',
-            IFNULL(CONCAT(LEFT(r.middlename, 1), '. '), ''),
-            r.lastname,
-            IF(r.suffix IS NOT NULL AND r.suffix != '', CONCAT(' ', r.suffix), '')
-        ) AS full_name,
+        r.firstname,
+        r.middlename,
+        r.lastname,
+        r.suffix,
         u.archived_at
     FROM residentinformationtbl r
     LEFT JOIN useraccountstbl u ON r.user_id = u.user_id
@@ -37,6 +35,15 @@ $result = $stmt->get_result();
 
 $data = [];
 while ($row = $result->fetch_assoc()) {
+    $row = pii_decrypt_resident_row($row) ?? $row;
+    $middleInitial = trim((string)($row['middlename'] ?? ''));
+    $row['full_name'] = trim(implode(' ', array_filter([
+        trim((string)($row['firstname'] ?? '')),
+        $middleInitial !== '' ? substr($middleInitial, 0, 1) . '.' : '',
+        trim((string)($row['lastname'] ?? '')),
+        trim((string)($row['suffix'] ?? '')),
+    ], static fn($part): bool => $part !== '')));
+    unset($row['firstname'], $row['middlename'], $row['lastname'], $row['suffix']);
     $row['archived_at'] = $row['archived_at']
         ? date('Y-m-d', strtotime($row['archived_at']))
         : null;

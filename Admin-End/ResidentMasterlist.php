@@ -935,6 +935,6 @@ if (isset($conn) && $conn instanceof mysqli) {
 </script>
 <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260321-2"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260804-1"></script>
 </body>
 </html>

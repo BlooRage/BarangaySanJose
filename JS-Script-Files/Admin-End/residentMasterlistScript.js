@@ -2208,7 +2208,7 @@ function hasFormChanges(form) {
   // ARCHIVE RESIDENT
   // ========================
   async function archiveEntry(row) {
-    if (!(await UniversalModal.confirm(`Archive Resident #${row.resident_id}? This can be restored later.`, { confirmLabel: "Archive", confirmClass: "btn btn-danger" }))) return;
+    if (!(await UniversalModal.confirm(`Archive Resident #${row.resident_id}? The linked user account will also be archived and can be restored later.`, { confirmLabel: "Archive", confirmClass: "btn btn-danger" }))) return;
 
     fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
       method: "POST",
@@ -2221,7 +2221,7 @@ function hasFormChanges(form) {
     .then(res => res.json())
     .then(data => {
       if (data.success) {
-        alert("Resident archived successfully.");
+        alert("Resident and linked user account archived successfully.");
         fetchResidents(searchInput.value.trim());
       } else {
         alert(data.message || "Failed to archive resident.");

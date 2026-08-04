@@ -5,6 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/caseUserAccountForeignKeys.php";
+require_once "../General/userAccountLocks.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 
@@ -26,6 +27,12 @@ $conn->begin_transaction();
 
 try {
     if ($action === 'restore') {
+        $archiveSupport = ual_ensure_archive_support($conn);
+        $accountStatuses = is_array($archiveSupport['status_ids'] ?? null)
+            ? $archiveSupport['status_ids']
+            : ual_load_status_ids($conn);
+        $activeAccountStatusId = (int)($accountStatuses['active'] ?? 0);
+        $archivedAccountStatusId = (int)($archiveSupport['archived_status_id'] ?? $accountStatuses['archived'] ?? 0);
         // Get VerifiedResident status id
         $statusId = null;
         $stmt = $conn->prepare("
@@ -68,27 +75,28 @@ try {
         $stmt->execute();
         $stmt->close();
 
-        // Clear archived_at if column exists
-        $colExists = 0;
-        $stmt = $conn->prepare("
-            SELECT COUNT(*)
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'useraccountstbl'
-              AND COLUMN_NAME = 'archived_at'
-        ");
-        $stmt->execute();
-        $stmt->bind_result($colExists);
-        $stmt->fetch();
-        $stmt->close();
-
-        if ($colExists && $userId) {
+        if ($userId) {
+            if ($activeAccountStatusId <= 0) {
+                throw new Exception('Active account status not found.');
+            }
             $stmt = $conn->prepare("
                 UPDATE useraccountstbl
-                SET archived_at = NULL
+                SET status_id_account = CASE
+                        WHEN status_id_account = ? THEN COALESCE(NULLIF(archived_prev_status_id, ?), ?)
+                        ELSE status_id_account
+                    END,
+                    archived_at = NULL,
+                    archived_prev_status_id = NULL,
+                    failed_logins = 0,
+                    lock_start = NULL,
+                    lock_until = NULL,
+                    lock_type = NULL,
+                    lock_reason = NULL,
+                    locked_by_user_id = NULL,
+                    updated_at = NOW()
                 WHERE user_id = ?
             ");
-            $stmt->bind_param("s", $userId);
+            $stmt->bind_param("iiis", $archivedAccountStatusId, $archivedAccountStatusId, $activeAccountStatusId, $userId);
             $stmt->execute();
             $stmt->close();
         }

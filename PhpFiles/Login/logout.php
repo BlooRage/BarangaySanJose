@@ -14,5 +14,6 @@ if (ini_get("session.use_cookies")) {
 
 session_destroy();
 
-redirectToLogin();
+$logoutReason = strtolower(trim((string)($_GET['reason'] ?? '')));
+redirectToLogin($logoutReason === 'expired' ? '?session=expired' : '');
 ?>

@@ -216,7 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function restoreResident(residentId) {
-    if (!(await UniversalModal.confirm("Restore this resident?", { confirmLabel: "Restore", confirmClass: "btn btn-success" }))) return;
+    if (!(await UniversalModal.confirm("Restore this resident and the linked user account?", { confirmLabel: "Restore", confirmClass: "btn btn-success" }))) return;
 
     fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
         method: "POST",

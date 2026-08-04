@@ -230,8 +230,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/archiveResidentScript.js?v=20260219-1"></script>
+<script src="../JS-Script-Files/Admin-End/archiveResidentScript.js?v=20260804-1"></script>
 </body>
 </html>
-
 
