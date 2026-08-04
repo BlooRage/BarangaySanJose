@@ -2376,6 +2376,25 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
             : 'Unemployed';
     }
     unset($registeredResident);
+    $residentAreaOrder = array_flip(array_keys($officialReportAreaOptions));
+    usort($res['registered_residents'], static function (array $left, array $right) use ($residentAreaOrder): int {
+        $leftArea = trim((string)($left['area'] ?? 'Unspecified'));
+        $rightArea = trim((string)($right['area'] ?? 'Unspecified'));
+        $leftAreaIndex = $residentAreaOrder[$leftArea] ?? PHP_INT_MAX;
+        $rightAreaIndex = $residentAreaOrder[$rightArea] ?? PHP_INT_MAX;
+        $areaCompare = $leftAreaIndex <=> $rightAreaIndex;
+        if ($areaCompare !== 0) {
+            return $areaCompare;
+        }
+        $fallbackAreaCompare = strnatcasecmp($leftArea, $rightArea);
+        if ($fallbackAreaCompare !== 0) {
+            return $fallbackAreaCompare;
+        }
+        return strcasecmp(
+            (string)($left['resident_name'] ?? ''),
+            (string)($right['resident_name'] ?? '')
+        );
+    });
 
     $res['household_kpi'] = rp_safe_query($conn, "
         SELECT COUNT(DISTINCT ri.resident_id) AS total
@@ -3338,6 +3357,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       white-space: nowrap;
     }
     .rp-col-hidden { display: none !important; }
+    .rp-subsection-label { margin-top: 20px; }
 
     /* Two-column layout for side-by-side tables */
     .rp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
@@ -4879,7 +4899,7 @@ elseif ($module === 'residents'):
       return;
     }
     ?>
-    <table class="rp-table" style="margin-top:18px;">
+    <table class="rp-table">
       <thead>
         <tr>
           <th class="text-center">No.</th>
@@ -5010,7 +5030,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <h3 style="margin:20px 0 0;">Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <div class="rp-section-label rp-subsection-label">Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
             <?php $renderResidentRoster($registeredResidentRows); ?>
           <?php endif; ?>
         </div>
@@ -5019,11 +5039,6 @@ elseif ($module === 'residents'):
         <?php if ($showReportSection('household')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('household')) ?></div>
-          <table class="rp-summary" style="margin-bottom:18px;">
-            <tbody>
-              <tr><td>Total Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
-            </tbody>
-          </table>
           <table class="rp-table">
             <thead>
               <tr>
@@ -5053,7 +5068,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <h3 style="margin:20px 0 0;">Heads of Family — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <div class="rp-section-label rp-subsection-label">Heads of Family — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
             <?php $renderResidentRoster($registeredHouseholdHeadRows); ?>
           <?php endif; ?>
         </div>
@@ -5187,7 +5202,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <h3 style="margin:20px 0 0;">Sector Members — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <div class="rp-section-label rp-subsection-label">Sector Members — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
             <?php $renderResidentRoster($registeredSectorMemberRows, true); ?>
           <?php endif; ?>
         </div>
@@ -5222,11 +5237,11 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-          <h3 style="margin:20px 0 0;">Employment List — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+          <div class="rp-section-label rp-subsection-label">Employment List — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
           <?php if ($registeredResidentRows === []): ?>
             <p class="rp-empty">No residents matched the selected filters.</p>
           <?php else: ?>
-          <table class="rp-table" style="margin-top:18px;">
+          <table class="rp-table">
             <thead>
               <tr>
                 <th class="text-center">No.</th>
