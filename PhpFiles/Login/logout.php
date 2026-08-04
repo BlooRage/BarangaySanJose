@@ -15,5 +15,9 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 $logoutReason = strtolower(trim((string)($_GET['reason'] ?? '')));
-redirectToLogin($logoutReason === 'expired' ? '?session=expired' : '');
+$accountLogoutReasons = ['archived', 'deactivated', 'deleted', 'locked'];
+if ($logoutReason === 'expired') {
+  redirectToLogin('?session=expired');
+}
+redirectToLogin(in_array($logoutReason, $accountLogoutReasons, true) ? '?account=' . $logoutReason : '');
 ?>

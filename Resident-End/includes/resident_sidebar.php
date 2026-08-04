@@ -785,7 +785,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   (() => {
     const IDLE_TIMEOUT_MS = <?= json_encode($residentIdleTimeoutMinutes * 60 * 1000) ?>;
     const TOUCH_THROTTLE_MS = 60 * 1000;
+    const STATUS_POLL_MS = 15 * 1000;
     const SESSION_TOUCH_URL = <?= json_encode(appUrl('/PhpFiles/Resident-End/session_touch.php'), JSON_UNESCAPED_SLASHES) ?>;
+    const SESSION_STATUS_URL = <?= json_encode(appUrl('/PhpFiles/Resident-End/session_status.php'), JSON_UNESCAPED_SLASHES) ?>;
     const LOGOUT_URL = <?= json_encode(appUrl('/logout?reason=expired'), JSON_UNESCAPED_SLASHES) ?>;
     const CSRF_TOKEN = <?= json_encode($residentIdleCsrfToken) ?>;
     const ACTIVITY_KEY = "barangay-resident-last-activity";
@@ -798,6 +800,18 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       if (expiring) return;
       expiring = true;
       window.location.replace(LOGOUT_URL);
+    };
+
+    const endRevokedSession = (message = "") => {
+      if (expiring) return;
+      expiring = true;
+      const normalized = String(message).toLowerCase();
+      let reason = "expired";
+      if (normalized.includes("archiv")) reason = "archived";
+      else if (normalized.includes("deactiv")) reason = "deactivated";
+      else if (normalized.includes("deleted") || normalized.includes("cannot be found")) reason = "deleted";
+      else if (normalized.includes("locked")) reason = "locked";
+      window.location.replace(`${LOGOUT_URL.split("?")[0]}?reason=${reason}`);
     };
 
     const scheduleExpiry = () => {
@@ -822,10 +836,28 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
           }
         });
         if (response.status === 401 || response.status === 403) {
-          expireSession();
+          const data = await response.json().catch(() => ({}));
+          endRevokedSession(data.message || "");
         }
       } catch (_) {
         // A temporary network failure must not turn into a forced logout.
+      }
+    };
+
+    const checkAccountStatus = async () => {
+      if (expiring || document.hidden) return;
+      try {
+        const response = await fetch(SESSION_STATUS_URL, {
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Accept": "application/json" }
+        });
+        if (response.status === 401 || response.status === 403) {
+          const data = await response.json().catch(() => ({}));
+          endRevokedSession(data.message || "");
+        }
+      } catch (_) {
+        // Retry at the next interval if connectivity is temporarily unavailable.
       }
     };
 
@@ -856,7 +888,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     });
 
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) scheduleExpiry();
+      if (!document.hidden) {
+        scheduleExpiry();
+        checkAccountStatus();
+      }
     });
 
     try {
@@ -867,6 +902,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       localStorage.setItem(ACTIVITY_KEY, String(lastActivityAt));
     } catch (_) {}
     scheduleExpiry();
+    window.setInterval(checkAccountStatus, STATUS_POLL_MS);
   })();
 </script>
 
