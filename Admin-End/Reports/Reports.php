@@ -1288,7 +1288,7 @@ function rp_report_customize_config(string $module): array {
                 'employment' => 'Employed and Unemployed',
                 'gender' => 'Gender',
                 'age' => 'Age Distribution',
-                'monthly' => 'List of Registered Residents',
+                'monthly' => 'Residents',
             ],
             'columns' => [
                 'identifier' => $sharedColumns['identifier'],
@@ -5327,7 +5327,7 @@ elseif ($module === 'residents'):
         </div>
         <?php endif; ?>
 
-        <?php if ($showReportSection('monthly') && !$isCompleteResidentReport): ?>
+        <?php if ($showReportSection('monthly')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('monthly')) ?></div>
           <?php if ($registeredResidentRows === []): ?>
