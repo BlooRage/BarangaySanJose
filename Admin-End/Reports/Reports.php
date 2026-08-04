@@ -4915,7 +4915,7 @@ elseif ($module === 'residents'):
   $residentAreaScopeLabel = $reportFilterAreas !== []
     ? implode(', ', $reportFilterAreas)
     : 'All Areas';
-  $renderResidentRoster = static function (array $rows, bool $showSector = false) use ($reportColumnClass): void {
+  $renderResidentRoster = static function (array $rows, bool $showSector = false) use ($reportColumnClass, $showReportColumn): void {
     if ($rows === []) {
       echo '<p class="rp-empty">No residents matched the selected filters.</p>';
       return;
@@ -4946,7 +4946,7 @@ elseif ($module === 'residents'):
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="<?= $showSector ? 5 : 4 ?>"><strong>TOTAL RESIDENTS</strong></td>
+          <td colspan="<?= ($showSector ? 4 : 3) + ($showReportColumn('address') ? 1 : 0) ?>"><strong>TOTAL RESIDENTS</strong></td>
           <td class="text-center"><strong><?= number_format(count($rows)) ?></strong></td>
         </tr>
       </tfoot>
@@ -5292,7 +5292,7 @@ elseif ($module === 'residents'):
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="6"><strong>TOTAL RESIDENTS</strong></td>
+                <td colspan="<?= $showReportColumn('address') ? 6 : 5 ?>"><strong>TOTAL RESIDENTS</strong></td>
                 <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
               </tr>
             </tfoot>
@@ -5397,7 +5397,7 @@ elseif ($module === 'residents'):
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="4"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
+                <td colspan="<?= $showReportColumn('address') ? 4 : 3 ?>"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
                 <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
               </tr>
             </tfoot>
