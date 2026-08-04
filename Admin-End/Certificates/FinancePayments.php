@@ -1864,7 +1864,7 @@ if ($financeSection === 'fees') {
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-32"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260729-resident-profile-fix"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260805-tracker-limit-fix"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
