@@ -4830,7 +4830,6 @@ elseif ($module === 'financial'):
 elseif ($module === 'residents'):
   $kpi   = $res['kpi'] ?? [];
   $total = (int)($kpi['total'] ?? 0);
-  $ver   = (int)($kpi['verified'] ?? 0);
   $residentSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
   $residentAreaRows = $res['by_area_complete'] ?? [];
   $residentAreaTotal = array_sum(array_column($residentAreaRows, 'total'));
@@ -4876,7 +4875,7 @@ elseif ($module === 'residents'):
     : 'All Areas';
   $renderResidentRoster = static function (array $rows, bool $showSector = false): void {
     if ($rows === []) {
-      echo '<p class="rp-empty">No verified residents matched the selected filters.</p>';
+      echo '<p class="rp-empty">No residents matched the selected filters.</p>';
       return;
     }
     ?>
@@ -4975,8 +4974,8 @@ elseif ($module === 'residents'):
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('summary')) ?></div>
           <table class="rp-summary">
             <tbody>
-              <tr><td>Total Verified Residents</td><td><?= number_format($total) ?></td></tr>
-              <tr><td>Total Verified Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
+              <tr><td>Total Residents</td><td><?= number_format($total) ?></td></tr>
+              <tr><td>Total Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
             </tbody>
           </table>
         </div>
@@ -5011,7 +5010,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <h3 style="margin:20px 0 0;">Verified Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
+            <h3 style="margin:20px 0 0;">Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
             <?php $renderResidentRoster($registeredResidentRows); ?>
           <?php endif; ?>
         </div>
@@ -5022,7 +5021,7 @@ elseif ($module === 'residents'):
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('household')) ?></div>
           <table class="rp-summary" style="margin-bottom:18px;">
             <tbody>
-              <tr><td>Total Verified Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
+              <tr><td>Total Households</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
             </tbody>
           </table>
           <table class="rp-table">
@@ -5072,7 +5071,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentAreaChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified residents by area.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of residents by area.</div>
             </div>
             <?php if ($residentHouseholdChartData !== []): ?>
             <div class="rp-chart-card">
@@ -5080,7 +5079,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentHouseholdChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified heads of family by area.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of heads of family by area.</div>
             </div>
             <?php endif; ?>
             <?php if ($residentSectorChartData !== []): ?>
@@ -5089,7 +5088,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentSectorChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified residents by sector membership.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of residents by sector membership.</div>
             </div>
             <?php endif; ?>
             <?php if ($residentEmploymentChartData !== []): ?>
@@ -5098,7 +5097,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentEmploymentChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified resident employment status.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of resident employment status.</div>
             </div>
             <?php endif; ?>
             <?php if ($residentGenderChartData !== []): ?>
@@ -5107,7 +5106,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentGenderChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified residents by gender.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of residents by gender.</div>
             </div>
             <?php endif; ?>
             <?php if ($residentAgeChartData !== []): ?>
@@ -5116,7 +5115,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentAgeChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified residents by age group.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of residents by age group.</div>
             </div>
             <?php endif; ?>
             <?php if ($residentMonthlyChartData !== []): ?>
@@ -5125,7 +5124,7 @@ elseif ($module === 'residents'):
               <div class="rp-chart-wrap">
                 <canvas id="residentMonthlyChart"></canvas>
               </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of monthly verified resident registrations.</div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of monthly resident registrations.</div>
             </div>
             <?php endif; ?>
           </div>
@@ -5161,7 +5160,7 @@ elseif ($module === 'residents'):
 
         <?php if ($showReportSection('sector')): ?>
         <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('sector')) ?> (Verified)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('sector')) ?></div>
           <table class="rp-table">
             <thead>
               <tr>
@@ -5196,7 +5195,7 @@ elseif ($module === 'residents'):
 
         <?php if ($showReportSection('employment')): ?>
         <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('employment')) ?> (Verified)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('employment')) ?></div>
           <table class="rp-table">
             <thead>
               <tr>
@@ -5225,7 +5224,7 @@ elseif ($module === 'residents'):
           <?php if (!$isCompleteResidentReport): ?>
           <h3 style="margin:20px 0 0;">Employment List — <?= htmlspecialchars($residentAreaScopeLabel) ?></h3>
           <?php if ($registeredResidentRows === []): ?>
-            <p class="rp-empty">No verified residents matched the selected filters.</p>
+            <p class="rp-empty">No residents matched the selected filters.</p>
           <?php else: ?>
           <table class="rp-table" style="margin-top:18px;">
             <thead>
@@ -5264,7 +5263,7 @@ elseif ($module === 'residents'):
 
         <?php if ($showReportSection('gender')): ?>
         <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('gender')) ?> (Verified)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('gender')) ?></div>
           <?php if ($residentGenderRows === []): ?>
             <p class="rp-empty">No data.</p>
           <?php else: ?>
@@ -5299,7 +5298,7 @@ elseif ($module === 'residents'):
 
         <?php if ($showReportSection('age')): ?>
         <div class="rp-section">
-          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('age')) ?> (Verified)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('age')) ?></div>
           <table class="rp-table">
             <thead>
               <tr>
@@ -5332,7 +5331,7 @@ elseif ($module === 'residents'):
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('monthly')) ?></div>
           <?php if ($registeredResidentRows === []): ?>
-            <p class="rp-empty">No verified registered residents matched the selected filters.</p>
+            <p class="rp-empty">No registered residents matched the selected filters.</p>
           <?php else: ?>
           <table class="rp-table">
             <thead>
