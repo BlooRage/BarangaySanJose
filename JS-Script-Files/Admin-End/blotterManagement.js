@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("blotterForm");
     const submitBtn = document.getElementById("blotterSubmit");
+    const submitError = document.getElementById("blotterSubmitError");
     const inputMethod = document.getElementById("narrativeInputMethod");
     const textWrapper = document.getElementById("narrativeTextWrapper");
     const fileWrapper = document.getElementById("narrativeFileWrapper");
@@ -64,6 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const successModal = successSubmitModalEl ? new bootstrap.Modal(successSubmitModalEl) : null;
     const signatureFullscreenModal = signatureFullscreenModalEl ? new bootstrap.Modal(signatureFullscreenModalEl) : null;
     let submitConfirmed = false;
+    let submitting = false;
 
     const setNarrativeMode = () => {
         const mode = inputMethod?.value || "";
@@ -259,6 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 hasStroke = true;
                 hiddenInput.value = canvas.toDataURL("image/png");
                 hiddenInput.setCustomValidity("");
+                hiddenInput.removeAttribute("data-server-error");
                 if (errorEl) errorEl.classList.add("d-none");
             };
             img.src = dataUrl;
@@ -304,6 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
             hasStroke = true;
             hiddenInput.value = canvas.toDataURL("image/png");
             hiddenInput.setCustomValidity("");
+            hiddenInput.removeAttribute("data-server-error");
             if (errorEl) errorEl.classList.add("d-none");
         };
 
@@ -481,6 +485,80 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
+    const fieldForServerError = (message) => {
+        const text = String(message || "").toLowerCase();
+        if (text.includes("blotter number")) return form.elements.namedItem("blotter_number");
+        if (text.includes("narrative file") || text.includes("upload")) return fileInput;
+        if (text.includes("narrative report")) return narrativeText;
+        if (text.includes("incident area")) return incidentAreaNumberInput;
+        if (text.includes("incident date")) return incidentDateInput;
+        if (text.includes("incident time")) return incidentTimeInput;
+        if (text.includes("incident") && text.includes("place")) return incidentPlaceInput;
+        if (text.includes("complaint type")) return blotterComplaintType;
+        if (text.includes("complainant") && text.includes("signature")) return complainantSignatureData;
+        if (text.includes("respondent") && text.includes("signature")) return respondentSignatureData;
+        return null;
+    };
+
+    const showServerError = (message) => {
+        const cleanMessage = String(message || "Unable to submit the blotter. Please review the highlighted field.").trim();
+        if (submitError) {
+            submitError.textContent = cleanMessage;
+            submitError.classList.remove("d-none");
+        }
+
+        const field = fieldForServerError(cleanMessage);
+        if (field) {
+            field.setCustomValidity(cleanMessage);
+            field.setAttribute("data-server-error", "true");
+            field.classList.add("is-invalid");
+            const signatureError = field === complainantSignatureData
+                ? complainantSignatureError
+                : field === respondentSignatureData
+                    ? respondentSignatureError
+                    : null;
+            const feedback = signatureError || ensureFeedbackEl(field);
+            if (feedback) feedback.textContent = cleanMessage;
+            signatureError?.classList.remove("d-none");
+            const visibleTarget = field.type === "hidden"
+                ? field.closest(".col-12")?.querySelector("canvas, input, select, textarea")
+                : field;
+            visibleTarget?.scrollIntoView({ behavior: "smooth", block: "center" });
+            visibleTarget?.focus?.({ preventScroll: true });
+        } else {
+            submitError?.scrollIntoView({ behavior: "smooth", block: "center" });
+            submitError?.focus({ preventScroll: true });
+        }
+    };
+
+    const submitBlotter = async () => {
+        if (submitting) return;
+        submitting = true;
+        submitBtn.disabled = true;
+        submitError?.classList.add("d-none");
+        try {
+            const response = await fetch(form.action, {
+                method: "POST",
+                body: new FormData(form),
+                credentials: "same-origin"
+            });
+            if (!response.ok) {
+                throw new Error((await response.text()).trim() || "Unable to submit the blotter.");
+            }
+            if (response.redirected || new URL(response.url).searchParams.get("success") === "1") {
+                window.location.assign(response.url);
+                return;
+            }
+            throw new Error("The server did not confirm the blotter submission.");
+        } catch (error) {
+            submitConfirmed = false;
+            showServerError(error?.message || error);
+        } finally {
+            submitting = false;
+            updateState();
+        }
+    };
+
     const setWrapperState = (wrapper, show) => {
         if (!wrapper) return;
         wrapper.classList.toggle("d-none", !show);
@@ -650,10 +728,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     form.querySelectorAll("input, select, textarea").forEach((el) => {
         el.addEventListener("input", () => {
+            if (el.hasAttribute("data-server-error")) {
+                el.removeAttribute("data-server-error");
+                el.setCustomValidity("");
+            }
+            submitError?.classList.add("d-none");
             touchedFields.add(el);
             renderValidity(el);
         });
         el.addEventListener("change", () => {
+            if (el.hasAttribute("data-server-error")) {
+                el.removeAttribute("data-server-error");
+                el.setCustomValidity("");
+            }
+            submitError?.classList.add("d-none");
             touchedFields.add(el);
             renderValidity(el);
         });
@@ -779,7 +867,10 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             e.stopPropagation();
             renderAllValidity();
+            return;
         }
+        e.preventDefault();
+        submitBlotter();
     });
 
     confirmSubmitBtn?.addEventListener("click", () => {

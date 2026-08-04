@@ -140,6 +140,7 @@ $defaultFiledTime = date('H:i');
 
             <form method="POST" action="../../PhpFiles/Admin-End/blotterManagement.php" id="blotterForm" class="page-form" enctype="multipart/form-data">
                 <?= csrfTokenField() ?>
+                <div class="alert alert-danger d-none" id="blotterSubmitError" role="alert" tabindex="-1"></div>
                 <h3 class="section-title mb-3 text-center">Blotter Information</h3>
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
@@ -606,6 +607,6 @@ $defaultFiledTime = date('H:i');
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-incident-area" defer></script>
+<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-preserve-errors" defer></script>
 </body>
 </html>
