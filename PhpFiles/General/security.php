@@ -511,7 +511,15 @@ function enforceCurrentSessionAccountStatus(bool $json = true): void
 
     $conn = $GLOBALS['conn'] ?? null;
     if (!($conn instanceof mysqli)) {
-        return;
+        // Some guards authenticate before their page includes connection.php.
+        // Load it here so account revocation can never be silently skipped.
+        require_once __DIR__ . '/connection.php';
+        if (isset($conn) && $conn instanceof mysqli) {
+            $GLOBALS['conn'] = $conn;
+        }
+    }
+    if (!($conn instanceof mysqli)) {
+        destroySessionAndExit($json, 503, 'Account status could not be verified. Please login again.');
     }
 
     static $cache = [];

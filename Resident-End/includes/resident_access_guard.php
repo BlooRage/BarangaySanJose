@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../PhpFiles/General/security.php";
+require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
@@ -7,8 +8,6 @@ header("Expires: 0");
 
 // Enforce auth + 30-min inactivity timeout for Resident pages.
 requireRoleSession(['Resident'], false);
-
-require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
 if (!function_exists('resident_guard_normalize_public_path')) {
     function resident_guard_normalize_public_path(string $path): string
