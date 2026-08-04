@@ -1024,7 +1024,7 @@ function rp_filter_modal_checked_values(array $selectedValues, array $availableO
 }
 
 function rp_default_visible_report_columns(array $availableColumns): array {
-    $disabledByDefault = ['percentage', 'revenue', 'breakdown_revenue'];
+    $disabledByDefault = ['percentage', 'revenue', 'breakdown_revenue', 'address'];
     $visibleColumns = array_values(array_filter(
         $availableColumns,
         static fn(string $column): bool => !in_array($column, $disabledByDefault, true)
@@ -1242,6 +1242,7 @@ function rp_report_customize_config(string $module): array {
                 'revenue' => $sharedColumns['revenue'],
                 'payment' => 'Payment Type',
                 'resident' => $sharedColumns['resident'],
+                'address' => 'Resident Address (Optional)',
                 'channel' => 'GCash / Walk-in',
             ],
             'column_groups' => [
@@ -1306,12 +1307,12 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'Area Resident Summary',
                     'sections' => ['breakdown'],
-                    'columns' => ['area', 'count', 'percentage'],
+                    'columns' => ['area', 'count', 'percentage', 'address'],
                 ],
                 [
                     'label' => 'Household Data',
                     'sections' => ['household'],
-                    'columns' => ['area', 'household', 'count', 'percentage'],
+                    'columns' => ['area', 'household', 'count', 'percentage', 'address'],
                 ],
                 [
                     'label' => 'Tables (Supporting the Graphs)',
@@ -1321,12 +1322,12 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'Sector Membership',
                     'sections' => ['sector'],
-                    'columns' => ['sector', 'count', 'percentage'],
+                    'columns' => ['sector', 'count', 'percentage', 'address'],
                 ],
                 [
                     'label' => 'Employed and Unemployed',
                     'sections' => ['employment'],
-                    'columns' => ['type', 'count', 'percentage'],
+                    'columns' => ['type', 'count', 'percentage', 'address'],
                 ],
                 [
                     'label' => 'Gender',
@@ -1341,7 +1342,7 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'List of Registered Residents',
                     'sections' => ['monthly'],
-                    'columns' => ['count', 'resident', 'type', 'area'],
+                    'columns' => ['count', 'resident', 'type', 'area', 'address'],
                 ],
             ],
         ],
@@ -2353,6 +2354,11 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
           ri.occupation,
           ri.occupation_detail,
           ri.sector_membership,
+          " . ($residentAddressJoin !== '' ? "ra.unit_number" : "NULL") . " AS unit_number,
+          " . ($residentAddressJoin !== '' ? "ra.street_number" : "NULL") . " AS street_number,
+          " . ($residentAddressJoin !== '' ? "ra.street_name" : "NULL") . " AS street_name,
+          " . ($residentAddressJoin !== '' ? "ra.phase_number" : "NULL") . " AS phase_number,
+          " . ($residentAddressJoin !== '' ? "ra.subdivision" : "NULL") . " AS subdivision,
           " . ($residentAreaExpr !== 'NULL' ? "COALESCE({$residentAreaExpr}, 'Unspecified')" : "'Unspecified'") . " AS area
         FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
@@ -2371,6 +2377,17 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         $registeredResident['resident_name'] = implode(' ', $nameParts);
         $registeredResident['area'] = pii_decrypt_string((string)($registeredResident['area'] ?? 'Unspecified'));
         $registeredResident['occupation_detail'] = pii_decrypt_string((string)($registeredResident['occupation_detail'] ?? ''));
+        $addressParts = [];
+        foreach (['unit_number', 'street_number', 'street_name', 'phase_number', 'subdivision'] as $addressField) {
+            $addressPart = trim(pii_decrypt_string((string)($registeredResident[$addressField] ?? '')));
+            if ($addressPart !== '') {
+                $addressParts[] = $addressPart;
+            }
+        }
+        if (($registeredResident['area'] ?? '') !== '' && ($registeredResident['area'] ?? '') !== 'Unspecified') {
+            $addressParts[] = (string)$registeredResident['area'];
+        }
+        $registeredResident['address'] = $addressParts !== [] ? implode(', ', $addressParts) : '—';
         $registeredResident['employment_status'] = (int)($registeredResident['occupation'] ?? 0) === 1
             ? 'Employed'
             : 'Unemployed';
@@ -4898,7 +4915,7 @@ elseif ($module === 'residents'):
   $residentAreaScopeLabel = $reportFilterAreas !== []
     ? implode(', ', $reportFilterAreas)
     : 'All Areas';
-  $renderResidentRoster = static function (array $rows, bool $showSector = false): void {
+  $renderResidentRoster = static function (array $rows, bool $showSector = false) use ($reportColumnClass): void {
     if ($rows === []) {
       echo '<p class="rp-empty">No residents matched the selected filters.</p>';
       return;
@@ -4912,6 +4929,7 @@ elseif ($module === 'residents'):
           <th>Gender</th>
           <th>Area</th>
           <?php if ($showSector): ?><th>Sector Membership</th><?php endif; ?>
+          <th class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>">Address</th>
         </tr>
       </thead>
       <tbody>
@@ -4922,12 +4940,13 @@ elseif ($module === 'residents'):
           <td><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
           <td><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
           <?php if ($showSector): ?><td><?= htmlspecialchars((string)($row['sector_membership'] ?? '')) ?></td><?php endif; ?>
+          <td class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>"><?= htmlspecialchars((string)($row['address'] ?? '—')) ?></td>
         </tr>
         <?php endforeach; ?>
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="<?= $showSector ? 4 : 3 ?>"><strong>TOTAL RESIDENTS</strong></td>
+          <td colspan="<?= $showSector ? 5 : 4 ?>"><strong>TOTAL RESIDENTS</strong></td>
           <td class="text-center"><strong><?= number_format(count($rows)) ?></strong></td>
         </tr>
       </tfoot>
@@ -5253,6 +5272,7 @@ elseif ($module === 'residents'):
                 <th>Resident Name</th>
                 <th>Gender</th>
                 <th>Area</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>">Address</th>
                 <th>Employment Status</th>
                 <th>Occupation</th>
               </tr>
@@ -5264,6 +5284,7 @@ elseif ($module === 'residents'):
                 <td><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
                 <td><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
                 <td><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>"><?= htmlspecialchars((string)($row['address'] ?? '—')) ?></td>
                 <td><?= htmlspecialchars((string)($row['employment_status'] ?? 'Unemployed')) ?></td>
                 <td><?= htmlspecialchars(trim((string)($row['occupation_detail'] ?? '')) ?: '—') ?></td>
               </tr>
@@ -5271,7 +5292,7 @@ elseif ($module === 'residents'):
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="5"><strong>TOTAL RESIDENTS</strong></td>
+                <td colspan="6"><strong>TOTAL RESIDENTS</strong></td>
                 <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
               </tr>
             </tfoot>
@@ -5360,6 +5381,7 @@ elseif ($module === 'residents'):
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident Name</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Gender</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>">Address</th>
               </tr>
             </thead>
             <tbody>
@@ -5369,12 +5391,13 @@ elseif ($module === 'residents'):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('address'))) ?>"><?= htmlspecialchars((string)($row['address'] ?? '—')) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="3"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
+                <td colspan="4"><strong>TOTAL REGISTERED RESIDENTS</strong></td>
                 <td class="text-center"><strong><?= number_format(count($registeredResidentRows)) ?></strong></td>
               </tr>
             </tfoot>
