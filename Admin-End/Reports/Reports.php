@@ -1341,7 +1341,7 @@ function rp_report_customize_config(string $module): array {
                 [
                     'label' => 'List of Registered Residents',
                     'sections' => ['monthly'],
-                    'columns' => ['identifier', 'resident', 'area', 'date'],
+                    'columns' => ['identifier', 'resident', 'type', 'area', 'sector'],
                 ],
             ],
         ],
@@ -2169,6 +2169,10 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         : '';
     $residentAreaExpr = $residentAddressJoin !== '' ? "NULLIF(TRIM(ra.area_number), '')" : 'NULL';
     $residentSectorExpr = "NULLIF(TRIM(ri.sector_membership), '')";
+    $residentRegistrationJoin = rp_table_exists($conn, 'useraccountstbl')
+        ? 'LEFT JOIN useraccountstbl rua ON rua.user_id = ri.user_id'
+        : '';
+    $residentRegistrationDateExpr = $residentRegistrationJoin !== '' ? 'rua.account_created' : 'NULL';
     $residentVerifiedWhere = "s.status_name = 'VerifiedResident'";
     $residentFilterClauses = [];
     if ($reportFilterAreas !== [] && $residentAreaExpr !== 'NULL') {
@@ -2326,11 +2330,12 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
     ];
 
     $res['monthly_reg'] = rp_safe_query($conn, "
-        SELECT DATE_FORMAT(ri.created_at,'%Y-%m') AS month, COUNT(*) AS total
+        SELECT DATE_FORMAT({$residentRegistrationDateExpr},'%Y-%m') AS month, COUNT(*) AS total
         FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
+        " . ($residentRegistrationJoin !== '' ? "\n        {$residentRegistrationJoin}" : '') . "
         " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
-        WHERE ri.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        WHERE {$residentRegistrationDateExpr} >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
           AND {$residentVerifiedWhere}
         {$residentFilterSql}
         GROUP BY month ORDER BY month ASC
@@ -2343,8 +2348,9 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
           ri.middlename,
           ri.lastname,
           ri.suffix,
-          " . ($residentAreaExpr !== 'NULL' ? "COALESCE({$residentAreaExpr}, 'Unspecified')" : "'Unspecified'") . " AS area,
-          ri.created_at
+          ri.sex,
+          ri.sector_membership,
+          " . ($residentAreaExpr !== 'NULL' ? "COALESCE({$residentAreaExpr}, 'Unspecified')" : "'Unspecified'") . " AS area
         FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
         " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
@@ -5223,8 +5229,9 @@ elseif ($module === 'residents'):
               <tr>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Resident ID</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident Name</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Gender</th>
                 <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th>
-                <th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Registration Date</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector Membership</th>
               </tr>
             </thead>
             <tbody>
@@ -5232,8 +5239,9 @@ elseif ($module === 'residents'):
               <tr>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars((string)($row['resident_id'] ?? '')) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars((string)($row['resident_name'] ?? '')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(ucfirst((string)($row['sex'] ?? 'Unspecified'))) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(rp_date_label((string)($row['created_at'] ?? ''))) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)($row['sector_membership'] ?? 'None')) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
@@ -5241,8 +5249,9 @@ elseif ($module === 'residents'):
               <tr>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong>TOTAL</strong></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= number_format(count($registeredResidentRows)) ?> residents</td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"></td>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"></td>
               </tr>
             </tfoot>
           </table>
