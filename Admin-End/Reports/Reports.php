@@ -4851,6 +4851,11 @@ elseif ($module === 'residents'):
   $kpi   = $res['kpi'] ?? [];
   $total = (int)($kpi['total'] ?? 0);
   $residentSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
+  $residentRosterSectionLabel = static function (string $afterSection, string $label) use ($visibleReportSections): string {
+    $sectionIndex = array_search($afterSection, $visibleReportSections, true);
+    $ordinal = $sectionIndex === false ? count($visibleReportSections) + 1 : (int)$sectionIndex + 2;
+    return rp_roman_numeral($ordinal) . '. ' . $label;
+  };
   $residentAreaRows = $res['by_area_complete'] ?? [];
   $residentAreaTotal = array_sum(array_column($residentAreaRows, 'total'));
   $residentSectorRows = $res['by_sector_rows'] ?? [];
@@ -5030,7 +5035,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <div class="rp-section-label rp-subsection-label">Residents — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
+            <div class="rp-section-label rp-subsection-label"><?= htmlspecialchars($residentRosterSectionLabel('breakdown', 'Residents — ' . $residentAreaScopeLabel)) ?></div>
             <?php $renderResidentRoster($registeredResidentRows); ?>
           <?php endif; ?>
         </div>
@@ -5068,7 +5073,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <div class="rp-section-label rp-subsection-label">Heads of Family — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
+            <div class="rp-section-label rp-subsection-label"><?= htmlspecialchars($residentRosterSectionLabel('household', 'Heads of Family — ' . $residentAreaScopeLabel)) ?></div>
             <?php $renderResidentRoster($registeredHouseholdHeadRows); ?>
           <?php endif; ?>
         </div>
@@ -5202,7 +5207,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-            <div class="rp-section-label rp-subsection-label">Sector Members — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
+            <div class="rp-section-label rp-subsection-label"><?= htmlspecialchars($residentRosterSectionLabel('sector', 'Sector Members — ' . $residentAreaScopeLabel)) ?></div>
             <?php $renderResidentRoster($registeredSectorMemberRows, true); ?>
           <?php endif; ?>
         </div>
@@ -5237,7 +5242,7 @@ elseif ($module === 'residents'):
             </tfoot>
           </table>
           <?php if (!$isCompleteResidentReport): ?>
-          <div class="rp-section-label rp-subsection-label">Employment List — <?= htmlspecialchars($residentAreaScopeLabel) ?></div>
+          <div class="rp-section-label rp-subsection-label"><?= htmlspecialchars($residentRosterSectionLabel('employment', 'Employment List — ' . $residentAreaScopeLabel)) ?></div>
           <?php if ($registeredResidentRows === []): ?>
             <p class="rp-empty">No residents matched the selected filters.</p>
           <?php else: ?>
