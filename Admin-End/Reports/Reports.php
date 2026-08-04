@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../../PhpFiles/General/piiCrypto.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
+require_once __DIR__ . '/../../PhpFiles/General/complaintTypeDetails.php';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function rp_table_exists(mysqli $conn, string $t): bool {
@@ -1402,8 +1403,8 @@ function rp_report_customize_config(string $module): array {
                 'origin' => 'Origin',
                 'kind' => 'Subject Kind',
                 'area' => 'Complaints by Area',
-                'sector' => 'Complaints by Sector Membership',
                 'trend' => 'Monthly Trend',
+                'records' => 'Complaint Records',
             ],
             'columns' => [
                 'date' => $sharedColumns['date'],
@@ -1438,14 +1439,14 @@ function rp_report_customize_config(string $module): array {
                     'columns' => ['area', 'count', 'percentage'],
                 ],
                 [
-                    'label' => 'Complaints by Sector Membership',
-                    'sections' => ['sector'],
-                    'columns' => ['sector', 'count', 'percentage'],
-                ],
-                [
                     'label' => 'Monthly Trend',
                     'sections' => ['trend'],
                     'columns' => ['date', 'count', 'result', 'percentage'],
+                ],
+                [
+                    'label' => 'Complaint Records',
+                    'sections' => ['records'],
+                    'columns' => [],
                 ],
             ],
         ],
@@ -2878,19 +2879,6 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
         ");
     }
 
-    if ($complaintSectorExpr !== 'NULL') {
-        $complaintSectorRows = rp_safe_query($conn, "
-            SELECT {$complaintSectorExpr} AS sector_membership
-            FROM complaintstbl ct
-            {$complaintCaseJoin}
-            {$complaintResidentJoin}
-            WHERE {$complaintWhere}
-              AND {$complaintSectorExpr} IS NOT NULL
-              AND {$complaintSectorExpr} <> ''
-        ");
-        $comp['by_sector'] = rp_sector_rollup_rows($complaintSectorRows);
-    }
-
     $comp['trend'] = rp_safe_query($conn, "
         SELECT DATE_FORMAT(ct.created_at,'%Y-%m') AS month, COUNT(*) AS total,
           SUM(CASE WHEN escalated_to_blotter=1 THEN 1 ELSE 0 END) AS escalated
@@ -2900,6 +2888,43 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
         WHERE ct.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] && $hasCaseTable ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $complaintAreaExpr !== 'NULL' ? " AND {$complaintAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $complaintSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $complaintSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
+
+    if ($hasCaseTable) {
+        $comp['records'] = rp_safe_query($conn, "
+            SELECT
+              COALESCE(NULLIF(TRIM(ct.subject_display_name), ''), 'Not specified') AS complainee_name,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cp.firstname, cp.middlename, cp.lastname, cp.suffix)), ''), 'Not specified') AS complainant_name,
+              COALESCE(NULLIF(TRIM(c.incident_place), ''), 'Not specified') AS incident_address,
+              c.case_details,
+              {$complaintTypeExpr} AS case_name,
+              COALESCE(NULLIF(TRIM(l.status_name), ''), 'Complaint Only') AS complaint_level,
+              COALESCE(NULLIF(TRIM(s.status_name), ''), 'Received') AS complaint_status
+            FROM complaintstbl ct
+            INNER JOIN casereportstbl c ON c.case_id = ct.case_id AND c.report_type = 'Complaint'
+            LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+            LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+            LEFT JOIN (
+              SELECT
+                case_id,
+                MAX(firstname) AS firstname,
+                MAX(middlename) AS middlename,
+                MAX(lastname) AS lastname,
+                MAX(suffix) AS suffix
+              FROM caseparticipantstbl
+              WHERE participant_role = 'Complainant'
+              GROUP BY case_id
+            ) cp ON cp.case_id = c.case_id
+            " . ($complaintResidentJoin !== '' ? "\n            {$complaintResidentJoin}" : '') . "
+            WHERE {$complaintWhere}
+            ORDER BY ct.created_at DESC
+        ");
+        $comp['records'] = array_map(static function (array $row): array {
+            $details = complaintTypeParseCaseDetails((string)($row['case_details'] ?? ''));
+            $row['area_number'] = trim((string)($details['incident_area_number'] ?? ''));
+            unset($row['case_details']);
+            return $row;
+        }, $comp['records']);
+    }
 }
 
 // ── Module labels ─────────────────────────────────────────────────────────────
@@ -4047,7 +4072,6 @@ $complaintTypeChartData = [];
 $complaintOriginChartData = [];
 $complaintKindChartData = [];
 $complaintAreaChartData = [];
-$complaintSectorChartData = [];
 $complaintTrendChartData = [];
 if ($issuanceModuleConfig !== null):
   $issuanceSummary = $issuanceReport['summary'] ?? [];
@@ -6012,9 +6036,6 @@ elseif ($module === 'complaints'):
   $complaintAreaChartData = array_values(array_filter($comp['by_area'] ?? [], static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
-  $complaintSectorChartData = array_values(array_filter($comp['by_sector'] ?? [], static function (array $row): bool {
-    return (int)($row['total'] ?? 0) > 0;
-  }));
   $complaintTrendChartData = array_values(array_filter(array_map(static function (array $row): array {
     $monthValue = (string)($row['month'] ?? '');
     return [
@@ -6029,7 +6050,6 @@ elseif ($module === 'complaints'):
     || $complaintOriginChartData !== []
     || $complaintKindChartData !== []
     || $complaintAreaChartData !== []
-    || $complaintSectorChartData !== []
     || $complaintTrendChartData !== []
   );
 ?>
@@ -6051,7 +6071,7 @@ elseif ($module === 'complaints'):
         <?php if ($showReportSection('charts')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('charts')) ?></div>
-          <?php if ($complaintTypeChartData === [] && $complaintOriginChartData === [] && $complaintKindChartData === [] && $complaintAreaChartData === [] && $complaintSectorChartData === [] && $complaintTrendChartData === []): ?>
+          <?php if ($complaintTypeChartData === [] && $complaintOriginChartData === [] && $complaintKindChartData === [] && $complaintAreaChartData === [] && $complaintTrendChartData === []): ?>
             <p class="rp-empty">No chart data is available for the selected filters.</p>
           <?php else: ?>
           <div class="rp-chart-grid">
@@ -6089,15 +6109,6 @@ elseif ($module === 'complaints'):
                 <canvas id="complaintAreaChart"></canvas>
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by area.</div>
-            </div>
-            <?php endif; ?>
-            <?php if ($complaintSectorChartData !== []): ?>
-            <div class="rp-chart-card">
-              <div class="rp-subsection-title">Complaints by Sector Membership</div>
-              <div class="rp-chart-wrap">
-                <canvas id="complaintSectorChart"></canvas>
-              </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by sector membership.</div>
             </div>
             <?php endif; ?>
             <?php if ($complaintTrendChartData !== []): ?>
@@ -6186,8 +6197,8 @@ elseif ($module === 'complaints'):
         </div>
         <?php endif; ?>
 
-        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
-        <div class="rp-two-col" style="margin-top:22px;">
+        <?php if ($showReportSection('area')): ?>
+        <div style="margin-top:22px;">
           <?php if ($showReportSection('area')): ?>
           <div>
             <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('area')) ?></div>
@@ -6206,28 +6217,6 @@ elseif ($module === 'complaints'):
                 <?php endforeach; ?>
               </tbody>
               <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($complaintAreaTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
-            </table>
-            <?php endif; ?>
-          </div>
-          <?php endif; ?>
-          <?php if ($showReportSection('sector')): ?>
-          <div>
-            <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('sector')) ?></div>
-            <?php if (empty($comp['by_sector'])): ?>
-              <p class="rp-empty">No sector-linked complaint data.</p>
-            <?php else: $complaintSectorTotal = array_sum(array_column($comp['by_sector'], 'total')); ?>
-            <table class="rp-table">
-              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
-              <tbody>
-                <?php foreach ($comp['by_sector'] as $r): ?>
-                <tr>
-                  <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)$r['sector']) ?></td>
-                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $complaintSectorTotal) ?></td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($complaintSectorTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
@@ -6258,6 +6247,44 @@ elseif ($module === 'complaints'):
             </tbody>
             <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($tTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format($tEsc) ?></td><td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct($tEsc,$tTotal) ?></td></tr></tfoot>
           </table>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('records')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('records')) ?></div>
+          <?php if (empty($comp['records'])): ?>
+            <p class="rp-empty">No complaint records found for the selected filters.</p>
+          <?php else: ?>
+          <div style="overflow-x:auto;">
+            <table class="rp-table">
+              <thead>
+                <tr>
+                  <th>Complainee Name</th>
+                  <th>Complainant Name</th>
+                  <th>Incident Address</th>
+                  <th>Area Number</th>
+                  <th>Case</th>
+                  <th>Complaint Level</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($comp['records'] as $record): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string)($record['complainee_name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['complainant_name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['incident_address'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars(rp_area_number_only($record['area_number'] ?? '')) ?: 'Not specified' ?></td>
+                  <td><?= htmlspecialchars((string)($record['case_name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['complaint_level'] ?? 'Complaint Only')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['complaint_status'] ?? 'Received')) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
           <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -7100,14 +7127,6 @@ window.__rpChartHelpers = (() => {
       values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       title: 'Complaints by Area',
       datasetLabel: 'Complaints Filed',
-    },
-    {
-      canvasId: 'complaintSectorChart',
-      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['sector'] ?? ''), $complaintSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'Complaints by Sector Membership',
-      datasetLabel: 'Complaints Filed',
-      maxLabelChars: 22,
     },
     {
       canvasId: 'complaintTrendChart',
