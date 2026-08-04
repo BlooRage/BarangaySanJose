@@ -285,13 +285,14 @@
           transition: transform 0.15s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
         }
         .resident-date-calendar-day:hover:not(:disabled) {
-          background: #fff7ed;
-          border-color: #fdba74;
-          color: #9a3412;
+          background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+          border-color: #ea580c;
+          color: #fff;
           transform: translateY(-1px);
-          box-shadow: 0 8px 18px rgba(234, 88, 12, 0.10);
+          box-shadow: 0 10px 20px rgba(234, 88, 12, 0.18);
         }
-        .resident-date-calendar-day.is-selected {
+        .resident-date-calendar-day.is-selected,
+        .resident-date-calendar-day.is-selected:hover:not(:disabled) {
           background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
           border-color: #ea580c;
           color: #fff;

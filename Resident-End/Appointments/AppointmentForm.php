@@ -452,7 +452,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
+    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260804-appointment-calendar-states"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
@@ -527,6 +527,27 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     .map((value) => value.trim())
                     .filter((value) => value !== "")
             );
+
+            const syncOfficialCalendarAvailability = () => {
+                if (!appointmentDateInput) return;
+
+                const unavailableWeekdays = new Set(disabledWeekdays);
+                const officialUserId = String(appointmentCouncilMemberInput?.value || "").trim();
+                const officialSchedule = officialScheduleMap[officialUserId] || null;
+
+                if (officialSchedule) {
+                    for (let weekday = 0; weekday <= 6; weekday += 1) {
+                        const dayEntry = officialSchedule[String(weekday)] || officialSchedule[weekday] || null;
+                        if (!dayEntry || dayEntry.enabled !== true) {
+                            unavailableWeekdays.add(String(weekday));
+                        }
+                    }
+                }
+
+                appointmentDateInput.dataset.dateDisabledWeekdays = Array.from(unavailableWeekdays)
+                    .sort((left, right) => Number(left) - Number(right))
+                    .join(",");
+            };
 
             const parseIsoDate = (value) => {
                 const text = String(value || "").trim();
@@ -842,6 +863,7 @@ $bookedSlotMap = apos_fetch_booked_slots_map(
                     submitBtn.disabled = true;
                     return;
                 }
+                syncOfficialCalendarAvailability();
                 syncAppointmentAvailability();
                 validateSubjectOther();
                 validateAppointmentDate();
