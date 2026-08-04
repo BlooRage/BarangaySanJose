@@ -1353,8 +1353,8 @@ function rp_report_customize_config(string $module): array {
                 'type' => 'Blotter Case Summary',
                 'status' => 'Blotter Level Breakdown',
                 'area' => 'Cases by Area',
-                'sector' => 'Cases by Sector Membership',
                 'trend' => 'Monthly Trend',
+                'records' => 'Blotter Records',
             ],
             'columns' => [
                 'date' => $sharedColumns['date'],
@@ -1383,14 +1383,14 @@ function rp_report_customize_config(string $module): array {
                     'columns' => ['area', 'count', 'percentage'],
                 ],
                 [
-                    'label' => 'Cases by Sector Membership',
-                    'sections' => ['sector'],
-                    'columns' => ['sector', 'count', 'percentage'],
-                ],
-                [
                     'label' => 'Monthly Trend',
                     'sections' => ['trend'],
                     'columns' => ['date', 'count'],
+                ],
+                [
+                    'label' => 'Blotter Records',
+                    'sections' => ['records'],
+                    'columns' => [],
                 ],
             ],
         ],
@@ -2706,19 +2706,6 @@ if (
         ");
     }
 
-    if ($caseSectorExpr !== 'NULL') {
-        $blotterSectorRows = rp_safe_query($conn, "
-            SELECT {$caseSectorExpr} AS sector_membership
-            FROM casereportstbl c
-            {$blotterJoin}
-            {$caseJoin}
-            WHERE {$blotterWhere}
-              AND {$caseSectorExpr} IS NOT NULL
-              AND {$caseSectorExpr} <> ''
-        ");
-        $blot['by_sector'] = rp_sector_rollup_rows($blotterSectorRows);
-    }
-
     $blot['trend'] = rp_safe_query($conn, "
         SELECT DATE_FORMAT({$caseDateExpr},'%Y-%m') AS month, COUNT(*) AS total
         FROM casereportstbl c
@@ -2726,6 +2713,31 @@ if (
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
         WHERE {$caseDateExpr} >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $caseSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
+    ");
+
+    $blot['records'] = rp_safe_query($conn, "
+        SELECT
+          b.blotter_id,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cp.firstname, cp.middlename, cp.lastname, cp.suffix)), ''), 'Not specified') AS name,
+          {$complaintTypeExpr} AS case_name,
+          COALESCE(NULLIF(TRIM(l.status_name), ''), 'Not specified') AS blotter_level
+        FROM casereportstbl c
+        {$blotterJoin}
+        JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        LEFT JOIN (
+          SELECT
+            case_id,
+            MAX(firstname) AS firstname,
+            MAX(middlename) AS middlename,
+            MAX(lastname) AS lastname,
+            MAX(suffix) AS suffix
+          FROM caseparticipantstbl
+          WHERE participant_role = 'Complainant'
+          GROUP BY case_id
+        ) cp ON cp.case_id = c.case_id
+        " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
+        WHERE {$blotterWhere}
+        ORDER BY {$caseDateExpr} DESC, b.blotter_id DESC
     ");
 }
 
@@ -4016,7 +4028,6 @@ $appointmentTrendChartData = [];
 $blotterTypeChartData = [];
 $blotterStatusChartData = [];
 $blotterAreaChartData = [];
-$blotterSectorChartData = [];
 $blotterTrendChartData = [];
 $complaintTypeChartData = [];
 $complaintOriginChartData = [];
@@ -5739,9 +5750,6 @@ elseif ($module === 'blotter'):
   $blotterAreaChartData = array_values(array_filter($blot['by_area'] ?? [], static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
-  $blotterSectorChartData = array_values(array_filter($blot['by_sector'] ?? [], static function (array $row): bool {
-    return (int)($row['total'] ?? 0) > 0;
-  }));
   $blotterTrendChartData = array_values(array_filter(array_map(static function (array $row): array {
     $monthValue = (string)($row['month'] ?? '');
     return [
@@ -5755,7 +5763,6 @@ elseif ($module === 'blotter'):
     $blotterTypeChartData !== []
     || $blotterStatusChartData !== []
     || $blotterAreaChartData !== []
-    || $blotterSectorChartData !== []
     || $blotterTrendChartData !== []
   );
 ?>
@@ -5775,7 +5782,7 @@ elseif ($module === 'blotter'):
         <?php if ($showReportSection('charts')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('charts')) ?></div>
-          <?php if ($blotterTypeChartData === [] && $blotterStatusChartData === [] && $blotterAreaChartData === [] && $blotterSectorChartData === [] && $blotterTrendChartData === []): ?>
+          <?php if ($blotterTypeChartData === [] && $blotterStatusChartData === [] && $blotterAreaChartData === [] && $blotterTrendChartData === []): ?>
             <p class="rp-empty">No chart data is available for the selected filters.</p>
           <?php else: ?>
           <div class="rp-chart-grid">
@@ -5804,15 +5811,6 @@ elseif ($module === 'blotter'):
                 <canvas id="blotterAreaChart"></canvas>
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter cases by area.</div>
-            </div>
-            <?php endif; ?>
-            <?php if ($blotterSectorChartData !== []): ?>
-            <div class="rp-chart-card">
-              <div class="rp-subsection-title">Cases by Sector Membership</div>
-              <div class="rp-chart-wrap">
-                <canvas id="blotterSectorChart"></canvas>
-              </div>
-              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter cases by sector membership.</div>
             </div>
             <?php endif; ?>
             <?php if ($blotterTrendChartData !== []): ?>
@@ -5893,8 +5891,8 @@ elseif ($module === 'blotter'):
         </div>
         <?php endif; ?>
 
-        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
-        <div class="rp-two-col" style="margin-top:22px;">
+        <?php if ($showReportSection('area')): ?>
+        <div style="margin-top:22px;">
           <?php if ($showReportSection('area')): ?>
           <div>
             <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('area')) ?></div>
@@ -5913,28 +5911,6 @@ elseif ($module === 'blotter'):
                 <?php endforeach; ?>
               </tbody>
               <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($blotterAreaTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
-            </table>
-            <?php endif; ?>
-          </div>
-          <?php endif; ?>
-          <?php if ($showReportSection('sector')): ?>
-          <div>
-            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('sector')) ?></div>
-            <?php if (empty($blot['by_sector'])): ?>
-              <p class="rp-empty">No sector-linked case data.</p>
-            <?php else: $blotterSectorTotal = array_sum(array_column($blot['by_sector'], 'total')); ?>
-            <table class="rp-table">
-              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
-              <tbody>
-                <?php foreach ($blot['by_sector'] as $r): ?>
-                <tr>
-                  <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)$r['sector']) ?></td>
-                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $blotterSectorTotal) ?></td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($blotterSectorTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
@@ -5960,6 +5936,38 @@ elseif ($module === 'blotter'):
             </tbody>
             <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($tTotal) ?></td></tr></tfoot>
           </table>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('records')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label">VIII. Blotter Records</div>
+          <?php if (empty($blot['records'])): ?>
+            <p class="rp-empty">No blotter records found for the selected filters.</p>
+          <?php else: ?>
+          <div style="overflow-x:auto;">
+            <table class="rp-table">
+              <thead>
+                <tr>
+                  <th>Blotter ID</th>
+                  <th>Name</th>
+                  <th>Case</th>
+                  <th>Blotter Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($blot['records'] as $record): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string)($record['blotter_id'] ?? '')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['case_name'] ?? 'Not specified')) ?></td>
+                  <td><?= htmlspecialchars((string)($record['blotter_level'] ?? 'Not specified')) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
           <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -7010,14 +7018,6 @@ window.__rpChartHelpers = (() => {
       values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       title: 'Cases by Area',
       datasetLabel: 'Cases Filed',
-    },
-    {
-      canvasId: 'blotterSectorChart',
-      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['sector'] ?? ''), $blotterSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'Cases by Sector Membership',
-      datasetLabel: 'Cases Filed',
-      maxLabelChars: 22,
     },
     {
       canvasId: 'blotterTrendChart',

@@ -841,18 +841,19 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
             ...pendingCaseAction
           })
         });
-        const targetCaseId = currentViewCaseId;
+        const finishCaseUpdate = async () => {
+          currentViewCaseId = null;
+          currentDetail = null;
+          await loadList();
+          alert('Case updated successfully.');
+        };
         if (caseActionConfirmModalEl && caseActionConfirmModal) {
           caseActionConfirmModalEl.addEventListener('hidden.bs.modal', async () => {
-            alert('Case updated successfully.');
-            await loadList();
-            if (targetCaseId) openViewModal(targetCaseId);
+            await finishCaseUpdate();
           }, { once: true });
           caseActionConfirmModal.hide();
         } else {
-          alert('Case updated successfully.');
-          await loadList();
-          if (targetCaseId) openViewModal(targetCaseId);
+          await finishCaseUpdate();
         }
       } catch (err) {
         alert(String(err?.message || err || 'Failed to update case.'));
