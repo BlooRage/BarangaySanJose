@@ -8247,7 +8247,9 @@ if ($action === 'list') {
     $listContext = strtolower(trim((string)($_GET['list_context'] ?? '')));
     $isFinanceList = ($listContext === 'finance');
     $liteList = ((string)($_GET['lite'] ?? '0') === '1');
-    $limit = max(1, min(500, (int)($_GET['limit'] ?? 250)));
+    $limitParam = strtolower(trim((string)($_GET['limit'] ?? '250')));
+    $loadAllRows = in_array($limitParam, ['all', '0', 'unlimited'], true);
+    $limit = $loadAllRows ? null : max(1, min(500, (int)$limitParam));
 
     $stageCol = dr_column_exists($conn, 'documentrequesttbl', 'stage') ? 'stage' : null;
     $stage = trim((string)($_GET['stage'] ?? ''));
@@ -8374,7 +8376,10 @@ if ($action === 'list') {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
     $orderCol = dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') ? 'submitted_at' : 'request_timestamp';
-    $sql .= ' ORDER BY d.' . $orderCol . ' DESC, d.request_id DESC LIMIT ' . $limit;
+    $sql .= ' ORDER BY d.' . $orderCol . ' DESC, d.request_id DESC';
+    if ($limit !== null) {
+        $sql .= ' LIMIT ' . $limit;
+    }
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {

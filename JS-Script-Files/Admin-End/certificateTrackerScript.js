@@ -6293,12 +6293,12 @@
       params.set('lite', '1');
       if (isFinancePaymentsPage) {
         params.set('list_context', 'finance');
-        params.set('limit', '250');
+        params.set('limit', 'all');
       } else {
         // The endpoint returns all issuance modules together and document-type
-        // filtering happens below on the client. Fetch the supported maximum so
-        // newer ID/clearance rows cannot crowd certificates out of the result.
-        params.set('limit', '250');
+        // filtering happens below on the client. Request the complete result so
+        // newer rows from another module cannot crowd valid records out.
+        params.set('limit', 'all');
       }
       const data = await fetchJson(`${endpoint}?${params.toString()}`);
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');

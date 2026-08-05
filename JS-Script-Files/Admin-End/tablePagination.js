@@ -3,11 +3,24 @@
 
     function initTable(table) {
         if (table.dataset.paginationReady === "true") return;
-        table.dataset.paginationReady = "true";
+        if (table.dataset.tablePagination === "off") return;
 
         const shell = table.closest(".compact-admin-table-shell");
         const tbody = table.tBodies[0];
         if (!shell || !tbody) return;
+
+        // Trackers such as blotter/complaints paginate on the server and already
+        // render their own footer. Never place a second client paginator there.
+        const region = shell.parentElement;
+        const hasExplicitOptIn = table.hasAttribute("data-table-pagination");
+        const hasExistingFooter = region && (
+            region.querySelector(".resident-table-footer")
+            || region.querySelector(".table-pagination-controls")
+            || region.querySelector("ul.pagination[id]")
+        );
+        if (!hasExplicitOptIn && hasExistingFooter) return;
+
+        table.dataset.paginationReady = "true";
 
         let currentPage = 1;
         let perPage = 20;
@@ -40,25 +53,46 @@
             });
 
             pagination.innerHTML = "";
-            [
-                { label: "<", page: currentPage - 1, disabled: currentPage === 1 },
-                { label: String(currentPage), page: currentPage, active: true },
-                { label: ">", page: currentPage + 1, disabled: currentPage === totalPages }
-            ].forEach(function (item) {
+            const items = [{ label: "Prev", page: currentPage - 1, disabled: currentPage === 1 }];
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            startPage = Math.max(1, endPage - 4);
+
+            if (startPage > 1) {
+                items.push({ label: "1", page: 1, active: currentPage === 1 });
+                if (startPage > 2) items.push({ label: "…", disabled: true, ellipsis: true });
+            }
+            for (let page = startPage; page <= endPage; page += 1) {
+                items.push({ label: String(page), page: page, active: page === currentPage });
+            }
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) items.push({ label: "…", disabled: true, ellipsis: true });
+                items.push({ label: String(totalPages), page: totalPages, active: currentPage === totalPages });
+            }
+            items.push({ label: "Next", page: currentPage + 1, disabled: currentPage === totalPages });
+
+            items.forEach(function (item) {
                 const li = document.createElement("li");
                 li.className = "page-item" + (item.active ? " active" : "") + (item.disabled ? " disabled" : "");
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "page-link";
-                button.textContent = item.label;
-                button.disabled = Boolean(item.disabled);
-                button.setAttribute("aria-label", item.label === "<" ? "Previous page" : item.label === ">" ? "Next page" : "Current page");
-                button.addEventListener("click", function () {
-                    if (item.disabled || item.active) return;
-                    currentPage = item.page;
-                    render();
-                });
-                li.appendChild(button);
+                if (item.ellipsis) {
+                    const span = document.createElement("span");
+                    span.className = "page-link";
+                    span.textContent = item.label;
+                    li.appendChild(span);
+                } else {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "page-link";
+                    button.textContent = item.label;
+                    button.disabled = Boolean(item.disabled);
+                    button.setAttribute("aria-label", item.label === "Prev" ? "Previous page" : item.label === "Next" ? "Next page" : `Page ${item.label}`);
+                    button.addEventListener("click", function () {
+                        if (item.disabled || item.active) return;
+                        currentPage = item.page;
+                        render();
+                    });
+                    li.appendChild(button);
+                }
                 pagination.appendChild(li);
             });
 
@@ -84,7 +118,13 @@
     }
 
     function init() {
-        document.querySelectorAll("table[data-table-pagination]").forEach(initTable);
+        document.querySelectorAll("#main-display .table-responsive > table.table, main .table-responsive > table.table").forEach(function (table) {
+            if (table.closest(".modal, .rp-page, .rp-report, [data-admin-table-style='off']")) return;
+            table.classList.add("compact-admin-table");
+            const wrapper = table.parentElement;
+            if (wrapper) wrapper.classList.add("compact-admin-table-shell");
+        });
+        document.querySelectorAll("#main-display table.compact-admin-table, main table.compact-admin-table, table[data-table-pagination]").forEach(initTable);
     }
 
     if (document.readyState === "loading") {

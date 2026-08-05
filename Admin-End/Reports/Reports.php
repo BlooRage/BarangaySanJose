@@ -6450,7 +6450,8 @@ window.__rpChartHelpers = (() => {
       canvasId: 'issuanceTypeTotalsChart',
       labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['request_type_label'] ?? ''), $issuanceTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $issuanceTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'Total Requests by Document Type'
+      title: 'Total Requests by Document Type',
+      horizontal: true
     },
     {
       canvasId: 'issuanceStatusTotalsChart',
@@ -6498,8 +6499,15 @@ window.__rpChartHelpers = (() => {
     }
 
     const colors = colorsFor(source.labels.length);
+    const isHorizontalBar = chartType !== 'pie' && source.horizontal === true;
+    if (isHorizontalBar) {
+      const chartWrap = canvas.closest('.rp-chart-wrap');
+      if (chartWrap) {
+        chartWrap.style.minHeight = `${Math.max(300, source.labels.length * 54)}px`;
+      }
+    }
     const chartLabels = chartType === 'bar'
-      ? source.labels.map((label) => wrapLabel(label))
+      ? source.labels.map((label) => wrapLabel(label, isHorizontalBar ? 32 : 18))
       : source.labels;
     const config = chartType === 'pie'
       ? {
@@ -6538,9 +6546,28 @@ window.__rpChartHelpers = (() => {
             }]
           },
           options: {
+            indexAxis: isHorizontalBar ? 'y' : 'x',
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
+            scales: isHorizontalBar ? {
+              x: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0,
+                },
+              },
+              y: {
+                ticks: {
+                  autoSkip: false,
+                  font: {
+                    size: 10,
+                  },
+                },
+                grid: {
+                  display: false,
+                },
+              },
+            } : {
               x: {
                 ticks: {
                   autoSkip: false,
