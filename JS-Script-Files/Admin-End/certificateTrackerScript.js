@@ -4891,7 +4891,7 @@
       const handleHidden = () => {
         regenerateIssuedConfirmBtn.removeEventListener('click', handleConfirm);
         regenerateIssuedConfirmModalEl.removeEventListener('hidden.bs.modal', handleHidden);
-        if (viewerWasOpen && paymentProofModal) {
+        if (viewerWasOpen && paymentProofModal && !confirmed) {
           paymentProofModal.show();
         }
         paymentProofConfirmationHandoff = false;
@@ -4921,8 +4921,18 @@
       returnTarget: paymentProofModalState.returnTarget,
       options: { ...(paymentProofModalState.options || {}) }
     } : null;
-    paymentProofRegenerateBtn.disabled = true;
-    paymentProofRegenerateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regenerating...';
+    if (paymentProofTitle) paymentProofTitle.textContent = 'Regenerating Document';
+    if (paymentProofWrap) {
+      paymentProofWrap.innerHTML = `
+        <div class="doc-viewer-loading" role="status" aria-live="polite">
+          <div class="doc-viewer-loading__inner">
+            <div class="doc-viewer-loading__spinner" aria-hidden="true"></div>
+            <div class="doc-viewer-loading__label">Applying the latest signature and document settings...</div>
+          </div>
+        </div>`;
+    }
+    [paymentProofReturnBtn,paymentProofOpenNew,paymentProofCloseBtn,paymentProofPrintBtn,paymentProofReleaseBtn,paymentProofRegenerateBtn].forEach(control=>control?.classList.add('d-none'));
+    paymentProofModal?.show();
     try {
       const body = new FormData();
       body.append('action', 'regenerate_issued_document');
@@ -4931,14 +4941,14 @@
       cachedAllItems = null;
       await load({ force: true });
       if (modalState) {
+        const regeneratedUrl = String(data?.issued_file_path || modalState.docUrl || '').trim();
+        openDocumentModal(regeneratedUrl, modalState.title, modalState.returnTarget, modalState.options);
+      }
+    } catch (error) {
+      if (modalState) {
         openDocumentModal(modalState.docUrl, modalState.title, modalState.returnTarget, modalState.options);
       }
-      alert(data?.message || 'Issued document regenerated successfully.');
-    } catch (error) {
       alert(error?.message || 'Unable to regenerate the issued document.');
-    } finally {
-      paymentProofRegenerateBtn.disabled = false;
-      paymentProofRegenerateBtn.innerHTML = '<i class="fas fa-rotate me-1"></i>Regenerate Document';
     }
   });
 
