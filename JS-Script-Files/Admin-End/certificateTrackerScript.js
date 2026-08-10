@@ -1470,22 +1470,36 @@
   }
 
   function actionButtons(row) {
-    const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view-id="${esc(row.request_id)}">View</button>`;
+    const requestId = esc(row.request_id);
+    const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view-id="${requestId}">View</button>`;
+    const dropdown = items => `
+      <div class="dropdown tracker-action-dropdown">
+        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+          Actions
+        </button>
+        <div class="dropdown-menu dropdown-menu-end shadow-sm">
+          ${items.join('')}
+        </div>
+      </div>`;
+    const viewItem = `<button class="dropdown-item" type="button" data-view-id="${requestId}"><i class="fas fa-eye me-2 text-secondary"></i>View</button>`;
     const stageKey = resolveWorkflowStage(row);
     const issuedLabel = normalizePreviewDocKey(row?.document_type || '') === 'barangayid'
       ? 'View ID'
       : 'View Document';
     const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && canOpenIssuedDocument(row))
-      ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">${issuedLabel}</button>`
+      ? `<button class="dropdown-item" type="button" data-issued-id="${requestId}"><i class="fas fa-file-lines me-2 text-success"></i>${issuedLabel}</button>`
       : '';
     if (isFinancePaymentsPage) {
       const financeKey = statusBucket(row);
       if (financeKey === 'pending_verification') {
-        return `${viewBtn}<button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify Payment</button>`;
+        return dropdown([
+          viewItem,
+          `<button class="dropdown-item" type="button" data-inline-action="finance_verify_gcash" data-id="${requestId}"><i class="fas fa-circle-check me-2 text-success"></i>Verify Payment</button>`
+        ]);
       }
       return viewBtn;
     }
-    const buttons = `${viewBtn}${viewIssuedBtn}`;
+    const buttons = viewIssuedBtn ? dropdown([viewItem, viewIssuedBtn]) : viewBtn;
     return isIdIssuanceTrackerView
       ? `<div class="id-issuance-table-actions">${buttons}</div>`
       : buttons;
