@@ -23,6 +23,36 @@
     return modalInstances[id] || null;
   }
 
+  function waitForModalEvent(element, eventName) {
+    return new Promise((resolve) => {
+      if (!element) {
+        resolve();
+        return;
+      }
+      element.addEventListener(eventName, resolve, { once: true });
+    });
+  }
+
+  async function hideOpenModals(exceptElement = null) {
+    const openModals = Array.from(document.querySelectorAll('.modal.show'))
+      .filter((element) => element !== exceptElement);
+
+    await Promise.all(openModals.map(async (element) => {
+      const hidden = waitForModalEvent(element, 'hidden.bs.modal');
+      bootstrap.Modal.getOrCreateInstance(element).hide();
+      await hidden;
+    }));
+
+    return openModals;
+  }
+
+  async function restoreModal(element) {
+    if (!element?.isConnected || element.classList.contains('show')) return;
+    const shown = waitForModalEvent(element, 'shown.bs.modal');
+    bootstrap.Modal.getOrCreateInstance(element).show();
+    await shown;
+  }
+
   const secureConfirmModalEl = document.getElementById('modalSecureConfirmation');
   const secureConfirmActionTextEl = document.getElementById('secureConfirmActionText');
   const secureConfirmAlertEl = document.getElementById('secureConfirmAlert');
@@ -211,9 +241,10 @@
       throw new Error('Secure confirmation modal could not be opened.');
     }
 
+    const displacedModals = await hideOpenModals(secureConfirmModalEl);
     resetSecureConfirmationModal(actionLabel);
 
-    return new Promise((resolve) => {
+    const confirmation = await new Promise((resolve) => {
       let finished = false;
       let challengeKey = '';
       let currentStep = 'password';
@@ -394,6 +425,14 @@
       modal.show();
       secureConfirmPasswordEl?.focus();
     });
+
+    // Return the previous workflow only after secure confirmation is fully
+    // closed, keeping Bootstrap to one visible modal and backdrop at a time.
+    if (displacedModals.length > 0) {
+      await restoreModal(displacedModals[0]);
+    }
+
+    return confirmation;
   }
 
   const pageTool = document.body?.dataset.otTool || 'current_term';

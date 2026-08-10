@@ -741,6 +741,21 @@
     `;
   };
 
+  const protectedApprovalActionsHtml = (row) => {
+    if (String(row.profile_approval_state || "") !== "PendingApproval") return "";
+    const id = escapeHtml(safe(row.official_id));
+    return `
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-success officials-action-btn" data-action="approve_profile" data-official-id="${id}">
+          <i class="fas fa-check me-1"></i>Approve
+        </button>
+        <button class="btn btn-sm btn-outline-danger officials-action-btn" data-action="reject_profile" data-official-id="${id}">
+          <i class="fas fa-times me-1"></i>Reject
+        </button>
+      </div>
+    `;
+  };
+
   const actionButtonHtml = (row) => {
     const profileButton = supportsProfileManagement
       ? `<button type="button" class="btn btn-sm btn-outline-primary officials-action-btn" data-action="view_profile" data-official-id="${escapeHtml(safe(row.official_id))}">${row.can_edit_access ? "View / Edit" : "View"}</button>`
@@ -752,7 +767,8 @@
       }
 
       if (!row.can_edit_access) {
-        return `<div class="d-flex flex-wrap gap-2">${profileButton}</div>`;
+        const approvalActions = protectedApprovalActionsHtml(row);
+        return `<div class="d-flex flex-wrap gap-2">${profileButton}${approvalActions}</div>`;
       }
 
       return `<div class="d-flex flex-wrap gap-2 align-items-center">${profileButton}${managementDropdownHtml(row)}</div>`;
@@ -763,6 +779,8 @@
     }
 
     if (!row.can_edit_access) {
+      const approvalActions = protectedApprovalActionsHtml(row);
+      if (approvalActions) return approvalActions;
       return `<span class="text-muted small">${escapeHtml(String(row.edit_access_disabled_reason || "Protected account"))}</span>`;
     }
 

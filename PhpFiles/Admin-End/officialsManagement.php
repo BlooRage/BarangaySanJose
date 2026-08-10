@@ -597,7 +597,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $targetDisplayRole = rowDisplayRole((string)($targetAccount['account_role_access'] ?? $targetAccount['info_role_access'] ?? $targetAccount['role_access'] ?? ''));
         $oldPermissionMap = amp_get_effective_permission_keys_for_row($conn, $targetAccount);
         $oldPermissionSummary = officialsPermissionSummary($oldPermissionMap);
-        ensureActorCanModifyTarget($actorUserId, $actorProtectedCode, $targetAccount);
+        $isProfileApprovalAction = in_array($action, ['approve_profile', 'reject_profile'], true);
+        if (!$isProfileApprovalAction) {
+            ensureActorCanModifyTarget($actorUserId, $actorProtectedCode, $targetAccount);
+        }
         $superadminManageReason = superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
         if ($superadminManageReason !== '') {
             throw new Exception($superadminManageReason);
