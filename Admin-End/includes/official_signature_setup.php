@@ -81,8 +81,11 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-permission-list li{display:flex;gap:.55rem;align-items:flex-start;padding:.65rem .75rem;border:1px solid #e8edf3;border-radius:12px;background:#f8fafc;color:#475162}
   .osig-permission-list i{margin-top:.15rem;color:#d97a1d}
   .osig-permission-switch{display:flex;gap:.8rem;align-items:center;padding:.8rem .9rem;border:1px solid #f2d4ad;border-radius:14px;background:#fffaf3}
-  .osig-permission-switch .form-check-input{width:2.6rem;height:1.35rem;margin:0;cursor:pointer}
-  .osig-permission-switch .form-check-input:checked{background-color:#de710c;border-color:#de710c}
+  .osig-permission-toggle{position:relative;flex:0 0 auto;width:3rem;height:1.55rem;border:0;border-radius:999px;background:#d7dde5;appearance:none;-webkit-appearance:none;cursor:pointer;transition:background .15s ease,box-shadow .15s ease}
+  .osig-permission-toggle::before{content:"";position:absolute;left:.18rem;top:.18rem;width:1.18rem;height:1.18rem;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(15,23,42,.22);transition:transform .15s ease}
+  .osig-permission-toggle:checked{background:#de710c}
+  .osig-permission-toggle:checked::before{transform:translateX(1.45rem)}
+  .osig-permission-toggle:focus{outline:0;box-shadow:0 0 0 .2rem rgba(222,113,12,.18)}
   .osig-reminder-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto .9rem;border-radius:16px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.35rem}
   .osig-reminder-title{font-family:'Geist',Arial,sans-serif;color:#172132;font-size:1.25rem;font-weight:800;letter-spacing:0}
   .osig-reminder-note{padding:.75rem .9rem;border-radius:10px;background:#fff4e8;color:#8a4a0d;font-size:.88rem}
@@ -193,8 +196,8 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title fw-bold mb-0"><i class="fas fa-shield-alt me-2 text-warning"></i>Signature Permission</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title fw-bold mb-0">Signature Permission</h5>
+        <button type="button" class="btn-close" id="osigPermissionClose" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div id="osigPermissionAlert" class="alert alert-danger d-none"></div>
@@ -206,12 +209,12 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
           <li><i class="fas fa-file-alt"></i><span>Official reports, endorsements, attestations, and other barangay documents that require the Punong Barangay signature</span></li>
         </ul>
         <label class="osig-permission-switch" for="osigPermissionAgree">
-          <input class="form-check-input" type="checkbox" role="switch" id="osigPermissionAgree">
+          <input class="osig-permission-toggle" type="checkbox" role="switch" id="osigPermissionAgree">
           <span class="fw-semibold">I agree to these signature permission terms and authorize the use of my official signature for issued documents.</span>
         </label>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary me-auto" data-bs-dismiss="modal">Back</button>
+        <button type="button" class="btn btn-outline-secondary me-auto" id="osigPermissionBack">Back</button>
         <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigPermissionConfirm" disabled><i class="fas fa-check me-1"></i>Agree and Save</button>
       </div>
     </div>
@@ -274,6 +277,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const permissionModal = permissionModalEl ? bootstrap.Modal.getOrCreateInstance(permissionModalEl) : null;
   const syncPermissionConfirm = () => { if(permissionConfirm)permissionConfirm.disabled=!permissionAgree?.checked||!hasInk; };
   const syncSaveButton = () => { if(saveButton)saveButton.disabled=!hasInk; syncPermissionConfirm(); };
+  const showPermissionModal = () => {
+    if(!permissionModal)return;
+    if(permissionAgree)permissionAgree.checked=false;
+    permissionAlert?.classList.add('d-none');
+    syncPermissionConfirm();
+    const openPermission = () => permissionModal.show();
+    if(modalEl.classList.contains('show')){
+      modalEl.addEventListener('hidden.bs.modal',openPermission,{once:true});
+      setupModal.hide();
+    }else{
+      openPermission();
+    }
+  };
+  const returnFromPermissionModal = () => {
+    if(!permissionModal)return;
+    permissionModalEl.addEventListener('hidden.bs.modal',()=>setupModal.show(),{once:true});
+    permissionModal.hide();
+  };
   const applyPreviewPlacement = () => {
     preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`;
   };
@@ -420,9 +441,11 @@ document.addEventListener('DOMContentLoaded', () => {
       syncPermissionConfirm();
     }
   };
-  saveButton?.addEventListener('click',()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');syncSaveButton();return;} if(permissionAgree)permissionAgree.checked=false; permissionAlert?.classList.add('d-none'); syncPermissionConfirm(); permissionModal?.show(); });
+  saveButton?.addEventListener('click',()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');syncSaveButton();return;} showPermissionModal(); });
   permissionAgree?.addEventListener('change',syncPermissionConfirm);
   permissionConfirm?.addEventListener('click',saveOfficialSignature);
+  document.getElementById('osigPermissionBack')?.addEventListener('click',returnFromPermissionModal);
+  document.getElementById('osigPermissionClose')?.addEventListener('click',returnFromPermissionModal);
   document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
   document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body}).catch(()=>{});});
   const reminderEl = document.getElementById('officialSignatureReminderModal');
