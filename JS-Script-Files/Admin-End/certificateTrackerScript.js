@@ -572,28 +572,6 @@
   const regenerateIssuedConfirmModal = regenerateIssuedConfirmModalEl ? new bootstrap.Modal(regenerateIssuedConfirmModalEl) : null;
   const regenerateIssuedConfirmBtn = document.getElementById('regenerateIssuedConfirmBtn');
 
-  // Bootstrap assigns every modal/backdrop the same z-index. This confirmation is
-  // intentionally opened over the document viewer, so give its backdrop and
-  // dialog their own layer and restore the viewer's scroll/focus state afterward.
-  regenerateIssuedConfirmModalEl?.addEventListener('show.bs.modal', () => {
-    regenerateIssuedConfirmModalEl.style.zIndex = '1070';
-    window.setTimeout(() => {
-      const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
-      const confirmationBackdrop = backdrops[backdrops.length - 1];
-      if (confirmationBackdrop) {
-        confirmationBackdrop.style.zIndex = '1065';
-        confirmationBackdrop.dataset.regenerateIssuedBackdrop = '1';
-      }
-    }, 0);
-  });
-  regenerateIssuedConfirmModalEl?.addEventListener('hidden.bs.modal', () => {
-    regenerateIssuedConfirmModalEl.style.removeProperty('z-index');
-    document.querySelectorAll('[data-regenerate-issued-backdrop="1"]').forEach((backdrop) => backdrop.remove());
-    if (paymentProofModalEl?.classList.contains('show')) {
-      document.body.classList.add('modal-open');
-      paymentProofModalEl.focus({ preventScroll: true });
-    }
-  });
   const idPrintProcessModalEl = document.getElementById('idPrintProcessModal');
   const idPrintProcessModal = idPrintProcessModalEl ? new bootstrap.Modal(idPrintProcessModalEl) : null;
   const idPrintProcessPreview = document.getElementById('idPrintProcessPreview');
@@ -644,6 +622,7 @@
   let paymentProofPrintUrl = '';
   let paymentProofReleaseRequestId = '';
   let paymentProofModalState = null;
+  let paymentProofConfirmationHandoff = false;
   let idPrintProcessPhase = 'front';
   let idPrintProcessPendingOpen = false;
   let idPrintProcessContext = null;
@@ -4898,26 +4877,36 @@
     }
     return new Promise((resolve) => {
       let settled = false;
+      let confirmed = false;
+      const viewerWasOpen = Boolean(paymentProofModalEl?.classList.contains('show'));
       const finish = (confirmed) => {
         if (settled) return;
         settled = true;
         resolve(confirmed);
       };
       const handleConfirm = () => {
-        finish(true);
+        confirmed = true;
         regenerateIssuedConfirmModal.hide();
       };
       const handleHidden = () => {
         regenerateIssuedConfirmBtn.removeEventListener('click', handleConfirm);
         regenerateIssuedConfirmModalEl.removeEventListener('hidden.bs.modal', handleHidden);
-        if (paymentProofModalEl?.classList.contains('show')) {
-          document.body.classList.add('modal-open');
+        if (viewerWasOpen && paymentProofModal) {
+          paymentProofModal.show();
         }
-        finish(false);
+        paymentProofConfirmationHandoff = false;
+        finish(confirmed);
       };
       regenerateIssuedConfirmBtn.addEventListener('click', handleConfirm, { once: true });
       regenerateIssuedConfirmModalEl.addEventListener('hidden.bs.modal', handleHidden, { once: true });
-      regenerateIssuedConfirmModal.show();
+      const showConfirmation = () => regenerateIssuedConfirmModal.show();
+      if (viewerWasOpen && paymentProofModal) {
+        paymentProofConfirmationHandoff = true;
+        runAfterModalHidden(paymentProofModalEl, showConfirmation);
+        paymentProofModal.hide();
+      } else {
+        showConfirmation();
+      }
     });
   }
 
@@ -5328,6 +5317,7 @@
   });
 
   paymentProofModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (paymentProofConfirmationHandoff) return;
     const queuedAction = pendingPaymentProofAction ? { ...pendingPaymentProofAction } : null;
     const queuedReturnState = queuedAction && paymentProofModalState ? {
       docUrl: paymentProofModalState.docUrl,

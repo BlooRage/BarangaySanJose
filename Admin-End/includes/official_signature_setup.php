@@ -240,7 +240,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
     </div>
     <div class="osig-draw-footer">
       <button type="button" class="btn btn-outline-secondary me-auto" id="osigDrawReturn"><i class="fas fa-arrow-left me-1"></i>Return</button>
-      <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigDrawSave"><i class="fas fa-arrow-right me-1"></i>Continue to Authorization</button>
+      <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigDrawSave"><i class="fas fa-check me-1"></i>Use This Signature</button>
     </div>
   </div>
 </div>
@@ -373,9 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(largeHasInk)ctx.drawImage(largeCanvas,0,0,canvas.width,canvas.height);
     hasInk=largeHasInk;
     if(hasInk)refresh();else clear();
-    drawModal?.classList.remove('is-open');
-    document.body.style.overflow='';
-    showPermissionModal();
+    returnToSetupModal();
   };
   largeCanvas?.addEventListener('pointerdown',e=>{e.preventDefault();largeCanvas.setPointerCapture(e.pointerId);largeHistory.push(largeSnapshot());largeRedo=[];updateHistoryButtons();largeDrawing=true;const p=largePoint(e);largeCtx.beginPath();largeCtx.moveTo(p.x,p.y);});
   largeCanvas?.addEventListener('pointermove',e=>{if(!largeDrawing)return;e.preventDefault();const p=largePoint(e);largeCtx.lineWidth=Number(largeWidth.value);largeCtx.strokeStyle=largeColor.value;largeCtx.lineCap='round';largeCtx.lineJoin='round';largeCtx.lineTo(p.x,p.y);largeCtx.stroke();largeHasInk=true;});
