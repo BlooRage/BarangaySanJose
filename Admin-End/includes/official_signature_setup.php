@@ -21,6 +21,27 @@ $osigShowCard = !empty($officialSignatureShowCard);
 $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty($_SESSION['official_signature_skipped']);
 ?>
 <?php if ($osigIsChairman): ?>
+<style>
+  #officialSignatureModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
+  #officialSignatureModal .modal-dialog{width:calc(100% - 2rem);max-width:900px}
+  #officialSignatureModal .modal-header{align-items:flex-start;padding:1.35rem 1.5rem;background:linear-gradient(135deg,#fff8ee,#fff);border-bottom:1px solid #f3dcc3}
+  .osig-kicker{display:flex;align-items:center;gap:.45rem;color:#b85e08;font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .osig-title{font-family:'Charis SIL Bold',serif;color:#263142;font-size:1.55rem}
+  .osig-status{display:inline-flex;align-items:center;gap:.4rem;margin-top:.65rem;padding:.35rem .7rem;border-radius:999px;background:#fff0d9;color:#a65306;font-size:.76rem;font-weight:800;border:1px solid #f4cf9d}
+  .osig-status-dot{width:.5rem;height:.5rem;border-radius:50%;background:#e7760a}
+  .osig-intro{display:flex;gap:.85rem;padding:1rem;border:1px solid #f2d4ad;border-radius:16px;background:#fffaf3;color:#5c4936}
+  .osig-intro-icon{display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:13px;background:#ffe2bc;color:#c5670d;font-size:1.05rem}
+  #osigTabs{gap:.5rem;padding:.35rem;background:#f4f6f8;border-radius:14px}
+  #osigTabs .nav-link{border-radius:10px;color:#5f6877;font-weight:700;padding:.65rem 1rem}
+  #osigTabs .nav-link.active{background:#fff;color:#c2630b;box-shadow:0 3px 12px rgba(15,23,42,.09)}
+  .osig-workspace{border:1px solid #e2e7ed!important;border-radius:18px!important;background:#f8fafc!important}
+  #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
+  .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
+  #officialSignatureModal .modal-footer{padding:1rem 1.5rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
+  .osig-save-btn{background:#de710c!important;border-color:#de710c!important;font-weight:700}
+  .osig-save-btn:hover{background:#c86208!important;border-color:#c86208!important}
+  @media(max-width:575.98px){#officialSignatureModal .modal-header,#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.3rem}#osigCanvas{height:145px!important}}
+</style>
 <?php if ($osigShowCard): ?>
 <div class="card shadow-sm mb-4 profile-card">
   <div class="card-header d-flex justify-content-between align-items-center"><span>Official Signature</span></div>
@@ -46,17 +67,27 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <div><h5 class="modal-title mb-1">Create Your Official Signature</h5><div class="small text-muted">This signature becomes active immediately for supported official documents.</div></div>
+        <div>
+          <div class="osig-kicker"><i class="fas fa-pen-nib"></i> Official account setup</div>
+          <h5 class="modal-title osig-title mt-1 mb-1">Set Up Your Official Signature</h5>
+          <div class="small text-muted">Complete this setup to sign supported certificates, clearances, and Barangay IDs.</div>
+          <div class="osig-status"><span class="osig-status-dot"></span> Setup incomplete</div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
+        <div class="osig-intro mb-3">
+          <div class="osig-intro-icon"><i class="fas fa-file-signature"></i></div>
+          <div><div class="fw-bold">Required for digital document signing</div><div class="small">Your account remains accessible if you skip, but documents cannot use your official signature until setup is completed.</div></div>
+        </div>
         <ul class="nav nav-pills mb-3" id="osigTabs">
-          <li class="nav-item"><button type="button" class="nav-link active" data-osig-mode="draw">Draw</button></li>
-          <li class="nav-item"><button type="button" class="nav-link" data-osig-mode="upload">Upload</button></li>
-          <li class="nav-item"><button type="button" class="nav-link" data-osig-mode="type">Type</button></li>
+          <li class="nav-item flex-fill"><button type="button" class="nav-link active w-100" data-osig-mode="draw"><i class="fas fa-pen me-1"></i> Draw</button></li>
+          <li class="nav-item flex-fill"><button type="button" class="nav-link w-100" data-osig-mode="upload"><i class="fas fa-upload me-1"></i> Upload</button></li>
+          <li class="nav-item flex-fill"><button type="button" class="nav-link w-100" data-osig-mode="type"><i class="fas fa-font me-1"></i> Type</button></li>
         </ul>
         <div id="osigAlert" class="alert alert-danger d-none"></div>
-        <div class="border rounded-3 p-3 bg-light">
+        <div class="border rounded-3 p-3 bg-light osig-workspace">
+          <div class="d-flex justify-content-between align-items-center mb-2"><div class="fw-bold">Signature workspace</div><div class="small text-muted">Sign inside the box</div></div>
           <canvas id="osigCanvas" width="900" height="260" style="display:block;width:100%;height:220px;background:#fff;border:1px dashed #adb5bd;border-radius:12px;touch-action:none;"></canvas>
           <div class="d-flex flex-wrap gap-2 mt-3 align-items-center" id="osigDrawTools">
             <label class="small fw-semibold">Ink <input type="color" id="osigColor" value="#111827" class="form-control form-control-color d-inline-block ms-1"></label>
@@ -74,7 +105,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
             <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="osigRenderTyped">Generate Signature</button>
           </div>
         </div>
-        <div class="mt-3 p-3 border rounded-3 text-center bg-white">
+        <div class="mt-3 p-3 border rounded-3 text-center bg-white osig-preview-card">
           <div class="small text-uppercase text-muted fw-semibold">Document preview</div>
           <div style="height:80px;display:flex;align-items:end;justify-content:center;"><img id="osigPreview" alt="Signature preview" style="display:none;max-width:280px;max-height:75px;object-fit:contain;"></div>
           <div class="border-top mx-auto" style="max-width:320px;"></div>
@@ -84,8 +115,8 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
       </div>
       <div class="modal-footer">
         <?php if ($osigAutoPrompt): ?><button type="button" class="btn btn-outline-secondary me-auto" id="osigSkipButton" data-bs-dismiss="modal">Skip for Now</button><?php endif; ?>
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="osigSave">Save Signature</button>
+        <?php if (!$osigAutoPrompt): ?><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><?php endif; ?>
+        <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigSave"><i class="fas fa-check me-1"></i> Complete Setup</button>
       </div>
     </div>
   </div>
