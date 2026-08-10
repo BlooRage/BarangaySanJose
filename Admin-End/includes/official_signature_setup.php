@@ -42,9 +42,9 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-workspace{border:1px solid #e2e7ed!important;border-radius:18px!important;background:#f8fafc!important}
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
-  .osig-preview-stage{position:relative;width:min(420px,100%);height:110px;margin:0 auto;overflow:hidden;touch-action:none}
-  .osig-preview-line{position:absolute;left:50%;bottom:0;width:320px;max-width:76%;border-top:1px solid #d7dde5;transform:translateX(-50%);z-index:1}
-  #osigPreview{position:absolute;left:50%;top:50%;z-index:2;display:none;max-width:340px;max-height:100px;object-fit:contain;cursor:grab;user-select:none;touch-action:none}
+  .osig-preview-stage{position:relative;width:min(420px,100%);height:128px;margin:0 auto;overflow:hidden;touch-action:none}
+  .osig-preview-line{position:absolute;left:50%;bottom:10px;width:320px;max-width:76%;border-top:1px solid #d7dde5;transform:translateX(-50%);z-index:1}
+  #osigPreview{position:absolute;left:50%;top:50%;z-index:2;display:none;max-width:340px;max-height:104px;object-fit:contain;cursor:grab;user-select:none;touch-action:none}
   #osigPreview.is-dragging{cursor:grabbing}
   .osig-preview-help{display:none;margin-top:.4rem;color:#98a2b3;font-size:.78rem}
   .osig-preview-card.has-signature .osig-preview-help{display:block}
@@ -193,7 +193,19 @@ document.addEventListener('DOMContentLoaded', () => {
   let mode = 'draw', drawing = false, hasInk = false;
   let uploadImage = null, uploadObjectUrl = '';
   let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
-  const applyPreviewPlacement = () => { preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`; };
+  const clampPreviewPlacement = () => {
+    if (!previewStage || preview.style.display === 'none') return;
+    const stageRect = previewStage.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const maxX = Math.max(0, (stageRect.width - previewRect.width) / 2);
+    const maxY = Math.max(0, (stageRect.height - previewRect.height) / 2);
+    previewOffsetX = Math.max(-maxX, Math.min(maxX, previewOffsetX));
+    previewOffsetY = Math.max(-maxY, Math.min(maxY, previewOffsetY));
+  };
+  const applyPreviewPlacement = () => {
+    clampPreviewPlacement();
+    preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`;
+  };
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); };
   const resetUploadPlacement = () => { if(uploadX)uploadX.value='0'; if(uploadY)uploadY.value='0'; if(uploadScale)uploadScale.value='100'; };
   const renderUploadImage = () => {
@@ -213,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const start = e => { if(mode!=='draw')return; e.preventDefault(); drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
   const move = e => { if(!drawing)return; e.preventDefault(); const p=point(e); ctx.lineWidth=Number(document.getElementById('osigWidth').value); ctx.strokeStyle=document.getElementById('osigColor').value; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineTo(p.x,p.y); ctx.stroke(); hasInk=true; refresh(); };
   const stop = () => { drawing=false; ctx.closePath(); };
-  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='block'; previewCard?.classList.add('has-signature'); applyPreviewPlacement(); };
+  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='block'; previewCard?.classList.add('has-signature'); requestAnimationFrame(applyPreviewPlacement); };
   const adjustedSignatureData = () => {
     if (!hasInk || !previewStage) return canvas.toDataURL('image/png');
     const stageRect = previewStage.getBoundingClientRect();
