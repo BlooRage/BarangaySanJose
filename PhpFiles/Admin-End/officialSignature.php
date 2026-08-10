@@ -50,6 +50,30 @@ if ($binary === false || strlen($binary) < 100 || strlen($binary) > 3 * 1024 * 1
     osig_reply(['success' => false, 'message' => 'The signature image is invalid or too large.'], 422);
 }
 
+// A transparent canvas is technically a valid PNG, but it is not a usable
+// signature. Reject it here instead of activating an invisible document asset.
+if (function_exists('imagecreatefromstring')) {
+    $signatureImage = @imagecreatefromstring($binary);
+    if ($signatureImage !== false) {
+        $imageWidth = imagesx($signatureImage);
+        $imageHeight = imagesy($signatureImage);
+        $stepX = max(1, (int)floor($imageWidth / 300));
+        $stepY = max(1, (int)floor($imageHeight / 100));
+        $visiblePixels = 0;
+        for ($y = 0; $y < $imageHeight && $visiblePixels < 8; $y += $stepY) {
+            for ($x = 0; $x < $imageWidth && $visiblePixels < 8; $x += $stepX) {
+                $rgba = imagecolorat($signatureImage, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F;
+                if ($alpha < 118) $visiblePixels++;
+            }
+        }
+        imagedestroy($signatureImage);
+        if ($visiblePixels < 8) {
+            osig_reply(['success' => false, 'message' => 'The signature is blank. Draw or upload a visible signature before saving.'], 422);
+        }
+    }
+}
+
 $projectRoot = realpath(__DIR__ . '/../../');
 $relativeDir = '/UnifiedFileAttachment/OfficialSignatures/' . preg_replace('/[^A-Za-z0-9_-]/', '', $officialId);
 $diskDir = $projectRoot . $relativeDir;

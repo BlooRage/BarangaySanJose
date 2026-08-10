@@ -247,6 +247,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  const signatureSaveEndpoint = <?= json_encode(appUrl('PhpFiles/Admin-End/officialSignature.php'), JSON_UNESCAPED_SLASHES) ?>;
   const modalEl = document.getElementById('officialSignatureModal');
   const canvas = document.getElementById('osigCanvas');
   if (!modalEl || !canvas) return;
@@ -279,6 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let mode = 'draw', hasInk = false;
   let uploadImage = null, uploadObjectUrl = '';
   let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
+  let previewStageWidth = 420, previewStageHeight = 128;
   let largeDrawing = false, largeHasInk = false, largeHistory = [], largeRedo = [];
   const setupModal = bootstrap.Modal.getOrCreateInstance(modalEl);
   const permissionModal = permissionModalEl ? bootstrap.Modal.getOrCreateInstance(permissionModalEl) : null;
@@ -286,6 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const syncSaveButton = () => { if(saveButton)saveButton.disabled=!hasInk; syncPermissionConfirm(); };
   const showPermissionModal = () => {
     if(!permissionModal)return;
+    const previewBounds = previewStage?.getBoundingClientRect();
+    if(previewBounds?.width > 0)previewStageWidth=previewBounds.width;
+    if(previewBounds?.height > 0)previewStageHeight=previewBounds.height;
     if(permissionAgree)permissionAgree.checked=false;
     permissionAlert?.classList.add('d-none');
     syncPermissionConfirm();
@@ -389,8 +394,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const adjustedSignatureData = () => {
     if (!hasInk || !previewStage) return canvas.toDataURL('image/png');
     const stageRect = previewStage.getBoundingClientRect();
-    const stageScaleX = canvas.width / Math.max(stageRect.width, 1);
-    const stageScaleY = canvas.height / Math.max(stageRect.height, 1);
+    const stageWidth = stageRect.width > 0 ? stageRect.width : previewStageWidth;
+    const stageHeight = stageRect.height > 0 ? stageRect.height : previewStageHeight;
+    const stageScaleX = canvas.width / Math.max(stageWidth, 1);
+    const stageScaleY = canvas.height / Math.max(stageHeight, 1);
     const output = document.createElement('canvas');
     output.width = canvas.width;
     output.height = canvas.height;
@@ -427,17 +434,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(permissionConfirm)permissionConfirm.disabled=true;
     saveButton.disabled=true;
+    const originalConfirmHtml = permissionConfirm?.innerHTML || '';
+    if(permissionConfirm)permissionConfirm.innerHTML='<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Saving Signature...';
     permissionAlert?.classList.add('d-none');
     const body=new FormData();
     body.append('action','save');
     body.append('creation_method',mode);
     body.append('signature_data',adjustedSignatureData());
     try{
-      const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});
+      const res=await fetch(signatureSaveEndpoint,{method:'POST',body});
       const data=await res.json();
       if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');
       location.reload();
     }catch(e){
+      if(permissionConfirm)permissionConfirm.innerHTML=originalConfirmHtml;
       if(permissionAlert){
         permissionAlert.textContent=e.message;
         permissionAlert.classList.remove('d-none');
@@ -454,8 +464,8 @@ document.addEventListener('DOMContentLoaded', () => {
   permissionConfirm?.addEventListener('click',saveOfficialSignature);
   document.getElementById('osigPermissionBack')?.addEventListener('click',returnFromPermissionModal);
   document.getElementById('osigPermissionClose')?.addEventListener('click',returnFromPermissionModal);
-  document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
-  document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body}).catch(()=>{});});
+  document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch(signatureSaveEndpoint,{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
+  document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch(signatureSaveEndpoint,{method:'POST',body}).catch(()=>{});});
   const reminderEl = document.getElementById('officialSignatureReminderModal');
   document.getElementById('osigSetupNow')?.addEventListener('click',()=>{
     if (!reminderEl) return;
