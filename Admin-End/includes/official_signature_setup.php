@@ -22,16 +22,18 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
 ?>
 <?php if ($osigIsChairman): ?>
 <style>
+  #officialSignatureModal,#officialSignatureReminderModal{font-family:'Geist',sans-serif;color:#172132;-webkit-font-smoothing:antialiased}
+  #officialSignatureModal button,#officialSignatureModal input,#officialSignatureReminderModal button{font-family:'Geist',sans-serif}
   #officialSignatureModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
   #officialSignatureModal .modal-dialog{width:calc(100% - 2rem);max-width:900px}
   #officialSignatureModal .modal-header{position:relative;display:block;padding:1.5rem 3.5rem 1.25rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff);border-bottom:1px solid #f3dcc3}
   #officialSignatureModal .modal-header .btn-close{position:absolute;right:1.4rem;top:1.35rem}
   #officialSignatureModal .modal-body{padding:1.35rem 1.5rem;background:#fff}
-  .osig-kicker{display:flex;align-items:center;gap:.45rem;color:#b85e08;font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .osig-kicker{display:flex;align-items:center;gap:.45rem;color:var(--dashboard-accent-deep,#d97a1d);font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
   .osig-title{font-family:'Charis SIL Bold',serif;color:#263142;font-size:1.55rem}
   .osig-status{display:inline-flex;align-items:center;gap:.4rem;margin-top:.65rem;padding:.35rem .7rem;border-radius:999px;background:#fff0d9;color:#a65306;font-size:.76rem;font-weight:800;border:1px solid #f4cf9d}
-  .osig-status-dot{width:.5rem;height:.5rem;border-radius:50%;background:#e7760a}
-  .osig-setup-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto .7rem;border-radius:18px;background:#ffe2bc;color:#c5670d;font-size:1.35rem;box-shadow:0 9px 22px rgba(222,113,12,.12)}
+  .osig-status-dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--dashboard-accent,#fe993c)}
+  .osig-setup-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto .7rem;border-radius:18px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.35rem;box-shadow:0 9px 22px rgba(222,113,12,.12)}
   .osig-intro{display:flex;gap:.85rem;padding:1rem;border:1px solid #f2d4ad;border-radius:16px;background:#fffaf3;color:#5c4936}
   .osig-intro-icon{display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:13px;background:#ffe2bc;color:#c5670d;font-size:1.05rem}
   #osigTabs{gap:.5rem;padding:.35rem;background:#f4f6f8;border-radius:14px}
@@ -42,12 +44,12 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
   #officialSignatureModal .modal-footer{padding:1rem 1.5rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
   #officialSignatureReminderModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
-  #officialSignatureReminderModal .modal-body{padding:2rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff)}
-  .osig-reminder-icon{display:grid;place-items:center;width:76px;height:76px;margin:0 auto 1rem;border-radius:24px;background:#ffe2bc;color:#c5670d;font-size:1.8rem;box-shadow:0 12px 28px rgba(222,113,12,.15)}
+  #officialSignatureReminderModal .modal-body{padding:2rem;text-align:center;background:#fff}
+  .osig-reminder-icon{display:grid;place-items:center;width:76px;height:76px;margin:0 auto 1rem;border-radius:24px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.8rem;box-shadow:0 12px 28px rgba(222,113,12,.15)}
   .osig-reminder-title{font-family:'Charis SIL Bold',serif;color:#263142;font-size:1.65rem}
   .osig-reminder-note{padding:.8rem 1rem;border-radius:14px;background:#fff1dc;color:#8a4a0d;font-size:.88rem}
-  .osig-save-btn{background:#de710c!important;border-color:#de710c!important;font-weight:700}
-  .osig-save-btn:hover{background:#c86208!important;border-color:#c86208!important}
+  .osig-save-btn{background:var(--dashboard-accent-deep,#d97a1d)!important;border-color:var(--dashboard-accent-deep,#d97a1d)!important;font-weight:700}
+  .osig-save-btn:hover{background:#bd6514!important;border-color:#bd6514!important}
   #osigColor{border-color:#e1b982;border-radius:10px}
   #osigWidth{accent-color:#de710c}
   @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:1.25rem 2.75rem 1rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.3rem}#osigCanvas{height:145px!important}}
