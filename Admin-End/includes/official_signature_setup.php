@@ -369,7 +369,26 @@ document.addEventListener('DOMContentLoaded', () => {
     img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); };
     img.src=uploadObjectUrl;
   };
-  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='block'; previewCard?.classList.add('has-signature'); syncSaveButton(); requestAnimationFrame(applyPreviewPlacement); };
+  const visibleInkDataUrl = sourceCanvas => {
+    const sourceCtx = sourceCanvas.getContext('2d');
+    const pixels = sourceCtx.getImageData(0,0,sourceCanvas.width,sourceCanvas.height);
+    let minX=sourceCanvas.width,minY=sourceCanvas.height,maxX=-1,maxY=-1;
+    for(let y=0;y<sourceCanvas.height;y+=1){
+      for(let x=0;x<sourceCanvas.width;x+=1){
+        if(pixels.data[((y*sourceCanvas.width+x)*4)+3] <= 18)continue;
+        minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+      }
+    }
+    if(maxX<minX||maxY<minY)return sourceCanvas.toDataURL('image/png');
+    const padding=4;
+    minX=Math.max(0,minX-padding);minY=Math.max(0,minY-padding);
+    maxX=Math.min(sourceCanvas.width-1,maxX+padding);maxY=Math.min(sourceCanvas.height-1,maxY+padding);
+    const cropped=document.createElement('canvas');
+    cropped.width=maxX-minX+1;cropped.height=maxY-minY+1;
+    cropped.getContext('2d').drawImage(sourceCanvas,minX,minY,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
+    return cropped.toDataURL('image/png');
+  };
+  const refresh = () => { if(!hasInk)return; preview.src=visibleInkDataUrl(canvas); preview.style.display='block'; previewCard?.classList.add('has-signature'); syncSaveButton(); requestAnimationFrame(applyPreviewPlacement); };
   const largePoint = e => { const r=largeCanvas.getBoundingClientRect(); return {x:(e.clientX-r.left)*largeCanvas.width/r.width,y:(e.clientY-r.top)*largeCanvas.height/r.height}; };
   const updateHistoryButtons = () => { undoButton.disabled=!largeHistory.length; redoButton.disabled=!largeRedo.length; };
   const largeSnapshot = () => ({data:largeCanvas.toDataURL('image/png'),hasInk:largeHasInk});
