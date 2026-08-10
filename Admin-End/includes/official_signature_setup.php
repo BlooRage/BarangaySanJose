@@ -22,15 +22,15 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
 ?>
 <?php if ($osigIsChairman): ?>
 <style>
-  #officialSignatureModal,#officialSignatureReminderModal{font-family:'Geist',sans-serif;color:#172132;-webkit-font-smoothing:antialiased}
-  #officialSignatureModal button,#officialSignatureModal input,#officialSignatureReminderModal button{font-family:'Geist',sans-serif}
+  #officialSignatureModal,#officialSignatureReminderModal{font-family:'Geist',Arial,sans-serif;color:#172132;-webkit-font-smoothing:antialiased}
+  #officialSignatureModal button,#officialSignatureModal input,#officialSignatureReminderModal button{font-family:'Geist',Arial,sans-serif}
   #officialSignatureModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
   #officialSignatureModal .modal-dialog{width:calc(100% - 2rem);max-width:900px}
   #officialSignatureModal .modal-header{position:relative;display:block;padding:1.5rem 3.5rem 1.25rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff);border-bottom:1px solid #f3dcc3}
   #officialSignatureModal .modal-header .btn-close{position:absolute;right:1.4rem;top:1.35rem}
   #officialSignatureModal .modal-body{padding:1.35rem 1.5rem;background:#fff}
   .osig-kicker{display:flex;align-items:center;gap:.45rem;color:var(--dashboard-accent-deep,#d97a1d);font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-  .osig-title{font-family:'Charis SIL Bold',serif;color:#263142;font-size:1.55rem}
+  .osig-title{font-family:'Geist',Arial,sans-serif;color:#172132;font-size:1.35rem;font-weight:800;letter-spacing:0}
   .osig-status{display:inline-flex;align-items:center;gap:.4rem;margin-top:.65rem;padding:.35rem .7rem;border-radius:999px;background:#fff0d9;color:#a65306;font-size:.76rem;font-weight:800;border:1px solid #f4cf9d}
   .osig-status-dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--dashboard-accent,#fe993c)}
   .osig-setup-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto .7rem;border-radius:18px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.35rem;box-shadow:0 9px 22px rgba(222,113,12,.12)}
@@ -43,16 +43,19 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
   #officialSignatureModal .modal-footer{padding:1rem 1.5rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
-  #officialSignatureReminderModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
-  #officialSignatureReminderModal .modal-body{padding:2rem;text-align:center;background:#fff}
-  .osig-reminder-icon{display:grid;place-items:center;width:76px;height:76px;margin:0 auto 1rem;border-radius:24px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.8rem;box-shadow:0 12px 28px rgba(222,113,12,.15)}
-  .osig-reminder-title{font-family:'Charis SIL Bold',serif;color:#263142;font-size:1.65rem}
-  .osig-reminder-note{padding:.8rem 1rem;border-radius:14px;background:#fff1dc;color:#8a4a0d;font-size:.88rem}
+  #officialSignatureReminderModal .modal-dialog{max-width:520px}
+  #officialSignatureReminderModal .modal-content{border:0;border-radius:12px;overflow:hidden;box-shadow:0 1rem 3rem rgba(15,23,42,.22)}
+  #officialSignatureReminderModal .modal-header{padding:1.1rem 1.25rem .8rem;background:#fff}
+  #officialSignatureReminderModal .modal-body{padding:1rem 1.25rem 1.1rem;text-align:center;background:#fff}
+  #officialSignatureReminderModal .modal-footer{padding:0 1.25rem 1.25rem;background:#fff}
+  .osig-reminder-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto .9rem;border-radius:16px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.35rem}
+  .osig-reminder-title{font-family:'Geist',Arial,sans-serif;color:#172132;font-size:1.25rem;font-weight:800;letter-spacing:0}
+  .osig-reminder-note{padding:.75rem .9rem;border-radius:10px;background:#fff4e8;color:#8a4a0d;font-size:.88rem}
   .osig-save-btn{background:var(--dashboard-accent-deep,#d97a1d)!important;border-color:var(--dashboard-accent-deep,#d97a1d)!important;font-weight:700}
   .osig-save-btn:hover{background:#bd6514!important;border-color:#bd6514!important}
   #osigColor{border-color:#e1b982;border-radius:10px}
   #osigWidth{accent-color:#de710c}
-  @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:1.25rem 2.75rem 1rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.3rem}#osigCanvas{height:145px!important}}
+  @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:1.25rem 2.75rem 1rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.2rem}#osigCanvas{height:145px!important}}
 </style>
 <?php if ($osigShowCard): ?>
 <div class="card shadow-sm mb-4 profile-card">
@@ -77,18 +80,22 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
 
 <?php if ($osigAutoPrompt): ?>
 <div class="modal fade" id="officialSignatureReminderModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog modal-dialog-centered" style="max-width:520px">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
+      <div class="modal-header border-0 pb-0 bg-white">
+        <h5 class="modal-title w-100 text-center text-dark">Official Account Setup</h5>
+      </div>
+      <hr class="my-0">
       <div class="modal-body">
         <div class="osig-reminder-icon"><i class="fas fa-file-signature"></i></div>
         <div class="osig-kicker justify-content-center">Official account reminder</div>
         <h5 class="osig-reminder-title mt-2 mb-2">Set Up Your Official Signature</h5>
         <p class="text-muted mb-3">Your signature has not been configured yet. Set it up to use it on supported certificates, clearances, and Barangay IDs.</p>
-        <div class="osig-reminder-note mb-4"><i class="fas fa-circle-info me-1"></i> You can skip this reminder and continue using your assigned modules.</div>
-        <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-          <button type="button" class="btn btn-outline-secondary px-4" id="osigSkipButton" data-bs-dismiss="modal">Skip for Now</button>
-          <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigSetupNow"><i class="fas fa-pen-nib me-1"></i> Set Up Now</button>
-        </div>
+        <div class="osig-reminder-note"><i class="fas fa-circle-info me-1"></i> You can skip this reminder and continue using your assigned modules.</div>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex gap-2">
+        <button type="button" class="btn btn-secondary flex-fill" id="osigSkipButton" data-bs-dismiss="modal">Skip for Now</button>
+        <button type="button" class="btn btn-primary osig-save-btn flex-fill" id="osigSetupNow"><i class="fas fa-pen-nib me-1"></i> Set Up Now</button>
       </div>
     </div>
   </div>
