@@ -42,6 +42,11 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-workspace{border:1px solid #e2e7ed!important;border-radius:18px!important;background:#f8fafc!important}
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
+  .osig-preview-stage{position:relative;width:min(420px,100%);height:110px;margin:0 auto;overflow:hidden;touch-action:none}
+  .osig-preview-stage::after{content:'Drag signature to adjust placement';position:absolute;left:50%;bottom:.25rem;transform:translateX(-50%);font-size:.72rem;color:#98a2b3;opacity:0;pointer-events:none;transition:opacity .15s}
+  .osig-preview-stage.has-signature:hover::after{opacity:1}
+  #osigPreview{position:absolute;left:50%;top:50%;display:none;max-width:340px;max-height:100px;object-fit:contain;cursor:grab;user-select:none;touch-action:none}
+  #osigPreview.is-dragging{cursor:grabbing}
   .osig-placement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:.75rem;align-items:end}
   .osig-placement-grid label{display:block;margin:0;color:#49515d}
   .osig-placement-grid input[type="range"]{width:100%;accent-color:#de710c}
@@ -157,7 +162,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
         </div>
         <div class="mt-3 p-3 border rounded-3 text-center bg-white osig-preview-card">
           <div class="small text-uppercase text-muted fw-semibold">Document preview</div>
-          <div style="height:80px;display:flex;align-items:end;justify-content:center;"><img id="osigPreview" alt="Signature preview" style="display:none;max-width:280px;max-height:75px;object-fit:contain;"></div>
+          <div class="osig-preview-stage" id="osigPreviewStage"><img id="osigPreview" alt="Signature preview"></div>
           <div class="border-top mx-auto" style="max-width:320px;"></div>
           <div class="fw-bold mt-1"><?= htmlspecialchars(trim((string)($osigAccount['firstname'] ?? '') . ' ' . (string)($osigAccount['lastname'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
           <div class="small text-muted">Punong Barangay</div>
@@ -178,13 +183,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!modalEl || !canvas) return;
   const ctx = canvas.getContext('2d');
   const preview = document.getElementById('osigPreview');
+  const previewStage = document.getElementById('osigPreviewStage');
   const alertEl = document.getElementById('osigAlert');
   const uploadX = document.getElementById('osigUploadX');
   const uploadY = document.getElementById('osigUploadY');
   const uploadScale = document.getElementById('osigUploadScale');
   let mode = 'draw', drawing = false, hasInk = false;
   let uploadImage = null, uploadObjectUrl = '';
-  const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; };
+  let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
+  const applyPreviewPlacement = () => { preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`; };
+  const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewStage?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); };
   const resetUploadPlacement = () => { if(uploadX)uploadX.value='0'; if(uploadY)uploadY.value='0'; if(uploadScale)uploadScale.value='100'; };
   const renderUploadImage = () => {
     if (!uploadImage) return;
@@ -203,15 +211,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const start = e => { if(mode!=='draw')return; e.preventDefault(); drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
   const move = e => { if(!drawing)return; e.preventDefault(); const p=point(e); ctx.lineWidth=Number(document.getElementById('osigWidth').value); ctx.strokeStyle=document.getElementById('osigColor').value; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineTo(p.x,p.y); ctx.stroke(); hasInk=true; refresh(); };
   const stop = () => { drawing=false; ctx.closePath(); };
-  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='inline-block'; };
+  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='block'; previewStage?.classList.add('has-signature'); applyPreviewPlacement(); };
+  const adjustedSignatureData = () => {
+    if (!hasInk || !previewStage) return canvas.toDataURL('image/png');
+    const stageRect = previewStage.getBoundingClientRect();
+    const stageScaleX = canvas.width / Math.max(stageRect.width, 1);
+    const stageScaleY = canvas.height / Math.max(stageRect.height, 1);
+    const output = document.createElement('canvas');
+    output.width = canvas.width;
+    output.height = canvas.height;
+    const outputCtx = output.getContext('2d');
+    outputCtx.clearRect(0, 0, output.width, output.height);
+    outputCtx.drawImage(canvas, previewOffsetX * stageScaleX, previewOffsetY * stageScaleY);
+    return output.toDataURL('image/png');
+  };
   ['pointerdown'].forEach(n=>canvas.addEventListener(n,start)); canvas.addEventListener('pointermove',move); window.addEventListener('pointerup',stop);
   document.getElementById('osigClear').addEventListener('click', clear);
   document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ mode=btn.dataset.osigMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); document.getElementById('osigTypeTools').classList.toggle('d-none',mode!=='type'); if(mode!=='upload') uploadImage=null; clear(); }));
   document.getElementById('osigFile').addEventListener('change', e=>{ const file=e.target.files?.[0]; if(!file)return; const img=new Image(); if(uploadObjectUrl) URL.revokeObjectURL(uploadObjectUrl); uploadObjectUrl=URL.createObjectURL(file); img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); }; img.src=uploadObjectUrl; });
   [uploadX,uploadY,uploadScale].forEach(input=>input?.addEventListener('input',renderUploadImage));
-  document.getElementById('osigResetPlacement')?.addEventListener('click',()=>{ resetUploadPlacement(); renderUploadImage(); });
+  document.getElementById('osigResetPlacement')?.addEventListener('click',()=>{ resetUploadPlacement(); previewOffsetX=0; previewOffsetY=0; applyPreviewPlacement(); renderUploadImage(); });
+  preview.addEventListener('pointerdown',e=>{ if(!hasInk)return; e.preventDefault(); preview.setPointerCapture(e.pointerId); preview.classList.add('is-dragging'); previewDrag={x:e.clientX,y:e.clientY,startX:previewOffsetX,startY:previewOffsetY}; });
+  preview.addEventListener('pointermove',e=>{ if(!previewDrag)return; previewOffsetX=previewDrag.startX+(e.clientX-previewDrag.x); previewOffsetY=previewDrag.startY+(e.clientY-previewDrag.y); applyPreviewPlacement(); });
+  preview.addEventListener('pointerup',()=>{ previewDrag=null; preview.classList.remove('is-dragging'); });
+  preview.addEventListener('pointercancel',()=>{ previewDrag=null; preview.classList.remove('is-dragging'); });
   document.getElementById('osigRenderTyped').addEventListener('click',()=>{ const name=document.getElementById('osigTypedName').value.trim(); clear(); if(!name)return; ctx.fillStyle=document.getElementById('osigColor').value; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='italic 92px cursive'; ctx.fillText(name,canvas.width/2,canvas.height/2,canvas.width-60); hasInk=true; refresh(); });
-  document.getElementById('osigSave').addEventListener('click',async()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');return;} const btn=document.getElementById('osigSave');btn.disabled=true; const body=new FormData();body.append('action','save');body.append('creation_method',mode);body.append('signature_data',canvas.toDataURL('image/png')); try{const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');location.reload();}catch(e){alertEl.textContent=e.message;alertEl.classList.remove('d-none');btn.disabled=false;} });
+  document.getElementById('osigSave').addEventListener('click',async()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');return;} const btn=document.getElementById('osigSave');btn.disabled=true; const body=new FormData();body.append('action','save');body.append('creation_method',mode);body.append('signature_data',adjustedSignatureData()); try{const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');location.reload();}catch(e){alertEl.textContent=e.message;alertEl.classList.remove('d-none');btn.disabled=false;} });
   document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
   document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body}).catch(()=>{});});
   const reminderEl = document.getElementById('officialSignatureReminderModal');
