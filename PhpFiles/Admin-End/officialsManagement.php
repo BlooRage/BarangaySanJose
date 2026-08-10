@@ -202,11 +202,9 @@ function superadminManagementDisabledReason(mysqli $conn, string $actorUserId, a
 }
 
 function ensureActorCanModifyTarget(string $actorUserId, string $actorProtectedCode, array $targetAccount): void {
-    $targetProtectedCode = amp_get_protected_code($targetAccount);
-
-    if ($targetProtectedCode === 'BARANGAY_CAPTAIN') {
-        throw new Exception('The Barangay Captain account is managed through official transitions.');
-    }
+    // Access to this endpoint is already restricted to SuperAdmin. Governance
+    // seat identity remains protected in Official Transition, but the account
+    // itself must still be manageable here for approval, invites, and locks.
 }
 
 function replaceOfficialModulePermissions(mysqli $conn, string $officialId, string $userId, array $permissionKeys, string $grantedByUserId): void {
@@ -353,7 +351,9 @@ function officialsManagementProfileEditability(mysqli $conn, string $actorUserId
         return [false, $e->getMessage()];
     }
 
-    $superadminManageReason = superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
+    $superadminManageReason = amp_get_protected_code($targetAccount) === 'BARANGAY_CAPTAIN'
+        ? ''
+        : superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
     if ($superadminManageReason !== '') {
         return [false, $superadminManageReason];
     }
@@ -601,7 +601,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if (!$isProfileApprovalAction) {
             ensureActorCanModifyTarget($actorUserId, $actorProtectedCode, $targetAccount);
         }
-        $superadminManageReason = superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
+        $superadminManageReason = $targetProtectedCode === 'BARANGAY_CAPTAIN'
+            ? ''
+            : superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
         if ($superadminManageReason !== '') {
             throw new Exception($superadminManageReason);
         }
@@ -1196,12 +1198,9 @@ try {
         );
 
         $permissionMap = amp_get_effective_permission_keys_for_row($conn, $row);
-        $editAccessDisabledReason = '';
-        if ($protectedCode === 'BARANGAY_CAPTAIN') {
-            $editAccessDisabledReason = 'The Barangay Captain account is managed through official transitions.';
-        } else {
-            $editAccessDisabledReason = amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $displayRole);
-        }
+        $editAccessDisabledReason = $protectedCode === 'BARANGAY_CAPTAIN'
+            ? ''
+            : amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $displayRole);
         $canEditAccess = ($editAccessDisabledReason === '');
         $workflow = ogw_sync_profile_workflow($conn, (string)($row['official_id'] ?? ''));
 
