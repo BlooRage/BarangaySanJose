@@ -1867,7 +1867,7 @@ if ($sbSidebarUserId !== '') {
         </div>
       </li>
       <?php endif; ?>
-      <?php if ($isSuperAdminSidebar): ?>
+      <?php if ($isSuperAdminSidebar && ($sbCan('officials_management') || $sbCan('personnel_invite'))): ?>
       <li class="mb-1">
         <button type="button"
                 class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelMgmtActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
@@ -1882,24 +1882,30 @@ if ($sbSidebarUserId !== '') {
         </button>
         <div class="collapse <?= $isPersonnelMgmtActive ? 'show' : '' ?>" id="personnelmanagement-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('officials_management')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelTracker.php')) ?>"
                  class="link-dark rounded <?= $current == 'PersonnelTracker.php' ? 'active' : '' ?>">
                 Tracker
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('personnel_invite')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
                 Account Invite
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('officials_management')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>"
                  class="link-dark rounded <?= $current == 'PersonnelRoleAccess.php' ? 'active' : '' ?>">
                 Personnel Access Control
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>

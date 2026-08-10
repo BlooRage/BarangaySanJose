@@ -298,7 +298,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
             $requestedPermissionKeys = [];
         }
 
-        $validKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
+        // Governance-seat access only accepts the same non-admin modules shown
+        // in this control. Hidden admin-only keys must never survive a save.
+        $validKeys = array_fill_keys(amp_get_default_admin_permission_keys(), true);
         $permissionMap = [];
         foreach ($requestedPermissionKeys as $permissionKey) {
             $permissionKey = trim((string)$permissionKey);
@@ -2593,11 +2595,12 @@ if ($hasCouncilTbl) {
         state.search = '';
         if (searchEl) searchEl.value = '';
         state.permissionMap = {};
-        const selectedKeys = Array.isArray(seat?.permission_keys) && seat.permission_keys.length
-          ? seat.permission_keys.map(String)
+        const selectedKeys = Boolean(seat?.has_saved_template)
+          ? (Array.isArray(seat?.permission_keys) ? seat.permission_keys.map(String) : [])
           : defaultKeys.slice();
         selectedKeys.forEach((key) => {
-          state.permissionMap[String(key)] = true;
+          const normalizedKey = String(key);
+          if (labelMap.has(normalizedKey)) state.permissionMap[normalizedKey] = true;
         });
 
         if (councilIdInput) councilIdInput.value = String(seat?.council_id || '');

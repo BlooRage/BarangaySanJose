@@ -1582,7 +1582,7 @@ if (!function_exists('amp_get_effective_permission_keys_for_council')) {
                 $res = $stmt->get_result();
                 while ($permRow = $res->fetch_assoc()) {
                     $key = trim((string)($permRow['permission_key'] ?? ''));
-                    if ($key !== '') {
+                    if ($key !== '' && !amp_is_admin_only_permission($key)) {
                         $permissions[$key] = true;
                     }
                 }
@@ -1591,9 +1591,7 @@ if (!function_exists('amp_get_effective_permission_keys_for_council')) {
         }
 
         if (!$permissions && !amp_has_saved_seat_access_profile($conn, $councilId)) {
-            $defaultKeys = amp_storage_role_to_display_role($displayRole) === 'SuperAdmin'
-                ? amp_get_all_leaf_permission_keys()
-                : amp_get_default_admin_permission_keys();
+            $defaultKeys = amp_get_default_admin_permission_keys();
             foreach ($defaultKeys as $key) {
                 $permissions[$key] = true;
             }
@@ -1713,6 +1711,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'UserArchive.php' => 'user_archive',
             'AdminManagement.php' => 'admin_management',
             'PersonnelTracker.php' => 'officials_management',
+            'PersonnelRoleAccess.php' => 'officials_management',
             'OfficialsManagement.php' => 'official_records_management',
             'OfficialInvites.php' => 'personnel_invite',
             'OfficialTransitions.php' => 'official_transition',
