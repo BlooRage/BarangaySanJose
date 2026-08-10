@@ -41,6 +41,7 @@ if ($action === 'remove') {
 if ($action !== 'save') osig_reply(['success' => false, 'message' => 'Invalid signature action.'], 400);
 $dataUrl = trim((string)($_POST['signature_data'] ?? ''));
 $method = strtolower(trim((string)($_POST['creation_method'] ?? 'draw')));
+$scalePercent = max(50, min(160, (int)($_POST['scale_percent'] ?? 100)));
 if (!in_array($method, ['draw', 'upload', 'type'], true)) $method = 'draw';
 if (!preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $match)) {
     osig_reply(['success' => false, 'message' => 'Create or upload a valid signature first.'], 422);
@@ -93,9 +94,9 @@ try {
     $off->bind_param('s', $officialId);
     $off->execute();
     $off->close();
-    $ins = $conn->prepare("INSERT INTO officialsignaturetbl (official_id, user_id, file_path, signature_blob, creation_method) VALUES (?, ?, ?, ?, ?)");
+    $ins = $conn->prepare("INSERT INTO officialsignaturetbl (official_id, user_id, file_path, signature_blob, scale_percent, creation_method) VALUES (?, ?, ?, ?, ?, ?)");
     $nullBlob = null;
-    $ins->bind_param('sssbs', $officialId, $userId, $filePath, $nullBlob, $method);
+    $ins->bind_param('sssbis', $officialId, $userId, $filePath, $nullBlob, $scalePercent, $method);
     $ins->send_long_data(3, $binary);
     $ins->execute();
     $ins->close();

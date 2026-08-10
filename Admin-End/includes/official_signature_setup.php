@@ -19,6 +19,7 @@ if ($osigIsChairman && $osigOfficialId !== '') {
 $osigCurrent = $osigIsChairman ? osig_get_current($conn, $osigOfficialId, $osigUserId) : null;
 $osigShowCard = !empty($officialSignatureShowCard);
 $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty($_SESSION['official_signature_skipped']);
+$osigScalePercent = max(50, min(160, (int)($osigCurrent['scale_percent'] ?? 100)));
 $osigMiddleName = trim((string)($osigAccount['middlename'] ?? ''));
 $osigMiddleInitial = $osigMiddleName !== '' ? strtoupper((string)mb_substr($osigMiddleName, 0, 1, 'UTF-8')) . '.' : '';
 $osigPreviewName = trim(implode(' ', array_filter([
@@ -72,6 +73,8 @@ $osigPreviewName = trim(implode(' ', array_filter([
   #osigPreview.is-dragging{cursor:grabbing}
   .osig-preview-help{display:none;margin-top:.4rem;color:#98a2b3;font-size:.78rem}
   .osig-preview-card.has-signature .osig-preview-help{display:block}
+  .osig-size-control{display:grid;grid-template-columns:auto minmax(180px,320px) 3.5rem;align-items:center;justify-content:center;gap:.75rem;margin:.85rem auto 0;color:#49515d}
+  .osig-size-control input{width:100%;accent-color:#de710c}.osig-size-control output{font-weight:800;color:#c2630b;text-align:right}
   .osig-placement-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.75rem;align-items:end}
   .osig-placement-grid label{display:block;margin:0;color:#49515d}
   .osig-placement-grid input[type="range"]{width:100%;accent-color:#de710c}
@@ -192,6 +195,7 @@ $osigPreviewName = trim(implode(' ', array_filter([
           <div class="fw-bold mt-1"><?= htmlspecialchars($osigPreviewName, ENT_QUOTES, 'UTF-8') ?></div>
           <div class="small text-muted">Punong Barangay</div>
           <div class="osig-preview-help">Drag the signature to adjust placement.</div>
+          <label class="osig-size-control" for="osigSignatureScale"><span class="small fw-semibold">Signature size</span><input type="range" id="osigSignatureScale" min="50" max="160" step="5" value="<?= $osigScalePercent ?>"><output id="osigSignatureScaleValue"><?= $osigScalePercent ?>%</output></label>
         </div>
       </div>
       <div class="modal-footer">
@@ -264,6 +268,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const preview = document.getElementById('osigPreview');
   const previewStage = document.getElementById('osigPreviewStage');
   const previewCard = document.getElementById('osigPreviewCard');
+  const signatureScale = document.getElementById('osigSignatureScale');
+  const signatureScaleValue = document.getElementById('osigSignatureScaleValue');
   const alertEl = document.getElementById('osigAlert');
   const uploadScale = document.getElementById('osigUploadScale');
   const uploadDropzone = document.getElementById('osigUploadDropzone');
@@ -317,7 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
     permissionModal.hide();
   };
   const applyPreviewPlacement = () => {
-    preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`;
+    const scale = Math.max(.5, Math.min(1.6, Number(signatureScale?.value || 100) / 100));
+    preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px)) scale(${scale})`;
+    if(signatureScaleValue)signatureScaleValue.value=`${Math.round(scale*100)}%`;
   };
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); syncSaveButton(); };
   const resetUploadPlacement = () => { if(uploadScale)uploadScale.value='100'; };
@@ -401,20 +409,11 @@ document.addEventListener('DOMContentLoaded', () => {
   drawModal?.addEventListener('pointerdown',e=>{if(e.target===drawModal)returnToSetupModal();});
   document.addEventListener('keydown',e=>{if(!drawModal?.classList.contains('is-open'))return;if(e.key==='Escape')returnToSetupModal();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();(e.shiftKey?redoButton:undoButton)?.click();}});
   const adjustedSignatureData = () => {
-    if (!hasInk || !previewStage) return canvas.toDataURL('image/png');
-    const stageRect = previewStage.getBoundingClientRect();
-    const stageWidth = stageRect.width > 0 ? stageRect.width : previewStageWidth;
-    const stageHeight = stageRect.height > 0 ? stageRect.height : previewStageHeight;
-    const stageScaleX = canvas.width / Math.max(stageWidth, 1);
-    const stageScaleY = canvas.height / Math.max(stageHeight, 1);
-    const output = document.createElement('canvas');
-    output.width = canvas.width;
-    output.height = canvas.height;
-    const outputCtx = output.getContext('2d');
-    outputCtx.clearRect(0, 0, output.width, output.height);
-    outputCtx.drawImage(canvas, previewOffsetX * stageScaleX, previewOffsetY * stageScaleY);
-    return output.toDataURL('image/png');
+    // Keep the complete drawing untouched. Placement and size are presentation
+    // settings; baking them into this fixed canvas can clip long or low strokes.
+    return canvas.toDataURL('image/png');
   };
+  signatureScale?.addEventListener('input',applyPreviewPlacement);
   canvas.addEventListener('click',openDrawModal);
   canvas.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawModal();}});
   document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ const nextMode=btn.dataset.osigMode;if(mode===nextMode)return;mode=nextMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); uploadDropzone?.classList.toggle('d-none',mode!=='upload'||Boolean(uploadImage)); }));
@@ -450,6 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     body.append('action','save');
     body.append('creation_method',mode);
     body.append('signature_data',adjustedSignatureData());
+    body.append('scale_percent',String(Math.round(Number(signatureScale?.value || 100))));
     try{
       const res=await fetch(signatureSaveEndpoint,{method:'POST',body});
       const data=await res.json();

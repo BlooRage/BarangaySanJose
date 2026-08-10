@@ -876,6 +876,7 @@ if (!function_exists('dms_resolve_module_signatories')) {
                 'name' => $name,
                 'title' => $title,
                 'signature_path' => trim((string)($row['signature_path'] ?? '')),
+                'signature_scale_percent' => 100,
                 'signature_help' => trim((string)($signatoryConfig['signature_help'] ?? '')),
                 'default_name' => $defaultName,
                 'default_title' => $defaultTitle,
@@ -887,6 +888,7 @@ if (!function_exists('dms_resolve_module_signatories')) {
                 $officialSignature = osig_get_current_punong($conn);
                 if (!empty($officialSignature['file_path'])) {
                     $resolved[$signatoryKey]['signature_path'] = trim((string)$officialSignature['file_path']);
+                    $resolved[$signatoryKey]['signature_scale_percent'] = max(50, min(160, (int)($officialSignature['scale_percent'] ?? 100)));
                 }
             }
         }
