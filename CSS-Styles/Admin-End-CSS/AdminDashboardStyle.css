@@ -662,8 +662,7 @@ body {
 
 .service-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 320px));
-    justify-content: center;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
     gap: 1.5rem;
     margin: 0;
 }
@@ -682,7 +681,8 @@ body {
     --card-icon-color: #b86a16;
     position: relative;
     overflow: hidden;
-    min-height: 280px;
+    aspect-ratio: 1 / 1;
+    min-height: 0;
     height: 100%;
     padding: clamp(1rem, 1.45vw, 1.45rem);
     border-radius: 30px;
@@ -694,7 +694,7 @@ body {
         0 18px 42px rgba(15, 23, 42, 0.07),
         inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
     display: grid;
-    grid-template-rows: 76px minmax(2.8rem, auto) minmax(3.2rem, auto);
+    grid-template-rows: 88px minmax(2.8rem, auto) minmax(3.2rem, auto);
     align-content: center;
     justify-items: center;
     gap: 0.85rem;
@@ -870,7 +870,8 @@ body {
     }
 
     .card-action {
-        min-height: 230px;
+        min-height: 250px;
+        aspect-ratio: auto;
         border-radius: 26px;
     }
 
