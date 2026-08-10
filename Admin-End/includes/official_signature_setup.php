@@ -42,6 +42,9 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-workspace{border:1px solid #e2e7ed!important;border-radius:18px!important;background:#f8fafc!important}
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
   #osigCanvas.osig-draw-launcher{cursor:pointer}
+  .osig-draw-open{display:flex;width:100%;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem .8rem;border:1px solid #dee2e6;border-radius:.375rem;background:#fff;color:#2b313a;text-align:left}
+  .osig-draw-open:hover,.osig-draw-open:focus{border-color:#c8d0da;background:#fffaf3;box-shadow:0 0 0 .2rem rgba(222,113,12,.1)}
+  .osig-draw-open span{color:#6c757d;font-size:.92rem;font-weight:500}
   .osig-draw-modal{position:fixed;inset:0;z-index:1090;display:none;align-items:center;justify-content:center;padding:1.25rem;background:rgba(15,23,42,.7)}
   .osig-draw-modal.is-open{display:flex}
   .osig-draw-dialog{display:flex;flex-direction:column;width:min(1200px,96vw);max-height:94vh;overflow:hidden;border-radius:20px;background:#f8fafc;box-shadow:0 30px 90px rgba(0,0,0,.35)}
@@ -147,12 +150,19 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
         </ul>
         <div id="osigAlert" class="alert alert-danger d-none"></div>
         <div class="border rounded-3 p-3 bg-light osig-workspace">
-          <div class="d-flex justify-content-between align-items-center mb-2"><div class="fw-bold">Signature workspace</div><div class="small text-muted">Select the box to open the large signature pad</div></div>
-          <canvas id="osigCanvas" class="osig-draw-launcher" width="900" height="260" aria-label="Open large signature pad" role="button" tabindex="0" style="display:block;width:100%;height:220px;background:#fff;border:1px dashed #adb5bd;border-radius:12px;touch-action:none;"></canvas>
-          <div class="d-flex flex-wrap gap-2 mt-3 align-items-center" id="osigDrawTools">
+          <div class="fw-bold mb-2">Signature workspace</div>
+          <canvas id="osigCanvas" class="osig-draw-launcher" width="900" height="260" aria-label="Signature preview" role="button" tabindex="0" style="display:block;width:100%;height:220px;background:#fff;border:1px dashed #adb5bd;border-radius:12px;touch-action:none;"></canvas>
+          <div class="mt-3" id="osigDrawTools">
+            <label class="form-label fw-semibold">Create signature</label>
+            <button type="button" class="osig-draw-open" id="osigOpenDrawPad">
+              <strong><i class="fas fa-pen me-1"></i> Open Signature Pad</strong>
+              <span>Draw in the larger workspace</span>
+            </button>
+            <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
             <label class="small fw-semibold">Ink <input type="color" id="osigColor" value="#111827" class="form-control form-control-color d-inline-block ms-1"></label>
             <label class="small fw-semibold">Thickness <input type="range" id="osigWidth" min="2" max="12" value="5" class="align-middle ms-1"></label>
             <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="osigClear">Clear</button>
+            </div>
           </div>
           <div class="d-none mt-3" id="osigUploadTools">
             <label class="form-label fw-semibold">Choose signature image</label>
@@ -199,8 +209,8 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
       </div>
     </div>
     <div class="osig-draw-footer">
-      <button type="button" class="btn btn-outline-secondary" id="osigDrawCancel">Cancel</button>
-      <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigDrawApply"><i class="fas fa-check me-1"></i>Use Signature</button>
+      <button type="button" class="btn btn-outline-secondary me-auto" id="osigDrawReturn"><i class="fas fa-arrow-left me-1"></i>Return</button>
+      <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigDrawSave"><i class="fas fa-check me-1"></i>Save Signature</button>
     </div>
   </div>
 </div>
@@ -229,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let uploadImage = null, uploadObjectUrl = '';
   let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
   let largeDrawing = false, largeHasInk = false, largeHistory = [], largeRedo = [];
+  const setupModal = bootstrap.Modal.getOrCreateInstance(modalEl);
   const applyPreviewPlacement = () => {
     preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`;
   };
@@ -270,9 +281,28 @@ document.addEventListener('DOMContentLoaded', () => {
     largeHasInk=hasInk; largeHistory=[]; largeRedo=[]; updateHistoryButtons();
     largeColor.value=document.getElementById('osigColor').value;
     largeWidth.value=String(Math.max(2,Number(document.getElementById('osigWidth').value)*1.6));
-    drawModal.classList.add('is-open'); document.body.style.overflow='hidden';
+    const showDrawPad = () => { drawModal.classList.add('is-open'); document.body.style.overflow='hidden'; };
+    if(modalEl.classList.contains('show')){
+      modalEl.addEventListener('hidden.bs.modal',showDrawPad,{once:true});
+      setupModal.hide();
+    }else{
+      showDrawPad();
+    }
   };
-  const closeDrawModal = () => { drawModal?.classList.remove('is-open');document.body.style.overflow=''; };
+  const returnToSetupModal = () => {
+    drawModal?.classList.remove('is-open');
+    document.body.style.overflow='';
+    setupModal.show();
+  };
+  const saveLargeSignature = () => {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(largeHasInk)ctx.drawImage(largeCanvas,0,0,canvas.width,canvas.height);
+    hasInk=largeHasInk;
+    document.getElementById('osigColor').value=largeColor.value;
+    document.getElementById('osigWidth').value=String(Math.min(12,Math.max(2,Math.round(Number(largeWidth.value)/1.6))));
+    if(hasInk)refresh();else clear();
+    returnToSetupModal();
+  };
   largeCanvas?.addEventListener('pointerdown',e=>{e.preventDefault();largeCanvas.setPointerCapture(e.pointerId);largeHistory.push(largeSnapshot());largeRedo=[];updateHistoryButtons();largeDrawing=true;const p=largePoint(e);largeCtx.beginPath();largeCtx.moveTo(p.x,p.y);});
   largeCanvas?.addEventListener('pointermove',e=>{if(!largeDrawing)return;e.preventDefault();const p=largePoint(e);largeCtx.lineWidth=Number(largeWidth.value);largeCtx.strokeStyle=largeColor.value;largeCtx.lineCap='round';largeCtx.lineJoin='round';largeCtx.lineTo(p.x,p.y);largeCtx.stroke();largeHasInk=true;});
   const stopLargeDrawing = () => {if(!largeDrawing)return;largeDrawing=false;largeCtx.closePath();};
@@ -280,10 +310,10 @@ document.addEventListener('DOMContentLoaded', () => {
   undoButton?.addEventListener('click',async()=>{if(!largeHistory.length)return;largeRedo.push(largeSnapshot());await restoreLargeSnapshot(largeHistory.pop());updateHistoryButtons();});
   redoButton?.addEventListener('click',async()=>{if(!largeRedo.length)return;largeHistory.push(largeSnapshot());await restoreLargeSnapshot(largeRedo.pop());updateHistoryButtons();});
   document.getElementById('osigLargeClear')?.addEventListener('click',()=>{if(!largeHasInk)return;largeHistory.push(largeSnapshot());largeRedo=[];largeCtx.clearRect(0,0,largeCanvas.width,largeCanvas.height);largeHasInk=false;updateHistoryButtons();});
-  document.getElementById('osigDrawApply')?.addEventListener('click',()=>{ctx.clearRect(0,0,canvas.width,canvas.height);if(largeHasInk)ctx.drawImage(largeCanvas,0,0,canvas.width,canvas.height);hasInk=largeHasInk;document.getElementById('osigColor').value=largeColor.value;document.getElementById('osigWidth').value=String(Math.min(12,Math.max(2,Math.round(Number(largeWidth.value)/1.6))));if(hasInk)refresh();else clear();closeDrawModal();});
-  document.getElementById('osigDrawClose')?.addEventListener('click',closeDrawModal);document.getElementById('osigDrawCancel')?.addEventListener('click',closeDrawModal);
-  drawModal?.addEventListener('pointerdown',e=>{if(e.target===drawModal)closeDrawModal();});
-  document.addEventListener('keydown',e=>{if(!drawModal?.classList.contains('is-open'))return;if(e.key==='Escape')closeDrawModal();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();(e.shiftKey?redoButton:undoButton)?.click();}});
+  document.getElementById('osigDrawSave')?.addEventListener('click',saveLargeSignature);
+  document.getElementById('osigDrawClose')?.addEventListener('click',returnToSetupModal);document.getElementById('osigDrawReturn')?.addEventListener('click',returnToSetupModal);
+  drawModal?.addEventListener('pointerdown',e=>{if(e.target===drawModal)returnToSetupModal();});
+  document.addEventListener('keydown',e=>{if(!drawModal?.classList.contains('is-open'))return;if(e.key==='Escape')returnToSetupModal();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();(e.shiftKey?redoButton:undoButton)?.click();}});
   const adjustedSignatureData = () => {
     if (!hasInk || !previewStage) return canvas.toDataURL('image/png');
     const stageRect = previewStage.getBoundingClientRect();
@@ -299,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   canvas.addEventListener('click',openDrawModal);
   canvas.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawModal();}});
+  document.getElementById('osigOpenDrawPad')?.addEventListener('click',openDrawModal);
   document.getElementById('osigClear').addEventListener('click', clear);
   document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ mode=btn.dataset.osigMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); if(mode==='draw')requestAnimationFrame(openDrawModal); }));
   document.getElementById('osigFile').addEventListener('change', e=>{ const file=e.target.files?.[0]; if(!file)return; const img=new Image(); if(uploadObjectUrl) URL.revokeObjectURL(uploadObjectUrl); uploadObjectUrl=URL.createObjectURL(file); img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); }; img.src=uploadObjectUrl; });
