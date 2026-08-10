@@ -69,8 +69,7 @@ $osigPreviewName = trim(implode(' ', array_filter([
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
   .osig-preview-stage{position:relative;width:min(420px,100%);height:128px;margin:0 auto;overflow:visible;touch-action:none}
   .osig-preview-line{position:absolute;left:50%;bottom:10px;width:320px;max-width:76%;border-top:1px solid #d7dde5;transform:translateX(-50%);z-index:1}
-  #osigPreview{position:absolute;left:50%;top:50%;z-index:2;display:none;max-width:340px;max-height:104px;object-fit:contain;cursor:grab;user-select:none;touch-action:none}
-  #osigPreview.is-dragging{cursor:grabbing}
+  #osigPreview{position:absolute;left:50%;bottom:13px;z-index:2;display:none;width:200px;max-width:none;max-height:104px;object-fit:contain;transform-origin:center bottom;user-select:none;pointer-events:none}
   .osig-preview-help{display:none;margin-top:.4rem;color:#98a2b3;font-size:.78rem}
   .osig-preview-card.has-signature .osig-preview-help{display:block}
   .osig-size-control{display:grid;grid-template-columns:auto minmax(180px,320px) 3.5rem;align-items:center;justify-content:center;gap:.75rem;margin:.85rem auto 0;color:#49515d}
@@ -194,7 +193,7 @@ $osigPreviewName = trim(implode(' ', array_filter([
           <div class="osig-preview-stage" id="osigPreviewStage"><div class="osig-preview-line"></div><img id="osigPreview" alt="Signature preview"></div>
           <div class="fw-bold mt-1"><?= htmlspecialchars($osigPreviewName, ENT_QUOTES, 'UTF-8') ?></div>
           <div class="small text-muted">Punong Barangay</div>
-          <div class="osig-preview-help">Drag the signature to adjust placement.</div>
+          <div class="osig-preview-help">This size and centered placement are used on generated documents.</div>
           <label class="osig-size-control" for="osigSignatureScale"><span class="small fw-semibold">Signature size</span><input type="range" id="osigSignatureScale" min="50" max="160" step="5" value="<?= $osigScalePercent ?>"><output id="osigSignatureScaleValue"><?= $osigScalePercent ?>%</output></label>
         </div>
       </div>
@@ -324,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const applyPreviewPlacement = () => {
     const scale = Math.max(.5, Math.min(1.6, Number(signatureScale?.value || 100) / 100));
-    preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px)) scale(${scale})`;
+    preview.style.transform = `translateX(-50%) scale(${scale})`;
     if(signatureScaleValue)signatureScaleValue.value=`${Math.round(scale*100)}%`;
   };
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); syncSaveButton(); };
@@ -428,10 +427,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   uploadScale?.addEventListener('input',renderUploadImage);
   document.getElementById('osigResetPlacement')?.addEventListener('click',()=>{ resetUploadPlacement(); previewOffsetX=0; previewOffsetY=0; applyPreviewPlacement(); renderUploadImage(); });
-  preview.addEventListener('pointerdown',e=>{ if(!hasInk)return; e.preventDefault(); preview.setPointerCapture(e.pointerId); preview.classList.add('is-dragging'); previewDrag={x:e.clientX,y:e.clientY,startX:previewOffsetX,startY:previewOffsetY}; });
-  preview.addEventListener('pointermove',e=>{ if(!previewDrag)return; previewOffsetX=previewDrag.startX+(e.clientX-previewDrag.x); previewOffsetY=previewDrag.startY+(e.clientY-previewDrag.y); applyPreviewPlacement(); });
-  preview.addEventListener('pointerup',()=>{ previewDrag=null; preview.classList.remove('is-dragging'); });
-  preview.addEventListener('pointercancel',()=>{ previewDrag=null; preview.classList.remove('is-dragging'); });
   const saveOfficialSignature = async () => {
     if(!hasInk){
       alertEl.textContent='Create or upload a signature first.';

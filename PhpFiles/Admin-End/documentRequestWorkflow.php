@@ -2901,12 +2901,14 @@ function dra_render_signature_image(object $pdf, string $publicPath, float $x, f
     try {
         $size = @getimagesize($diskPath);
         if (is_array($size) && (int)$size[0] > 0 && (int)$size[1] > 0) {
-            $scale = min($w / (float)$size[0], $h / (float)$size[1]);
-            $renderWidth = max(0.1, (float)$size[0] * $scale);
-            $renderHeight = max(0.1, (float)$size[1] * $scale);
             $displayScale = max(50, min(160, $scalePercent)) / 160.0;
-            $renderWidth *= $displayScale;
-            $renderHeight *= $displayScale;
+            $renderWidth = max(0.1, $w * $displayScale);
+            $renderHeight = $renderWidth * ((float)$size[1] / (float)$size[0]);
+            if ($renderHeight > $h) {
+                $heightScale = $h / $renderHeight;
+                $renderWidth *= $heightScale;
+                $renderHeight = $h;
+            }
             $x += ($w - $renderWidth) / 2.0;
             $y += ($h - $renderHeight) / 2.0;
             $w = $renderWidth;
@@ -6275,7 +6277,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $signBaseY = 168.0;
             $signX = 126.0;
             $signW = 46.0;
-            dra_render_signature_image($pdf, $punongSignaturePath, $signX + 1.0, $signBaseY - 15.0, $signW - 2.0, 14.0, $punongSignatureScale);
+            dra_render_signature_image($pdf, $punongSignaturePath, $signX + 1.0, $signBaseY - 21.0, $signW - 2.0, 20.0, $punongSignatureScale);
             $pdf->Line($signX, $signBaseY, $signX + $signW, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 10);
             $pdf->SetXY($signX, $signBaseY + 1.5);
@@ -6352,7 +6354,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->Cell(44, 6, $secretarySignatoryTitle, 0, 1, 'C');
 
             // Punong Barangay signature block (lower-right)
-            dra_render_signature_image($pdf, $punongSignaturePath, 129.0, $signBaseY - 16.0, 60.0, 15.0, $punongSignatureScale);
+            dra_render_signature_image($pdf, $punongSignaturePath, 124.0, $signBaseY - 27.0, 70.0, 26.0, $punongSignatureScale);
             $pdf->Line(124, $signBaseY, 194, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 11);
             $pdf->SetXY(124, $signBaseY + 2);
@@ -6430,7 +6432,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     }
 
     $pdf->SetY(250);
-    dra_render_signature_image($pdf, $punongSignaturePath, 22.0, 237.0, 54.0, 12.0, $punongSignatureScale);
+    dra_render_signature_image($pdf, $punongSignaturePath, 18.0, 225.0, 70.0, 24.0, $punongSignatureScale);
     $pdf->Line(18, 250, 88, 250);
     $pdf->SetFont($fontFace, 'B', 11);
     $pdf->Cell(70, 7, $punongSignatoryName, 0, 1, 'L');
