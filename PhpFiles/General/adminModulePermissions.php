@@ -1484,8 +1484,37 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
         $officialId = trim((string)($row['official_id'] ?? ''));
         $hasSavedProfile = amp_has_saved_access_profile($conn, $officialId);
         $permissions = [];
+        $usesSeatTemplate = false;
 
+        // For a seated barangay official, the active council seat template is
+        // the source of truth. This prevents copied per-account permissions
+        // from drifting away from Official Access Control.
+        $activeCouncilId = 0;
         if ($officialId !== '') {
+            $seatStmt = $conn->prepare("
+                SELECT council_id
+                FROM barangaycounciltbl
+                WHERE current_official_id = ?
+                  AND is_active = 1
+                ORDER BY sort_order, council_id
+                LIMIT 1
+            ");
+            if ($seatStmt) {
+                $seatStmt->bind_param('s', $officialId);
+                $seatStmt->execute();
+                $seatRow = $seatStmt->get_result()->fetch_assoc();
+                $seatStmt->close();
+                $activeCouncilId = (int)($seatRow['council_id'] ?? 0);
+            }
+        }
+
+        if ($activeCouncilId > 0 && amp_has_saved_seat_access_profile($conn, $activeCouncilId)) {
+            $permissions = amp_get_effective_permission_keys_for_council($conn, $activeCouncilId, $displayRole);
+            $hasSavedProfile = true;
+            $usesSeatTemplate = true;
+        }
+
+        if (!$usesSeatTemplate && $officialId !== '') {
             $stmt = $conn->prepare("
                 SELECT permission_key
                 FROM officialmodulepermissionstbl
@@ -1527,16 +1556,6 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
             foreach (amp_get_it_superadmin_locked_permission_keys() as $key) {
                 $permissions[$key] = true;
             }
-        }
-
-        // The Barangay Captain must always have a valid portal landing page.
-        // Seat templates may add more permissions, but cannot remove Dashboard.
-        if ($protectedCode === 'BARANGAY_CAPTAIN') {
-            $permissions['dashboard'] = true;
-        }
-
-        if ($displayRole === 'SuperAdmin') {
-            $permissions['website_settings'] = true;
         }
 
         return $permissions;
@@ -1602,44 +1621,19 @@ if (!function_exists('amp_apply_seat_permissions_to_official')) {
 if (!function_exists('amp_get_allowed_permission_keys')) {
     function amp_get_allowed_permission_keys(mysqli $conn, string $userId, string $sessionRole = ''): array
     {
-        static $cache = [];
-        $cacheKey = $userId . '|' . $sessionRole;
-        if (isset($cache[$cacheKey])) {
-            return $cache[$cacheKey];
-        }
-
-        $sessionCacheKey = 'allowed_permissions:v3:' . md5($cacheKey);
-        $sessionCached = amp_session_cache_get($sessionCacheKey, 1800);
-        if (is_array($sessionCached)) {
-            $cache[$cacheKey] = $sessionCached;
-            return $sessionCached;
-        }
-
-        $sharedCached = amp_shared_cache_get($sessionCacheKey, 1800);
-        if (is_array($sharedCached)) {
-            $cache[$cacheKey] = $sharedCached;
-            amp_session_cache_put($sessionCacheKey, $sharedCached);
-            return $sharedCached;
-        }
-
+        // Permissions are security state, not presentation data. Resolve them
+        // from storage on every request so grants and revocations made in
+        // Official Access Control take effect immediately.
         $row = $userId !== '' ? amp_get_official_account_by_user_id($conn, $userId) : null;
         if (!$row) {
             $role = amp_storage_role_to_display_role($sessionRole);
             $keys = $role === 'SuperAdmin'
                 ? amp_get_all_leaf_permission_keys()
                 : amp_get_default_admin_permission_keys();
-            $allowed = array_fill_keys($keys, true);
-            $cache[$cacheKey] = $allowed;
-            amp_session_cache_put($sessionCacheKey, $allowed);
-            amp_shared_cache_put($sessionCacheKey, $allowed);
-            return $allowed;
+            return array_fill_keys($keys, true);
         }
 
-        $allowed = amp_get_effective_permission_keys_for_row($conn, $row);
-        $cache[$cacheKey] = $allowed;
-        amp_session_cache_put($sessionCacheKey, $allowed);
-        amp_shared_cache_put($sessionCacheKey, $allowed);
-        return $allowed;
+        return amp_get_effective_permission_keys_for_row($conn, $row);
     }
 }
 
