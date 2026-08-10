@@ -1958,13 +1958,13 @@ if ($sbSidebarUserId !== '') {
         <div class="collapse <?= $isOfficialTransitionActive ? 'show' : '' ?>" id="officialtransition-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term')) ?>"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=seat')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' && $officialTransitionPanel !== 'access' ? 'active' : '' ?>">
                 Seat Assignment
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=access#official-access-control')) ?>"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=access')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' && $officialTransitionPanel === 'access' ? 'active' : '' ?>">
                 Official Access Control
               </a>

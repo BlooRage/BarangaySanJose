@@ -219,8 +219,14 @@ if (!in_array($transitionPanel, ['seat', 'access'], true)) {
 }
 
 $autoOpenNewTermModal = false;
-$transitionPageDescription = 'Handle seat assignment, turnover, replacement, and demotion while keeping incoming access pending for Access Control review.';
+$transitionPageTitle = $transitionPanel === 'access'
+    ? 'Official Access Control'
+    : 'Seat Assignment';
+$transitionPageDescription = $transitionPanel === 'access'
+    ? 'Manage the module access template assigned to each governance seat and its current or future holder.'
+    : 'Handle seat assignment, turnover, replacement, and demotion while keeping incoming access pending for Access Control review.';
 if ($transitionTool === 'create_new_term') {
+    $transitionPageTitle = 'Governance Cycle';
     $transitionPageDescription = 'Create a governance cycle, open the elected seats for reassignment, and prepare the incoming office holders before access is granted.';
 }
 $transitionQueueTitle = $transitionTool === 'create_new_term'
@@ -352,7 +358,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
         ];
     }
 
-    header('Location: OfficialTransitions.php?tool=current_term&panel=access#official-access-control');
+    header('Location: OfficialTransitions.php?tool=current_term&panel=access');
     exit;
 }
 
@@ -609,7 +615,7 @@ if ($hasCouncilTbl) {
   <meta charset="UTF-8" />
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Official Transition and Seat Assignment</title>
+  <title><?= htmlspecialchars($transitionPageTitle, ENT_QUOTES, 'UTF-8') ?></title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -1092,22 +1098,19 @@ if ($hasCouncilTbl) {
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
       <div>
         <h2 style="font-family:'Charis SIL Bold';color:#DE710C;">
-          Official Governance Transition
+          <?= htmlspecialchars($transitionPageTitle, ENT_QUOTES, 'UTF-8') ?>
         </h2>
         <p class="text-muted mb-0" style="font-size:.9rem;">
           <?= htmlspecialchars($transitionPageDescription, ENT_QUOTES, 'UTF-8') ?>
         </p>
       </div>
-      <?php if ($transitionTool === 'current_term'): ?>
+      <?php if ($transitionTool === 'current_term' && $transitionPanel === 'seat'): ?>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-secondary btn-sm" id="btnOtQuickActions"
                 data-bs-toggle="modal" data-bs-target="#modalQuickActions"
                 <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
           <i class="fas fa-bolt me-1"></i> Transition Actions
         </button>
-        <a class="btn btn-outline-secondary btn-sm" href="OfficialTransitions.php?tool=current_term&panel=access#official-access-control">
-          <i class="fas fa-shield-halved me-1"></i> Official Access Control
-        </a>
         <a class="btn btn-outline-primary btn-sm" href="OfficialTransitions.php?tool=create_new_term">
           <i class="fas fa-layer-group me-1"></i> Create Governance Cycle
         </a>
@@ -1121,33 +1124,18 @@ if ($hasCouncilTbl) {
     </div>
     <hr class="mb-4">
 
-    <?php if ($transitionTool === 'current_term'): ?>
-    <nav class="ot-subnav" aria-label="Official governance sections">
-      <a class="ot-subnav-link <?= $transitionPanel === 'seat' ? 'active' : '' ?>"
-         href="OfficialTransitions.php?tool=current_term&panel=seat#seat-assignment">
-        <i class="fas fa-right-left"></i>
-        <span>Seat Assignment</span>
-      </a>
-      <a class="ot-subnav-link <?= $transitionPanel === 'access' ? 'active' : '' ?>"
-         href="OfficialTransitions.php?tool=current_term&panel=access#official-access-control">
-        <i class="fas fa-shield-halved"></i>
-        <span>Official Access Control</span>
-      </a>
-    </nav>
-    <?php endif; ?>
-
     <?php if (!empty($officialTransitionFlash['message'])): ?>
       <div class="alert alert-<?= htmlspecialchars((string)($officialTransitionFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> mb-4">
         <?= htmlspecialchars((string)$officialTransitionFlash['message'], ENT_QUOTES, 'UTF-8') ?>
       </div>
     <?php endif; ?>
-    <?php if ($transitionTool === 'current_term' && !$hasConfiguredTermSchedule): ?>
+    <?php if ($transitionTool === 'current_term' && $transitionPanel === 'seat' && !$hasConfiguredTermSchedule): ?>
       <div class="alert alert-warning mb-4">
         No governance cycle is configured yet. Create the initial cycle first so turnover and seat assignment tracking can begin.
       </div>
     <?php endif; ?>
 
-    <?php if ($transitionTool === 'current_term'): ?>
+    <?php if ($transitionTool === 'current_term' && $transitionPanel === 'seat'): ?>
     <div class="ot-overview-grid mb-4">
       <div class="ot-overview-card">
         <div class="ot-overview-label">Council Seats</div>
@@ -1327,6 +1315,7 @@ if ($hasCouncilTbl) {
       </div>
     </div>
 
+    <?php elseif ($transitionTool === 'current_term' && $transitionPanel === 'access'): ?>
     <div class="bg-white rounded-3 shadow-sm border mb-4" id="official-access-control">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-bottom">
         <div>
