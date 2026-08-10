@@ -38,6 +38,11 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
   #officialSignatureModal .modal-footer{padding:1rem 1.5rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
+  #officialSignatureReminderModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
+  #officialSignatureReminderModal .modal-body{padding:2rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff)}
+  .osig-reminder-icon{display:grid;place-items:center;width:76px;height:76px;margin:0 auto 1rem;border-radius:24px;background:#ffe2bc;color:#c5670d;font-size:1.8rem;box-shadow:0 12px 28px rgba(222,113,12,.15)}
+  .osig-reminder-title{font-family:'Charis SIL Bold',serif;color:#263142;font-size:1.65rem}
+  .osig-reminder-note{padding:.8rem 1rem;border-radius:14px;background:#fff1dc;color:#8a4a0d;font-size:.88rem}
   .osig-save-btn{background:#de710c!important;border-color:#de710c!important;font-weight:700}
   .osig-save-btn:hover{background:#c86208!important;border-color:#c86208!important}
   @media(max-width:575.98px){#officialSignatureModal .modal-header,#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.3rem}#osigCanvas{height:145px!important}}
@@ -58,6 +63,26 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
     <div class="d-flex gap-2 flex-wrap">
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#officialSignatureModal"><?= $osigCurrent ? 'Change Signature' : 'Set Up Signature' ?></button>
       <?php if ($osigCurrent): ?><button type="button" class="btn btn-outline-danger" id="osigRemoveButton">Remove</button><?php endif; ?>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($osigAutoPrompt): ?>
+<div class="modal fade" id="officialSignatureReminderModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:520px">
+    <div class="modal-content">
+      <div class="modal-body">
+        <div class="osig-reminder-icon"><i class="fas fa-file-signature"></i></div>
+        <div class="osig-kicker justify-content-center">Official account reminder</div>
+        <h5 class="osig-reminder-title mt-2 mb-2">Set Up Your Official Signature</h5>
+        <p class="text-muted mb-3">Your signature has not been configured yet. Set it up to use it on supported certificates, clearances, and Barangay IDs.</p>
+        <div class="osig-reminder-note mb-4"><i class="fas fa-circle-info me-1"></i> You can skip this reminder and continue using your assigned modules.</div>
+        <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+          <button type="button" class="btn btn-outline-secondary px-4" id="osigSkipButton" data-bs-dismiss="modal">Skip for Now</button>
+          <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigSetupNow"><i class="fas fa-pen-nib me-1"></i> Set Up Now</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -114,8 +139,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
         </div>
       </div>
       <div class="modal-footer">
-        <?php if ($osigAutoPrompt): ?><button type="button" class="btn btn-outline-secondary me-auto" id="osigSkipButton" data-bs-dismiss="modal">Skip for Now</button><?php endif; ?>
-        <?php if (!$osigAutoPrompt): ?><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><?php endif; ?>
+        <button type="button" class="btn btn-outline-secondary me-auto" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigSave"><i class="fas fa-check me-1"></i> Complete Setup</button>
       </div>
     </div>
@@ -145,7 +169,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('osigSave').addEventListener('click',async()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');return;} const btn=document.getElementById('osigSave');btn.disabled=true; const body=new FormData();body.append('action','save');body.append('creation_method',mode);body.append('signature_data',canvas.toDataURL('image/png')); try{const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');location.reload();}catch(e){alertEl.textContent=e.message;alertEl.classList.remove('d-none');btn.disabled=false;} });
   document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
   document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body}).catch(()=>{});});
-  <?php if ($osigAutoPrompt): ?>bootstrap.Modal.getOrCreateInstance(modalEl).show();<?php endif; ?>
+  const reminderEl = document.getElementById('officialSignatureReminderModal');
+  document.getElementById('osigSetupNow')?.addEventListener('click',()=>{
+    if (!reminderEl) return;
+    reminderEl.addEventListener('hidden.bs.modal',()=>bootstrap.Modal.getOrCreateInstance(modalEl).show(),{once:true});
+    bootstrap.Modal.getOrCreateInstance(reminderEl).hide();
+  });
+  <?php if ($osigAutoPrompt): ?>if(reminderEl) bootstrap.Modal.getOrCreateInstance(reminderEl).show();<?php endif; ?>
 });
 </script>
 <?php endif; ?>
