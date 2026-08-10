@@ -1671,6 +1671,21 @@ if ($action === 'complete_transition') {
                 $upUser->execute();
                 $upUser->close();
             }
+            // Materialize the seat template on the incoming account before the
+            // profile is marked initialized. Marking an empty profile initialized
+            // causes the authorization guard to deny every admin page.
+            $seatPermissionKeys = array_keys(amp_get_effective_permission_keys_for_council(
+                $conn,
+                $councilId,
+                $assignment['account_role']
+            ));
+            amp_replace_official_module_permissions(
+                $conn,
+                $incomingOfficialId,
+                $incomingUserId,
+                $seatPermissionKeys,
+                $actorId
+            );
             amp_upsert_official_access_profile($conn, $incomingOfficialId, $incomingUserId);
             $upProfile = $conn->prepare("
                 UPDATE officialaccessprofiletbl
