@@ -2835,6 +2835,56 @@ function dra_signature_image_type(string $diskPath): string
     };
 }
 
+function dra_signature_trimmed_asset(string $diskPath): string
+{
+    if (!function_exists('imagecreatefrompng') || strtolower(pathinfo($diskPath, PATHINFO_EXTENSION)) !== 'png') {
+        return $diskPath;
+    }
+    $source = @imagecreatefrompng($diskPath);
+    if ($source === false) return $diskPath;
+    $width = imagesx($source);
+    $height = imagesy($source);
+    $minX = $width;
+    $minY = $height;
+    $maxX = -1;
+    $maxY = -1;
+    for ($y = 0; $y < $height; $y++) {
+        for ($x = 0; $x < $width; $x++) {
+            $alpha = (imagecolorat($source, $x, $y) >> 24) & 0x7F;
+            if ($alpha < 118) {
+                $minX = min($minX, $x);
+                $minY = min($minY, $y);
+                $maxX = max($maxX, $x);
+                $maxY = max($maxY, $y);
+            }
+        }
+    }
+    if ($maxX < $minX || $maxY < $minY) {
+        imagedestroy($source);
+        return $diskPath;
+    }
+    $padding = 4;
+    $minX = max(0, $minX - $padding);
+    $minY = max(0, $minY - $padding);
+    $cropWidth = min($width - $minX, ($maxX - $minX + 1) + $padding);
+    $cropHeight = min($height - $minY, ($maxY - $minY + 1) + $padding);
+    $cacheDir = dirname(__DIR__, 2) . '/UnifiedFileAttachment/IssuedDocuments/Tmp/signature_assets';
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0775, true);
+    $cachePath = $cacheDir . '/' . sha1($diskPath . '|' . (string)@filemtime($diskPath)) . '.png';
+    if (!is_file($cachePath) && is_dir($cacheDir)) {
+        $trimmed = imagecreatetruecolor($cropWidth, $cropHeight);
+        imagealphablending($trimmed, false);
+        imagesavealpha($trimmed, true);
+        $transparent = imagecolorallocatealpha($trimmed, 0, 0, 0, 127);
+        imagefill($trimmed, 0, 0, $transparent);
+        imagecopy($trimmed, $source, 0, 0, $minX, $minY, $cropWidth, $cropHeight);
+        @imagepng($trimmed, $cachePath, 6);
+        imagedestroy($trimmed);
+    }
+    imagedestroy($source);
+    return is_file($cachePath) ? $cachePath : $diskPath;
+}
+
 function dra_render_signature_image(object $pdf, string $publicPath, float $x, float $y, float $w, float $h): void
 {
     $diskPath = dms_signature_public_path_to_disk($publicPath);
@@ -2842,6 +2892,7 @@ function dra_render_signature_image(object $pdf, string $publicPath, float $x, f
         return;
     }
 
+    $diskPath = dra_signature_trimmed_asset($diskPath);
     $imageType = dra_signature_image_type($diskPath);
     if ($imageType === '') {
         return;
@@ -6297,7 +6348,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->Cell(44, 6, $secretarySignatoryTitle, 0, 1, 'C');
 
             // Punong Barangay signature block (lower-right)
-            dra_render_signature_image($pdf, $punongSignaturePath, 136.0, $signBaseY - 9.0, 46.0, 8.0);
+            dra_render_signature_image($pdf, $punongSignaturePath, 136.0, $signBaseY - 11.0, 46.0, 10.0);
             $pdf->Line(124, $signBaseY, 194, $signBaseY);
             $pdf->SetFont($indigencyFont, 'B', 11);
             $pdf->SetXY(124, $signBaseY + 2);

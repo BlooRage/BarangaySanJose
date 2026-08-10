@@ -7,7 +7,7 @@ $osigAccount = isset($currentOfficialAccount) && is_array($currentOfficialAccoun
 $osigIsChairman = is_array($osigAccount) && amp_get_protected_code($osigAccount) === 'BARANGAY_CAPTAIN';
 $osigOfficialId = trim((string)($osigAccount['official_id'] ?? ''));
 if ($osigIsChairman && $osigOfficialId !== '') {
-    $osigNameStmt = $conn->prepare("SELECT firstname, lastname FROM officialinformationtbl WHERE official_id = ? LIMIT 1");
+    $osigNameStmt = $conn->prepare("SELECT firstname, middlename, lastname, suffix FROM officialinformationtbl WHERE official_id = ? LIMIT 1");
     if ($osigNameStmt) {
         $osigNameStmt->bind_param('s', $osigOfficialId);
         $osigNameStmt->execute();
@@ -19,6 +19,15 @@ if ($osigIsChairman && $osigOfficialId !== '') {
 $osigCurrent = $osigIsChairman ? osig_get_current($conn, $osigOfficialId, $osigUserId) : null;
 $osigShowCard = !empty($officialSignatureShowCard);
 $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty($_SESSION['official_signature_skipped']);
+$osigMiddleName = trim((string)($osigAccount['middlename'] ?? ''));
+$osigMiddleInitial = $osigMiddleName !== '' ? strtoupper((string)mb_substr($osigMiddleName, 0, 1, 'UTF-8')) . '.' : '';
+$osigPreviewName = trim(implode(' ', array_filter([
+    'Hon.',
+    trim((string)($osigAccount['firstname'] ?? '')),
+    $osigMiddleInitial,
+    trim((string)($osigAccount['lastname'] ?? '')),
+    trim((string)($osigAccount['suffix'] ?? '')),
+], static fn($part) => $part !== '')));
 ?>
 <?php if ($osigIsChairman): ?>
 <style>
@@ -180,7 +189,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
         <div class="mt-3 p-3 border rounded-3 text-center bg-white osig-preview-card" id="osigPreviewCard">
           <div class="small text-uppercase text-muted fw-semibold">Document preview</div>
           <div class="osig-preview-stage" id="osigPreviewStage"><div class="osig-preview-line"></div><img id="osigPreview" alt="Signature preview"></div>
-          <div class="fw-bold mt-1"><?= htmlspecialchars(trim((string)($osigAccount['firstname'] ?? '') . ' ' . (string)($osigAccount['lastname'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
+          <div class="fw-bold mt-1"><?= htmlspecialchars($osigPreviewName, ENT_QUOTES, 'UTF-8') ?></div>
           <div class="small text-muted">Punong Barangay</div>
           <div class="osig-preview-help">Drag the signature to adjust placement.</div>
         </div>
