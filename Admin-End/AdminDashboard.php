@@ -324,6 +324,8 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
   </main>
 </div>
 
+<?php $officialSignatureAutoPrompt = true; include __DIR__ . '/includes/official_signature_setup.php'; ?>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {

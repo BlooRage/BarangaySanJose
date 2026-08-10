@@ -680,6 +680,8 @@ $positionDisplayLabel = ap_format_position_label(
                 </div>
             </div>
         </div>
+
+        <?php $officialSignatureShowCard = true; include __DIR__ . '/includes/official_signature_setup.php'; ?>
     </main>
 </div>
 

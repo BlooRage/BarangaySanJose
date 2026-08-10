@@ -840,6 +840,7 @@ if (!function_exists('dms_signature_public_path_to_disk')) {
 if (!function_exists('dms_resolve_module_signatories')) {
     function dms_resolve_module_signatories(mysqli $conn, string $moduleKey): array
     {
+        require_once __DIR__ . '/officialSignature.php';
         $config = dms_get_module_config($moduleKey);
         $storedRows = dms_fetch_module_setting_rows($conn, $moduleKey);
         $seatSignatories = dms_current_barangay_signatories($conn);
@@ -881,6 +882,13 @@ if (!function_exists('dms_resolve_module_signatories')) {
                 'updated_at' => trim((string)($row['updated_at'] ?? '')),
                 'updated_by_user_id' => trim((string)($row['updated_by_user_id'] ?? '')),
             ];
+
+            if ($source === 'seat_punong') {
+                $officialSignature = osig_get_current_punong($conn);
+                if (!empty($officialSignature['file_path'])) {
+                    $resolved[$signatoryKey]['signature_path'] = trim((string)$officialSignature['file_path']);
+                }
+            }
         }
 
         return $resolved;
