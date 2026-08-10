@@ -45,7 +45,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-preview-stage{position:relative;width:min(420px,100%);height:110px;margin:0 auto;overflow:hidden;touch-action:none}
   .osig-preview-stage::after{content:'Drag signature to adjust placement';position:absolute;left:50%;bottom:.25rem;transform:translateX(-50%);font-size:.72rem;color:#98a2b3;opacity:0;pointer-events:none;transition:opacity .15s}
   .osig-preview-stage.has-signature:hover::after{opacity:1}
-  #osigPreview{position:absolute;left:50%;top:50%;display:none;max-width:340px;max-height:100px;object-fit:contain;cursor:grab;user-select:none;touch-action:none}
+  #osigPreview{position:absolute;left:50%;top:38%;display:none;max-width:340px;max-height:100px;object-fit:contain;cursor:grab;user-select:none;touch-action:none}
   #osigPreview.is-dragging{cursor:grabbing}
   .osig-placement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:.75rem;align-items:end}
   .osig-placement-grid label{display:block;margin:0;color:#49515d}
@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let mode = 'draw', drawing = false, hasInk = false;
   let uploadImage = null, uploadObjectUrl = '';
   let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
+  const previewTopPercent = 0.38;
   const applyPreviewPlacement = () => { preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`; };
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewStage?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); };
   const resetUploadPlacement = () => { if(uploadX)uploadX.value='0'; if(uploadY)uploadY.value='0'; if(uploadScale)uploadScale.value='100'; };
@@ -222,7 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
     output.height = canvas.height;
     const outputCtx = output.getContext('2d');
     outputCtx.clearRect(0, 0, output.width, output.height);
-    outputCtx.drawImage(canvas, previewOffsetX * stageScaleX, previewOffsetY * stageScaleY);
+    const defaultY = (previewTopPercent - 0.5) * stageRect.height;
+    outputCtx.drawImage(canvas, previewOffsetX * stageScaleX, (previewOffsetY + defaultY) * stageScaleY);
     return output.toDataURL('image/png');
   };
   ['pointerdown'].forEach(n=>canvas.addEventListener(n,start)); canvas.addEventListener('pointermove',move); window.addEventListener('pointerup',stop);
