@@ -22,8 +22,8 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
 ?>
 <?php if ($osigIsChairman): ?>
 <style>
-  #officialSignatureModal,#officialSignatureReminderModal{font-family:'Geist',Arial,sans-serif;color:#172132;-webkit-font-smoothing:antialiased}
-  #officialSignatureModal button,#officialSignatureModal input,#officialSignatureReminderModal button{font-family:'Geist',Arial,sans-serif}
+  #officialSignatureModal,#officialSignatureReminderModal,#officialSignaturePermissionModal{font-family:'Geist',Arial,sans-serif;color:#172132;-webkit-font-smoothing:antialiased}
+  #officialSignatureModal button,#officialSignatureModal input,#officialSignatureReminderModal button,#officialSignaturePermissionModal button,#officialSignaturePermissionModal input{font-family:'Geist',Arial,sans-serif}
   #officialSignatureModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
   #officialSignatureModal .modal-dialog{width:calc(100% - 2rem);max-width:900px}
   #officialSignatureModal .modal-header{position:relative;display:flex;align-items:center;justify-content:center;padding:.8rem 3.5rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff);border-bottom:1px solid #f3dcc3}
@@ -72,13 +72,22 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #officialSignatureReminderModal .modal-header{padding:1.1rem 1.25rem .8rem;background:#fff}
   #officialSignatureReminderModal .modal-body{padding:1rem 1.25rem 1.1rem;text-align:center;background:#fff}
   #officialSignatureReminderModal .modal-footer{padding:0 1.25rem 1.25rem;background:#fff}
+  #officialSignaturePermissionModal .modal-dialog{max-width:560px}
+  #officialSignaturePermissionModal .modal-content{border:0;border-radius:18px;overflow:hidden;box-shadow:0 1.25rem 3.5rem rgba(15,23,42,.25)}
+  #officialSignaturePermissionModal .modal-header{padding:1rem 1.25rem;background:#fffaf3;border-bottom:1px solid #f3dcc3}
+  #officialSignaturePermissionModal .modal-body{padding:1.15rem 1.25rem;background:#fff}
+  #officialSignaturePermissionModal .modal-footer{padding:1rem 1.25rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
+  .osig-permission-list{display:grid;gap:.55rem;margin:.85rem 0 1rem;padding:0;list-style:none}
+  .osig-permission-list li{display:flex;gap:.55rem;align-items:flex-start;padding:.65rem .75rem;border:1px solid #e8edf3;border-radius:12px;background:#f8fafc;color:#475162}
+  .osig-permission-list i{margin-top:.15rem;color:#d97a1d}
+  .osig-permission-switch{display:flex;gap:.8rem;align-items:center;padding:.8rem .9rem;border:1px solid #f2d4ad;border-radius:14px;background:#fffaf3}
+  .osig-permission-switch .form-check-input{width:2.6rem;height:1.35rem;margin:0;cursor:pointer}
+  .osig-permission-switch .form-check-input:checked{background-color:#de710c;border-color:#de710c}
   .osig-reminder-icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto .9rem;border-radius:16px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1.35rem}
   .osig-reminder-title{font-family:'Geist',Arial,sans-serif;color:#172132;font-size:1.25rem;font-weight:800;letter-spacing:0}
   .osig-reminder-note{padding:.75rem .9rem;border-radius:10px;background:#fff4e8;color:#8a4a0d;font-size:.88rem}
   .osig-save-btn{background:var(--dashboard-accent-deep,#d97a1d)!important;border-color:var(--dashboard-accent-deep,#d97a1d)!important;font-weight:700}
   .osig-save-btn:hover{background:#bd6514!important;border-color:#bd6514!important}
-  #osigColor{border-color:#e1b982;border-radius:10px}
-  #osigWidth{accent-color:#de710c}
   @media(max-width:767.98px){.osig-placement-grid{grid-template-columns:1fr}}
   @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:.75rem 2.75rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.1rem}#osigCanvas{height:145px!important}}
 </style>
@@ -154,13 +163,6 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
               <span>or select this box to browse PNG, JPG, or WebP</span>
             </div>
           </div>
-          <div class="mt-3" id="osigDrawTools">
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <label class="small fw-semibold">Ink <input type="color" id="osigColor" value="#111827" class="form-control form-control-color d-inline-block ms-1"></label>
-              <label class="small fw-semibold">Thickness <input type="range" id="osigWidth" min="2" max="12" value="5" class="align-middle ms-1"></label>
-              <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="osigClear">Clear</button>
-            </div>
-          </div>
           <div class="d-none mt-3" id="osigUploadTools">
             <label class="form-label fw-semibold">Choose signature image</label>
             <input type="file" class="form-control d-none" id="osigFile" accept="image/png,image/jpeg,image/webp">
@@ -181,7 +183,36 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary me-auto" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigSave"><i class="fas fa-check me-1"></i> Complete Setup</button>
+        <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigSave" disabled><i class="fas fa-check me-1"></i> Complete Setup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="officialSignaturePermissionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold mb-0"><i class="fas fa-shield-alt me-2 text-warning"></i>Signature Permission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="osigPermissionAlert" class="alert alert-danger d-none"></div>
+        <p class="text-muted mb-0">By completing this setup, you permit Barangay San Jose to apply your official signature to issued barangay documents that require authorization, including:</p>
+        <ul class="osig-permission-list">
+          <li><i class="fas fa-id-card"></i><span>Barangay IDs and resident identification documents</span></li>
+          <li><i class="fas fa-certificate"></i><span>Barangay certifications, certificates of residency, and indigency certifications</span></li>
+          <li><i class="fas fa-file-signature"></i><span>Barangay-issued clearances and permit-related documents</span></li>
+          <li><i class="fas fa-file-alt"></i><span>Official reports, endorsements, attestations, and other barangay documents that require the Punong Barangay signature</span></li>
+        </ul>
+        <label class="osig-permission-switch" for="osigPermissionAgree">
+          <input class="form-check-input" type="checkbox" role="switch" id="osigPermissionAgree">
+          <span class="fw-semibold">I agree to these signature permission terms and authorize the use of my official signature for issued documents.</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary me-auto" data-bs-dismiss="modal">Back</button>
+        <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigPermissionConfirm" disabled><i class="fas fa-check me-1"></i>Agree and Save</button>
       </div>
     </div>
   </div>
@@ -223,6 +254,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const uploadScale = document.getElementById('osigUploadScale');
   const uploadDropzone = document.getElementById('osigUploadDropzone');
   const uploadFile = document.getElementById('osigFile');
+  const saveButton = document.getElementById('osigSave');
+  const permissionModalEl = document.getElementById('officialSignaturePermissionModal');
+  const permissionAgree = document.getElementById('osigPermissionAgree');
+  const permissionConfirm = document.getElementById('osigPermissionConfirm');
+  const permissionAlert = document.getElementById('osigPermissionAlert');
   const drawModal = document.getElementById('osigDrawModal');
   const largeCanvas = document.getElementById('osigLargeCanvas');
   const largeCtx = largeCanvas?.getContext('2d');
@@ -230,15 +266,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const largeWidth = document.getElementById('osigLargeWidth');
   const undoButton = document.getElementById('osigUndo');
   const redoButton = document.getElementById('osigRedo');
-  let mode = 'draw', drawing = false, hasInk = false;
+  let mode = 'draw', hasInk = false;
   let uploadImage = null, uploadObjectUrl = '';
   let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
   let largeDrawing = false, largeHasInk = false, largeHistory = [], largeRedo = [];
   const setupModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  const permissionModal = permissionModalEl ? bootstrap.Modal.getOrCreateInstance(permissionModalEl) : null;
+  const syncPermissionConfirm = () => { if(permissionConfirm)permissionConfirm.disabled=!permissionAgree?.checked||!hasInk; };
+  const syncSaveButton = () => { if(saveButton)saveButton.disabled=!hasInk; syncPermissionConfirm(); };
   const applyPreviewPlacement = () => {
     preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`;
   };
-  const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); };
+  const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); syncSaveButton(); };
   const resetUploadPlacement = () => { if(uploadScale)uploadScale.value='100'; };
   const renderUploadImage = () => {
     if (!uploadImage) return;
@@ -268,11 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); };
     img.src=uploadObjectUrl;
   };
-  const point = (e) => { const r=canvas.getBoundingClientRect(); const p=e.touches?.[0]||e; return {x:(p.clientX-r.left)*canvas.width/r.width,y:(p.clientY-r.top)*canvas.height/r.height}; };
-  const start = e => { if(mode!=='draw')return; e.preventDefault(); drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
-  const move = e => { if(!drawing)return; e.preventDefault(); const p=point(e); ctx.lineWidth=Number(document.getElementById('osigWidth').value); ctx.strokeStyle=document.getElementById('osigColor').value; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineTo(p.x,p.y); ctx.stroke(); hasInk=true; refresh(); };
-  const stop = () => { drawing=false; ctx.closePath(); };
-  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='block'; previewCard?.classList.add('has-signature'); requestAnimationFrame(applyPreviewPlacement); };
+  const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='block'; previewCard?.classList.add('has-signature'); syncSaveButton(); requestAnimationFrame(applyPreviewPlacement); };
   const largePoint = e => { const r=largeCanvas.getBoundingClientRect(); return {x:(e.clientX-r.left)*largeCanvas.width/r.width,y:(e.clientY-r.top)*largeCanvas.height/r.height}; };
   const updateHistoryButtons = () => { undoButton.disabled=!largeHistory.length; redoButton.disabled=!largeRedo.length; };
   const largeSnapshot = () => ({data:largeCanvas.toDataURL('image/png'),hasInk:largeHasInk});
@@ -289,8 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
     largeCtx.clearRect(0,0,largeCanvas.width,largeCanvas.height);
     if(hasInk) largeCtx.drawImage(canvas,0,0,largeCanvas.width,largeCanvas.height);
     largeHasInk=hasInk; largeHistory=[]; largeRedo=[]; updateHistoryButtons();
-    largeColor.value=document.getElementById('osigColor').value;
-    largeWidth.value=String(Math.max(2,Number(document.getElementById('osigWidth').value)*1.6));
+    largeColor.value=largeColor.value || '#111827';
+    largeWidth.value=largeWidth.value || '8';
     const showDrawPad = () => { drawModal.classList.add('is-open'); document.body.style.overflow='hidden'; };
     if(modalEl.classList.contains('show')){
       modalEl.addEventListener('hidden.bs.modal',showDrawPad,{once:true});
@@ -308,8 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     if(largeHasInk)ctx.drawImage(largeCanvas,0,0,canvas.width,canvas.height);
     hasInk=largeHasInk;
-    document.getElementById('osigColor').value=largeColor.value;
-    document.getElementById('osigWidth').value=String(Math.min(12,Math.max(2,Math.round(Number(largeWidth.value)/1.6))));
     if(hasInk)refresh();else clear();
     returnToSetupModal();
   };
@@ -339,8 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   canvas.addEventListener('click',openDrawModal);
   canvas.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawModal();}});
-  document.getElementById('osigClear').addEventListener('click', clear);
-  document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ const nextMode=btn.dataset.osigMode;if(mode===nextMode)return;mode=nextMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); uploadDropzone?.classList.toggle('d-none',mode!=='upload'||Boolean(uploadImage)); if(mode==='draw')requestAnimationFrame(openDrawModal); }));
+  document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ const nextMode=btn.dataset.osigMode;if(mode===nextMode)return;mode=nextMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); uploadDropzone?.classList.toggle('d-none',mode!=='upload'||Boolean(uploadImage)); }));
   uploadFile?.addEventListener('change', e=>loadUploadFile(e.target.files?.[0]));
   const uploadTargets = [uploadDropzone, canvas].filter(Boolean);
   uploadTargets.forEach(target=>{
@@ -356,7 +388,41 @@ document.addEventListener('DOMContentLoaded', () => {
   preview.addEventListener('pointermove',e=>{ if(!previewDrag)return; previewOffsetX=previewDrag.startX+(e.clientX-previewDrag.x); previewOffsetY=previewDrag.startY+(e.clientY-previewDrag.y); applyPreviewPlacement(); });
   preview.addEventListener('pointerup',()=>{ previewDrag=null; preview.classList.remove('is-dragging'); });
   preview.addEventListener('pointercancel',()=>{ previewDrag=null; preview.classList.remove('is-dragging'); });
-  document.getElementById('osigSave').addEventListener('click',async()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');return;} const btn=document.getElementById('osigSave');btn.disabled=true; const body=new FormData();body.append('action','save');body.append('creation_method',mode);body.append('signature_data',adjustedSignatureData()); try{const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');location.reload();}catch(e){alertEl.textContent=e.message;alertEl.classList.remove('d-none');btn.disabled=false;} });
+  const saveOfficialSignature = async () => {
+    if(!hasInk){
+      alertEl.textContent='Create or upload a signature first.';
+      alertEl.classList.remove('d-none');
+      syncSaveButton();
+      syncPermissionConfirm();
+      return;
+    }
+    if(permissionConfirm)permissionConfirm.disabled=true;
+    saveButton.disabled=true;
+    permissionAlert?.classList.add('d-none');
+    const body=new FormData();
+    body.append('action','save');
+    body.append('creation_method',mode);
+    body.append('signature_data',adjustedSignatureData());
+    try{
+      const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});
+      const data=await res.json();
+      if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');
+      location.reload();
+    }catch(e){
+      if(permissionAlert){
+        permissionAlert.textContent=e.message;
+        permissionAlert.classList.remove('d-none');
+      }else{
+        alertEl.textContent=e.message;
+        alertEl.classList.remove('d-none');
+      }
+      syncSaveButton();
+      syncPermissionConfirm();
+    }
+  };
+  saveButton?.addEventListener('click',()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');syncSaveButton();return;} if(permissionAgree)permissionAgree.checked=false; permissionAlert?.classList.add('d-none'); syncPermissionConfirm(); permissionModal?.show(); });
+  permissionAgree?.addEventListener('change',syncPermissionConfirm);
+  permissionConfirm?.addEventListener('click',saveOfficialSignature);
   document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
   document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body}).catch(()=>{});});
   const reminderEl = document.getElementById('officialSignatureReminderModal');
