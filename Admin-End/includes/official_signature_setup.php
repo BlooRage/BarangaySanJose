@@ -26,14 +26,11 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #officialSignatureModal button,#officialSignatureModal input,#officialSignatureReminderModal button{font-family:'Geist',Arial,sans-serif}
   #officialSignatureModal .modal-content{border:0;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.24)}
   #officialSignatureModal .modal-dialog{width:calc(100% - 2rem);max-width:900px}
-  #officialSignatureModal .modal-header{position:relative;display:block;padding:.7rem 3.5rem .65rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff);border-bottom:1px solid #f3dcc3}
-  #officialSignatureModal .modal-header .btn-close{position:absolute;right:1.25rem;top:1rem}
+  #officialSignatureModal .modal-header{position:relative;display:flex;align-items:center;justify-content:center;padding:.8rem 3.5rem;text-align:center;background:linear-gradient(180deg,#fffaf3,#fff);border-bottom:1px solid #f3dcc3}
+  #officialSignatureModal .modal-header .btn-close{position:absolute;right:1.25rem;top:50%;transform:translateY(-50%)}
   #officialSignatureModal .modal-body{padding:1.35rem 1.5rem;background:#fff}
   .osig-kicker{display:flex;align-items:center;gap:.45rem;color:var(--dashboard-accent-deep,#d97a1d);font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
   .osig-title{font-family:'Geist',Arial,sans-serif;color:#172132;font-size:1.2rem;font-weight:800;line-height:1.15;letter-spacing:0}
-  .osig-status{display:inline-flex;align-items:center;gap:.35rem;margin-top:.35rem;padding:.25rem .6rem;border-radius:999px;background:#fff0d9;color:#a65306;font-size:.72rem;font-weight:800;border:1px solid #f4cf9d}
-  .osig-status-dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--dashboard-accent,#fe993c)}
-  .osig-setup-icon{display:grid;place-items:center;width:38px;height:38px;margin:0 auto .25rem;border-radius:12px;background:var(--dashboard-accent-soft,#fff4e8);color:var(--dashboard-accent-deep,#d97a1d);font-size:1rem;box-shadow:0 6px 16px rgba(222,113,12,.1)}
   .osig-intro{display:flex;gap:.85rem;padding:1rem;border:1px solid #f2d4ad;border-radius:16px;background:#fffaf3;color:#5c4936}
   .osig-intro-icon{display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:13px;background:#ffe2bc;color:#c5670d;font-size:1.05rem}
   #osigTabs{gap:.5rem;padding:.35rem;background:#f4f6f8;border-radius:14px}
@@ -49,9 +46,6 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-upload-dropzone i{color:#d97a1d;font-size:1.7rem}
   .osig-upload-dropzone strong{color:#172132;font-size:1rem}
   .osig-upload-dropzone span{font-size:.9rem}
-  .osig-draw-open{display:flex;width:100%;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem .8rem;border:1px solid #dee2e6;border-radius:.375rem;background:#fff;color:#2b313a;text-align:left}
-  .osig-draw-open:hover,.osig-draw-open:focus{border-color:#c8d0da;background:#fffaf3;box-shadow:0 0 0 .2rem rgba(222,113,12,.1)}
-  .osig-draw-open span{color:#6c757d;font-size:.92rem;font-weight:500}
   .osig-draw-modal{position:fixed;inset:0;z-index:1090;display:none;align-items:center;justify-content:center;padding:1.25rem;background:rgba(15,23,42,.7)}
   .osig-draw-modal.is-open{display:flex}
   .osig-draw-dialog{display:flex;flex-direction:column;width:min(1200px,96vw);max-height:94vh;overflow:hidden;border-radius:20px;background:#f8fafc;box-shadow:0 30px 90px rgba(0,0,0,.35)}
@@ -86,7 +80,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #osigColor{border-color:#e1b982;border-radius:10px}
   #osigWidth{accent-color:#de710c}
   @media(max-width:767.98px){.osig-placement-grid{grid-template-columns:1fr}}
-  @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:.65rem 2.75rem .6rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.1rem}#osigCanvas{height:145px!important}}
+  @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:.75rem 2.75rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.1rem}#osigCanvas{height:145px!important}}
 </style>
 <?php if ($osigShowCard): ?>
 <div class="card shadow-sm mb-4 profile-card">
@@ -137,13 +131,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <div>
-          <div class="osig-setup-icon"><i class="fas fa-file-signature"></i></div>
-          <div class="osig-kicker justify-content-center">Official account setup</div>
-          <h5 class="modal-title osig-title mt-1 mb-1">Set Up Your Official Signature</h5>
-          <div class="small text-muted">Complete this setup to sign supported certificates, clearances, and Barangay IDs.</div>
-          <div class="osig-status"><span class="osig-status-dot"></span> Setup in progress</div>
-        </div>
+        <h5 class="modal-title osig-title mb-0">Official Signature Setup</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -167,15 +155,10 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
             </div>
           </div>
           <div class="mt-3" id="osigDrawTools">
-            <label class="form-label fw-semibold">Create signature</label>
-            <button type="button" class="osig-draw-open" id="osigOpenDrawPad">
-              <strong><i class="fas fa-pen me-1"></i> Open Signature Pad</strong>
-              <span>Draw in the larger workspace</span>
-            </button>
-            <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
-            <label class="small fw-semibold">Ink <input type="color" id="osigColor" value="#111827" class="form-control form-control-color d-inline-block ms-1"></label>
-            <label class="small fw-semibold">Thickness <input type="range" id="osigWidth" min="2" max="12" value="5" class="align-middle ms-1"></label>
-            <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="osigClear">Clear</button>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <label class="small fw-semibold">Ink <input type="color" id="osigColor" value="#111827" class="form-control form-control-color d-inline-block ms-1"></label>
+              <label class="small fw-semibold">Thickness <input type="range" id="osigWidth" min="2" max="12" value="5" class="align-middle ms-1"></label>
+              <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="osigClear">Clear</button>
             </div>
           </div>
           <div class="d-none mt-3" id="osigUploadTools">
@@ -356,7 +339,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   canvas.addEventListener('click',openDrawModal);
   canvas.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawModal();}});
-  document.getElementById('osigOpenDrawPad')?.addEventListener('click',openDrawModal);
   document.getElementById('osigClear').addEventListener('click', clear);
   document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ const nextMode=btn.dataset.osigMode;if(mode===nextMode)return;mode=nextMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); uploadDropzone?.classList.toggle('d-none',mode!=='upload'||Boolean(uploadImage)); if(mode==='draw')requestAnimationFrame(openDrawModal); }));
   uploadFile?.addEventListener('change', e=>loadUploadFile(e.target.files?.[0]));
