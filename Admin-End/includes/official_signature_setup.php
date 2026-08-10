@@ -40,8 +40,15 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #osigTabs .nav-link{border-radius:10px;color:#5f6877;font-weight:700;padding:.65rem 1rem}
   #osigTabs .nav-link.active{background:#fff;color:#c2630b;box-shadow:0 3px 12px rgba(15,23,42,.09)}
   .osig-workspace{border:1px solid #e2e7ed!important;border-radius:18px!important;background:#f8fafc!important}
+  .osig-canvas-shell{position:relative}
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
+  #osigCanvas.is-upload-dragover{border-color:#de710c!important;background:#fffaf3!important;box-shadow:0 0 0 .2rem rgba(222,113,12,.1)}
   #osigCanvas.osig-draw-launcher{cursor:pointer}
+  .osig-upload-dropzone{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35rem;padding:1rem;border:2px dashed #cbd3dd;border-radius:14px;background:#fff;color:#5f6877;text-align:center;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+  .osig-upload-dropzone:hover,.osig-upload-dropzone.is-dragover{border-color:#de710c;background:#fffaf3;box-shadow:0 0 0 .2rem rgba(222,113,12,.1)}
+  .osig-upload-dropzone i{color:#d97a1d;font-size:1.7rem}
+  .osig-upload-dropzone strong{color:#172132;font-size:1rem}
+  .osig-upload-dropzone span{font-size:.9rem}
   .osig-draw-open{display:flex;width:100%;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem .8rem;border:1px solid #dee2e6;border-radius:.375rem;background:#fff;color:#2b313a;text-align:left}
   .osig-draw-open:hover,.osig-draw-open:focus{border-color:#c8d0da;background:#fffaf3;box-shadow:0 0 0 .2rem rgba(222,113,12,.1)}
   .osig-draw-open span{color:#6c757d;font-size:.92rem;font-weight:500}
@@ -151,7 +158,14 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
         <div id="osigAlert" class="alert alert-danger d-none"></div>
         <div class="border rounded-3 p-3 bg-light osig-workspace">
           <div class="fw-bold mb-2">Signature workspace</div>
-          <canvas id="osigCanvas" class="osig-draw-launcher" width="900" height="260" aria-label="Signature preview" role="button" tabindex="0" style="display:block;width:100%;height:220px;background:#fff;border:1px dashed #adb5bd;border-radius:12px;touch-action:none;"></canvas>
+          <div class="osig-canvas-shell">
+            <canvas id="osigCanvas" class="osig-draw-launcher" width="900" height="260" aria-label="Signature preview" role="button" tabindex="0" style="display:block;width:100%;height:220px;background:#fff;border:1px dashed #adb5bd;border-radius:12px;touch-action:none;"></canvas>
+            <div class="osig-upload-dropzone d-none" id="osigUploadDropzone" role="button" tabindex="0" aria-label="Upload signature image">
+              <i class="fas fa-cloud-arrow-up"></i>
+              <strong>Drag and drop signature image</strong>
+              <span>or select this box to browse PNG, JPG, or WebP</span>
+            </div>
+          </div>
           <div class="mt-3" id="osigDrawTools">
             <label class="form-label fw-semibold">Create signature</label>
             <button type="button" class="osig-draw-open" id="osigOpenDrawPad">
@@ -166,7 +180,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
           </div>
           <div class="d-none mt-3" id="osigUploadTools">
             <label class="form-label fw-semibold">Choose signature image</label>
-            <input type="file" class="form-control" id="osigFile" accept="image/png,image/jpeg,image/webp">
+            <input type="file" class="form-control d-none" id="osigFile" accept="image/png,image/jpeg,image/webp">
             <div class="form-text">The image will be converted to a transparent-ready PNG canvas.</div>
             <div class="osig-placement-grid mt-3">
               <label class="small fw-semibold">Horizontal position <input type="range" id="osigUploadX" min="-100" max="100" value="0"></label>
@@ -228,6 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const uploadX = document.getElementById('osigUploadX');
   const uploadY = document.getElementById('osigUploadY');
   const uploadScale = document.getElementById('osigUploadScale');
+  const uploadDropzone = document.getElementById('osigUploadDropzone');
+  const uploadFile = document.getElementById('osigFile');
   const drawModal = document.getElementById('osigDrawModal');
   const largeCanvas = document.getElementById('osigLargeCanvas');
   const largeCtx = largeCanvas?.getContext('2d');
@@ -256,7 +272,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const y = ((canvas.height - h) / 2) + (Number(uploadY?.value || 0) / 100) * (canvas.height / 2);
     ctx.drawImage(uploadImage, x, y, w, h);
     hasInk = true;
+    uploadDropzone?.classList.add('d-none');
     refresh();
+  };
+  const loadUploadFile = file => {
+    if(!file)return;
+    if(!file.type || !['image/png','image/jpeg','image/webp'].includes(file.type)){
+      alertEl.textContent='Please upload a PNG, JPG, or WebP signature image.';
+      alertEl.classList.remove('d-none');
+      return;
+    }
+    alertEl.classList.add('d-none');
+    const img=new Image();
+    if(uploadObjectUrl) URL.revokeObjectURL(uploadObjectUrl);
+    uploadObjectUrl=URL.createObjectURL(file);
+    img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); };
+    img.src=uploadObjectUrl;
   };
   const point = (e) => { const r=canvas.getBoundingClientRect(); const p=e.touches?.[0]||e; return {x:(p.clientX-r.left)*canvas.width/r.width,y:(p.clientY-r.top)*canvas.height/r.height}; };
   const start = e => { if(mode!=='draw')return; e.preventDefault(); drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
@@ -331,8 +362,16 @@ document.addEventListener('DOMContentLoaded', () => {
   canvas.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawModal();}});
   document.getElementById('osigOpenDrawPad')?.addEventListener('click',openDrawModal);
   document.getElementById('osigClear').addEventListener('click', clear);
-  document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ mode=btn.dataset.osigMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); if(mode==='draw')requestAnimationFrame(openDrawModal); }));
-  document.getElementById('osigFile').addEventListener('change', e=>{ const file=e.target.files?.[0]; if(!file)return; const img=new Image(); if(uploadObjectUrl) URL.revokeObjectURL(uploadObjectUrl); uploadObjectUrl=URL.createObjectURL(file); img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); }; img.src=uploadObjectUrl; });
+  document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ const nextMode=btn.dataset.osigMode;if(mode===nextMode)return;mode=nextMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); uploadDropzone?.classList.toggle('d-none',mode!=='upload'||Boolean(uploadImage)); if(mode==='draw')requestAnimationFrame(openDrawModal); }));
+  uploadFile?.addEventListener('change', e=>loadUploadFile(e.target.files?.[0]));
+  const uploadTargets = [uploadDropzone, canvas].filter(Boolean);
+  uploadTargets.forEach(target=>{
+    target.addEventListener('click',()=>{if(mode==='upload')uploadFile?.click();});
+    target.addEventListener('keydown',e=>{if(mode==='upload'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();uploadFile?.click();}});
+    ['dragenter','dragover'].forEach(type=>target.addEventListener(type,e=>{if(mode!=='upload')return;e.preventDefault();uploadDropzone?.classList.add('is-dragover');canvas.classList.add('is-upload-dragover');}));
+    ['dragleave','drop'].forEach(type=>target.addEventListener(type,e=>{if(mode!=='upload')return;e.preventDefault();uploadDropzone?.classList.remove('is-dragover');canvas.classList.remove('is-upload-dragover');}));
+    target.addEventListener('drop',e=>{if(mode==='upload')loadUploadFile(e.dataTransfer?.files?.[0]);});
+  });
   [uploadX,uploadY,uploadScale].forEach(input=>input?.addEventListener('input',renderUploadImage));
   document.getElementById('osigResetPlacement')?.addEventListener('click',()=>{ resetUploadPlacement(); previewOffsetX=0; previewOffsetY=0; applyPreviewPlacement(); renderUploadImage(); });
   preview.addEventListener('pointerdown',e=>{ if(!hasInk)return; e.preventDefault(); preview.setPointerCapture(e.pointerId); preview.classList.add('is-dragging'); previewDrag={x:e.clientX,y:e.clientY,startX:previewOffsetX,startY:previewOffsetY}; });
