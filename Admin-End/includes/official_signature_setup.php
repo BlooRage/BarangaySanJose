@@ -46,9 +46,9 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-upload-dropzone i{color:#d97a1d;font-size:1.7rem}
   .osig-upload-dropzone strong{color:#172132;font-size:1rem}
   .osig-upload-dropzone span{font-size:.9rem}
-  .osig-draw-modal{position:fixed;inset:0;z-index:1090;display:none;align-items:center;justify-content:center;padding:1.25rem;background:rgba(15,23,42,.7)}
+  .osig-draw-modal{position:fixed;inset:0;z-index:2090;display:none;align-items:center;justify-content:center;box-sizing:border-box;width:100vw;height:100vh;height:100dvh;padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));background:rgba(15,23,42,.7)}
   .osig-draw-modal.is-open{display:flex}
-  .osig-draw-dialog{display:flex;flex-direction:column;width:min(1200px,96vw);max-height:94vh;overflow:hidden;border-radius:20px;background:#f8fafc;box-shadow:0 30px 90px rgba(0,0,0,.35)}
+  .osig-draw-dialog{display:flex;flex-direction:column;width:min(1200px,calc(100vw - 2rem));max-width:100%;max-height:calc(100vh - 2rem);max-height:calc(100dvh - 2rem);overflow:hidden;border-radius:20px;background:#f8fafc;box-shadow:0 30px 90px rgba(0,0,0,.35)}
   .osig-draw-header,.osig-draw-footer{display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;background:#fff}
   .osig-draw-header{border-bottom:1px solid #e2e7ed}.osig-draw-footer{justify-content:flex-end;border-top:1px solid #e2e7ed}
   .osig-draw-header .btn-close{margin-left:auto}
@@ -92,6 +92,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-save-btn{background:var(--dashboard-accent-deep,#d97a1d)!important;border-color:var(--dashboard-accent-deep,#d97a1d)!important;font-weight:700}
   .osig-save-btn:hover{background:#bd6514!important;border-color:#bd6514!important}
   @media(max-width:767.98px){.osig-placement-grid{grid-template-columns:1fr}}
+  @media(max-width:991.98px){.osig-draw-modal{padding:.75rem}.osig-draw-dialog{width:calc(100vw - 1.5rem);max-height:calc(100dvh - 1.5rem)}#osigLargeCanvas{height:min(55vh,440px)}}
   @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:.75rem 2.75rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.1rem}#osigCanvas{height:145px!important}}
 </style>
 <?php if ($osigShowCard): ?>
@@ -239,7 +240,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
     </div>
     <div class="osig-draw-footer">
       <button type="button" class="btn btn-outline-secondary me-auto" id="osigDrawReturn"><i class="fas fa-arrow-left me-1"></i>Return</button>
-      <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigDrawSave"><i class="fas fa-check me-1"></i>Save Signature</button>
+      <button type="button" class="btn btn-primary osig-save-btn px-4" id="osigDrawSave"><i class="fas fa-arrow-right me-1"></i>Continue to Authorization</button>
     </div>
   </div>
 </div>
@@ -263,6 +264,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const permissionConfirm = document.getElementById('osigPermissionConfirm');
   const permissionAlert = document.getElementById('osigPermissionAlert');
   const drawModal = document.getElementById('osigDrawModal');
+  // This include can live inside the dashboard's flex content area. Move the
+  // full-screen drawing surface to <body> so Safari/iPad does not constrain it
+  // to the main column and slide it underneath the sidebar.
+  if (drawModal && drawModal.parentElement !== document.body) {
+    document.body.appendChild(drawModal);
+  }
   const largeCanvas = document.getElementById('osigLargeCanvas');
   const largeCtx = largeCanvas?.getContext('2d');
   const largeColor = document.getElementById('osigLargeColor');
@@ -361,11 +368,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModal.show();
   };
   const saveLargeSignature = () => {
+    if(!largeHasInk)return;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     if(largeHasInk)ctx.drawImage(largeCanvas,0,0,canvas.width,canvas.height);
     hasInk=largeHasInk;
     if(hasInk)refresh();else clear();
-    returnToSetupModal();
+    drawModal?.classList.remove('is-open');
+    document.body.style.overflow='';
+    showPermissionModal();
   };
   largeCanvas?.addEventListener('pointerdown',e=>{e.preventDefault();largeCanvas.setPointerCapture(e.pointerId);largeHistory.push(largeSnapshot());largeRedo=[];updateHistoryButtons();largeDrawing=true;const p=largePoint(e);largeCtx.beginPath();largeCtx.moveTo(p.x,p.y);});
   largeCanvas?.addEventListener('pointermove',e=>{if(!largeDrawing)return;e.preventDefault();const p=largePoint(e);largeCtx.lineWidth=Number(largeWidth.value);largeCtx.strokeStyle=largeColor.value;largeCtx.lineCap='round';largeCtx.lineJoin='round';largeCtx.lineTo(p.x,p.y);largeCtx.stroke();largeHasInk=true;});

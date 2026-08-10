@@ -571,6 +571,29 @@
   const regenerateIssuedConfirmModalEl = document.getElementById('regenerateIssuedConfirmModal');
   const regenerateIssuedConfirmModal = regenerateIssuedConfirmModalEl ? new bootstrap.Modal(regenerateIssuedConfirmModalEl) : null;
   const regenerateIssuedConfirmBtn = document.getElementById('regenerateIssuedConfirmBtn');
+
+  // Bootstrap assigns every modal/backdrop the same z-index. This confirmation is
+  // intentionally opened over the document viewer, so give its backdrop and
+  // dialog their own layer and restore the viewer's scroll/focus state afterward.
+  regenerateIssuedConfirmModalEl?.addEventListener('show.bs.modal', () => {
+    regenerateIssuedConfirmModalEl.style.zIndex = '1070';
+    window.setTimeout(() => {
+      const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+      const confirmationBackdrop = backdrops[backdrops.length - 1];
+      if (confirmationBackdrop) {
+        confirmationBackdrop.style.zIndex = '1065';
+        confirmationBackdrop.dataset.regenerateIssuedBackdrop = '1';
+      }
+    }, 0);
+  });
+  regenerateIssuedConfirmModalEl?.addEventListener('hidden.bs.modal', () => {
+    regenerateIssuedConfirmModalEl.style.removeProperty('z-index');
+    document.querySelectorAll('[data-regenerate-issued-backdrop="1"]').forEach((backdrop) => backdrop.remove());
+    if (paymentProofModalEl?.classList.contains('show')) {
+      document.body.classList.add('modal-open');
+      paymentProofModalEl.focus({ preventScroll: true });
+    }
+  });
   const idPrintProcessModalEl = document.getElementById('idPrintProcessModal');
   const idPrintProcessModal = idPrintProcessModalEl ? new bootstrap.Modal(idPrintProcessModalEl) : null;
   const idPrintProcessPreview = document.getElementById('idPrintProcessPreview');
