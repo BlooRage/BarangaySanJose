@@ -69,7 +69,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   #osigPreview.is-dragging{cursor:grabbing}
   .osig-preview-help{display:none;margin-top:.4rem;color:#98a2b3;font-size:.78rem}
   .osig-preview-card.has-signature .osig-preview-help{display:block}
-  .osig-placement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:.75rem;align-items:end}
+  .osig-placement-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.75rem;align-items:end}
   .osig-placement-grid label{display:block;margin:0;color:#49515d}
   .osig-placement-grid input[type="range"]{width:100%;accent-color:#de710c}
   #officialSignatureModal .modal-footer{padding:1rem 1.5rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
@@ -183,8 +183,6 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
             <input type="file" class="form-control d-none" id="osigFile" accept="image/png,image/jpeg,image/webp">
             <div class="form-text">The image will be converted to a transparent-ready PNG canvas.</div>
             <div class="osig-placement-grid mt-3">
-              <label class="small fw-semibold">Horizontal position <input type="range" id="osigUploadX" min="-100" max="100" value="0"></label>
-              <label class="small fw-semibold">Vertical position <input type="range" id="osigUploadY" min="-100" max="100" value="0"></label>
               <label class="small fw-semibold">Size <input type="range" id="osigUploadScale" min="20" max="160" value="100"></label>
               <button type="button" class="btn btn-sm btn-outline-secondary" id="osigResetPlacement">Reset</button>
             </div>
@@ -239,8 +237,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewStage = document.getElementById('osigPreviewStage');
   const previewCard = document.getElementById('osigPreviewCard');
   const alertEl = document.getElementById('osigAlert');
-  const uploadX = document.getElementById('osigUploadX');
-  const uploadY = document.getElementById('osigUploadY');
   const uploadScale = document.getElementById('osigUploadScale');
   const uploadDropzone = document.getElementById('osigUploadDropzone');
   const uploadFile = document.getElementById('osigFile');
@@ -260,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     preview.style.transform = `translate(calc(-50% + ${previewOffsetX}px), calc(-50% + ${previewOffsetY}px))`;
   };
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); };
-  const resetUploadPlacement = () => { if(uploadX)uploadX.value='0'; if(uploadY)uploadY.value='0'; if(uploadScale)uploadScale.value='100'; };
+  const resetUploadPlacement = () => { if(uploadScale)uploadScale.value='100'; };
   const renderUploadImage = () => {
     if (!uploadImage) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -268,8 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const scale = baseScale * (Number(uploadScale?.value || 100) / 100);
     const w = uploadImage.width * scale;
     const h = uploadImage.height * scale;
-    const x = ((canvas.width - w) / 2) + (Number(uploadX?.value || 0) / 100) * (canvas.width / 2);
-    const y = ((canvas.height - h) / 2) + (Number(uploadY?.value || 0) / 100) * (canvas.height / 2);
+    const x = (canvas.width - w) / 2;
+    const y = (canvas.height - h) / 2;
     ctx.drawImage(uploadImage, x, y, w, h);
     hasInk = true;
     uploadDropzone?.classList.add('d-none');
@@ -372,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['dragleave','drop'].forEach(type=>target.addEventListener(type,e=>{if(mode!=='upload')return;e.preventDefault();uploadDropzone?.classList.remove('is-dragover');canvas.classList.remove('is-upload-dragover');}));
     target.addEventListener('drop',e=>{if(mode==='upload')loadUploadFile(e.dataTransfer?.files?.[0]);});
   });
-  [uploadX,uploadY,uploadScale].forEach(input=>input?.addEventListener('input',renderUploadImage));
+  uploadScale?.addEventListener('input',renderUploadImage);
   document.getElementById('osigResetPlacement')?.addEventListener('click',()=>{ resetUploadPlacement(); previewOffsetX=0; previewOffsetY=0; applyPreviewPlacement(); renderUploadImage(); });
   preview.addEventListener('pointerdown',e=>{ if(!hasInk)return; e.preventDefault(); preview.setPointerCapture(e.pointerId); preview.classList.add('is-dragging'); previewDrag={x:e.clientX,y:e.clientY,startX:previewOffsetX,startY:previewOffsetY}; });
   preview.addEventListener('pointermove',e=>{ if(!previewDrag)return; previewOffsetX=previewDrag.startX+(e.clientX-previewDrag.x); previewOffsetY=previewDrag.startY+(e.clientY-previewDrag.y); applyPreviewPlacement(); });
