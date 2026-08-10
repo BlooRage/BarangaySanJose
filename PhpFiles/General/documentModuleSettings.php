@@ -877,6 +877,8 @@ if (!function_exists('dms_resolve_module_signatories')) {
                 'title' => $title,
                 'signature_path' => trim((string)($row['signature_path'] ?? '')),
                 'signature_scale_percent' => 100,
+                'signature_offset_x_percent' => 0.0,
+                'signature_offset_y_percent' => 0.0,
                 'signature_help' => trim((string)($signatoryConfig['signature_help'] ?? '')),
                 'default_name' => $defaultName,
                 'default_title' => $defaultTitle,
@@ -889,6 +891,8 @@ if (!function_exists('dms_resolve_module_signatories')) {
                 if (!empty($officialSignature['file_path'])) {
                     $resolved[$signatoryKey]['signature_path'] = trim((string)$officialSignature['file_path']);
                     $resolved[$signatoryKey]['signature_scale_percent'] = max(50, min(160, (int)($officialSignature['scale_percent'] ?? 100)));
+                    $resolved[$signatoryKey]['signature_offset_x_percent'] = max(-50.0, min(50.0, (float)($officialSignature['offset_x_percent'] ?? 0)));
+                    $resolved[$signatoryKey]['signature_offset_y_percent'] = max(-50.0, min(50.0, (float)($officialSignature['offset_y_percent'] ?? 0)));
                 }
             }
         }

@@ -42,6 +42,8 @@ if ($action !== 'save') osig_reply(['success' => false, 'message' => 'Invalid si
 $dataUrl = trim((string)($_POST['signature_data'] ?? ''));
 $method = strtolower(trim((string)($_POST['creation_method'] ?? 'draw')));
 $scalePercent = max(50, min(160, (int)($_POST['scale_percent'] ?? 100)));
+$offsetXPercent = max(-50.0, min(50.0, (float)($_POST['offset_x_percent'] ?? 0)));
+$offsetYPercent = max(-50.0, min(50.0, (float)($_POST['offset_y_percent'] ?? 0)));
 if (!in_array($method, ['draw', 'upload', 'type'], true)) $method = 'draw';
 if (!preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $match)) {
     osig_reply(['success' => false, 'message' => 'Create or upload a valid signature first.'], 422);
@@ -94,9 +96,9 @@ try {
     $off->bind_param('s', $officialId);
     $off->execute();
     $off->close();
-    $ins = $conn->prepare("INSERT INTO officialsignaturetbl (official_id, user_id, file_path, signature_blob, scale_percent, creation_method) VALUES (?, ?, ?, ?, ?, ?)");
+    $ins = $conn->prepare("INSERT INTO officialsignaturetbl (official_id, user_id, file_path, signature_blob, scale_percent, offset_x_percent, offset_y_percent, creation_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $nullBlob = null;
-    $ins->bind_param('sssbis', $officialId, $userId, $filePath, $nullBlob, $scalePercent, $method);
+    $ins->bind_param('sssbidds', $officialId, $userId, $filePath, $nullBlob, $scalePercent, $offsetXPercent, $offsetYPercent, $method);
     $ins->send_long_data(3, $binary);
     $ins->execute();
     $ins->close();

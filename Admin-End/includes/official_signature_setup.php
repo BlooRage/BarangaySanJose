@@ -20,6 +20,8 @@ $osigCurrent = $osigIsChairman ? osig_get_current($conn, $osigOfficialId, $osigU
 $osigShowCard = !empty($officialSignatureShowCard);
 $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty($_SESSION['official_signature_skipped']);
 $osigScalePercent = max(50, min(160, (int)($osigCurrent['scale_percent'] ?? 100)));
+$osigOffsetXPercent = max(-50.0, min(50.0, (float)($osigCurrent['offset_x_percent'] ?? 0)));
+$osigOffsetYPercent = max(-50.0, min(50.0, (float)($osigCurrent['offset_y_percent'] ?? 0)));
 $osigMiddleName = trim((string)($osigAccount['middlename'] ?? ''));
 $osigMiddleInitial = $osigMiddleName !== '' ? strtoupper((string)mb_substr($osigMiddleName, 0, 1, 'UTF-8')) . '.' : '';
 $osigPreviewName = trim(implode(' ', array_filter([
@@ -69,7 +71,8 @@ $osigPreviewName = trim(implode(' ', array_filter([
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
   .osig-preview-stage{position:relative;width:min(420px,100%);height:128px;margin:0 auto;overflow:visible;touch-action:none}
   .osig-preview-line{position:absolute;left:50%;bottom:10px;width:320px;max-width:76%;border-top:1px solid #d7dde5;transform:translateX(-50%);z-index:1}
-  #osigPreview{position:absolute;left:50%;bottom:13px;z-index:2;display:none;width:200px;max-width:none;max-height:104px;object-fit:contain;transform-origin:center bottom;user-select:none;pointer-events:none}
+  #osigPreview{position:absolute;left:50%;bottom:13px;z-index:2;display:none;width:200px;max-width:none;max-height:104px;object-fit:contain;transform-origin:center bottom;user-select:none;touch-action:none;cursor:grab}
+  #osigPreview.is-dragging{cursor:grabbing}
   .osig-preview-help{display:none;margin-top:.4rem;color:#98a2b3;font-size:.78rem}
   .osig-preview-card.has-signature .osig-preview-help{display:block}
   .osig-size-control{display:grid;grid-template-columns:auto minmax(180px,320px) 3.5rem;align-items:center;justify-content:center;gap:.75rem;margin:.85rem auto 0;color:#49515d}
@@ -193,7 +196,7 @@ $osigPreviewName = trim(implode(' ', array_filter([
           <div class="osig-preview-stage" id="osigPreviewStage"><div class="osig-preview-line"></div><img id="osigPreview" alt="Signature preview"></div>
           <div class="fw-bold mt-1"><?= htmlspecialchars($osigPreviewName, ENT_QUOTES, 'UTF-8') ?></div>
           <div class="small text-muted">Punong Barangay</div>
-          <div class="osig-preview-help">This size and centered placement are used on generated documents.</div>
+          <div class="osig-preview-help">Drag to position the signature. Size and placement are reproduced on generated documents.</div>
           <label class="osig-size-control" for="osigSignatureScale"><span class="small fw-semibold">Signature size</span><input type="range" id="osigSignatureScale" min="50" max="160" step="5" value="<?= $osigScalePercent ?>"><output id="osigSignatureScaleValue"><?= $osigScalePercent ?>%</output></label>
         </div>
       </div>
@@ -266,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ctx = canvas.getContext('2d');
   const preview = document.getElementById('osigPreview');
   const previewStage = document.getElementById('osigPreviewStage');
+  const previewLine = previewStage?.querySelector('.osig-preview-line');
   const previewCard = document.getElementById('osigPreviewCard');
   const signatureScale = document.getElementById('osigSignatureScale');
   const signatureScaleValue = document.getElementById('osigSignatureScaleValue');
@@ -294,6 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let mode = 'draw', hasInk = false;
   let uploadImage = null, uploadObjectUrl = '';
   let previewOffsetX = 0, previewOffsetY = 0, previewDrag = null;
+  const initialOffsetXPercent = <?= json_encode($osigOffsetXPercent) ?>;
+  const initialOffsetYPercent = <?= json_encode($osigOffsetYPercent) ?>;
   let previewStageWidth = 420, previewStageHeight = 128;
   let largeDrawing = false, largeHasInk = false, largeHistory = [], largeRedo = [];
   const setupModal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -323,8 +329,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const applyPreviewPlacement = () => {
     const scale = Math.max(.5, Math.min(1.6, Number(signatureScale?.value || 100) / 100));
-    preview.style.transform = `translateX(-50%) scale(${scale})`;
+    preview.style.transform = `translateX(-50%) translate(${previewOffsetX}px, ${previewOffsetY}px) scale(${scale})`;
     if(signatureScaleValue)signatureScaleValue.value=`${Math.round(scale*100)}%`;
+  };
+  const restoreSavedPlacement = () => {
+    const lineWidth = previewLine?.getBoundingClientRect().width || 320;
+    const stageHeight = previewStage?.getBoundingClientRect().height || 128;
+    previewOffsetX = lineWidth * Number(initialOffsetXPercent || 0) / 100;
+    previewOffsetY = stageHeight * Number(initialOffsetYPercent || 0) / 100;
+    applyPreviewPlacement();
   };
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; previewCard?.classList.remove('has-signature'); previewOffsetX = 0; previewOffsetY = 0; applyPreviewPlacement(); syncSaveButton(); };
   const resetUploadPlacement = () => { if(uploadScale)uploadScale.value='100'; };
@@ -413,6 +426,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return canvas.toDataURL('image/png');
   };
   signatureScale?.addEventListener('input',applyPreviewPlacement);
+  preview.addEventListener('pointerdown',e=>{if(!hasInk)return;e.preventDefault();preview.setPointerCapture(e.pointerId);preview.classList.add('is-dragging');previewDrag={x:e.clientX,y:e.clientY,startX:previewOffsetX,startY:previewOffsetY};});
+  preview.addEventListener('pointermove',e=>{if(!previewDrag)return;e.preventDefault();previewOffsetX=previewDrag.startX+(e.clientX-previewDrag.x);previewOffsetY=previewDrag.startY+(e.clientY-previewDrag.y);applyPreviewPlacement();});
+  preview.addEventListener('pointerup',()=>{previewDrag=null;preview.classList.remove('is-dragging');});
+  preview.addEventListener('pointercancel',()=>{previewDrag=null;preview.classList.remove('is-dragging');});
   canvas.addEventListener('click',openDrawModal);
   canvas.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawModal();}});
   document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ const nextMode=btn.dataset.osigMode;if(mode===nextMode)return;mode=nextMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); if(mode!=='upload') uploadImage=null; clear(); uploadDropzone?.classList.toggle('d-none',mode!=='upload'||Boolean(uploadImage)); }));
@@ -445,6 +462,10 @@ document.addEventListener('DOMContentLoaded', () => {
     body.append('creation_method',mode);
     body.append('signature_data',adjustedSignatureData());
     body.append('scale_percent',String(Math.round(Number(signatureScale?.value || 100))));
+    const placementLineWidth = previewLine?.getBoundingClientRect().width || 320;
+    const placementStageHeight = previewStage?.getBoundingClientRect().height || 128;
+    body.append('offset_x_percent',String((previewOffsetX / placementLineWidth) * 100));
+    body.append('offset_y_percent',String((previewOffsetY / placementStageHeight) * 100));
     try{
       const res=await fetch(signatureSaveEndpoint,{method:'POST',body});
       const data=await res.json();
@@ -471,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch(signatureSaveEndpoint,{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
   document.getElementById('osigSkipButton')?.addEventListener('click',()=>{const body=new FormData();body.append('action','skip');fetch(signatureSaveEndpoint,{method:'POST',body}).catch(()=>{});});
   const reminderEl = document.getElementById('officialSignatureReminderModal');
+  window.requestAnimationFrame(restoreSavedPlacement);
   document.getElementById('osigSetupNow')?.addEventListener('click',()=>{
     if (!reminderEl) return;
     reminderEl.addEventListener('hidden.bs.modal',()=>bootstrap.Modal.getOrCreateInstance(modalEl).show(),{once:true});
