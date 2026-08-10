@@ -2848,8 +2848,19 @@ function dra_render_signature_image(object $pdf, string $publicPath, float $x, f
     }
 
     try {
+        $size = @getimagesize($diskPath);
+        if (is_array($size) && (int)$size[0] > 0 && (int)$size[1] > 0) {
+            $scale = min($w / (float)$size[0], $h / (float)$size[1]);
+            $renderWidth = max(0.1, (float)$size[0] * $scale);
+            $renderHeight = max(0.1, (float)$size[1] * $scale);
+            $x += ($w - $renderWidth) / 2.0;
+            $y += ($h - $renderHeight) / 2.0;
+            $w = $renderWidth;
+            $h = $renderHeight;
+        }
         $pdf->Image($diskPath, $x, $y, $w, $h, $imageType);
-    } catch (Throwable $ignored) {
+    } catch (Throwable $error) {
+        error_log('[dra_render_signature_image] ' . $error->getMessage() . ' [' . $diskPath . ']');
     }
 }
 

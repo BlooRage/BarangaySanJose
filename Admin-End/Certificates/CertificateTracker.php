@@ -3329,11 +3329,11 @@ if ($certificateLaunchStage === 'release') {
                   <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
                 </div>
                 <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
-                  <label for="manualOccupation" class="form-label fw-semibold small">Occupation <span class="text-danger">*</span></label>
+                  <label for="manualOccupation" class="form-label fw-semibold small">Occupation <span class="text-danger d-none" id="manualOccupationRequiredMark">*</span></label>
                   <input type="text" id="manualOccupation" class="form-control" placeholder="Occupation">
                 </div>
                 <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
-                  <label for="manualReligion" class="form-label fw-semibold small">Religion <span class="text-danger">*</span></label>
+                  <label for="manualReligion" class="form-label fw-semibold small">Religion <span class="text-danger d-none" id="manualReligionRequiredMark">*</span></label>
                   <input type="text" id="manualReligion" class="form-control" placeholder="Religion">
                 </div>
                   <div class="col-12">

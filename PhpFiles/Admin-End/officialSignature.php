@@ -69,8 +69,10 @@ try {
     $off->bind_param('s', $officialId);
     $off->execute();
     $off->close();
-    $ins = $conn->prepare("INSERT INTO officialsignaturetbl (official_id, user_id, file_path, creation_method) VALUES (?, ?, ?, ?)");
-    $ins->bind_param('ssss', $officialId, $userId, $filePath, $method);
+    $ins = $conn->prepare("INSERT INTO officialsignaturetbl (official_id, user_id, file_path, signature_blob, creation_method) VALUES (?, ?, ?, ?, ?)");
+    $nullBlob = null;
+    $ins->bind_param('sssbs', $officialId, $userId, $filePath, $nullBlob, $method);
+    $ins->send_long_data(3, $binary);
     $ins->execute();
     $ins->close();
     $conn->commit();

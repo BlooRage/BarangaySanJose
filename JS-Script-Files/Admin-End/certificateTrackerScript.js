@@ -8507,7 +8507,9 @@
     const manualBirthplace = document.getElementById('manualBirthplace');
     const manualBirthplaceRequiredMark = document.getElementById('manualBirthplaceRequiredMark');
     const manualOccupation = document.getElementById('manualOccupation');
+    const manualOccupationRequiredMark = document.getElementById('manualOccupationRequiredMark');
     const manualReligion = document.getElementById('manualReligion');
+    const manualReligionRequiredMark = document.getElementById('manualReligionRequiredMark');
     const manualFullAddress = document.getElementById('manualFullAddress');
     const manualAddressLine = document.getElementById('manualAddressLine');
     const manualAreaNumber = document.getElementById('manualAreaNumber');
@@ -10157,7 +10159,8 @@
     }
 
     function manualApplyCommonFieldRequirements(config) {
-      const isBarangayId = config?.kind === 'barangay_id';
+      const fields = manualFieldDefinitions(config);
+      const fieldRequired = (name) => fields.some((field) => field?.name === name && field.required);
       if (manualBirthdate) manualBirthdate.required = true;
       manualBirthdateRequiredMark?.classList.remove('d-none');
       if (manualSex) manualSex.required = true;
@@ -10165,8 +10168,12 @@
       if (manualContactNumber) manualContactNumber.required = true;
       if (manualBirthplace) manualBirthplace.required = true;
       manualBirthplaceRequiredMark?.classList.remove('d-none');
-      if (manualOccupation) manualOccupation.required = !isBarangayId;
-      if (manualReligion) manualReligion.required = !isBarangayId;
+      const occupationRequired = fieldRequired('occupation');
+      const religionRequired = fieldRequired('religion');
+      if (manualOccupation) manualOccupation.required = occupationRequired;
+      manualOccupationRequiredMark?.classList.toggle('d-none', !occupationRequired);
+      if (manualReligion) manualReligion.required = religionRequired;
+      manualReligionRequiredMark?.classList.toggle('d-none', !religionRequired);
     }
 
     function manualMarkPreviewStale(silent = false) {
