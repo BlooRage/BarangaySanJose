@@ -42,6 +42,9 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-workspace{border:1px solid #e2e7ed!important;border-radius:18px!important;background:#f8fafc!important}
   #osigCanvas{height:170px!important;border:2px dashed #cbd3dd!important;border-radius:14px!important}
   .osig-preview-card{background:linear-gradient(180deg,#fff,#fffaf4)!important;border-color:#efd8bb!important;border-radius:18px!important}
+  .osig-placement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:.75rem;align-items:end}
+  .osig-placement-grid label{display:block;margin:0;color:#49515d}
+  .osig-placement-grid input[type="range"]{width:100%;accent-color:#de710c}
   #officialSignatureModal .modal-footer{padding:1rem 1.5rem;background:#fbfcfd;border-top:1px solid #e6e9ee}
   #officialSignatureReminderModal .modal-dialog{max-width:520px}
   #officialSignatureReminderModal .modal-content{border:0;border-radius:12px;overflow:hidden;box-shadow:0 1rem 3rem rgba(15,23,42,.22)}
@@ -55,6 +58,7 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
   .osig-save-btn:hover{background:#bd6514!important;border-color:#bd6514!important}
   #osigColor{border-color:#e1b982;border-radius:10px}
   #osigWidth{accent-color:#de710c}
+  @media(max-width:767.98px){.osig-placement-grid{grid-template-columns:1fr}}
   @media(max-width:575.98px){#officialSignatureModal .modal-header{padding:1.25rem 2.75rem 1rem}#officialSignatureModal .modal-body,#officialSignatureModal .modal-footer{padding:1rem}.osig-title{font-size:1.2rem}#osigCanvas{height:145px!important}}
 </style>
 <?php if ($osigShowCard): ?>
@@ -138,6 +142,12 @@ $osigAutoPrompt = !empty($officialSignatureAutoPrompt) && !$osigCurrent && empty
             <label class="form-label fw-semibold">Choose signature image</label>
             <input type="file" class="form-control" id="osigFile" accept="image/png,image/jpeg,image/webp">
             <div class="form-text">The image will be converted to a transparent-ready PNG canvas.</div>
+            <div class="osig-placement-grid mt-3">
+              <label class="small fw-semibold">Horizontal position <input type="range" id="osigUploadX" min="-100" max="100" value="0"></label>
+              <label class="small fw-semibold">Vertical position <input type="range" id="osigUploadY" min="-100" max="100" value="0"></label>
+              <label class="small fw-semibold">Size <input type="range" id="osigUploadScale" min="20" max="160" value="100"></label>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="osigResetPlacement">Reset</button>
+            </div>
           </div>
           <div class="d-none mt-3" id="osigTypeTools">
             <label class="form-label fw-semibold">Type your full name</label>
@@ -169,8 +179,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const ctx = canvas.getContext('2d');
   const preview = document.getElementById('osigPreview');
   const alertEl = document.getElementById('osigAlert');
+  const uploadX = document.getElementById('osigUploadX');
+  const uploadY = document.getElementById('osigUploadY');
+  const uploadScale = document.getElementById('osigUploadScale');
   let mode = 'draw', drawing = false, hasInk = false;
+  let uploadImage = null, uploadObjectUrl = '';
   const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; preview.style.display = 'none'; };
+  const resetUploadPlacement = () => { if(uploadX)uploadX.value='0'; if(uploadY)uploadY.value='0'; if(uploadScale)uploadScale.value='100'; };
+  const renderUploadImage = () => {
+    if (!uploadImage) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const baseScale = Math.min(canvas.width / uploadImage.width, canvas.height / uploadImage.height);
+    const scale = baseScale * (Number(uploadScale?.value || 100) / 100);
+    const w = uploadImage.width * scale;
+    const h = uploadImage.height * scale;
+    const x = ((canvas.width - w) / 2) + (Number(uploadX?.value || 0) / 100) * (canvas.width / 2);
+    const y = ((canvas.height - h) / 2) + (Number(uploadY?.value || 0) / 100) * (canvas.height / 2);
+    ctx.drawImage(uploadImage, x, y, w, h);
+    hasInk = true;
+    refresh();
+  };
   const point = (e) => { const r=canvas.getBoundingClientRect(); const p=e.touches?.[0]||e; return {x:(p.clientX-r.left)*canvas.width/r.width,y:(p.clientY-r.top)*canvas.height/r.height}; };
   const start = e => { if(mode!=='draw')return; e.preventDefault(); drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
   const move = e => { if(!drawing)return; e.preventDefault(); const p=point(e); ctx.lineWidth=Number(document.getElementById('osigWidth').value); ctx.strokeStyle=document.getElementById('osigColor').value; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineTo(p.x,p.y); ctx.stroke(); hasInk=true; refresh(); };
@@ -178,8 +206,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const refresh = () => { if(!hasInk)return; preview.src=canvas.toDataURL('image/png'); preview.style.display='inline-block'; };
   ['pointerdown'].forEach(n=>canvas.addEventListener(n,start)); canvas.addEventListener('pointermove',move); window.addEventListener('pointerup',stop);
   document.getElementById('osigClear').addEventListener('click', clear);
-  document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ mode=btn.dataset.osigMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); document.getElementById('osigTypeTools').classList.toggle('d-none',mode!=='type'); clear(); }));
-  document.getElementById('osigFile').addEventListener('change', e=>{ const file=e.target.files?.[0]; if(!file)return; const img=new Image(); img.onload=()=>{ clear(); const scale=Math.min(canvas.width/img.width,canvas.height/img.height); const w=img.width*scale,h=img.height*scale; ctx.drawImage(img,(canvas.width-w)/2,(canvas.height-h)/2,w,h); hasInk=true; refresh(); URL.revokeObjectURL(img.src); }; img.src=URL.createObjectURL(file); });
+  document.querySelectorAll('[data-osig-mode]').forEach(btn=>btn.addEventListener('click',()=>{ mode=btn.dataset.osigMode; document.querySelectorAll('[data-osig-mode]').forEach(b=>b.classList.toggle('active',b===btn)); document.getElementById('osigDrawTools').classList.toggle('d-none',mode!=='draw'); document.getElementById('osigUploadTools').classList.toggle('d-none',mode!=='upload'); document.getElementById('osigTypeTools').classList.toggle('d-none',mode!=='type'); if(mode!=='upload') uploadImage=null; clear(); }));
+  document.getElementById('osigFile').addEventListener('change', e=>{ const file=e.target.files?.[0]; if(!file)return; const img=new Image(); if(uploadObjectUrl) URL.revokeObjectURL(uploadObjectUrl); uploadObjectUrl=URL.createObjectURL(file); img.onload=()=>{ uploadImage=img; resetUploadPlacement(); renderUploadImage(); }; img.src=uploadObjectUrl; });
+  [uploadX,uploadY,uploadScale].forEach(input=>input?.addEventListener('input',renderUploadImage));
+  document.getElementById('osigResetPlacement')?.addEventListener('click',()=>{ resetUploadPlacement(); renderUploadImage(); });
   document.getElementById('osigRenderTyped').addEventListener('click',()=>{ const name=document.getElementById('osigTypedName').value.trim(); clear(); if(!name)return; ctx.fillStyle=document.getElementById('osigColor').value; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='italic 92px cursive'; ctx.fillText(name,canvas.width/2,canvas.height/2,canvas.width-60); hasInk=true; refresh(); });
   document.getElementById('osigSave').addEventListener('click',async()=>{ if(!hasInk){alertEl.textContent='Create or upload a signature first.';alertEl.classList.remove('d-none');return;} const btn=document.getElementById('osigSave');btn.disabled=true; const body=new FormData();body.append('action','save');body.append('creation_method',mode);body.append('signature_data',canvas.toDataURL('image/png')); try{const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(!res.ok||!data.success)throw new Error(data.message||'Unable to save signature.');location.reload();}catch(e){alertEl.textContent=e.message;alertEl.classList.remove('d-none');btn.disabled=false;} });
   document.getElementById('osigRemoveButton')?.addEventListener('click',async()=>{if(!confirm('Remove the active official signature?'))return;const body=new FormData();body.append('action','remove');const res=await fetch('../PhpFiles/Admin-End/officialSignature.php',{method:'POST',body});const data=await res.json();if(data.success)location.reload();else alert(data.message||'Unable to remove signature.');});
