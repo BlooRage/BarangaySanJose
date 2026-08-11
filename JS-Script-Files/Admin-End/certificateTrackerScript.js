@@ -4929,6 +4929,9 @@
     if (!requestId || !(await confirmIssuedDocumentRegeneration())) {
       return;
     }
+    const barangayIdReopen = typeof paymentProofBarangayIdReopen === 'function'
+      ? paymentProofBarangayIdReopen
+      : null;
     const modalState = paymentProofModalState ? {
       docUrl: paymentProofModalState.docUrl,
       title: paymentProofModalState.title,
@@ -4954,12 +4957,16 @@
       const data = await fetchJson(endpoint, { method: 'POST', body });
       cachedAllItems = null;
       await load({ force: true });
-      if (modalState) {
+      if (barangayIdReopen) {
+        barangayIdReopen();
+      } else if (modalState) {
         const regeneratedUrl = String(data?.issued_file_path || modalState.docUrl || '').trim();
         openDocumentModal(regeneratedUrl, modalState.title, modalState.returnTarget, modalState.options);
       }
     } catch (error) {
-      if (modalState) {
+      if (barangayIdReopen) {
+        barangayIdReopen();
+      } else if (modalState) {
         openDocumentModal(modalState.docUrl, modalState.title, modalState.returnTarget, modalState.options);
       }
       alert(error?.message || 'Unable to regenerate the issued document.');
@@ -5598,6 +5605,12 @@
     }
     if (paymentProofReleaseBtn) {
       paymentProofReleaseBtn.classList.add('d-none');
+    }
+    if (paymentProofRegenerateBtn) {
+      const canRegenerate = String(options?.releaseRequestId || '').trim() !== '';
+      paymentProofRegenerateBtn.classList.toggle('d-none', !canRegenerate);
+      paymentProofRegenerateBtn.disabled = false;
+      paymentProofRegenerateBtn.innerHTML = '<i class="fas fa-rotate me-1"></i>Regenerate ID';
     }
     if (paymentProofPrintBtn) {
       paymentProofPrintBtn.classList.toggle('d-none', !(options && options.allowPrint));

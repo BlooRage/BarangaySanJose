@@ -345,7 +345,7 @@ $hasCouncilTbl = $conn->query("SHOW TABLES LIKE 'barangaycounciltbl'")->num_rows
 if ($hasCouncilTbl) {
     $csRes = $conn->query("
         SELECT bc.council_id, bc.seat_name, bc.selection_method, bc.seat_group,
-               bc.sort_order, bc.term_start, bc.term_end,
+               bc.sort_order,
                bc.current_official_id,
                oi.firstname,
                oi.lastname,
@@ -378,14 +378,6 @@ $councilSeats = array_values(array_filter(
     static fn (array $seat): bool => ot_is_managed_transition_seat((string)($seat['seat_name'] ?? ''))
 ));
 
-$otFormatDateLabel = static function (?string $value): string {
-    $value = trim((string)$value);
-    if ($value === '' || $value === '0000-00-00') {
-        return '—';
-    }
-    $ts = strtotime($value);
-    return $ts ? date('M d, Y', $ts) : '—';
-};
 $councilSeatsByGroup = [];
 $appointedPreviewSeats = [];
 $currentTermSeatCount = 0;
@@ -1110,7 +1102,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
         <span class="official-process__number">1</span>
         <div>
           <div class="official-process__title">Set Up Seats</div>
-          <div class="official-process__copy">Create the positions, selection method, display order, and term dates.</div>
+          <div class="official-process__copy">Create the positions, selection method, and display order.</div>
         </div>
       </div>
       <div class="official-process__step">
@@ -1249,7 +1241,6 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
                 <tr>
                   <th>Position / Seat</th>
                   <th>Official</th>
-                  <th>Term</th>
                   <th>Account</th>
                   <th>Access Template</th>
                   <th class="text-end">Actions</th>
@@ -1260,8 +1251,6 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
                   <?php
                     $holderName = trim((string)($seat['current_official_name'] ?? ''));
                     $selectionMethod = trim((string)($seat['selection_method'] ?? ''));
-                    $termStartLabel = $otFormatDateLabel((string)($seat['term_start'] ?? ''));
-                    $termEndLabel = $otFormatDateLabel((string)($seat['term_end'] ?? ''));
                     $positionAccess = trim((string)($seat['current_position_access'] ?? ''));
                     $accountStatus = trim((string)($seat['account_status'] ?? ''));
                     $seatAccess = $seatAccessByCouncilId[(int)($seat['council_id'] ?? 0)] ?? null;
@@ -1278,10 +1267,6 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
                       <?php else: ?>
                         <span class="official-seat-status is-vacant"><i class="fas fa-circle fa-2xs"></i> Vacant</span>
                       <?php endif; ?>
-                    </td>
-                    <td>
-                      <div class="small"><?= htmlspecialchars($termStartLabel, ENT_QUOTES, 'UTF-8') ?></div>
-                      <div class="small text-muted">to <?= htmlspecialchars($termEndLabel, ENT_QUOTES, 'UTF-8') ?></div>
                     </td>
                     <td>
                       <?php if ($holderName === ''): ?>
@@ -1678,15 +1663,13 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
               <th>Type</th>
               <th>Position</th>
               <th>Outgoing Official</th>
-              <th>Reference</th>
-              <th>Assignment Period</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="otTableBody">
             <tr>
-              <td colspan="8" class="text-center text-muted py-4">
+              <td colspan="6" class="text-center text-muted py-4">
                 <i class="fas fa-spinner fa-spin me-2"></i> Loading…
               </td>
             </tr>
@@ -1771,21 +1754,11 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
                   </select>
                 </div>
               </div>
-              <div class="row g-3 mb-3">
-                <div class="col-sm-6">
-                  <label class="form-label fw-semibold" for="seatSetupTermStart">Term Start</label>
-                  <input type="date" class="form-control" id="seatSetupTermStart" name="term_start">
-                </div>
-                <div class="col-sm-6">
-                  <label class="form-label fw-semibold" for="seatSetupTermEnd">Term End</label>
-                  <input type="date" class="form-control" id="seatSetupTermEnd" name="term_end">
-                </div>
-              </div>
               <div class="mb-3">
                 <label class="form-label fw-semibold" for="seatSetupSortOrder">Display Order</label>
                 <input type="number" class="form-control" id="seatSetupSortOrder" name="sort_order" min="0" step="1" value="0">
               </div>
-              <div class="small text-muted mb-3">For an occupied seat, term changes also update the current official. Access permissions are configured under Access Templates.</div>
+              <div class="small text-muted mb-3">Access permissions are configured separately under Access Templates.</div>
               <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                 <button type="button" class="btn btn-outline-danger d-none" id="btnDeactivateCouncilSeat">Deactivate Seat</button>
                 <button type="submit" class="btn btn-primary ms-auto" id="btnSaveCouncilSeat"><i class="fas fa-save me-1"></i> Save Seat</button>
@@ -1880,25 +1853,13 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
               </select>
             </div>
 
-            <!-- Effective Date -->
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Assignment Start <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="effective_date" id="ntEffectiveDate" data-date-modal-style="calendar" required>
-            </div>
-
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Assignment End</label>
-              <input type="date" class="form-control" name="assignment_end_date" id="ntAssignmentEndDate" data-date-modal-style="calendar">
-              <div class="form-text">Optional for open-ended or temporary assignments.</div>
-            </div>
-
             <input type="hidden" name="batch_label" id="ntBatchLabel" value="">
 
             <!-- Reason -->
             <div class="col-12">
               <label class="form-label fw-semibold" id="ntReasonLabel">Assignment Notes</label>
               <textarea class="form-control" name="reason" id="ntReason" rows="2"
-                        placeholder="Optional — required for Removal"></textarea>
+                        placeholder="Optional notes about this assignment"></textarea>
             </div>
           </div>
           <?php endif; ?>

@@ -476,7 +476,7 @@
   async function loadTransitions() {
     const tbody = document.getElementById('otTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</td></tr>';
 
     const q    = document.getElementById('otSearch')?.value.trim()     || '';
     const type = document.getElementById('otTypeFilter')?.value.trim() || '';
@@ -490,11 +490,11 @@
     });
 
     if (!data.success) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${data.message || 'Failed to load.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${data.message || 'Failed to load.'}</td></tr>`;
       return;
     }
     if (data.notice) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5">
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5">
         <div class="text-muted mb-2"><i class="fas fa-database fa-2x"></i></div>
         <div class="fw-semibold">Database migration not yet applied.</div>
         <div class="text-muted small mt-1">Run <code>20260323_create_official_transitions_schema.sql</code> on your database to activate this module.</div>
@@ -504,7 +504,7 @@
 
     const rows = data.data || [];
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">${emptyQueueMessage}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">${emptyQueueMessage}</td></tr>`;
       renderPagination(0);
       return;
     }
@@ -519,12 +519,6 @@
           : '',
       ].filter(Boolean);
       const outgoing = outgoingParts.join('') || '<span class="text-muted small">Vacant seat</span>';
-      const batch = r.batch_label
-        ? `<div><span class="badge bg-secondary">${esc(r.batch_label)}</span></div>`
-        : '<span class="text-muted small">Manual</span>';
-      const startDate = r.effective_date ? fmtDate(r.effective_date) : '—';
-      const endDate = r.assignment_end_date ? fmtDate(r.assignment_end_date) : 'Open-ended';
-      const assignmentPeriod = `<div>${startDate}</div><div class="small text-muted">to ${endDate}</div>`;
       const actingTag = r.is_acting == 1   ? ' <span class="badge bg-info text-dark ms-1">Acting</span>' : '';
 
       const actions = buildRowActions(r);
@@ -535,8 +529,6 @@
           <td>${typeBadge(r.transition_type)}</td>
           <td>${esc(r.position || '—')}${actingTag}</td>
           <td>${outgoing}</td>
-          <td>${batch}</td>
-          <td>${assignmentPeriod}</td>
           <td>${statusBadge(r.status)}</td>
           <td>${actions}</td>
         </tr>`;
@@ -614,8 +606,6 @@
   const ntBatchWrap  = document.getElementById('ntBatchLabelWrap');
   const ntReasonLbl  = document.getElementById('ntReasonLabel');
   const ntSeatWrap   = document.getElementById('ntSeatInfoWrap');
-  const ntEffectiveDate = document.getElementById('ntEffectiveDate');
-  const ntAssignmentEndDate = document.getElementById('ntAssignmentEndDate');
 
   // Transition type options per selection_method
   const ELECTED_TYPES = [
@@ -675,8 +665,6 @@
     if (ntType) ntType.value = '';
     if (ntBatchWrap) ntBatchWrap.style.display = 'none';
     if (ntReasonLbl) ntReasonLbl.textContent = 'Assignment Notes';
-    if (ntEffectiveDate) ntEffectiveDate.value = String(seatRecord.term_start || '').slice(0, 10);
-    if (ntAssignmentEndDate) ntAssignmentEndDate.value = String(seatRecord.term_end || '').slice(0, 10);
   });
 
   ntType?.addEventListener('change', () => {
@@ -734,8 +722,6 @@
   const seatSetupName = document.getElementById('seatSetupName');
   const seatSetupGroup = document.getElementById('seatSetupGroup');
   const seatSetupMethod = document.getElementById('seatSetupMethod');
-  const seatSetupStart = document.getElementById('seatSetupTermStart');
-  const seatSetupEnd = document.getElementById('seatSetupTermEnd');
   const seatSetupSort = document.getElementById('seatSetupSortOrder');
   const seatSetupTitle = document.getElementById('seatSetupFormTitle');
   const seatSetupBadge = document.getElementById('seatSetupModeBadge');
@@ -758,8 +744,6 @@
     if (seatSetupName) seatSetupName.value = String(seat.seat_name || '');
     if (seatSetupGroup) seatSetupGroup.value = String(seat.seat_group || 'Sangguniang Barangay');
     if (seatSetupMethod) seatSetupMethod.value = String(seat.selection_method || 'Elected');
-    if (seatSetupStart) seatSetupStart.value = String(seat.term_start || '').slice(0, 10);
-    if (seatSetupEnd) seatSetupEnd.value = String(seat.term_end || '').slice(0, 10);
     if (seatSetupSort) seatSetupSort.value = String(seat.sort_order || 0);
     if (seatSetupTitle) seatSetupTitle.textContent = 'Edit Seat';
     if (seatSetupBadge) seatSetupBadge.textContent = 'Editing';

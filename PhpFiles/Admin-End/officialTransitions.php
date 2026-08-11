@@ -1011,8 +1011,6 @@ if ($action === 'fetch_council_seats') {
             bc.selection_method,
             bc.seat_group,
             bc.sort_order,
-            bc.term_start,
-            bc.term_end,
             bc.is_active,
             bc.current_official_id,
             oi.firstname,
@@ -1057,10 +1055,6 @@ if ($action === 'save_council_seat') {
     $selectionMethod = trim((string)($_POST['selection_method'] ?? ''));
     $seatGroup = trim((string)($_POST['seat_group'] ?? ''));
     $sortOrder = max(0, (int)($_POST['sort_order'] ?? 0));
-    $termStartInput = trim((string)($_POST['term_start'] ?? ''));
-    $termEndInput = trim((string)($_POST['term_end'] ?? ''));
-    $termStart = otNormalizeDateOrNull($termStartInput);
-    $termEnd = otNormalizeDateOrNull($termEndInput);
 
     if ($seatName === '' || mb_strlen($seatName) > 150) {
         otError('Enter a seat name with no more than 150 characters.');
@@ -1071,13 +1065,6 @@ if ($action === 'save_council_seat') {
     if ($seatGroup === '' || mb_strlen($seatGroup) > 50) {
         otError('Enter a seat group with no more than 50 characters.');
     }
-    if (($termStartInput !== '' && $termStart === null) || ($termEndInput !== '' && $termEnd === null)) {
-        otError('Enter valid seat term dates.');
-    }
-    if ($termStart !== null && $termEnd !== null && $termEnd < $termStart) {
-        otError('The default term end date cannot be earlier than the start date.');
-    }
-
     $duplicateStmt = $conn->prepare("
         SELECT council_id
         FROM barangaycounciltbl
@@ -1104,8 +1091,6 @@ if ($action === 'save_council_seat') {
                 selection_method = ?,
                 seat_group = ?,
                 sort_order = ?,
-                term_start = ?,
-                term_end = ?,
                 updated_at = NOW()
             WHERE council_id = ? AND is_active = 1
             LIMIT 1
@@ -1113,7 +1098,7 @@ if ($action === 'save_council_seat') {
         if (!$stmt) {
             otError('Unable to prepare the seat update.');
         }
-        $stmt->bind_param('sssissi', $seatName, $selectionMethod, $seatGroup, $sortOrder, $termStart, $termEnd, $councilId);
+        $stmt->bind_param('sssii', $seatName, $selectionMethod, $seatGroup, $sortOrder, $councilId);
         if (!$stmt->execute()) {
             $message = $stmt->error;
             $stmt->close();
@@ -1123,8 +1108,6 @@ if ($action === 'save_council_seat') {
         $syncAssignmentStmt = $conn->prepare("
             UPDATE officialinformationtbl
             SET selection_method = ?,
-                term_start = ?,
-                term_end = ?,
                 last_updated = CURRENT_TIMESTAMP
             WHERE official_id = (
                 SELECT current_official_id
@@ -1134,7 +1117,7 @@ if ($action === 'save_council_seat') {
             LIMIT 1
         ");
         if ($syncAssignmentStmt) {
-            $syncAssignmentStmt->bind_param('sssi', $selectionMethod, $termStart, $termEnd, $councilId);
+            $syncAssignmentStmt->bind_param('si', $selectionMethod, $councilId);
             $syncAssignmentStmt->execute();
             $syncAssignmentStmt->close();
         }
@@ -1143,13 +1126,13 @@ if ($action === 'save_council_seat') {
     } else {
         $stmt = $conn->prepare("
             INSERT INTO barangaycounciltbl
-                (seat_name, selection_method, seat_group, sort_order, term_start, term_end, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+                (seat_name, selection_method, seat_group, sort_order, is_active)
+            VALUES (?, ?, ?, ?, 1)
         ");
         if (!$stmt) {
             otError('Unable to prepare the new seat.');
         }
-        $stmt->bind_param('sssiss', $seatName, $selectionMethod, $seatGroup, $sortOrder, $termStart, $termEnd);
+        $stmt->bind_param('sssi', $seatName, $selectionMethod, $seatGroup, $sortOrder);
         if (!$stmt->execute()) {
             $message = $stmt->error;
             $stmt->close();
@@ -1486,9 +1469,6 @@ if ($action === 'fetch_transitions') {
         SELECT t.transition_id,
                t.transition_type,
                t.seat_name AS position,
-               t.batch_label,
-               t.effective_date,
-               t.assignment_end_date,
                t.status,
                t.reason,
                t.acting_until_date,
@@ -1523,7 +1503,7 @@ if ($action === 'fetch_transitions') {
         $row = otDecryptOfficialContactRow($row);
         $row['outgoing_name'] = otFormatOfficialName($row, true);
         $row['is_acting'] = 0;
-        if ($q !== '' && !pii_search_match($row, ['transition_id', 'position', 'batch_label', 'outgoing_name'], $q)) {
+        if ($q !== '' && !pii_search_match($row, ['transition_id', 'position', 'outgoing_name'], $q)) {
             continue;
         }
         $filteredRows[] = $row;
@@ -1567,24 +1547,9 @@ if ($action === 'fetch_candidates') {
 if ($action === 'new_transition') {
     $councilId = (int)($_POST['council_id'] ?? 0);
     $transType = trim((string)($_POST['transition_type'] ?? ''));
-    $effectiveDate = trim((string)($_POST['effective_date'] ?? ''));
-    $assignmentEndDate = trim((string)($_POST['assignment_end_date'] ?? ''));
     $reason = trim((string)($_POST['reason'] ?? ''));
-    $batchLabel = trim((string)($_POST['batch_label'] ?? ''));
     if ($councilId <= 0) otError('Council seat is required.');
     if ($transType === '') otError('Transition type is required.');
-    if ($effectiveDate === '') {
-        $effectiveDate = date('Y-m-d');
-    }
-    if (otNormalizeDateOrNull($effectiveDate) === null) {
-        otError('Enter a valid assignment start date.');
-    }
-    if ($assignmentEndDate !== '' && otNormalizeDateOrNull($assignmentEndDate) === null) {
-        otError('Enter a valid assignment end date.');
-    }
-    if ($assignmentEndDate !== '' && $assignmentEndDate < $effectiveDate) {
-        otError('The assignment end date cannot be earlier than the start date.');
-    }
     $seatStmt = $conn->prepare("
         SELECT bc.council_id, bc.seat_name, bc.current_official_id, oi.department, oi.area_number
         FROM barangaycounciltbl bc
@@ -1602,8 +1567,8 @@ if ($action === 'new_transition') {
     $transitionId = ogw_generate_transition_id();
     $stmt = $conn->prepare("
         INSERT INTO officialgovernancetransitiontbl
-            (transition_id, council_id, batch_label, transition_type, seat_name, department, area_number, outgoing_official_id, effective_date, assignment_end_date, reason, status, created_by_user_id)
-        VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 'PendingSuperAdminApproval', ?)
+            (transition_id, council_id, transition_type, seat_name, department, area_number, outgoing_official_id, reason, status, created_by_user_id)
+        VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 'PendingSuperAdminApproval', ?)
     ");
     if (!$stmt) otError('Insert failed: ' . $conn->error);
     $seatName = (string)($seat['seat_name'] ?? '');
@@ -1613,14 +1578,11 @@ if ($action === 'new_transition') {
     otBindStringParams($stmt, [
         $transitionId,
         $councilId,
-        $batchLabel,
         $transType,
         $seatName,
         $department,
         $areaNumber,
         $outgoingId,
-        $effectiveDate,
-        $assignmentEndDate,
         $reason,
         $actorId
     ]);
@@ -1754,7 +1716,6 @@ if ($action === 'complete_transition') {
     $incomingUserId = '';
     $outgoingId = (string)($transition['outgoing_official_id'] ?? '');
     $councilId = (int)($transition['council_id'] ?? 0);
-    $assignmentEndDate = trim((string)($transition['assignment_end_date'] ?? ''));
     if ($outcome === 'ReElected' && $outgoingId === '') {
         otError('The current official account could not be found for renewal.');
     }
@@ -1804,22 +1765,6 @@ if ($action === 'complete_transition') {
                     otUpdateOfficialContacts($conn, $incomingOfficialId, $incomingUserId, $contactEmail, $contactPhone10);
                 }
             }
-            if ($incomingOfficialId !== '') {
-                $renewStmt = $conn->prepare("
-                    UPDATE officialinformationtbl
-                    SET term_start = ?,
-                        term_end = NULLIF(?, ''),
-                        last_updated = CURRENT_TIMESTAMP
-                    WHERE official_id = ?
-                    LIMIT 1
-                ");
-                if ($renewStmt) {
-                    $renewStart = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
-                    $renewStmt->bind_param('sss', $renewStart, $assignmentEndDate, $incomingOfficialId);
-                    $renewStmt->execute();
-                    $renewStmt->close();
-                }
-            }
         } elseif ($outcome !== 'NoSuccessor') {
             if ($linkedOfficialId !== '') {
                 $existing = otGetOfficialUser($conn, $linkedOfficialId);
@@ -1857,7 +1802,6 @@ if ($action === 'complete_transition') {
                 'transition_type' => (string)($transition['transition_type'] ?? ''),
                 'selection_method' => (string)($transition['selection_method'] ?? ''),
             ]);
-            $effectiveDate = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
             $upOfficial = $conn->prepare("
                 UPDATE officialinformationtbl
                 SET role_access = ?,
@@ -1865,24 +1809,17 @@ if ($action === 'complete_transition') {
                     department = ?,
                     area_number = ?,
                     selection_method = ?,
-                    term_start = ?,
-                    term_end = NULLIF(?, ''),
-                    batch_label = NULLIF(?, ''),
                     last_updated = CURRENT_TIMESTAMP
                 WHERE official_id = ?
                 LIMIT 1
             ");
             if ($upOfficial) {
-                $batchLabel = trim((string)($transition['batch_label'] ?? ''));
                 otBindStringParams($upOfficial, [
                     $assignment['official_role'],
                     $assignment['position_access'],
                     $assignment['department'],
                     $assignment['area_number'],
                     $assignment['selection_method'],
-                    $effectiveDate,
-                    $assignmentEndDate,
-                    $batchLabel,
                     $incomingOfficialId
                 ]);
                 $upOfficial->execute();
@@ -1969,15 +1906,12 @@ if ($action === 'complete_transition') {
             $seatStmt = $conn->prepare("
                 UPDATE barangaycounciltbl
                 SET current_official_id = NULLIF(?, ''),
-                    term_start = COALESCE(NULLIF(?, ''), term_start),
-                    term_end = NULLIF(?, ''),
                     updated_at = NOW()
                 WHERE council_id = ?
                 LIMIT 1
             ");
             if ($seatStmt) {
-                $effectiveDate = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
-                $seatStmt->bind_param('sssi', $incomingOfficialId, $effectiveDate, $assignmentEndDate, $councilId);
+                $seatStmt->bind_param('si', $incomingOfficialId, $councilId);
                 $seatStmt->execute();
                 $seatStmt->close();
             }

@@ -9163,10 +9163,13 @@ if ($action === 'regenerate_issued_document') {
         dr_respond_json(405, ['success' => false, 'message' => 'Document regeneration requires POST.']);
     }
     $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
-    if ($currentStage !== DR_STAGE_READY_FOR_CLAIM) {
+    $isBarangayId = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
+    $canRegenerate = $currentStage === DR_STAGE_READY_FOR_CLAIM
+        || ($isBarangayId && $currentStage === DR_STAGE_FOR_PRINTING);
+    if (!$canRegenerate) {
         dr_respond_json(422, [
             'success' => false,
-            'message' => 'Regeneration is only available while the request is For Release.',
+            'message' => 'Regeneration is only available while the request is For Printing or For Release.',
         ]);
     }
     $generatedPath = trim((string)(dra_generate_issued_document_safe((array)$row) ?? ''));
@@ -9177,7 +9180,7 @@ if ($action === 'regenerate_issued_document') {
             'message' => 'Unable to regenerate the issued document. ' . dra_issued_document_diagnostics($baseDir, (array)$row),
         ]);
     }
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
+    $updated = dr_update_stage($conn, $requestId, $currentStage, [
         'issued_file_path' => $generatedPath,
     ]);
     if (!$updated) {
@@ -9195,7 +9198,7 @@ if ($action === 'regenerate_issued_document') {
             'issued_file_path',
             (string)($row['issued_file_path'] ?? ''),
             $generatedPath,
-            'Regenerated from current admin settings while request was For Release.'
+            'Regenerated from current admin settings while request was awaiting printing or release.'
         );
     } catch (Throwable $__e) {
     }
