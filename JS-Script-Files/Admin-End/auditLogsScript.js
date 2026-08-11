@@ -49,17 +49,17 @@
   const STORAGE_KEY = "audit_cols_v1";
 
   const columns = [
-    { key: "timestamp", label: "Timestamp", default: true, get: (r) => safeText(r.action_timestamp), nowrap: true },
-    { key: "user_id", label: "User ID", default: true, get: (r) => safeText(r.user_id) },
-    { key: "name", label: "Name", default: true, get: (r) => safeText(r.display_name) },
-    { key: "role_access", label: "Role Access", default: true, get: (r) => safeText(r.role_access) },
-    { key: "action_type", label: "Action", default: true, get: (r) => safeText(r.action_type) },
-    { key: "module_affected", label: "Module", default: false, get: (r) => safeText(r.module_affected) },
-    { key: "target", label: "Target", default: false, get: (r) => `${safeText(r.target_type)} #${safeText(r.target_id)}` },
-    { key: "field_changed", label: "Field", default: false, get: (r) => safeText(r.field_changed) },
-    { key: "old_value", label: "Old", default: false, get: (r) => safeText(r.old_value), truncate: 60 },
-    { key: "new_value", label: "New", default: false, get: (r) => safeText(r.new_value), truncate: 60 },
-    { key: "remarks", label: "Remarks", default: false, get: (r) => safeText(r.remarks), truncate: 60 },
+    { key: "timestamp", label: "Timestamp", default: true, width: 165, get: (r) => safeText(r.action_timestamp), nowrap: true },
+    { key: "user_id", label: "User ID", default: true, width: 145, get: (r) => safeText(r.user_id) },
+    { key: "name", label: "Name", default: true, width: 180, get: (r) => safeText(r.display_name) },
+    { key: "role_access", label: "Role Access", default: true, width: 135, get: (r) => safeText(r.role_access) },
+    { key: "action_type", label: "Action", default: true, width: 220, get: (r) => safeText(r.action_type), truncate: 100 },
+    { key: "module_affected", label: "Module", default: false, width: 160, get: (r) => safeText(r.module_affected) },
+    { key: "target", label: "Target", default: false, width: 180, get: (r) => `${safeText(r.target_type)} #${safeText(r.target_id)}` },
+    { key: "field_changed", label: "Field", default: false, width: 140, get: (r) => safeText(r.field_changed) },
+    { key: "old_value", label: "Old", default: false, width: 220, get: (r) => safeText(r.old_value), truncate: 60 },
+    { key: "new_value", label: "New", default: false, width: 220, get: (r) => safeText(r.new_value), truncate: 60 },
+    { key: "remarks", label: "Remarks", default: false, width: 220, get: (r) => safeText(r.remarks), truncate: 60 },
   ];
 
   const defaultVisibleCols = () => columns.filter((c) => c.default).map((c) => c.key);
@@ -95,10 +95,14 @@
     const theadRow = el("auditTheadRow");
     if (!theadRow) return;
     const activeCols = getActiveColumns();
+    const table = theadRow.closest("table");
+    const minimumWidth = activeCols.reduce((total, column) => total + (column.width || 160), 0);
+    table?.style.setProperty("--audit-table-min-width", `${Math.max(620, minimumWidth)}px`);
     theadRow.innerHTML = "";
     activeCols.forEach((c) => {
       const th = document.createElement("th");
       th.textContent = c.label;
+      if (c.width) th.style.width = `${c.width}px`;
       if (c.nowrap) th.style.whiteSpace = "nowrap";
       theadRow.appendChild(th);
     });

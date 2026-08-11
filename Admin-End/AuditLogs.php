@@ -18,10 +18,10 @@ $auditLogsCsrfToken = ensureCsrfToken();
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AuditLogsStyle.css?v=20260811-1">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AuditLogsStyle.css?v=20260811-2">
 </head>
-<body>
-  <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
+<body class="audit-logs-page">
+  <div class="audit-page-layout d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
@@ -179,7 +179,7 @@ $auditLogsCsrfToken = ensureCsrfToken();
   <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
   <script
     id="auditLogsScript"
-    src="../JS-Script-Files/Admin-End/auditLogsScript.js?v=20260811-1"
+    src="../JS-Script-Files/Admin-End/auditLogsScript.js?v=20260811-2"
     data-endpoint="<?= htmlspecialchars($auditLogsEndpoint, ENT_QUOTES, 'UTF-8') ?>"
     data-csrf-token="<?= htmlspecialchars($auditLogsCsrfToken, ENT_QUOTES, 'UTF-8') ?>"
   ></script>
