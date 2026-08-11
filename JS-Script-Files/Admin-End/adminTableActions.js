@@ -203,27 +203,6 @@
     delete dropdown._adminActionOverflowNodes;
   }
 
-  function reserveDropdownSpace(dropdown) {
-    const menu = dropdown?.querySelector?.('.dropdown-menu.show');
-    const shell = dropdown?.closest?.('.compact-admin-table-shell,.table-responsive');
-    if (!menu || !shell) return;
-    if (!shell.dataset.adminActionBasePaddingBottom) {
-      shell.dataset.adminActionBasePaddingBottom = window.getComputedStyle(shell).paddingBottom || '0px';
-    }
-    const basePadding = parseFloat(shell.dataset.adminActionBasePaddingBottom) || 0;
-    const overflow = Math.ceil(menu.getBoundingClientRect().bottom - shell.getBoundingClientRect().bottom + 12);
-    if (overflow > 0) shell.style.paddingBottom = `${basePadding + overflow}px`;
-    dropdown._adminActionSpaceShell = shell;
-  }
-
-  function restoreDropdownSpace(dropdown) {
-    const shell = dropdown?._adminActionSpaceShell;
-    if (!shell || shell.querySelector?.('.dropdown-menu.show')) return;
-    shell.style.paddingBottom = shell.dataset.adminActionBasePaddingBottom || '';
-    delete shell.dataset.adminActionBasePaddingBottom;
-    delete dropdown._adminActionSpaceShell;
-  }
-
   const start = () => {
     processAll();
     let queued = false;
@@ -244,15 +223,9 @@
       prepareDropdown(dropdown);
       openOverflowForDropdown(dropdown);
     });
-    document.addEventListener('shown.bs.dropdown', event => {
-      const dropdown = tableDropdownFromToggle(event.target);
-      if (!dropdown) return;
-      requestAnimationFrame(() => reserveDropdownSpace(dropdown));
-    });
     document.addEventListener('hidden.bs.dropdown', event => {
       const dropdown = tableDropdownFromToggle(event.target);
       if (!dropdown) return;
-      restoreDropdownSpace(dropdown);
       closeOverflowForDropdown(dropdown);
     });
   };
