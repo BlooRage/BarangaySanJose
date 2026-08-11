@@ -244,7 +244,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
                 oi.role_access AS info_role_access,
                 COALESCE(oi.position_access, oi.role_access) AS position_access,
                 oi.department,
-                oi.term_end,
                 ua.role_access AS account_role_access,
                 COALESCE(sa.status_name, '') AS account_status
             FROM barangaycounciltbl bc
@@ -526,7 +525,6 @@ if ($hasCouncilTbl) {
             COALESCE(oi.position_access, oi.role_access) AS position_access,
             oi.department,
             oi.area_number,
-            oi.term_end,
             ua.email,
             ua.phone_number,
             ua.role_access AS account_role_access,
@@ -568,7 +566,6 @@ if ($hasCouncilTbl) {
                 'position_access' => (string)($row['position_access'] ?? ''),
                 'department' => (string)($row['department'] ?? ''),
                 'area_number' => (string)($row['area_number'] ?? ''),
-                'term_end' => (string)($row['term_end'] ?? ''),
                 'email' => (string)($row['email'] ?? ''),
                 'phone_number' => (string)($row['phone_number'] ?? ''),
                 'account_status' => (string)($row['account_status'] ?? ''),
@@ -1632,7 +1629,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
           <div class="ot-table-toolbar">
             <div class="input-group">
               <input type="text" class="form-control form-control-sm" id="otSearch"
-                     placeholder="Search position, official, term…">
+                     placeholder="Search position, official, or assignment ID…">
               <span class="input-group-text bg-white"><i class="fas fa-search fa-xs"></i></span>
             </div>
             <div class="ot-table-toolbar-controls">
@@ -1846,14 +1843,12 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
             </div>
 
             <!-- Transition Type — options filtered by selection_method -->
-            <div class="col-12 col-md-6">
+            <div class="col-12">
               <label class="form-label fw-semibold">Assignment Type <span class="text-danger">*</span></label>
               <select class="form-select" name="transition_type" id="ntType" required>
                 <option value="">— Select a seat first —</option>
               </select>
             </div>
-
-            <input type="hidden" name="batch_label" id="ntBatchLabel" value="">
 
             <!-- Reason -->
             <div class="col-12">
@@ -2512,7 +2507,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-2"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-3"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};

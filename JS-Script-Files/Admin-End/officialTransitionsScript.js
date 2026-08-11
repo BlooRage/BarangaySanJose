@@ -603,7 +603,6 @@
   // ══════════════════════════════════════════════════════════════════════════
   const ntCouncilId  = document.getElementById('ntCouncilId');
   const ntType       = document.getElementById('ntType');
-  const ntBatchWrap  = document.getElementById('ntBatchLabelWrap');
   const ntReasonLbl  = document.getElementById('ntReasonLabel');
   const ntSeatWrap   = document.getElementById('ntSeatInfoWrap');
 
@@ -637,8 +636,6 @@
     const method     = opt.dataset.method      || 'Elected';
     const holderName = opt.dataset.officialName || 'Vacant';
     const acctStatus = opt.dataset.accountStatus || '';
-    const seatRecord = (window.OT_DATA?.councilSeats || []).find((row) => String(row.council_id || '') === String(opt.value || '')) || {};
-
     // Show seat info card
     if (ntSeatWrap) {
       ntSeatWrap.style.display = '';
@@ -663,16 +660,11 @@
 
     // Reset dependent fields
     if (ntType) ntType.value = '';
-    if (ntBatchWrap) ntBatchWrap.style.display = 'none';
     if (ntReasonLbl) ntReasonLbl.textContent = 'Assignment Notes';
   });
 
   ntType?.addEventListener('change', () => {
-    const v          = ntType.value;
-    const isElection = ['BarangayElection','SKElection'].includes(v);
-    const isRemoval  = v === 'Removal';
-    if (ntBatchWrap) ntBatchWrap.style.display = 'none';
-    if (ntReasonLbl) ntReasonLbl.textContent   = isRemoval ? 'Reason *' : 'Assignment Notes';
+    if (ntReasonLbl) ntReasonLbl.textContent = 'Assignment Notes';
   });
 
   document.querySelectorAll('.ot-start-assignment').forEach((button) => {

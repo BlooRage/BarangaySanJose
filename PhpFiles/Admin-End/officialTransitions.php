@@ -1291,7 +1291,7 @@ if (!function_exists('ot_governance_create_shell')) {
         $firstname = trim((string)($candidate['candidate_first_name'] ?? ''));
         $middlename = trim((string)($candidate['candidate_middle_name'] ?? ''));
         $suffix = trim((string)($candidate['candidate_suffix'] ?? ''));
-        $effectiveDate = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
+        $recordCreatedDate = date('Y-m-d');
         $officialIdentity = pii_encrypt_field_map([
             'lastname' => $lastname,
             'firstname' => $firstname,
@@ -1307,18 +1307,17 @@ if (!function_exists('ot_governance_create_shell')) {
         $officialStmt = $conn->prepare("
             INSERT INTO officialinformationtbl
                 (official_id, user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email,
-                 area_access, department, selection_method, term_start, term_end, batch_label, area_number,
+                 area_access, department, selection_method, area_number,
                  role_access, position_access, status_id_employment, date_hired)
             VALUES
                 (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?,
-                 ?, ?, NULLIF(?, ''), ?, NULL, NULLIF(?, ''), NULLIF(?, ''),
+                 ?, ?, NULLIF(?, ''), NULLIF(?, ''),
                  ?, NULLIF(?, ''), ?, ?)
         ");
         if (!$officialStmt) {
             throw new RuntimeException('Failed to prepare incoming official profile.');
         }
         $selectionMethod = (string)$assignment['selection_method'];
-        $batchLabel = trim((string)($transition['batch_label'] ?? ''));
         otBindStringParams($officialStmt, [
             $officialId,
             $userId,
@@ -1334,13 +1333,11 @@ if (!function_exists('ot_governance_create_shell')) {
             $assignment['area_access'],
             $assignment['department'],
             $selectionMethod,
-            $effectiveDate,
-            $batchLabel,
             $assignment['area_number'],
             $assignment['official_role'],
             $assignment['position_access'],
             $employmentStatusId,
-            $effectiveDate
+            $recordCreatedDate
         ]);
         if (!$officialStmt->execute()) {
             $error = $officialStmt->error;
