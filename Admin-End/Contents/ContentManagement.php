@@ -838,13 +838,13 @@ $previewCssAssets = [
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260722-4">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260811-admin-consistency">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light cms-page-root">
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 bg-light cms-page-root">
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
         Content Management System
       </h2>
@@ -859,10 +859,10 @@ $previewCssAssets = [
       <?php if ($selectedModuleKey === 'overview'): ?>
         <section class="cms-hero-card mb-4">
           <div class="cms-hero-copy">
-            <div class="cms-kicker mb-2">Content Manager</div>
-            <h3 class="cms-page-title mb-2">Manage the public website</h3>
+            <div class="cms-kicker mb-2">Public website</div>
+            <h3 class="cms-page-title mb-2">Content Manager</h3>
             <p class="cms-page-subtitle mb-0">
-              Select a page editor, review your content requests, or continue with an item waiting for attention.
+              Open page editors, track drafts, and review submitted website updates.
             </p>
           </div>
           <div class="cms-hero-actions">
@@ -883,11 +883,11 @@ $previewCssAssets = [
         <div class="cms-rule-strip mb-4" aria-label="Content request summary">
           <div class="cms-rule-chip">
             <i class="fa-solid fa-file-pen" aria-hidden="true"></i>
-            <div><strong><?= (int)$draftCount ?></strong> draft<?= $draftCount === 1 ? '' : 's' ?> ready to continue</div>
+            <div><strong><?= (int)$draftCount ?></strong> draft<?= $draftCount === 1 ? '' : 's' ?></div>
           </div>
           <div class="cms-rule-chip">
             <i class="fa-solid fa-clock" aria-hidden="true"></i>
-            <div><strong><?= (int)$myPendingCount ?></strong> request<?= $myPendingCount === 1 ? '' : 's' ?> pending</div>
+            <div><strong><?= (int)$myPendingCount ?></strong> pending request<?= $myPendingCount === 1 ? '' : 's' ?></div>
           </div>
           <div class="cms-rule-chip">
             <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
@@ -902,9 +902,9 @@ $previewCssAssets = [
         <section class="cms-section-card mb-4">
           <div class="cms-section-heading">
             <div>
-              <div class="cms-section-kicker mb-1">Page editors</div>
-              <h3 class="cms-section-title mb-1">What would you like to update?</h3>
-              <p class="text-muted mb-0">Open an editor to preview and prepare changes for the public website.</p>
+              <div class="cms-section-kicker mb-1">Editors</div>
+              <h3 class="cms-section-title mb-1">Page Editors</h3>
+              <p class="text-muted mb-0">Open a public-page editor to preview and prepare content changes.</p>
             </div>
           </div>
           <div class="cms-nav-grid">
@@ -926,8 +926,8 @@ $previewCssAssets = [
         <section class="cms-section-card">
           <div class="cms-section-heading mb-0">
             <div>
-              <div class="cms-section-kicker mb-1">Workflow</div>
-              <h3 class="cms-section-title mb-1">Content change requests</h3>
+              <div class="cms-section-kicker mb-1">Requests</div>
+              <h3 class="cms-section-title mb-1">Request Tracker</h3>
               <p class="text-muted mb-0">Track drafts, approvals, denials, and published website updates.</p>
             </div>
             <a href="<?= htmlspecialchars(cms_nav_url('requests'), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary fw-semibold">
