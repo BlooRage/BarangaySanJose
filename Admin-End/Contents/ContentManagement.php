@@ -1053,14 +1053,21 @@ $previewCssAssets = [
                 </p>
               <?php endif; ?>
             </div>
-            <button
-              type="button"
-              class="btn btn-outline-primary fw-semibold btn-sm ms-auto"
-              data-bs-toggle="modal"
-              data-bs-target="#cmsPreviewModal"
-              data-cms-open-preview>
-              View Preview
-            </button>
+            <div class="cms-editor-header-actions">
+              <a
+                href="<?= htmlspecialchars(cms_nav_url('overview'), ENT_QUOTES, 'UTF-8') ?>"
+                class="btn btn-outline-secondary fw-semibold btn-sm">
+                <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Return
+              </a>
+              <button
+                type="button"
+                class="btn btn-outline-primary fw-semibold btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#cmsPreviewModal"
+                data-cms-open-preview>
+                View Preview
+              </button>
+            </div>
           </div>
 
           <?php if ($editorReadOnlyMessage !== ''): ?>

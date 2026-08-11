@@ -400,6 +400,22 @@
   align-self: center;
 }
 
+.cms-editor-header-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.cms-editor-header-actions .btn {
+  border-radius: 8px;
+  min-height: 34px;
+  padding: 0.34rem 0.65rem;
+}
+
 .cms-detail-copy {
   flex: 1 1 0%;
 }
@@ -1178,9 +1194,16 @@
     flex-direction: column;
   }
 
+  .cms-editor-header-actions {
+    align-items: stretch;
+    margin-left: 0;
+    width: 100%;
+  }
+
   .cms-module-actions > *,
   .cms-detail-actions > *,
-  .cms-hero-actions > * {
+  .cms-hero-actions > *,
+  .cms-editor-header-actions > * {
     width: 100%;
   }
 

@@ -4,14 +4,14 @@ $current = basename($_SERVER['PHP_SELF']);
 // Group pages by section
 $residentMgmtPages = ['ResidentTracker.php', 'ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'AddResident.php'];
 $householdProfilingPages = ['HouseholdProfiling.php', 'HeadOfTheFamilyVerification.php', 'HouseholdMemberVerification.php'];
-$appointmentPages = ['AppointmentTracker.php', 'AppointmentRequestVerification.php'];
+$appointmentPages = ['AppointmentTracker.php', 'AppointmentRequestVerification.php', 'WalkInAppointmentForm.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
-$blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
-$complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
+$blotterPages = ['BlotterTracker.php', 'ReviewQueue.php'];
+$complaintPages = ['ComplaintTracker.php'];
 $contentMgmtPages = ['Contents.php', 'CreateContent.php', 'CreateNews.php'];
 $areaManagementPages = ['BarangayStatistics.php', 'AreaStatistics.php', 'AreaProfile.php'];
-$reportPages = ['Reports.php'];
+$reportPages = ['Reports.php', 'ReportsLanding.php', 'ReportCategoryLanding.php', 'ReportSignatorySettings.php'];
 $userMgmtPages = ['UserMasterlist.php', 'UserArchive.php'];
 $personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php'];
 $adminRecordsPages = ['AdminManagement.php'];
@@ -110,7 +110,9 @@ $isCertificateIssuanceSettingsActive = in_array($current, [
     'IndigencyRecipientSettings.php',
     'IssuanceFeeSettings.php',
 ], true) || $isCertificateFeeSettingsRoute;
+$isCertificateIssuanceSettingsSubtabActive = $current === 'CertificateIssuanceSettings.php';
 $isBusinessMonitoringSettingsActive = in_array($current, ['BusinessMonitoringSettings.php', 'ClearanceDocumentSettings.php', 'ClearanceGeneralSettings.php', 'ClearanceTypeSettings.php', 'ClearanceNotificationSettings.php'], true) || $isMonitoringFeeSettingsRoute;
+$isBusinessMonitoringSettingsSubtabActive = $current === 'BusinessMonitoringSettings.php';
 $isBarangayIdSettingsActive = ($current === 'BarangayIdSettings.php');
 $isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
 $isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);
@@ -275,8 +277,7 @@ $isContentCreateSectionActive = in_array($current, ['CreateContent.php', 'Create
 $isContentToolsSectionActive = $current === 'Contents.php' && $sidebarContentTypeFilter !== 'news';
 $isContentFaqCreateActive = $current === 'CreateContent.php' && $contentCreateType === 'faq';
 $isContentNewsCreateActive = $current === 'CreateNews.php';
-$isNewsManagementActive = ($current === 'Contents.php' && $sidebarContentTypeFilter === 'news');
-$isContentNavigatorActive = $current === 'ContentManagement.php' || $isContentFaqCreateActive;
+$isNewsManagementActive = ($current === 'Contents.php' && $sidebarContentTypeFilter === 'news') || $isContentNewsCreateActive;
 
 $sbAllowedPermissions = [];
 if ($sbDeferDb && isset($allowedPermissions) && is_array($allowedPermissions)) {
@@ -348,6 +349,94 @@ if (!$sbCanReviewContent && $sbCurrentOfficialAccount) {
     }
 }
 $sbCanAccessContentNavigator = $sbCan('announcements_tracker');
+
+// Highlight a collapsible section's main navigation only when the current
+// route has no active subtab that is actually available to this user.
+$sbMainNavActiveWithoutSubtab = static function (bool $sectionActive, array $availableActiveSubtabs): bool {
+    return $sectionActive && !in_array(true, $availableActiveSubtabs, true);
+};
+
+$isContentNavigatorActive = $current === 'ContentManagement.php'
+    || ($isContentFaqCreateActive && $sbCanAccessContentNavigator);
+$isAnnouncementsActive = $isContentMgmtActive
+    && !$isNewsManagementActive
+    && !$isContentNavigatorActive;
+
+$isAppointmentMainNavActive = $sbMainNavActiveWithoutSubtab($isAppointmentActive, [
+    $sbCanAccessAppointmentTracker && $isAppointmentTrackerActive,
+    $sbCanAccessAppointmentSettings && $isAppointmentSettingsActive,
+    $sbCanAccessAppointmentSchedule && $isAppointmentScheduleActive,
+]);
+$isResidentMainNavActive = $sbMainNavActiveWithoutSubtab($isResidentMgmtActive, [
+    $sbCan('resident_masterlist') && $current === 'ResidentTracker.php',
+    $sbCan('resident_masterlist') && $current === 'ResidentMasterlist.php',
+    $sbCan('resident_edit_requests') && $current === 'EditRequests.php',
+    $sbCan('resident_archive') && $current === 'ResidentArchive.php',
+    $sbCan('resident_sector_membership_verification') && $current === 'SectorMembershipVerification.php',
+]);
+$isHouseholdMainNavActive = $sbMainNavActiveWithoutSubtab($isHouseholdProfilingActive, [
+    $sbCan('household_profiling_main') && $current === 'HouseholdProfiling.php',
+    $sbCan('head_of_family_verification') && $current === 'HeadOfTheFamilyVerification.php',
+    $sbCan('household_member_verification') && $current === 'HouseholdMemberVerification.php',
+]);
+$isAreaManagementMainNavActive = $sbMainNavActiveWithoutSubtab($isAreaManagementActive, [
+    $sbCan('dashboard') && $current === 'BarangayStatistics.php',
+    $sbCan('area_statistics_summary') && $current === 'AreaStatistics.php' && $areaManagementTab === 'summary',
+    $sbCan('area_profile_area_01') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 01',
+    $sbCan('area_profile_area_1a') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 1A',
+    $sbCan('area_profile_area_02') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 02',
+    $sbCan('area_profile_area_03') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 03',
+    $sbCan('area_profile_area_04') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 04',
+    $sbCan('area_profile_area_05') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 05',
+    $sbCan('area_profile_area_06') && $current === 'AreaProfile.php' && $areaManagementArea === 'Area 06',
+]);
+$isCertificateIssuanceMainNavActive = $sbMainNavActiveWithoutSubtab($isCertificateIssuanceSectionActive, [
+    $sbCan('certificate_issuance') && $isCertificateIssuanceTrackerActive,
+    $sbCan('certificate_issuance') && $isCertificateIssuanceSettingsSubtabActive,
+]);
+$isIdIssuanceMainNavActive = $sbMainNavActiveWithoutSubtab($isIdIssuanceActive, [
+    $sbCan('id_issuance_tracker') && $isIdIssuanceTrackerActive,
+    $sbCan('id_issuance_manual') && $isIdIssuanceManualActive,
+    $sbCan('id_issuance_tracker') && $isBarangayIdSettingsActive,
+]);
+$isClearanceIssuanceMainNavActive = $sbMainNavActiveWithoutSubtab($isClearanceIssuanceSectionActive, [
+    $sbCan('clearance_issuance') && $isClearanceIssuanceTrackerActive,
+    $sbCan('clearance_issuance') && $isBusinessMonitoringSettingsSubtabActive,
+]);
+$isFinanceMainNavActive = $sbMainNavActiveWithoutSubtab($isFinanceActive, [
+    $sbCan('finance_payment_tracker') && $isFinanceTrackerActive,
+    $sbCan('finance_create_transaction') && $isFinanceCreateActive,
+    $sbCan('finance_fee_management') && $isFinanceFeesActive,
+]);
+$isBlotterMainNavActive = $sbMainNavActiveWithoutSubtab($isBlotterActive, [
+    $sbCan('blotter_tracker') && $current === 'BlotterTracker.php',
+    $sbCan('blotter_review_queue') && $current === 'ReviewQueue.php',
+]);
+$isComplaintMainNavActive = $sbMainNavActiveWithoutSubtab($isComplaintActive, [
+    $sbCan('complaint_tracker') && $current === 'ComplaintTracker.php',
+]);
+$isContentNavigatorMainNavActive = $sbMainNavActiveWithoutSubtab($isContentNavigatorActive, [
+    $sbCanAccessContentNavigator && $current === 'ContentManagement.php' && $contentManagementModule === 'overview',
+    $sbCanAccessContentNavigator && $current === 'ContentManagement.php' && $contentManagementModule === 'requests',
+]);
+$isAnnouncementsMainNavActive = $sbMainNavActiveWithoutSubtab($isAnnouncementsActive, [
+    $sbCan('announcements_page') && $current === 'CreateContent.php' && $contentCreateType === 'page',
+    $sbCan('announcements_delivery') && $current === 'CreateContent.php' && $contentCreateType === 'delivery',
+    $sbCan('announcements_tracker') && $current === 'Contents.php' && $contentToolView === 'tracker',
+]);
+$isUserManagementMainNavActive = $sbMainNavActiveWithoutSubtab($isUserMgmtActive, [
+    $sbCan('user_masterlist') && $current === 'UserMasterlist.php',
+    $sbCan('user_archive') && $current === 'UserArchive.php',
+]);
+$isPersonnelManagementMainNavActive = $sbMainNavActiveWithoutSubtab($isPersonnelMgmtActive, [
+    $sbCan('officials_management') && $current === 'PersonnelTracker.php',
+    $sbCan('personnel_invite') && $current === 'OfficialInvites.php',
+    $sbCan('officials_management') && $current === 'PersonnelRoleAccess.php',
+]);
+$isOfficialTransitionMainNavActive = $sbMainNavActiveWithoutSubtab($isOfficialTransitionActive, [
+    $sbCan('official_transition') && $current === 'OfficialTransitions.php' && $officialTransitionTool === 'current_term',
+    $sbCan('official_transition') && $current === 'OfficialTransitions.php' && $officialTransitionTool === 'create_new_term',
+]);
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
 if ($sbDeferDb) {
@@ -1125,7 +1214,7 @@ if ($sbSidebarUserId !== '') {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Office of the Barangay</li>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentMainNavActive ? 'active' : '' ?> <?= $isAppointmentActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#appointments-collapse"
                 aria-controls="appointments-collapse"
@@ -1172,7 +1261,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbHasAny($sbResidentProfilingKeys)): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMainNavActive ? 'active' : '' ?> <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#resident-mgmt-collapse"
                 aria-controls="resident-mgmt-collapse"
@@ -1189,7 +1278,7 @@ if ($sbSidebarUserId !== '') {
             <?php if ($sbCan('resident_masterlist')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentTracker.php')) ?>"
-                 class="link-dark rounded sidebar-subnav-link <?= in_array($current, ['ResidentTracker.php', 'AddResident.php'], true) ? 'active' : '' ?>">
+                 class="link-dark rounded sidebar-subnav-link <?= $current === 'ResidentTracker.php' ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">Resident Tracker</span>
                 <?= $sbRenderAttentionBadge($sbCount('resident_tracker')) ?>
               </a>
@@ -1234,7 +1323,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbHasAny($sbHouseholdProfilingKeys)): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdMainNavActive ? 'active' : '' ?> <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#household-profiling-collapse"
                 aria-controls="household-profiling-collapse"
@@ -1282,7 +1371,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbHasAny($sbAreaStatisticsKeys)): ?>
       <li class="mb-2">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementMainNavActive ? 'active' : '' ?> <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#area-management-collapse"
                 aria-controls="area-management-collapse"
@@ -1377,7 +1466,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbCan('certificate_issuance')): ?>
       <li class="mb-2">
         <button type="button"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertificateIssuanceSectionActive ? '' : 'collapsed' ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertificateIssuanceMainNavActive ? 'active' : '' ?> <?= $isCertificateIssuanceSectionActive ? '' : 'collapsed' ?>"
            data-sidebar-toggle="collapse"
            data-sidebar-target="#certificate-issuance-collapse"
            aria-controls="certificate-issuance-collapse"
@@ -1401,7 +1490,7 @@ if ($sbSidebarUserId !== '') {
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateIssuanceSettings.php')) ?>"
-                 class="link-dark rounded sidebar-subnav-link <?= $isCertificateIssuanceSettingsActive ? 'active' : '' ?>">
+                 class="link-dark rounded sidebar-subnav-link <?= $isCertificateIssuanceSettingsSubtabActive ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">Settings</span>
               </a>
             </li>
@@ -1412,7 +1501,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbHasAny($sbIdIssuanceKeys)): ?>
       <li class="mb-2">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceMainNavActive ? 'active' : '' ?> <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#id-issuance-collapse"
                 aria-controls="id-issuance-collapse"
@@ -1462,7 +1551,7 @@ if ($sbSidebarUserId !== '') {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Monitoring</li>
       <li class="mb-2">
         <button type="button"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceSectionActive ? '' : 'collapsed' ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceMainNavActive ? 'active' : '' ?> <?= $isClearanceIssuanceSectionActive ? '' : 'collapsed' ?>"
            data-sidebar-toggle="collapse"
            data-sidebar-target="#clearance-issuance-collapse"
            aria-controls="clearance-issuance-collapse"
@@ -1488,7 +1577,7 @@ if ($sbSidebarUserId !== '') {
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoringSettings.php')) ?>"
-                 class="link-dark rounded sidebar-subnav-link <?= $isBusinessMonitoringSettingsActive ? 'active' : '' ?>">
+                 class="link-dark rounded sidebar-subnav-link <?= $isBusinessMonitoringSettingsSubtabActive ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">Settings</span>
               </a>
             </li>
@@ -1520,7 +1609,7 @@ if ($sbSidebarUserId !== '') {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Treasury</li>
       <li class="mb-2">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceMainNavActive ? 'active' : '' ?> <?= $isFinanceActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#finance-collapse"
                 aria-controls="finance-collapse"
@@ -1582,7 +1671,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbCan('blotter_tracker') || $sbCan('blotter_review_queue')): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterMainNavActive ? 'active' : '' ?> <?= $isBlotterActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#blotter-tools-collapse"
                 aria-controls="blotter-tools-collapse"
@@ -1637,7 +1726,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbCan('complaint_tracker')): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintMainNavActive ? 'active' : '' ?> <?= $isComplaintActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#complaint-tools-collapse"
                 aria-controls="complaint-tools-collapse"
@@ -1669,7 +1758,7 @@ if ($sbSidebarUserId !== '') {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
       <li class="mb-2">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentNavigatorActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentNavigatorMainNavActive ? 'active' : '' ?> <?= $isContentNavigatorActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#content-management-collapse"
                 aria-controls="content-management-collapse"
@@ -1716,17 +1805,17 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbHasAny($sbAnnouncementKeys)): ?>
       <li class="mb-2">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= ($isContentMgmtActive && !$isNewsManagementActive) ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAnnouncementsMainNavActive ? 'active' : '' ?> <?= $isAnnouncementsActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#announcements-collapse"
                 aria-controls="announcements-collapse"
-                aria-expanded="<?= ($isContentMgmtActive && !$isNewsManagementActive) ? 'true' : 'false' ?>">
+                aria-expanded="<?= $isAnnouncementsActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-bullhorn"></i>
           </span>
           <span class="sidebar-button-label">Announcements</span>
         </button>
-        <div class="collapse <?= ($isContentMgmtActive && !$isNewsManagementActive) ? 'show' : '' ?>" id="announcements-collapse">
+        <div class="collapse <?= $isAnnouncementsActive ? 'show' : '' ?>" id="announcements-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('announcements_page')): ?>
             <li>
@@ -1747,7 +1836,7 @@ if ($sbSidebarUserId !== '') {
             <?php if ($sbCan('announcements_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker#tracker-card"
-                 class="link-dark rounded <?= ($current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
+                 class="link-dark rounded <?= ($isAnnouncementsActive && $current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
                 Tracker
               </a>
             </li>
@@ -1786,7 +1875,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbCan('user_masterlist') || $sbCan('user_archive')): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? 'active' : '' ?> <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserManagementMainNavActive ? 'active' : '' ?> <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#usermanagement-collapse"
                 aria-controls="usermanagement-collapse"
@@ -1823,7 +1912,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($isSuperAdminSidebar && ($sbCan('officials_management') || $sbCan('personnel_invite'))): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelMgmtActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelManagementMainNavActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#personnelmanagement-collapse"
                 aria-controls="personnelmanagement-collapse"
@@ -1904,7 +1993,7 @@ if ($sbSidebarUserId !== '') {
       <?php if ($sbCan('official_transition')): ?>
       <li class="mb-1">
         <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionActive ? '' : 'collapsed' ?>"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionMainNavActive ? 'active' : '' ?> <?= $isOfficialTransitionActive ? '' : 'collapsed' ?>"
                 data-sidebar-toggle="collapse"
                 data-sidebar-target="#officialtransition-collapse"
                 aria-controls="officialtransition-collapse"
