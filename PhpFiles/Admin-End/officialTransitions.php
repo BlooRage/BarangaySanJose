@@ -1768,8 +1768,15 @@ if ($action === 'complete_transition') {
                 if (!$existing) {
                     throw new RuntimeException('Linked official record could not be found.');
                 }
+                $linkedUserId = trim((string)($existing['user_id'] ?? ''));
+                if (
+                    strtolower(trim((string)($existing['ua_role'] ?? ''))) !== 'official'
+                    || preg_match('/^[0-9]{6}O[0-9]{5}$/i', $linkedUserId) !== 1
+                ) {
+                    throw new RuntimeException('Only an official account with an O user ID can be assigned to an official position.');
+                }
                 $incomingOfficialId = $linkedOfficialId;
-                $incomingUserId = (string)($existing['user_id'] ?? '');
+                $incomingUserId = $linkedUserId;
             } else {
                 if ($candidate['candidate_first_name'] === '' || $candidate['candidate_last_name'] === '' || $candidate['candidate_email'] === '' || $candidate['candidate_mobile'] === '') {
                     throw new RuntimeException('Complete the incoming official name and contact details first.');

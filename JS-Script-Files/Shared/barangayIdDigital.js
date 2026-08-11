@@ -585,8 +585,12 @@
       const imageUrl = getStateValue(state, field);
       const isSignature = field.type === 'image' && field.source === 'punongSignatorySignatureUrl';
       const placeholderText = field.type === 'qr' ? 'QR HERE' : isSignature ? 'SIGNATURE' : 'IMAGE';
-      const baseClassName = field.type === 'qr' ? 'barangay-id-card__qr' : 'barangay-id-card__photo';
-      const className = `${baseClassName}${isSignature ? ' barangay-id-card__signature' : ''}`;
+      const baseClassName = field.type === 'qr'
+        ? 'barangay-id-card__qr'
+        : isSignature
+          ? 'barangay-id-card__signature'
+          : 'barangay-id-card__photo';
+      const className = baseClassName;
       const objectFit = fitToObjectPosition(field.fit);
       const cornerRadius = `${Math.max(0, Math.min(50, Number(field.cornerRadius || 0)))}%`;
       if (!imageUrl) {
@@ -665,12 +669,14 @@
       .barangay-id-card__field,
       .barangay-id-card__label,
       .barangay-id-card__photo,
+      .barangay-id-card__signature,
       .barangay-id-card__qr,
       .barangay-id-card__signatory { position:absolute; }
       .barangay-id-card__cover { z-index:1; }
       .barangay-id-card__field,
       .barangay-id-card__label,
       .barangay-id-card__photo,
+      .barangay-id-card__signature,
       .barangay-id-card__qr { z-index:2; overflow:hidden; }
       .barangay-id-card__field,
       .barangay-id-card__label { font-family:Arial, Helvetica, sans-serif; color:#111; overflow:hidden; }
@@ -681,12 +687,13 @@
       .barangay-id-card__text--center { text-align:center; }
       .barangay-id-card__text--right { text-align:right; }
       .barangay-id-card__photo img,
+      .barangay-id-card__signature img,
       .barangay-id-card__qr img { width:100%; height:100%; display:block; }
       .barangay-id-card__photo { background:transparent; }
       .barangay-id-card__photo img { object-position:center center; }
-      .barangay-id-card__signature { background:transparent !important; }
-      .barangay-id-card__signature img { object-position:center bottom; background:transparent; }
-      .barangay-id-card__signature.barangay-id-card__photo--placeholder { background:transparent; }
+      .barangay-id-card__signature { background:transparent !important; border:0 !important; border-radius:0 !important; outline:0 !important; box-shadow:none !important; }
+      .barangay-id-card__signature img { object-position:center bottom; background:transparent !important; border:0 !important; border-radius:0 !important; outline:0 !important; box-shadow:none !important; }
+      .barangay-id-card__signature--placeholder { display:flex; align-items:center; justify-content:center; color:#7a5a35; background:transparent !important; border:0 !important; border-radius:0 !important; outline:0 !important; box-shadow:none !important; font-family:Arial, Helvetica, sans-serif; font-size:3.33cqw; font-weight:700; line-height:1; text-align:center; }
       .barangay-id-card__qr { background:transparent; }
       .barangay-id-card__qr img { image-rendering:pixelated; }
       .barangay-id-card__qr--placeholder,

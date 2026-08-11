@@ -1200,7 +1200,7 @@
 
     linkedSearchResults.innerHTML = officials.map((official) => {
       const displayName = linkedOfficialDisplayName(official);
-      const detailBits = [official.official_id, official.department, official.account_status].filter(Boolean);
+      const detailBits = [official.user_id || official.official_id, official.department, official.account_status].filter(Boolean);
       return `
         <button type="button" class="linked-search-item w-100 text-start border-0 bg-transparent p-2 border-bottom"
                 data-official-id="${esc(official.official_id)}">
@@ -1261,13 +1261,14 @@
       });
     } else if (mode === 'active') {
       const qLower = String(query || '').trim().toLowerCase();
-      officials = (window.OT_DATA?.activeOfficials || []).filter((row) => {
+      officials = (window.OT_DATA?.assignableActiveOfficials || []).filter((row) => {
         const officialId = String(row.official_id || '').trim();
         if (!officialId || officialId === outgoingOfficialId) return false;
-        if (!/active|suspended|acting/i.test(String(row.account_status || ''))) return false;
+        if (String(row.account_status || '').trim().toLowerCase() !== 'active') return false;
         if (!qLower) return true;
         const haystack = [
           row.official_id,
+          row.user_id,
           row.firstname,
           row.lastname,
           row.position,

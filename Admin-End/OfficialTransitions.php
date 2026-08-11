@@ -388,12 +388,13 @@ $batchPreviewSeats = [];
 
 // Active officials still needed for Quick Actions / Restore / Credentials
 $activeOfficials = [];
+$assignableActiveOfficials = [];
 $aoRes = $conn->query("
-    SELECT oi.official_id, oi.firstname, oi.lastname, oi.middlename, oi.suffix,
+    SELECT oi.official_id, oi.user_id, oi.firstname, oi.lastname, oi.middlename, oi.suffix,
            COALESCE(oi.position_access, oi.role_access) AS position,
            oi.department, oi.area_number,
            oi.acting_for_id,
-           ua.email, ua.phone_number,
+           ua.email, ua.phone_number, ua.role_access AS account_role,
            COALESCE(se.status_name,'') AS employment_status,
            COALESCE(sa.status_name,'') AS account_status
     FROM officialinformationtbl oi
@@ -411,7 +412,18 @@ $aoRes = $conn->query("
 ");
 if ($aoRes instanceof mysqli_result) {
     while ($r = $aoRes->fetch_assoc()) {
-        $activeOfficials[] = ot_page_decrypt_official_row($r);
+        $official = ot_page_decrypt_official_row($r);
+        $activeOfficials[] = $official;
+        $userId = trim((string)($official['user_id'] ?? ''));
+        $accountRole = strtolower(trim((string)($official['account_role'] ?? '')));
+        $accountStatus = strtolower(trim((string)($official['account_status'] ?? '')));
+        if (
+            $accountRole === 'official'
+            && $accountStatus === 'active'
+            && preg_match('/^[0-9]{6}O[0-9]{5}$/i', $userId) === 1
+        ) {
+            $assignableActiveOfficials[] = $official;
+        }
     }
     $aoRes->close();
 }
@@ -2491,6 +2503,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
 <script>
   window.OT_DATA = {
     activeOfficials: <?= json_encode(array_values($activeOfficials), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    assignableActiveOfficials: <?= json_encode(array_values($assignableActiveOfficials), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     councilSeats:    <?= json_encode(array_values($councilSeats),    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     departments: <?= json_encode($departmentOptions, JSON_UNESCAPED_UNICODE) ?>,
     areas: <?= json_encode($areaOptions, JSON_UNESCAPED_UNICODE) ?>
@@ -2507,7 +2520,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-3"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-4"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};
