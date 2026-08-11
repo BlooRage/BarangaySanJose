@@ -4051,21 +4051,34 @@ if ($certificateLaunchStage === 'release') {
 
 <style>
   .tracker-action-dropdown { display: inline-block; white-space: nowrap; }
-  .tracker-action-dropdown .dropdown-menu { min-width: 11.5rem; padding: .4rem; border: 1px solid #e2e8f0; border-radius: .65rem; }
+  .tracker-action-dropdown .dropdown-menu {
+    --bs-dropdown-link-hover-bg: #f8fafc;
+    --bs-dropdown-link-hover-color: #0f172a;
+    --bs-dropdown-link-active-bg: #f8fafc;
+    --bs-dropdown-link-active-color: #0f172a;
+    min-width: 11.5rem;
+    padding: .4rem;
+    border: 1px solid #e2e8f0;
+    border-radius: .65rem;
+  }
   .tracker-action-dropdown .dropdown-item {
     display: flex;
     align-items: center;
     border-radius: .4rem;
     padding: .55rem .7rem;
-    background: transparent;
-    color: #1f2937;
+    background-color: transparent !important;
+    color: #1f2937 !important;
     font-size: .875rem;
+  }
+  .tracker-action-dropdown .dropdown-item.action-effect-view {
+    background-color: transparent !important;
+    color: #1f2937 !important;
   }
   .tracker-action-dropdown .dropdown-menu .dropdown-item:hover,
   .tracker-action-dropdown .dropdown-menu .dropdown-item:focus,
   .tracker-action-dropdown .dropdown-menu .dropdown-item:active,
   .tracker-action-dropdown .dropdown-menu .dropdown-item.active {
-    background-color: #f1f5f9 !important;
+    background-color: #f8fafc !important;
     color: #0f172a !important;
   }
   .tracker-action-dropdown .dropdown-item:focus-visible {
@@ -4330,7 +4343,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260718-address-dedupe-33"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260811-action-dropdown"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260811-action-dropdown-neutral"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
