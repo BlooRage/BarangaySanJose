@@ -9,12 +9,66 @@
     .admin-table-action-dropdown .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;color:#1f2937;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
     .admin-table-action-dropdown .dropdown-item:hover,.admin-table-action-dropdown .dropdown-item:focus{background:#f1f5f9;color:#0f172a}
     .admin-table-action-dropdown .dropdown-item:active{background:#0d6efd;color:#fff}
+    .admin-table-action-dropdown .dropdown-item.action-effect-view{color:#075bb5;background:#eff6ff}
+    .admin-table-action-dropdown .dropdown-item.action-effect-success{color:#087443;background:#ecfdf3}
+    .admin-table-action-dropdown .dropdown-item.action-effect-warning{color:#9a5708;background:#fff8e6}
+    .admin-table-action-dropdown .dropdown-item.action-effect-danger{color:#b42318;background:#fff1f0}
+    .admin-table-action-dropdown .dropdown-item.action-effect-neutral{color:#667085;background:#f8fafc}
+    .admin-table-action-dropdown .dropdown-item.action-effect-view:hover{background:#dbeafe}
+    .admin-table-action-dropdown .dropdown-item.action-effect-success:hover{background:#d1fadf}
+    .admin-table-action-dropdown .dropdown-item.action-effect-warning:hover{background:#fef0c7}
+    .admin-table-action-dropdown .dropdown-item.action-effect-danger:hover{background:#fee4e2}
+    .admin-table-action-dropdown .dropdown-item.action-effect-neutral:hover{background:#eef2f6}
+    .admin-table-action-dropdown .dropdown-item+.dropdown-item,.admin-table-action-dropdown form+.dropdown-item,.admin-table-action-dropdown .dropdown-item+form{margin-top:.25rem!important}
+    .admin-table-action-dropdown .dropdown-item:disabled,.admin-table-action-dropdown .dropdown-item.disabled{opacity:.55;pointer-events:none}
+    .admin-table-action-dropdown .dropdown-item .admin-action-icon{width:1.15rem;text-align:center}
     .admin-table-action-dropdown form{display:block!important;width:100%;margin:0!important;padding:0!important}
   `;
   document.head.appendChild(style);
 
   const normalizedHeading = value => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const isActionHeading = value => ['action', 'actions'].includes(normalizedHeading(value));
+
+  function actionPresentation(control, originalClasses = []) {
+    const descriptor = [
+      control.textContent,
+      control.getAttribute('title'),
+      control.getAttribute('aria-label'),
+      control.getAttribute('data-action'),
+      control.getAttribute('data-view-action'),
+      control.getAttribute('data-inline-action')
+    ].filter(Boolean).join(' ').toLowerCase();
+    const hasClass = pattern => originalClasses.some(name => pattern.test(name));
+    if (control.disabled || control.classList.contains('disabled') || /\bunavailable\b|\bno action/.test(descriptor)) {
+      return ['neutral', 'fa-ban'];
+    }
+    if (hasClass(/^btn-(?:outline-)?danger$/) || /delete|remove|reject|deny|decline|fail|deactivate|revoke|void|block/.test(descriptor)) {
+      return ['danger', /reject|deny|decline|fail/.test(descriptor) ? 'fa-circle-xmark' : 'fa-trash-can'];
+    }
+    if (hasClass(/^btn-(?:outline-)?success$/) || /approve|verify|accept|activate|restore|release|complete|confirm|pass|save/.test(descriptor)) {
+      return ['success', /restore/.test(descriptor) ? 'fa-rotate-left' : 'fa-circle-check'];
+    }
+    if (hasClass(/^btn-(?:outline-)?warning$/) || /archive|edit|update|reset|resend|retry|transition|transfer|assign/.test(descriptor)) {
+      return ['warning', /archive/.test(descriptor) ? 'fa-box-archive' : (/edit|update/.test(descriptor) ? 'fa-pen' : 'fa-rotate')];
+    }
+    if (/view|open|details|preview|document|profile|history|inspect/.test(descriptor)) return ['view', 'fa-eye'];
+    if (/download|export/.test(descriptor)) return ['view', 'fa-download'];
+    if (/print/.test(descriptor)) return ['view', 'fa-print'];
+    return ['neutral', 'fa-ellipsis'];
+  }
+
+  function decorateAction(control, originalClasses = Array.from(control.classList)) {
+    if (!control || control.dataset.actionDecorated === '1') return;
+    const [effect, icon] = actionPresentation(control, originalClasses);
+    control.classList.add(`action-effect-${effect}`);
+    if (!control.querySelector('i,svg,.spinner-border,.spinner-grow')) {
+      const iconElement = document.createElement('i');
+      iconElement.className = `fas ${icon} admin-action-icon`;
+      iconElement.setAttribute('aria-hidden', 'true');
+      control.prepend(iconElement);
+    }
+    control.dataset.actionDecorated = '1';
+  }
 
   function actionableNode(control, cell) {
     const form = control.closest('form');
@@ -46,6 +100,7 @@
     const menu = dropdown.querySelector('.dropdown-menu');
 
     actions.forEach(({ node, control }) => {
+      const originalClasses = Array.from(control.classList);
       control.className = Array.from(control.classList)
         .filter(name => name !== 'btn'
           && name !== 'btn-sm'
@@ -53,6 +108,7 @@
           && name !== 'me-1' && name !== 'me-2' && name !== 'ms-1' && name !== 'ms-2')
         .join(' ');
       control.classList.add('dropdown-item');
+      decorateAction(control, originalClasses);
       if (node !== control) {
         node.classList.add('admin-table-action-form');
       }
@@ -77,7 +133,11 @@
     if (!actionIndexes.length) return;
     Array.from(table.tBodies || []).forEach(body => {
       Array.from(body.rows || []).forEach(row => {
-        actionIndexes.forEach(index => convertCell(row.cells[index]));
+        actionIndexes.forEach(index => {
+          const cell = row.cells[index];
+          convertCell(cell);
+          cell?.querySelectorAll('.admin-table-action-dropdown .dropdown-item,.tracker-action-dropdown .dropdown-item').forEach(item => decorateAction(item));
+        });
       });
     });
   }

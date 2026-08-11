@@ -4052,9 +4052,28 @@ if ($certificateLaunchStage === 'release') {
 <style>
   .tracker-action-dropdown { display: inline-block; white-space: nowrap; }
   .tracker-action-dropdown .dropdown-menu { min-width: 11.5rem; padding: .4rem; border: 1px solid #e2e8f0; border-radius: .65rem; }
-  .tracker-action-dropdown .dropdown-item { display: flex; align-items: center; border-radius: .4rem; padding: .55rem .7rem; font-size: .875rem; }
-  .tracker-action-dropdown .dropdown-item:active { background: #0d6efd; color: #fff; }
-  .tracker-action-dropdown .dropdown-item:active i { color: #fff !important; }
+  .tracker-action-dropdown .dropdown-item {
+    display: flex;
+    align-items: center;
+    border-radius: .4rem;
+    padding: .55rem .7rem;
+    background: transparent;
+    color: #1f2937;
+    font-size: .875rem;
+  }
+  .tracker-action-dropdown .dropdown-item:hover,
+  .tracker-action-dropdown .dropdown-item:focus {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+  .tracker-action-dropdown .dropdown-item:focus-visible {
+    outline: 2px solid rgba(13, 110, 253, .35);
+    outline-offset: -2px;
+  }
+  .tracker-action-dropdown .dropdown-item:active {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
   #paymentProofWrap iframe {
     width: 100%;
     height: 70vh;
