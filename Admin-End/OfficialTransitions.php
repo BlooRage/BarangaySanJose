@@ -608,7 +608,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/OfficialWorkspaceStyle.css?v=20260812-1">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/OfficialWorkspaceStyle.css?v=20260812-2">
   <style>
     #main-display { min-width: 0; }
 
@@ -743,7 +743,6 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
     .linked-search-item:focus { background: #f8f9fa; }
 
     /* ── Quick actions ── */
-    .quick-action-btn { text-align: left; }
 
     /* ── Module sub-navigation ── */
     .ot-subnav {
@@ -1100,8 +1099,6 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
       <?php endif; ?>
     </header>
 
-    <?php include __DIR__ . '/includes/official_workspace_nav.php'; ?>
-
     <?php if (!empty($officialTransitionFlash['message'])): ?>
       <div class="alert alert-<?= htmlspecialchars((string)($officialTransitionFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> mb-4">
         <?= htmlspecialchars((string)$officialTransitionFlash['message'], ENT_QUOTES, 'UTF-8') ?>
@@ -1314,7 +1311,8 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
                             class="btn btn-sm btn-outline-secondary ot-manage-access"
                             data-seat-access="<?= htmlspecialchars(json_encode($seatAccess, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"
                             title="Manage seat access template">
-                            <i class="fas fa-shield-halved"></i>
+                            <i class="fas fa-shield-halved me-1" aria-hidden="true"></i>
+                            <span>Manage Access</span>
                           </button>
                         <?php endif; ?>
                         <?php if ($holderName !== '' && !empty($seat['current_official_id'])): ?>
@@ -1323,7 +1321,8 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
                             class="btn btn-sm btn-outline-danger"
                             onclick="otDemoteOfficial(<?= htmlspecialchars(json_encode((string)$seat['current_official_id']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($holderName), ENT_QUOTES, 'UTF-8') ?>)"
                             title="End current assignment">
-                            <i class="fas fa-user-minus"></i>
+                            <i class="fas fa-user-minus me-1" aria-hidden="true"></i>
+                            <span>End Assignment</span>
                           </button>
                         <?php endif; ?>
                       </div>
@@ -2386,36 +2385,51 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Quick Actions
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalQuickActions" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-bolt me-2 text-warning"></i> Quick Actions</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div>
+          <div class="text-uppercase small fw-semibold text-primary mb-1">Account tools</div>
+          <h5 class="modal-title">Quick Actions</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <p class="text-muted small mb-3">
-          These controls apply directly to an existing official account or assignment.
+          Select an account or assignment task to continue.
         </p>
-        <div class="d-grid gap-2">
-          <button class="btn btn-outline-success quick-action-btn" id="btnQaRestoreAccess">
-            <i class="fas fa-unlock me-2"></i>
-            <strong>Restore Access</strong>
-            <small class="d-block text-muted fw-normal">Reactivate a suspended or inactive official's account.</small>
+        <div class="official-quick-actions">
+          <button type="button" class="official-quick-action" id="btnQaRestoreAccess">
+            <span class="official-quick-action__icon is-success"><i class="fas fa-unlock" aria-hidden="true"></i></span>
+            <span class="official-quick-action__content">
+              <span class="official-quick-action__title">Restore Access</span>
+              <span class="official-quick-action__copy">Reactivate a suspended or inactive official account.</span>
+            </span>
+            <i class="fas fa-chevron-right official-quick-action__chevron" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-outline-primary quick-action-btn" id="btnQaChangeCredentials">
-            <i class="fas fa-key me-2"></i>
-            <strong>Change Credentials</strong>
-            <small class="d-block text-muted fw-normal">Update email, phone, or force a password reset.</small>
+          <button type="button" class="official-quick-action" id="btnQaChangeCredentials">
+            <span class="official-quick-action__icon is-primary"><i class="fas fa-key" aria-hidden="true"></i></span>
+            <span class="official-quick-action__content">
+              <span class="official-quick-action__title">Change Credentials</span>
+              <span class="official-quick-action__copy">Update email or mobile details, or require a password reset.</span>
+            </span>
+            <i class="fas fa-chevron-right official-quick-action__chevron" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-outline-warning quick-action-btn" id="btnQaEndActing">
-            <i class="fas fa-user-clock me-2"></i>
-            <strong>End Acting Assignment</strong>
-            <small class="d-block text-muted fw-normal">Restore the original official and remove the acting replacement's access.</small>
+          <button type="button" class="official-quick-action" id="btnQaEndActing">
+            <span class="official-quick-action__icon is-warning"><i class="fas fa-user-clock" aria-hidden="true"></i></span>
+            <span class="official-quick-action__content">
+              <span class="official-quick-action__title">End Acting Assignment</span>
+              <span class="official-quick-action__copy">Restore the original official and remove the acting replacement's access.</span>
+            </span>
+            <i class="fas fa-chevron-right official-quick-action__chevron" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-outline-secondary quick-action-btn" id="btnQaChangePosition">
-            <i class="fas fa-arrows-rotate me-2"></i>
-            <strong>Direct Position Change</strong>
-            <small class="d-block text-muted fw-normal">Move an official to a different position without an election.</small>
+          <button type="button" class="official-quick-action" id="btnQaChangePosition">
+            <span class="official-quick-action__icon is-neutral"><i class="fas fa-arrows-rotate" aria-hidden="true"></i></span>
+            <span class="official-quick-action__content">
+              <span class="official-quick-action__title">Direct Position Change</span>
+              <span class="official-quick-action__copy">Move an active official to another configured position.</span>
+            </span>
+            <i class="fas fa-chevron-right official-quick-action__chevron" aria-hidden="true"></i>
           </button>
         </div>
       </div>
@@ -2537,7 +2551,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-1"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-2"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};

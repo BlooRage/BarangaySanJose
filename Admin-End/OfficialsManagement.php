@@ -194,7 +194,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/OfficialWorkspaceStyle.css?v=20260812-1">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/OfficialWorkspaceStyle.css?v=20260812-2">
   <style>
     #main-display {
       min-width: 0;
@@ -599,7 +599,6 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
             </a>
           </div>
         </header>
-        <?php include __DIR__ . '/includes/official_workspace_nav.php'; ?>
       <?php else: ?>
         <div class="mb-4 officials-page-header">
           <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?></h2>

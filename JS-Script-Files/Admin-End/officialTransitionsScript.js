@@ -554,7 +554,7 @@
       btns.push(`<button class="btn btn-sm btn-primary" onclick="otOpenCandidates('${esc(tid)}')" title="Continue official setup"><i class="fas fa-arrow-right me-1"></i>Continue Setup</button>`);
     }
     if (s !== 'Completed' && s !== 'Cancelled') {
-      btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="otCancelTransition('${esc(tid)}')" title="Cancel setup"><i class="fas fa-times"></i></button>`);
+      btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="otCancelTransition('${esc(tid)}')" title="Cancel setup"><i class="fas fa-times me-1" aria-hidden="true"></i>Cancel Setup</button>`);
     }
 
     return btns.length
