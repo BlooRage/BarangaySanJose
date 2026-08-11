@@ -48,11 +48,19 @@ if ($action === 'optimize_indexes') {
 }
 
 if ($action === 'barangay_id_template_config') {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
     $templateAssets = dra_barangay_id_template_assets();
-    $barangayIdSignatories = dra_current_barangay_signatories($conn);
+    // The council-seat resolver only supplies names and titles. Use the
+    // module resolver here so the current Punong Barangay's active signature
+    // is included in every admin card preview as well.
+    $barangayIdSignatories = dms_resolve_module_signatories($conn, 'barangay_id');
+    $barangayIdOperations = dms_resolve_barangay_id_operational_settings($conn);
     $punongSignatory = is_array($barangayIdSignatories['punong'] ?? null) ? $barangayIdSignatories['punong'] : [];
     $secretarySignatory = is_array($barangayIdSignatories['secretary'] ?? null) ? $barangayIdSignatories['secretary'] : [];
-    $punongSignaturePath = trim((string)($punongSignatory['signature_path'] ?? ''));
+    $punongSignaturePath = !empty($barangayIdOperations['printed_id_has_signature'])
+        ? trim((string)($punongSignatory['signature_path'] ?? ''))
+        : '';
     $frontPublicPath = trim((string)($templateAssets['front_public_path'] ?? ''));
     $backPublicPath = trim((string)($templateAssets['back_public_path'] ?? ''));
     $frontDiskPath = trim((string)($templateAssets['front'] ?? ''));
@@ -8939,7 +8947,8 @@ if ($action === 'view_issued_card') {
         http_response_code(404);
         exit('Card preview is available for Barangay ID only.');
     }
-    if (!dms_resolve_barangay_id_operational_settings($conn)['digital_id_enabled']) {
+    $barangayIdOperations = dms_resolve_barangay_id_operational_settings($conn);
+    if (!$barangayIdOperations['digital_id_enabled']) {
         http_response_code(403);
         exit('Digital Barangay ID is currently disabled in issuance settings.');
     }
@@ -8954,6 +8963,15 @@ if ($action === 'view_issued_card') {
         trim((string)($row['resident_user_id'] ?? '')),
         trim((string)($row['resident_id'] ?? ''))
     );
+    $barangayIdSignatories = dms_resolve_module_signatories($conn, 'barangay_id');
+    $punongSignatory = is_array($barangayIdSignatories['punong'] ?? null)
+        ? $barangayIdSignatories['punong']
+        : [];
+    $row['punong_signatory_name'] = trim((string)($punongSignatory['name'] ?? ''));
+    $row['punong_signatory_title'] = trim((string)($punongSignatory['title'] ?? 'Punong Barangay'));
+    $row['punong_signatory_signature_path'] = !empty($barangayIdOperations['digital_id_has_signature'])
+        ? trim((string)($punongSignatory['signature_path'] ?? ''))
+        : '';
     $templateAssets = dra_barangay_id_template_assets();
     $frontTemplateUrl = dra_public_asset_path((string)($templateAssets['front_public_path'] ?? ''));
     $backTemplateUrl = dra_public_asset_path((string)($templateAssets['back_public_path'] ?? ''));
