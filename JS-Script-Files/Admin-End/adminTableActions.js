@@ -27,7 +27,7 @@
     .tracker-action-dropdown .dropdown-menu .dropdown-item:hover,.tracker-action-dropdown .dropdown-menu .dropdown-item:focus,.tracker-action-dropdown .dropdown-menu .dropdown-item:active,.tracker-action-dropdown .dropdown-menu .dropdown-item.active{background-color:#f8fafc!important;color:#0f172a!important}
     body #main-display .table-responsive .dropdown-menu,body main .table-responsive .dropdown-menu{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;z-index:2060}
     body #main-display .table-responsive .dropdown-menu .dropdown-item:focus,body #main-display .table-responsive .dropdown-menu .dropdown-item:active,body #main-display .table-responsive .dropdown-menu .dropdown-item.active,body main .table-responsive .dropdown-menu .dropdown-item:focus,body main .table-responsive .dropdown-menu .dropdown-item:active,body main .table-responsive .dropdown-menu .dropdown-item.active{background:#f8fafc!important;color:#0f172a!important}
-    body>.admin-table-action-menu-portal{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;position:fixed!important;min-width:12rem;margin:0!important;padding:.4rem;border:1px solid #e2e8f0;border-radius:.65rem;box-shadow:0 .5rem 1.25rem rgba(15,23,42,.14);z-index:2060}
+    body>.admin-table-action-menu-portal{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;position:fixed!important;min-width:12rem;max-height:calc(100vh - 16px);overflow-y:auto;margin:0!important;padding:.4rem;border:1px solid #e2e8f0;border-radius:.65rem;box-shadow:0 .5rem 1.25rem rgba(15,23,42,.14);z-index:2060}
     body>.admin-table-action-menu-portal .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
     body>.admin-table-action-menu-portal .dropdown-item:hover,body>.admin-table-action-menu-portal .dropdown-item:focus,body>.admin-table-action-menu-portal .dropdown-item:active{background:#f8fafc!important}
     body>.admin-table-action-menu-portal form{display:block!important;width:100%;margin:0!important;padding:0!important}
@@ -174,11 +174,39 @@
     if (!toggle) return;
     if (!toggle.hasAttribute('data-bs-boundary')) toggle.setAttribute('data-bs-boundary', 'viewport');
     if (!toggle.hasAttribute('data-bs-offset')) toggle.setAttribute('data-bs-offset', '0,6');
+    // The menu is positioned by this module after it is moved to <body>.
+    // Static display prevents Popper from asynchronously overwriting that
+    // anchored position after the Bootstrap shown event.
+    if (!toggle.hasAttribute('data-bs-display')) toggle.setAttribute('data-bs-display', 'static');
   }
 
   function prepareTableDropdowns(root = document) {
     if (root instanceof Element && isTableDropdown(root)) prepareDropdown(root);
     root.querySelectorAll?.('.admin-table-action-dropdown,.tracker-action-dropdown,.compact-admin-table-shell .dropdown,.table-responsive .dropdown').forEach(prepareDropdown);
+  }
+
+  function positionPortalDropdownMenu(dropdown) {
+    const toggle = dropdown?.querySelector?.('[data-bs-toggle="dropdown"]');
+    const menu = dropdown?._adminActionMenu;
+    if (!toggle || !menu || menu.parentElement !== document.body) return;
+
+    menu.style.setProperty('position', 'fixed', 'important');
+    menu.style.inset = 'auto';
+    menu.style.right = 'auto';
+    menu.style.bottom = 'auto';
+    menu.style.transform = 'none';
+
+    const toggleRect = toggle.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gutter = 8;
+    const left = Math.max(gutter, Math.min(toggleRect.right - menuRect.width, window.innerWidth - menuRect.width - gutter));
+    const fitsBelow = toggleRect.bottom + menuRect.height + gutter <= window.innerHeight;
+    const top = fitsBelow
+      ? toggleRect.bottom + 6
+      : Math.max(gutter, toggleRect.top - menuRect.height - 6);
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
   }
 
   function portalDropdownMenu(dropdown) {
@@ -190,24 +218,23 @@
     menu.classList.add('admin-table-action-menu-portal');
     document.body.appendChild(menu);
 
-    const toggleRect = toggle.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    const gutter = 8;
-    const left = Math.max(gutter, Math.min(toggleRect.right - menuRect.width, window.innerWidth - menuRect.width - gutter));
-    const fitsBelow = toggleRect.bottom + menuRect.height + gutter <= window.innerHeight;
-    const top = fitsBelow
-      ? toggleRect.bottom + 6
-      : Math.max(gutter, toggleRect.top - menuRect.height - 6);
-
-    menu.style.inset = 'auto';
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
-    menu.style.transform = 'none';
+    const positionMenu = () => positionPortalDropdownMenu(dropdown);
+    dropdown._adminActionPositionMenu = positionMenu;
+    document.addEventListener('scroll', positionMenu, true);
+    window.addEventListener('resize', positionMenu);
+    positionMenu();
+    requestAnimationFrame(positionMenu);
   }
 
   function restoreDropdownMenu(dropdown) {
     const menu = dropdown?._adminActionMenu;
     if (!menu) return;
+    const positionMenu = dropdown._adminActionPositionMenu;
+    if (positionMenu) {
+      document.removeEventListener('scroll', positionMenu, true);
+      window.removeEventListener('resize', positionMenu);
+      delete dropdown._adminActionPositionMenu;
+    }
     menu.classList.remove('admin-table-action-menu-portal');
     menu.removeAttribute('style');
     dropdown.appendChild(menu);

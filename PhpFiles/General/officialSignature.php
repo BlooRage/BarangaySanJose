@@ -120,6 +120,28 @@ if (!function_exists('osig_get_current_punong')) {
             LIMIT 1
         ");
         $row = $res instanceof mysqli_result ? ($res->fetch_assoc() ?: null) : null;
+
+        // Older and partially migrated installations may identify the current
+        // Punong Barangay through officialinformationtbl without having a
+        // matching active council-seat row yet. The signature setup is tied to
+        // the official record, so use the same position source that document
+        // signatory resolution uses before concluding that no signature exists.
+        if (!$row) {
+            $positionColumn = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+            $positionExpression = $positionColumn instanceof mysqli_result && $positionColumn->num_rows > 0
+                ? 'COALESCE(oi.position_access, oi.role_access)'
+                : 'oi.role_access';
+            $res = $conn->query("
+                SELECT os.signature_id, os.official_id, os.user_id, os.file_path, os.signature_blob, os.scale_percent, os.offset_x_percent, os.offset_y_percent, os.creation_method, os.created_at
+                FROM officialinformationtbl oi
+                INNER JOIN officialsignaturetbl os ON os.official_id = oi.official_id AND os.is_active = 1
+                WHERE LOWER(TRIM({$positionExpression})) IN ('punong barangay', 'barangay captain', 'barangay chairman')
+                ORDER BY os.signature_id DESC
+                LIMIT 1
+            ");
+            $row = $res instanceof mysqli_result ? ($res->fetch_assoc() ?: null) : null;
+        }
+
         return $row ? osig_restore_file($conn, $row) : null;
     }
 }
