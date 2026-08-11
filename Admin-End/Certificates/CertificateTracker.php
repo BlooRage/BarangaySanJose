@@ -4061,18 +4061,16 @@ if ($certificateLaunchStage === 'release') {
     color: #1f2937;
     font-size: .875rem;
   }
-  .tracker-action-dropdown .dropdown-item:hover,
-  .tracker-action-dropdown .dropdown-item:focus {
-    background: #f1f5f9;
-    color: #0f172a;
+  .tracker-action-dropdown .dropdown-menu .dropdown-item:hover,
+  .tracker-action-dropdown .dropdown-menu .dropdown-item:focus,
+  .tracker-action-dropdown .dropdown-menu .dropdown-item:active,
+  .tracker-action-dropdown .dropdown-menu .dropdown-item.active {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
   }
   .tracker-action-dropdown .dropdown-item:focus-visible {
     outline: 2px solid rgba(13, 110, 253, .35);
     outline-offset: -2px;
-  }
-  .tracker-action-dropdown .dropdown-item:active {
-    background: #e2e8f0;
-    color: #0f172a;
   }
   #paymentProofWrap iframe {
     width: 100%;
