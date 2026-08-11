@@ -348,13 +348,6 @@ if (!$sbCanReviewContent && $sbCurrentOfficialAccount) {
     }
 }
 $sbCanAccessContentNavigator = $sbCan('announcements_tracker');
-$sbCanAccessContentFaqEditor = $sbCan('announcements_faq');
-$sbContentFaqHref = $sbCanAccessContentNavigator
-    ? appUrl('Admin-End/Contents/ContentManagement.php?module=faq')
-    : appUrl('Admin-End/Contents/CreateContent.php?type=faq');
-$sbContentFaqActive = $sbCanAccessContentNavigator
-    ? (($current === 'ContentManagement.php' && $contentManagementModule === 'faq') || $isContentFaqCreateActive)
-    : $isContentFaqCreateActive;
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
 if ($sbDeferDb) {
@@ -1672,7 +1665,7 @@ if ($sbSidebarUserId !== '') {
       <?php endif; ?>
       <?php endif; ?>
 
-      <?php if ($sbCanAccessContentNavigator || $sbCanAccessContentFaqEditor): ?>
+      <?php if ($sbCanAccessContentNavigator): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
       <li class="mb-2">
         <button type="button"
@@ -1690,7 +1683,6 @@ if ($sbSidebarUserId !== '') {
         </button>
         <div class="collapse <?= $isContentNavigatorActive ? 'show' : '' ?>" id="content-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <?php if ($sbCanAccessContentNavigator): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'overview') ? 'active' : '' ?>">
@@ -1704,45 +1696,6 @@ if ($sbSidebarUserId !== '') {
                 <?= $sbRenderAttentionBadge($sbCount('content_change_request')) ?>
               </a>
             </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Home Page</span>
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=government"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'government') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Government</span>
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=services"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'services') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Services</span>
-              </a>
-            </li>
-            <?php endif; ?>
-            <li>
-              <a href="<?= htmlspecialchars($sbContentFaqHref) ?>"
-                 class="link-dark rounded sidebar-subnav-link <?= $sbContentFaqActive ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">FAQ</span>
-              </a>
-            </li>
-            <?php if ($sbCanAccessContentNavigator): ?>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=contact"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'contact') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Contact</span>
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=login"
-                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'login') ? 'active' : '' ?>">
-                <span class="sidebar-subnav-text">Login</span>
-              </a>
-            </li>
-            <?php endif; ?>
           </ul>
         </div>
       </li>

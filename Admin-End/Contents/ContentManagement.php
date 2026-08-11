@@ -923,18 +923,6 @@ $previewCssAssets = [
           </div>
         </section>
 
-        <section class="cms-section-card">
-          <div class="cms-section-heading mb-0">
-            <div>
-              <div class="cms-section-kicker mb-1">Requests</div>
-              <h3 class="cms-section-title mb-1">Request Tracker</h3>
-              <p class="text-muted mb-0">Track drafts, approvals, denials, and published website updates.</p>
-            </div>
-            <a href="<?= htmlspecialchars(cms_nav_url('requests'), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary fw-semibold">
-              Open Request Tracker
-            </a>
-          </div>
-        </section>
       <?php elseif ($selectedModuleKey === 'requests'): ?>
         <ul class="nav nav-tabs mb-0 cms-request-view-tabs" aria-label="Content request views">
           <?php foreach ($requestViewDefinitions as $requestViewKey => $requestViewMeta): ?>
