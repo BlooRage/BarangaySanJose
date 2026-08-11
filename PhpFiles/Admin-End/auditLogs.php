@@ -1,169 +1,211 @@
 <?php
-session_start();
-require_once "../General/connection.php";
-require_once "../General/security.php";
+declare(strict_types=1);
+
+require_once __DIR__ . '/../General/security.php';
+require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/audit.php';
+require_once __DIR__ . '/auditLogsSupport.php';
 
 requireRoleSession(['SuperAdmin']);
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!isset($_GET['fetch_audit_logs'])) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Not found']);
+function audit_logs_json_response(int $statusCode, array $payload): never
+{
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    echo json_encode(
+        $payload,
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+    );
     exit;
 }
 
-function auditLogsFormatName($fn, $mn, $ln, $suf): string
+function audit_logs_bool_input(mixed $value): bool
 {
-    $fn = trim((string)$fn);
-    $mn = trim((string)$mn);
-    $ln = trim((string)$ln);
-    $suf = trim((string)$suf);
-    if ($fn === '' && $ln === '') {
+    return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+}
+
+function audit_logs_export_limit(string $format, bool $includeDetails): int
+{
+    if ($format === 'pdf') {
+        return $includeDetails ? AUDIT_LOGS_PDF_DETAILS_ROW_LIMIT : AUDIT_LOGS_PDF_ROW_LIMIT;
+    }
+    return $includeDetails ? AUDIT_LOGS_CSV_DETAILS_ROW_LIMIT : AUDIT_LOGS_CSV_ROW_LIMIT;
+}
+
+function audit_logs_person_label_from_rows(array $rows, array $filters): string
+{
+    $personUserId = (string)($filters['person_user_id'] ?? '');
+    if ($personUserId === '') {
         return '';
     }
 
-    $mid = $mn !== '' ? (substr($mn, 0, 1) . '. ') : '';
-    $name = trim($fn . ' ' . $mid . $ln);
-    if ($suf !== '') {
-        $name .= ' ' . $suf;
+    foreach ($rows as $row) {
+        if ((string)($row['user_id'] ?? '') !== $personUserId) {
+            continue;
+        }
+        $name = trim((string)($row['display_name'] ?? ''));
+        return $name !== '' ? $name . ' (' . $personUserId . ')' : $personUserId;
     }
-    return trim($name);
+    return $personUserId;
 }
 
-function auditLogsDecryptRow(array $row): array
+function audit_logs_record_export(mysqli $conn, string $format, array $filters, bool $includeDetails, int $rowCount): void
 {
-    $row = pii_decrypt_assoc($row, [
-        'o_firstname',
-        'o_middlename',
-        'o_lastname',
-        'o_suffix',
-        'r_firstname',
-        'r_middlename',
-        'r_lastname',
-        'r_suffix',
-        'old_value',
-        'new_value',
-        'remarks',
-    ]);
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    $actorRole = trim((string)($_SESSION['role'] ?? 'SuperAdmin')) ?: 'SuperAdmin';
+    $remarks = json_encode([
+        'date_from' => $filters['date_from'],
+        'date_to' => $filters['date_to'],
+        'person_user_id' => $filters['person_user_id'],
+        'search_applied' => $filters['q'] !== '',
+        'include_details' => $includeDetails,
+        'row_count' => $rowCount,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    $officialName = auditLogsFormatName(
-        $row['o_firstname'] ?? '',
-        $row['o_middlename'] ?? '',
-        $row['o_lastname'] ?? '',
-        $row['o_suffix'] ?? ''
-    );
-    $residentName = auditLogsFormatName(
-        $row['r_firstname'] ?? '',
-        $row['r_middlename'] ?? '',
-        $row['r_lastname'] ?? '',
-        $row['r_suffix'] ?? ''
-    );
-
-    $row['display_name'] = $officialName !== '' ? $officialName : ($residentName !== '' ? $residentName : '');
-    return $row;
+    try {
+        insertUnifiedAuditLog(
+            $conn,
+            $actorUserId !== '' ? $actorUserId : null,
+            $actorRole,
+            'Audit Logs',
+            'audit_log_export',
+            $format,
+            $format === 'pdf' ? 'Export PDF' : 'Export CSV',
+            'exported_rows',
+            null,
+            (string)$rowCount,
+            $remarks !== false ? $remarks : null
+        );
+    } catch (Throwable $error) {
+        error_log('Unable to record the Audit Logs export: ' . $error->getMessage());
+    }
 }
 
-function auditLogsMatchesSearch(array $row, string $needle): bool
+function audit_logs_send_download_headers(string $contentType, string $filename, ?int $contentLength = null): void
 {
-    return pii_search_match($row, [
-        'audit_id',
-        'user_id',
-        'display_name',
-        'role_access',
-        'module_affected',
-        'target_type',
-        'target_id',
-        'action_type',
-        'field_changed',
-        'old_value',
-        'new_value',
-        'remarks',
-        'action_timestamp',
-    ], $needle);
+    header('Content-Type: ' . $contentType);
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    header('X-Content-Type-Options: nosniff');
+    if ($contentLength !== null && $contentLength >= 0) {
+        header('Content-Length: ' . $contentLength);
+    }
 }
 
 try {
-    $q = trim((string)($_GET['q'] ?? ''));
-    $limit = (int)($_GET['limit'] ?? 200);
-    if ($limit <= 0) $limit = 200;
-    if ($limit > 500) $limit = 500;
-    $queryLimit = $q !== '' ? 500 : $limit;
+    auditEnsureTable($conn);
 
-    $bindParams = static function (mysqli_stmt $stmt, string $types, array $params): void {
-        if ($types === '') return;
-        $refs = [];
-        $refs[] = $types;
-        foreach ($params as $k => $v) {
-            $refs[] = &$params[$k];
-        }
-        call_user_func_array([$stmt, 'bind_param'], $refs);
-    };
-
-    $sql = "
-        SELECT
-            a.audit_id,
-            a.user_id,
-            a.role_access,
-            a.module_affected,
-            a.target_type,
-            a.target_id,
-            a.action_type,
-            a.field_changed,
-            a.old_value,
-            a.new_value,
-            a.remarks,
-            a.action_timestamp,
-            oi.firstname AS o_firstname,
-            oi.middlename AS o_middlename,
-            oi.lastname AS o_lastname,
-            oi.suffix AS o_suffix,
-            ri.firstname AS r_firstname,
-            ri.middlename AS r_middlename,
-            ri.lastname AS r_lastname,
-            ri.suffix AS r_suffix
-        FROM unifiedauditlogstbl a
-        LEFT JOIN officialinformationtbl oi
-            ON oi.user_id COLLATE utf8mb4_general_ci = a.user_id COLLATE utf8mb4_general_ci
-        LEFT JOIN residentinformationtbl ri
-            ON ri.user_id COLLATE utf8mb4_general_ci = a.user_id COLLATE utf8mb4_general_ci
-    ";
-
-    $sql .= " ORDER BY a.action_timestamp DESC, a.audit_id DESC LIMIT ?";
-    $params = [$queryLimit];
-    $types = 'i';
-
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        throw new Exception("Prepare failed: " . $conn->error);
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_audit_people'])) {
+        $people = audit_logs_fetch_people($conn);
+        audit_logs_json_response(200, [
+            'success' => true,
+            'data' => $people,
+        ]);
     }
 
-    // bind dynamically
-    $bindParams($stmt, $types, $params);
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_audit_logs'])) {
+        $filters = audit_logs_parse_filters($_GET);
+        $limit = (int)($_GET['limit'] ?? 200);
+        if ($limit <= 0) {
+            $limit = 200;
+        }
+        $limit = min(AUDIT_LOGS_UI_ROW_LIMIT, $limit);
+        $result = audit_logs_fetch_consistent_snapshot($conn, $filters, $limit, AUDIT_LOGS_UI_SCAN_LIMIT);
 
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $rows = [];
-    while ($row = $res->fetch_assoc()) {
-        $row = auditLogsDecryptRow($row);
-        if ($q !== '' && !auditLogsMatchesSearch($row, $q)) {
-            continue;
+        audit_logs_json_response(200, [
+            'success' => true,
+            'data' => $result['rows'],
+            'meta' => [
+                'limit' => $limit,
+                'truncated' => $result['truncated'],
+                'scan_truncated' => $result['scan_truncated'],
+                'scanned_rows' => $result['scanned_rows'],
+            ],
+        ]);
+    }
+
+    if (isset($_POST['export']) || isset($_GET['export'])) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            audit_logs_json_response(405, [
+                'success' => false,
+                'message' => 'Audit-log exports must use POST.',
+            ]);
         }
 
-        unset(
-            $row['o_firstname'], $row['o_middlename'], $row['o_lastname'], $row['o_suffix'],
-            $row['r_firstname'], $row['r_middlename'], $row['r_lastname'], $row['r_suffix']
+        verifyCsrfToken(true);
+        $format = strtolower(audit_logs_input_text($_POST['export'] ?? '', 'Export format'));
+        if (!in_array($format, ['csv', 'pdf'], true)) {
+            throw new InvalidArgumentException('Choose either CSV or PDF format.');
+        }
+
+        $filters = audit_logs_parse_filters($_POST);
+        $includeDetails = audit_logs_bool_input($_POST['include_details'] ?? false);
+        $rowLimit = audit_logs_export_limit($format, $includeDetails);
+        $result = audit_logs_fetch_consistent_snapshot($conn, $filters, $rowLimit, AUDIT_LOGS_EXPORT_SCAN_LIMIT);
+
+        if ($result['truncated'] || $result['scan_truncated']) {
+            $detailNote = $includeDetails ? ' with change details' : '';
+            throw new InvalidArgumentException(
+                'Too many records match this ' . strtoupper($format) . $detailNote
+                . ' export. Narrow the date, person, or search filters and try again.'
+            );
+        }
+
+        $rows = $result['rows'];
+        $columns = audit_logs_export_columns($includeDetails);
+        $filename = audit_logs_export_filename($format, $filters);
+
+        if ($format === 'csv') {
+            $stream = audit_logs_build_csv_stream($rows, $columns);
+            $streamStats = fstat($stream);
+            $contentLength = is_array($streamStats) ? (int)($streamStats['size'] ?? 0) : null;
+
+            // The export event is written after the snapshot is generated, so
+            // it cannot appear inside the file that triggered it.
+            audit_logs_record_export($conn, $format, $filters, $includeDetails, count($rows));
+            audit_logs_send_download_headers('text/csv; charset=UTF-8', $filename, $contentLength);
+            fpassthru($stream);
+            fclose($stream);
+            exit;
+        }
+
+        require_once __DIR__ . '/auditLogsPdf.php';
+        $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+        $actorRole = trim((string)($_SESSION['role'] ?? 'SuperAdmin')) ?: 'SuperAdmin';
+        $generatedBy = $actorUserId !== ''
+            ? $actorUserId . ' (' . $actorRole . ')'
+            : $actorRole;
+        $personLabel = audit_logs_person_label_from_rows($rows, $filters);
+        $pdfBytes = audit_logs_build_pdf(
+            $rows,
+            $columns,
+            audit_logs_filter_summary($filters, $personLabel),
+            $generatedBy
         );
-        $rows[] = $row;
-    }
-    $stmt->close();
 
-    if ($q !== '' && count($rows) > $limit) {
-        $rows = array_slice($rows, 0, $limit);
+        audit_logs_record_export($conn, $format, $filters, $includeDetails, count($rows));
+        audit_logs_send_download_headers('application/pdf', $filename, strlen($pdfBytes));
+        echo $pdfBytes;
+        exit;
     }
 
-    echo json_encode(['success' => true, 'data' => $rows]);
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    audit_logs_json_response(404, [
+        'success' => false,
+        'message' => 'Not found.',
+    ]);
+} catch (InvalidArgumentException $error) {
+    audit_logs_json_response(422, [
+        'success' => false,
+        'message' => $error->getMessage(),
+    ]);
+} catch (Throwable $error) {
+    error_log('Audit Logs endpoint failed: ' . $error->getMessage());
+    audit_logs_json_response(500, [
+        'success' => false,
+        'message' => 'Unable to process the audit-log request right now.',
+    ]);
 }

@@ -1654,20 +1654,8 @@ if ($sbSidebarUserId !== '') {
       </li>
       <?php endif; ?>
 
-      <?php if ($sbHasAny($sbBlotterKeys)): ?>
+      <?php if ($sbCan('blotter_tracker') || $sbCan('blotter_review_queue')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">e-Blotter Management</li>
-      <?php if ($sbCan('blotter_log_new_incident')): ?>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
-           style="<?= $current == 'BlotterForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-file-pen"></i>
-          </span>
-          <span class="sidebar-button-label">Log New Incident</span>
-        </a>
-      </li>
-      <?php endif; ?>
       <?php if ($sbCan('blotter_tracker') || $sbCan('blotter_review_queue')): ?>
       <li class="mb-1">
         <button type="button"
@@ -1709,20 +1697,8 @@ if ($sbSidebarUserId !== '') {
       <?php endif; ?>
       <?php endif; ?>
 
-      <?php if ($sbHasAny($sbComplaintKeys)): ?>
+      <?php if ($sbCan('complaint_tracker')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Complaints and Grievances</li>
-      <?php if ($sbCan('complaint_log_new_incident')): ?>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
-           style="<?= $current == 'ComplaintForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-file-pen"></i>
-          </span>
-          <span class="sidebar-button-label">Log New Incident</span>
-        </a>
-      </li>
-      <?php endif; ?>
       <?php if ($sbCan('complaint_tracker')): ?>
       <li class="mb-1">
         <button type="button"
@@ -2292,4 +2268,4 @@ if ($sbSidebarUserId !== '') {
   })();
 </script>
 <script src="<?= htmlspecialchars(appUrl('/JS-Script-Files/websitePreferences.js'), ENT_QUOTES, 'UTF-8') ?>" data-endpoint="<?= htmlspecialchars(appUrl('/PhpFiles/GET/getWebsitePreferences.php'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<script src="<?= htmlspecialchars(appUrl('/JS-Script-Files/Admin-End/adminTableActions.js?v=20260811-action-dropdown-overlay'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(appUrl('/JS-Script-Files/Admin-End/adminTableActions.js?v=20260811-action-dropdown-portal'), ENT_QUOTES, 'UTF-8') ?>"></script>

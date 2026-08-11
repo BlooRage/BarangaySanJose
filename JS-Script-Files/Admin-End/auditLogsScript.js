@@ -1,20 +1,28 @@
 (() => {
+  const scriptEl = document.currentScript;
+  const endpoint = scriptEl?.dataset.endpoint || "../PhpFiles/Admin-End/auditLogs.php";
+  const csrfToken = scriptEl?.dataset.csrfToken || "";
   const el = (id) => document.getElementById(id);
 
   const state = {
     q: "",
     timer: null,
+    statusTimer: null,
     rows: [],
-    rowsRaw: [],
+    meta: {},
     visibleCols: null,
     filters: {
-      from: "", // YYYY-MM-DD
-      to: "",   // YYYY-MM-DD
+      from: "",
+      to: "",
+      personUserId: "",
+      includeDetails: false,
     },
     auto: {
       interval: null,
       inFlight: false,
     },
+    loadSequence: 0,
+    loadController: null,
     pagination: {
       currentPage: 1,
       entriesPerPage: 20,
@@ -35,7 +43,7 @@
   const truncate = (s, n = 60) => {
     const t = String(s ?? "");
     if (t.length <= n) return t;
-    return t.slice(0, n - 1) + "…";
+    return `${t.slice(0, n - 1)}…`;
   };
 
   const STORAGE_KEY = "audit_cols_v1";
@@ -74,7 +82,7 @@
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
     } catch {
-      // ignore
+      // Local storage can be unavailable in private browsing modes.
     }
   };
 
@@ -90,45 +98,9 @@
     theadRow.innerHTML = "";
     activeCols.forEach((c) => {
       const th = document.createElement("th");
-      th.innerText = c.label;
+      th.textContent = c.label;
       if (c.nowrap) th.style.whiteSpace = "nowrap";
       theadRow.appendChild(th);
-    });
-  };
-
-  const renderTable = () => {
-    const tbody = el("auditTbody");
-    const activeCols = getActiveColumns();
-
-    renderHeader();
-
-    if (!tbody) return;
-    const rows = state.rows || [];
-    const totalPages = Math.max(1, Math.ceil(rows.length / state.pagination.entriesPerPage));
-    if (state.pagination.currentPage > totalPages) state.pagination.currentPage = totalPages;
-    if (state.pagination.currentPage < 1) state.pagination.currentPage = 1;
-    const start = (state.pagination.currentPage - 1) * state.pagination.entriesPerPage;
-    const pageRows = rows.slice(start, start + state.pagination.entriesPerPage);
-    renderPagination(totalPages, rows.length);
-
-    if (!pageRows.length) {
-      tbody.innerHTML = `<tr><td colspan="${activeCols.length}" class="text-center text-muted py-4">No records found.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = "";
-    pageRows.forEach((r) => {
-      const tr = document.createElement("tr");
-      activeCols.forEach((c) => {
-        const td = document.createElement("td");
-        const raw = c.get(r);
-        const text = c.truncate ? truncate(raw, c.truncate) : String(raw ?? "");
-        td.innerText = text;
-        if (c.truncate) td.title = String(raw ?? "");
-        if (c.nowrap) td.style.whiteSpace = "nowrap";
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
     });
   };
 
@@ -154,49 +126,105 @@
     };
 
     if (totalRows <= 0) {
-      addBtn("<", 1, true, false);
+      addBtn("<", 1, true);
       addBtn("1", 1, false, true);
-      addBtn(">", 1, true, false);
+      addBtn(">", 1, true);
       return;
     }
 
-    addBtn("<", Math.max(1, state.pagination.currentPage - 1), state.pagination.currentPage <= 1, false);
+    addBtn("<", Math.max(1, state.pagination.currentPage - 1), state.pagination.currentPage <= 1);
     let startPage = Math.max(1, state.pagination.currentPage - 2);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
     if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-    for (let p = startPage; p <= endPage; p += 1) {
-      addBtn(String(p), p, false, p === state.pagination.currentPage);
+    for (let page = startPage; page <= endPage; page += 1) {
+      addBtn(String(page), page, false, page === state.pagination.currentPage);
     }
-    addBtn(">", Math.min(totalPages, state.pagination.currentPage + 1), state.pagination.currentPage >= totalPages, false);
+    addBtn(">", Math.min(totalPages, state.pagination.currentPage + 1), state.pagination.currentPage >= totalPages);
   };
 
-  const parseDateOnly = (yyyyMmDd) => {
-    const s = String(yyyyMmDd ?? "").trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-    const d = new Date(`${s}T00:00:00`);
-    return Number.isNaN(d.getTime()) ? null : d;
-  };
+  const renderTable = () => {
+    const tbody = el("auditTbody");
+    const activeCols = getActiveColumns();
+    renderHeader();
+    if (!tbody) return;
 
-  const rowTimestampDate = (row) => {
-    const raw = String(row?.action_timestamp ?? "").trim();
-    if (!raw) return null;
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? null : d;
-  };
+    const rows = state.rows || [];
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pagination.entriesPerPage));
+    state.pagination.currentPage = Math.min(Math.max(1, state.pagination.currentPage), totalPages);
+    const start = (state.pagination.currentPage - 1) * state.pagination.entriesPerPage;
+    const pageRows = rows.slice(start, start + state.pagination.entriesPerPage);
+    renderPagination(totalPages, rows.length);
 
-  const applyClientFilters = () => {
-    const fromD = parseDateOnly(state.filters.from);
-    const toD = parseDateOnly(state.filters.to);
-    // inclusive "to" (end of day)
-    const toEnd = toD ? new Date(toD.getTime() + 24 * 60 * 60 * 1000 - 1) : null;
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="${activeCols.length || 1}" class="text-center text-muted py-4">No records found.</td></tr>`;
+      return;
+    }
 
-    const raw = Array.isArray(state.rowsRaw) ? state.rowsRaw : [];
-    state.rows = raw.filter((r) => {
-      const ts = rowTimestampDate(r);
-      if (fromD && (!ts || ts < fromD)) return false;
-      if (toEnd && (!ts || ts > toEnd)) return false;
-      return true;
+    tbody.innerHTML = "";
+    pageRows.forEach((row) => {
+      const tr = document.createElement("tr");
+      activeCols.forEach((column) => {
+        const td = document.createElement("td");
+        const raw = column.get(row);
+        td.textContent = column.truncate ? truncate(raw, column.truncate) : String(raw ?? "");
+        if (column.truncate) td.title = String(raw ?? "");
+        if (column.nowrap) td.style.whiteSpace = "nowrap";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
     });
+  };
+
+  const renderTableMessage = (message, className = "text-muted") => {
+    const tbody = el("auditTbody");
+    if (!tbody) return;
+    renderHeader();
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = getActiveColumns().length || 1;
+    td.className = `text-center ${className} py-4`;
+    td.textContent = message;
+    tr.appendChild(td);
+    tbody.replaceChildren(tr);
+  };
+
+  const selectedPersonLabel = () => {
+    const select = el("auditFilterPerson");
+    if (!select || !state.filters.personUserId) return "";
+    const option = Array.from(select.options).find((candidate) => candidate.value === state.filters.personUserId);
+    return option?.textContent?.trim() || state.filters.personUserId;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "";
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const renderActiveFilters = () => {
+    const target = el("auditActiveFilters");
+    if (!target) return;
+
+    const filters = [];
+    if (state.filters.from && state.filters.to) {
+      filters.push(`${formatDate(state.filters.from)} to ${formatDate(state.filters.to)}`);
+    } else if (state.filters.from) {
+      filters.push(`From ${formatDate(state.filters.from)}`);
+    } else if (state.filters.to) {
+      filters.push(`Through ${formatDate(state.filters.to)}`);
+    }
+    if (state.filters.personUserId) filters.push(`Performed by: ${selectedPersonLabel()}`);
+    if (state.q.trim()) filters.push(`Search: “${truncate(state.q.trim(), 42)}”`);
+
+    const count = state.rows.length;
+    let resultText = `${count} record${count === 1 ? "" : "s"}`;
+    if (state.meta?.scan_truncated) {
+      resultText = `Showing ${resultText}; scan limit reached, narrow the filters for a complete result`;
+    } else if (state.meta?.truncated) {
+      resultText = `Showing latest ${count}+ records`;
+    }
+    target.textContent = `${filters.length ? filters.join(" • ") : "All audit logs"} — ${resultText}`;
   };
 
   const renderColumnsModal = () => {
@@ -205,7 +233,7 @@
     const selected = new Set(state.visibleCols || defaultVisibleCols());
     list.innerHTML = "";
 
-    columns.forEach((c) => {
+    columns.forEach((column) => {
       const col = document.createElement("div");
       col.className = "col-12 col-md-6 col-lg-4";
 
@@ -215,95 +243,256 @@
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.className = "form-check-input m-0";
-      cb.dataset.colKey = c.key;
-      cb.checked = selected.has(c.key);
+      cb.dataset.colKey = column.key;
+      cb.checked = selected.has(column.key);
 
       const text = document.createElement("div");
       text.className = "fw-semibold";
-      text.innerText = c.label;
+      text.textContent = column.label;
 
-      wrap.appendChild(cb);
-      wrap.appendChild(text);
+      wrap.append(cb, text);
       col.appendChild(wrap);
       list.appendChild(col);
     });
   };
 
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    if (state.q.trim()) params.set("q", state.q.trim());
+    if (state.filters.from) params.set("date_from", state.filters.from);
+    if (state.filters.to) params.set("date_to", state.filters.to);
+    if (state.filters.personUserId) params.set("person_user_id", state.filters.personUserId);
+    return params;
+  };
+
+  const readJsonResponse = async (response) => {
+    const rawText = await response.text();
+    try {
+      return { data: rawText ? JSON.parse(rawText) : null, rawText };
+    } catch {
+      return { data: null, rawText };
+    }
+  };
+
+  const responseErrorMessage = (data, rawText, fallback) => (
+    (data && (data.message || data.error))
+    || (rawText?.trim() ? rawText.trim().slice(0, 300) : "")
+    || fallback
+  );
+
   const load = async () => {
-    if (state.auto.inFlight) return;
+    const sequence = ++state.loadSequence;
+    if (state.loadController) state.loadController.abort();
+    const controller = new AbortController();
+    state.loadController = controller;
     state.auto.inFlight = true;
 
-    const tbody = el("auditTbody");
     const refreshBtn = el("btnAuditRefresh");
-    const activeCols = getActiveColumns();
-    const colCount = activeCols.length || 1;
-    renderHeader();
-    if (refreshBtn) {
-      refreshBtn.classList.add("is-loading");
-      refreshBtn.disabled = true;
-    }
-    if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted py-4">Loading...</td></tr>`;
-    }
+    refreshBtn?.classList.add("is-loading");
+    if (refreshBtn) refreshBtn.disabled = true;
+    renderTableMessage("Loading...");
 
-    const params = new URLSearchParams();
+    const params = buildFilterParams();
     params.set("fetch_audit_logs", "1");
-    if (state.q.trim()) params.set("q", state.q.trim());
-    params.set("limit", "200");
+    params.set("limit", "500");
 
     try {
-      const res = await fetch(`../PhpFiles/Admin-End/auditLogs.php?${params.toString()}`, {
+      const response = await fetch(`${endpoint}?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      const { data, rawText } = await readJsonResponse(response);
+
+      if (!response.ok || !data?.success) {
+        throw new Error(responseErrorMessage(data, rawText, "Failed to load audit logs."));
+      }
+      if (sequence !== state.loadSequence) return;
+
+      state.rows = Array.isArray(data.data) ? data.data : [];
+      state.meta = data.meta && typeof data.meta === "object" ? data.meta : {};
+      renderTable();
+      renderActiveFilters();
+    } catch (error) {
+      if (error?.name === "AbortError" || sequence !== state.loadSequence) return;
+      state.rows = [];
+      state.meta = {};
+      renderTableMessage(error?.message || "Failed to load audit logs.", "text-danger");
+      renderActiveFilters();
+    } finally {
+      if (sequence === state.loadSequence) {
+        refreshBtn?.classList.remove("is-loading");
+        if (refreshBtn) refreshBtn.disabled = false;
+        state.auto.inFlight = false;
+        state.loadController = null;
+      }
+    }
+  };
+
+  const loadPeople = async () => {
+    const select = el("auditFilterPerson");
+    if (!select) return;
+    const currentValue = state.filters.personUserId;
+    select.disabled = true;
+    select.replaceChildren(new Option("Loading people...", ""));
+
+    try {
+      const params = new URLSearchParams({ fetch_audit_people: "1" });
+      const response = await fetch(`${endpoint}?${params.toString()}`, {
         headers: { Accept: "application/json" },
       });
-
-      let data = null;
-      let rawText = "";
-      try {
-        rawText = await res.text();
-        data = rawText ? JSON.parse(rawText) : null;
-      } catch {
-        data = null;
+      const { data, rawText } = await readJsonResponse(response);
+      if (!response.ok || !data?.success) {
+        throw new Error(responseErrorMessage(data, rawText, "Failed to load people."));
       }
 
-      if (!res.ok || !data || !data.success) {
-        const msg =
-          (data && (data.message || data.error)) ||
-          (rawText && rawText.trim() ? rawText.trim().slice(0, 300) : "") ||
-          "Failed to load audit logs.";
-        if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-danger py-4">${msg}</td></tr>`;
-        }
-        return;
+      select.replaceChildren(new Option("All people", ""));
+      const people = Array.isArray(data.data) ? data.data : [];
+      people.forEach((person) => {
+        const userId = String(person?.user_id ?? "").trim();
+        if (!userId) return;
+        const label = String(person?.label || person?.display_name || userId).trim();
+        select.appendChild(new Option(label, userId));
+      });
+      if (currentValue && !Array.from(select.options).some((option) => option.value === currentValue)) {
+        select.appendChild(new Option(currentValue, currentValue));
       }
-
-      state.rowsRaw = Array.isArray(data.data) ? data.data : [];
-      applyClientFilters();
-      renderTable();
+      select.value = currentValue;
+    } catch {
+      select.replaceChildren(new Option("All people", ""));
+      if (currentValue) {
+        select.appendChild(new Option(currentValue, currentValue));
+        select.value = currentValue;
+      }
     } finally {
-      if (refreshBtn) {
-        refreshBtn.classList.remove("is-loading");
-        refreshBtn.disabled = false;
-      }
-      state.auto.inFlight = false;
+      select.disabled = false;
+      renderActiveFilters();
     }
   };
 
   const AUTO_REFRESH_MS = 30000;
+
+  const scheduleAutoRefresh = () => {
+    if (state.auto.interval) window.clearTimeout(state.auto.interval);
+    state.auto.interval = null;
+    // Decrypted free-text search can scan historical rows in PHP. Keep those
+    // searches manual instead of repeating the expensive scan every 30s.
+    if (state.q.trim()) return;
+    state.auto.interval = window.setTimeout(() => {
+      if (state.auto.inFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      load().finally(scheduleAutoRefresh);
+    }, AUTO_REFRESH_MS);
+  };
 
   const triggerRefresh = async () => {
     scheduleAutoRefresh();
     await load();
   };
 
-  const scheduleAutoRefresh = () => {
-    if (state.auto.interval) window.clearTimeout(state.auto.interval);
-    state.auto.interval = window.setTimeout(() => {
-      if (state.auto.inFlight) {
-        scheduleAutoRefresh();
-        return;
+  const setExportStatus = (message, kind = "muted") => {
+    const status = el("auditExportStatus");
+    if (!status) return;
+    if (state.statusTimer) window.clearTimeout(state.statusTimer);
+    status.className = `small text-${kind}`;
+    status.textContent = message;
+    if (message && kind !== "danger") {
+      state.statusTimer = window.setTimeout(() => {
+        status.textContent = "";
+      }, 6000);
+    }
+  };
+
+  const filenameFromDisposition = (header, fallback) => {
+    if (!header) return fallback;
+    const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match) {
+      try {
+        return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ""));
+      } catch {
+        // Fall through to the plain filename.
       }
-      triggerRefresh().catch(() => {});
-    }, AUTO_REFRESH_MS);
+    }
+    const plainMatch = header.match(/filename="?([^";]+)"?/i);
+    return plainMatch?.[1]?.trim() || fallback;
+  };
+
+  const downloadExport = async (format) => {
+    const normalized = format === "pdf" ? "pdf" : "csv";
+    const csvBtn = el("btnAuditExportCsv");
+    const pdfBtn = el("btnAuditExportPdf");
+    const activeBtn = normalized === "pdf" ? pdfBtn : csvBtn;
+    const params = buildFilterParams();
+    params.set("export", normalized);
+    params.set("include_details", state.filters.includeDetails ? "1" : "0");
+
+    [csvBtn, pdfBtn].forEach((button) => {
+      if (!button) return;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+    });
+    activeBtn?.classList.add("is-loading");
+    setExportStatus(`Preparing ${normalized.toUpperCase()}...`);
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Accept: "application/json, text/csv, application/pdf",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "X-CSRF-TOKEN": csrfToken,
+        },
+        body: params.toString(),
+      });
+
+      const contentType = (response.headers.get("Content-Type") || "").toLowerCase();
+      const expectedType = normalized === "pdf" ? "application/pdf" : "text/csv";
+      if (!response.ok || contentType.includes("application/json") || !contentType.includes(expectedType)) {
+        const { data, rawText } = await readJsonResponse(response);
+        throw new Error(responseErrorMessage(data, rawText, `Failed to create the ${normalized.toUpperCase()} file.`));
+      }
+
+      const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error(`The ${normalized.toUpperCase()} export was empty. Please try again.`);
+      }
+      const fallback = `audit_logs.${normalized}`;
+      const filename = filenameFromDisposition(response.headers.get("Content-Disposition"), fallback);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setExportStatus(`${normalized.toUpperCase()} download ready.`, "success");
+    } catch (error) {
+      const message = error?.message || `Failed to create the ${normalized.toUpperCase()} file.`;
+      setExportStatus(message, "danger");
+      window.alert(message);
+    } finally {
+      activeBtn?.classList.remove("is-loading");
+      [csvBtn, pdfBtn].forEach((button) => {
+        if (!button) return;
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      });
+    }
+  };
+
+  const validateDateRange = (fromEl, toEl) => {
+    const from = fromEl?.value || "";
+    const to = toEl?.value || "";
+    fromEl?.setCustomValidity("");
+    toEl?.setCustomValidity("");
+    if (from && to && from > to) {
+      toEl?.setCustomValidity("Date To must be on or after Date From.");
+      toEl?.reportValidity();
+      return false;
+    }
+    return true;
   };
 
   const wire = () => {
@@ -315,95 +504,95 @@
     const filterModalEl = el("modalAuditFilter");
     const filterFromEl = el("auditFilterFrom");
     const filterToEl = el("auditFilterTo");
+    const filterPersonEl = el("auditFilterPerson");
+    const includeDetailsEl = el("auditExportIncludeDetails");
     const filterApplyEl = el("btnAuditFilterApply");
     const filterResetEl = el("btnAuditFilterReset");
 
-    if (search) {
-      search.addEventListener("input", () => {
-        state.q = search.value || "";
-        state.pagination.currentPage = 1;
-        if (state.timer) window.clearTimeout(state.timer);
-        state.timer = window.setTimeout(load, 250);
-      });
-    }
-    if (refresh) refresh.addEventListener("click", () => triggerRefresh().catch(() => {}));
+    search?.addEventListener("input", () => {
+      state.q = search.value || "";
+      state.pagination.currentPage = 1;
+      scheduleAutoRefresh();
+      if (state.timer) window.clearTimeout(state.timer);
+      state.timer = window.setTimeout(() => {
+        load();
+        scheduleAutoRefresh();
+      }, 300);
+    });
+    refresh?.addEventListener("click", () => triggerRefresh());
+    el("btnAuditExportCsv")?.addEventListener("click", () => downloadExport("csv"));
+    el("btnAuditExportPdf")?.addEventListener("click", () => downloadExport("pdf"));
 
-    if (columnsModalEl) {
-      columnsModalEl.addEventListener("show.bs.modal", () => {
-        renderColumnsModal();
-      });
-    }
+    columnsModalEl?.addEventListener("show.bs.modal", renderColumnsModal);
+    filterModalEl?.addEventListener("show.bs.modal", () => {
+      if (filterFromEl) filterFromEl.value = state.filters.from;
+      if (filterToEl) filterToEl.value = state.filters.to;
+      if (filterPersonEl) filterPersonEl.value = state.filters.personUserId;
+      if (includeDetailsEl) includeDetailsEl.checked = state.filters.includeDetails;
+      validateDateRange(filterFromEl, filterToEl);
+    });
 
-    if (filterModalEl) {
-      filterModalEl.addEventListener("show.bs.modal", () => {
-        if (filterFromEl) filterFromEl.value = state.filters.from || "";
-        if (filterToEl) filterToEl.value = state.filters.to || "";
-      });
-    }
+    [filterFromEl, filterToEl].forEach((input) => {
+      input?.addEventListener("change", () => validateDateRange(filterFromEl, filterToEl));
+    });
 
-    if (filterApplyEl) {
-      filterApplyEl.addEventListener("click", () => {
-        state.filters.from = filterFromEl ? String(filterFromEl.value || "") : "";
-        state.filters.to = filterToEl ? String(filterToEl.value || "") : "";
-        state.pagination.currentPage = 1;
-        applyClientFilters();
-        renderTable();
-      });
-    }
+    filterApplyEl?.addEventListener("click", () => {
+      if (!validateDateRange(filterFromEl, filterToEl)) return;
+      state.filters.from = filterFromEl?.value || "";
+      state.filters.to = filterToEl?.value || "";
+      state.filters.personUserId = filterPersonEl?.value || "";
+      state.filters.includeDetails = Boolean(includeDetailsEl?.checked);
+      state.pagination.currentPage = 1;
+      if (filterModalEl) bootstrap.Modal.getOrCreateInstance(filterModalEl).hide();
+      triggerRefresh();
+    });
 
-    if (filterResetEl) {
-      filterResetEl.addEventListener("click", () => {
-        state.filters.from = "";
-        state.filters.to = "";
-        if (filterFromEl) filterFromEl.value = "";
-        if (filterToEl) filterToEl.value = "";
-        state.pagination.currentPage = 1;
-        applyClientFilters();
-        renderTable();
-      });
-    }
+    filterResetEl?.addEventListener("click", () => {
+      state.filters = { from: "", to: "", personUserId: "", includeDetails: false };
+      if (filterFromEl) filterFromEl.value = "";
+      if (filterToEl) filterToEl.value = "";
+      if (filterPersonEl) filterPersonEl.value = "";
+      if (includeDetailsEl) includeDetailsEl.checked = false;
+      validateDateRange(filterFromEl, filterToEl);
+      state.pagination.currentPage = 1;
+      triggerRefresh();
+    });
 
-    if (entriesPerPageInput) {
-      entriesPerPageInput.addEventListener("change", () => {
-        const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
-        state.pagination.entriesPerPage = next;
-        entriesPerPageInput.value = String(next);
-        state.pagination.currentPage = 1;
-        renderTable();
-      });
-    }
+    entriesPerPageInput?.addEventListener("change", () => {
+      const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+      state.pagination.entriesPerPage = next;
+      entriesPerPageInput.value = String(next);
+      state.pagination.currentPage = 1;
+      renderTable();
+    });
 
-    if (resetCols) {
-      resetCols.addEventListener("click", () => {
-        state.visibleCols = defaultVisibleCols();
-        saveVisibleCols(state.visibleCols);
-        renderColumnsModal();
-        renderTable();
-      });
-    }
+    resetCols?.addEventListener("click", () => {
+      state.visibleCols = defaultVisibleCols();
+      saveVisibleCols(state.visibleCols);
+      renderColumnsModal();
+      renderTable();
+    });
 
-    if (applyCols) {
-      applyCols.addEventListener("click", () => {
-        const list = el("auditColumnsList");
-        if (!list) return;
-        const checked = Array.from(list.querySelectorAll('input[type="checkbox"][data-col-key]'))
-          .filter((x) => x.checked)
-          .map((x) => String(x.dataset.colKey || "").trim())
-          .filter(Boolean);
-        state.visibleCols = checked.length ? checked : defaultVisibleCols();
-        saveVisibleCols(state.visibleCols);
-        renderTable();
-        if (columnsModalEl) {
-          bootstrap.Modal.getOrCreateInstance(columnsModalEl).hide();
-        }
-      });
-    }
+    applyCols?.addEventListener("click", () => {
+      const list = el("auditColumnsList");
+      if (!list) return;
+      const checked = Array.from(list.querySelectorAll('input[type="checkbox"][data-col-key]'))
+        .filter((input) => input.checked)
+        .map((input) => String(input.dataset.colKey || "").trim())
+        .filter(Boolean);
+      state.visibleCols = checked.length ? checked : defaultVisibleCols();
+      saveVisibleCols(state.visibleCols);
+      renderTable();
+      if (columnsModalEl) bootstrap.Modal.getOrCreateInstance(columnsModalEl).hide();
+    });
   };
 
   document.addEventListener("DOMContentLoaded", () => {
     state.visibleCols = loadVisibleCols();
     wire();
     renderHeader();
+    renderActiveFilters();
+    loadPeople();
     load();
     scheduleAutoRefresh();
   });

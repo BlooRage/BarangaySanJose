@@ -1,3 +1,11 @@
+<?php
+require_once __DIR__ . '/includes/admin_guard.php';
+
+requireRoleSession(['SuperAdmin'], false);
+
+$auditLogsEndpoint = appUrl('PhpFiles/Admin-End/auditLogs.php');
+$auditLogsCsrfToken = ensureCsrfToken();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,16 +18,11 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AuditLogsStyle.css?v=20260219-2">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AuditLogsStyle.css?v=20260811-1">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
-    <?php
-      require_once "../PhpFiles/General/connection.php";
-      require_once "includes/admin_guard.php";
-      requireRoleSession(['SuperAdmin'], false);
-      include "includes/sidebar.php";
-    ?>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
@@ -46,6 +49,14 @@
               <i class="fa-solid fa-sliders"></i>
               <span class="visually-hidden">Columns</span>
             </button>
+            <button id="btnAuditExportCsv" class="btn btn-outline-success btn-icon audit-export audit-export-csv" type="button" title="Download filtered logs as CSV" aria-label="Download filtered logs as CSV">
+              <i class="fa-solid fa-file-csv"></i>
+              <span class="visually-hidden">Download CSV</span>
+            </button>
+            <button id="btnAuditExportPdf" class="btn btn-outline-danger btn-icon audit-export audit-export-pdf" type="button" title="Download filtered logs as PDF" aria-label="Download filtered logs as PDF">
+              <i class="fa-solid fa-file-pdf"></i>
+              <span class="visually-hidden">Download PDF</span>
+            </button>
             <button id="btnAuditRefresh" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh table" aria-label="Refresh table">
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
@@ -53,6 +64,11 @@
             <span id="auditAutoRefreshCountdown" class="small text-muted d-none"></span>
             
           </div>
+        </div>
+
+        <div class="audit-result-summary d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" aria-live="polite">
+          <div id="auditActiveFilters" class="small text-muted">All audit logs</div>
+          <div id="auditExportStatus" class="small text-muted" role="status"></div>
         </div>
 
         <div class="table-responsive compact-admin-table-shell">
@@ -123,22 +139,37 @@
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-12">
-              <label class="form-label small text-muted mb-1">Date From</label>
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-muted mb-1" for="auditFilterFrom">Date From</label>
               <input type="date" class="form-control" id="auditFilterFrom" />
             </div>
-            <div class="col-12">
-              <label class="form-label small text-muted mb-1">Date To</label>
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-muted mb-1" for="auditFilterTo">Date To</label>
               <input type="date" class="form-control" id="auditFilterTo" />
+            </div>
+            <div class="col-12">
+              <label class="form-label small text-muted mb-1" for="auditFilterPerson">Performed by</label>
+              <select class="form-select" id="auditFilterPerson">
+                <option value="">All people</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <div class="form-check audit-export-details-option">
+                <input class="form-check-input" type="checkbox" id="auditExportIncludeDetails" />
+                <label class="form-check-label" for="auditExportIncludeDetails">
+                  Include old value, new value, and remarks in downloads
+                </label>
+              </div>
+              <div class="form-text">These fields may contain sensitive or lengthy information. CSV keeps the full values; PDF shortens unusually long values to keep the report readable.</div>
             </div>
           </div>
           <div class="small text-muted mt-3">
-            Filters are applied client-side on the loaded logs.
+            Filters are applied to both the table and downloaded files.
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="btnAuditFilterReset">Reset</button>
-          <button type="button" class="btn btn-primary" id="btnAuditFilterApply" data-bs-dismiss="modal">Apply</button>
+          <button type="button" class="btn btn-primary" id="btnAuditFilterApply">Apply</button>
         </div>
       </div>
     </div>
@@ -146,6 +177,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
-  <script src="../JS-Script-Files/Admin-End/auditLogsScript.js?v=20260219-1"></script>
+  <script
+    id="auditLogsScript"
+    src="../JS-Script-Files/Admin-End/auditLogsScript.js?v=20260811-1"
+    data-endpoint="<?= htmlspecialchars($auditLogsEndpoint, ENT_QUOTES, 'UTF-8') ?>"
+    data-csrf-token="<?= htmlspecialchars($auditLogsCsrfToken, ENT_QUOTES, 'UTF-8') ?>"
+  ></script>
 </body>
 </html>

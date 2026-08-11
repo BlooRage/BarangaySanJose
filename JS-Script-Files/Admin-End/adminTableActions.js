@@ -27,7 +27,11 @@
     .tracker-action-dropdown .dropdown-menu .dropdown-item:hover,.tracker-action-dropdown .dropdown-menu .dropdown-item:focus,.tracker-action-dropdown .dropdown-menu .dropdown-item:active,.tracker-action-dropdown .dropdown-menu .dropdown-item.active{background-color:#f8fafc!important;color:#0f172a!important}
     body #main-display .table-responsive .dropdown-menu,body main .table-responsive .dropdown-menu{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;z-index:2060}
     body #main-display .table-responsive .dropdown-menu .dropdown-item:focus,body #main-display .table-responsive .dropdown-menu .dropdown-item:active,body #main-display .table-responsive .dropdown-menu .dropdown-item.active,body main .table-responsive .dropdown-menu .dropdown-item:focus,body main .table-responsive .dropdown-menu .dropdown-item:active,body main .table-responsive .dropdown-menu .dropdown-item.active{background:#f8fafc!important;color:#0f172a!important}
-    body #main-display.admin-action-dropdown-overflow-open,body main.admin-action-dropdown-overflow-open,body #main-display .admin-action-dropdown-overflow-open.admin-action-dropdown-overflow-open,body main .admin-action-dropdown-overflow-open.admin-action-dropdown-overflow-open{overflow:visible!important}
+    body>.admin-table-action-menu-portal{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;position:fixed!important;min-width:12rem;margin:0!important;padding:.4rem;border:1px solid #e2e8f0;border-radius:.65rem;box-shadow:0 .5rem 1.25rem rgba(15,23,42,.14);z-index:2060}
+    body>.admin-table-action-menu-portal .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
+    body>.admin-table-action-menu-portal .dropdown-item:hover,body>.admin-table-action-menu-portal .dropdown-item:focus,body>.admin-table-action-menu-portal .dropdown-item:active{background:#f8fafc!important}
+    body>.admin-table-action-menu-portal form{display:block!important;width:100%;margin:0!important;padding:0!important}
+    body>.admin-table-action-menu-portal .dropdown-item+.dropdown-item,body>.admin-table-action-menu-portal form+.dropdown-item,body>.admin-table-action-menu-portal .dropdown-item+form{margin-top:.25rem!important}
   `;
   document.head.appendChild(style);
 
@@ -177,30 +181,37 @@
     root.querySelectorAll?.('.admin-table-action-dropdown,.tracker-action-dropdown,.compact-admin-table-shell .dropdown,.table-responsive .dropdown').forEach(prepareDropdown);
   }
 
-  function overflowClips(value) {
-    return ['hidden', 'clip', 'auto', 'scroll'].includes(String(value || '').toLowerCase());
+  function portalDropdownMenu(dropdown) {
+    const toggle = dropdown?.querySelector?.('[data-bs-toggle="dropdown"]');
+    const menu = dropdown?.querySelector?.('.dropdown-menu');
+    if (!toggle || !menu || menu.parentElement === document.body) return;
+
+    dropdown._adminActionMenu = menu;
+    menu.classList.add('admin-table-action-menu-portal');
+    document.body.appendChild(menu);
+
+    const toggleRect = toggle.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gutter = 8;
+    const left = Math.max(gutter, Math.min(toggleRect.right - menuRect.width, window.innerWidth - menuRect.width - gutter));
+    const fitsBelow = toggleRect.bottom + menuRect.height + gutter <= window.innerHeight;
+    const top = fitsBelow
+      ? toggleRect.bottom + 6
+      : Math.max(gutter, toggleRect.top - menuRect.height - 6);
+
+    menu.style.inset = 'auto';
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.transform = 'none';
   }
 
-  function openOverflowForDropdown(dropdown) {
-    const opened = [];
-    let node = dropdown?.parentElement || null;
-    while (node && node !== document.body) {
-      const style = window.getComputedStyle(node);
-      if (overflowClips(style.overflow) || overflowClips(style.overflowX) || overflowClips(style.overflowY)) {
-        node.classList.add('admin-action-dropdown-overflow-open');
-        opened.push(node);
-      }
-      if (node.matches?.('#main-display,main')) break;
-      node = node.parentElement;
-    }
-    dropdown._adminActionOverflowNodes = opened;
-  }
-
-  function closeOverflowForDropdown(dropdown) {
-    (dropdown?._adminActionOverflowNodes || []).forEach(node => {
-      if (!node.querySelector?.('.dropdown-menu.show')) node.classList.remove('admin-action-dropdown-overflow-open');
-    });
-    delete dropdown._adminActionOverflowNodes;
+  function restoreDropdownMenu(dropdown) {
+    const menu = dropdown?._adminActionMenu;
+    if (!menu) return;
+    menu.classList.remove('admin-table-action-menu-portal');
+    menu.removeAttribute('style');
+    dropdown.appendChild(menu);
+    delete dropdown._adminActionMenu;
   }
 
   const start = () => {
@@ -221,12 +232,16 @@
       const dropdown = tableDropdownFromToggle(event.target);
       if (!dropdown) return;
       prepareDropdown(dropdown);
-      openOverflowForDropdown(dropdown);
+    });
+    document.addEventListener('shown.bs.dropdown', event => {
+      const dropdown = tableDropdownFromToggle(event.target);
+      if (!dropdown) return;
+      portalDropdownMenu(dropdown);
     });
     document.addEventListener('hidden.bs.dropdown', event => {
       const dropdown = tableDropdownFromToggle(event.target);
       if (!dropdown) return;
-      closeOverflowForDropdown(dropdown);
+      restoreDropdownMenu(dropdown);
     });
   };
 

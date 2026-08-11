@@ -105,8 +105,52 @@
     margin-right: 0;
 }
 
-.audit-refresh.is-loading i {
+.audit-refresh.is-loading i,
+.audit-export.is-loading i {
     animation: auditSpin 900ms linear infinite;
+}
+
+.audit-export {
+    font-weight: 700;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.audit-export:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.audit-export:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.audit-export-csv {
+    border-color: rgba(25, 135, 84, 0.35);
+    color: #146c43;
+    background: linear-gradient(180deg, #f5fff9 0%, #eaf8f0 100%);
+}
+
+.audit-export-csv:hover:not(:disabled) {
+    border-color: rgba(25, 135, 84, 0.6);
+    color: #0f5a37;
+    background: linear-gradient(180deg, #effcf5 0%, #dff4e8 100%);
+    box-shadow: 0 10px 18px rgba(25, 135, 84, 0.12);
+}
+
+.audit-export-pdf {
+    border-color: rgba(220, 53, 69, 0.32);
+    color: #b02a37;
+    background: linear-gradient(180deg, #fff8f8 0%, #fcebed 100%);
+}
+
+.audit-export-pdf:hover:not(:disabled) {
+    border-color: rgba(220, 53, 69, 0.58);
+    color: #96232f;
+    background: linear-gradient(180deg, #fff3f4 0%, #f9dfe2 100%);
+    box-shadow: 0 10px 18px rgba(220, 53, 69, 0.12);
+}
+
+.audit-export:disabled {
+    cursor: wait;
 }
 
 @keyframes auditSpin {
@@ -159,7 +203,65 @@
     max-width: 440px;
 }
 
+.audit-result-summary {
+    min-height: 1.5rem;
+    padding: 0 .15rem;
+}
+
+#auditActiveFilters,
+#auditExportStatus {
+    overflow-wrap: anywhere;
+}
+
+.audit-export-details-option {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: .75rem .85rem .75rem 2.25rem;
+    background: #fffaf4;
+}
+
+.audit-export-details-option .form-check-input {
+    margin-left: -1.4rem;
+}
+
 #btnAuditRefresh.is-loading i {
     animation: auditSpin 900ms linear infinite;
 }
 
+@media (max-width: 1199.98px) {
+    .audit-shell .admin-list-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .audit-shell .admin-list-actions {
+        width: 100%;
+        margin-left: 0 !important;
+        flex-wrap: wrap !important;
+    }
+
+    .audit-shell .audit-search {
+        flex: 1 1 300px;
+        max-width: none;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .audit-shell {
+        padding: 1rem !important;
+    }
+
+    .audit-shell .audit-actions-row {
+        align-items: stretch !important;
+    }
+
+    .audit-shell .audit-search {
+        flex: 1 0 100%;
+        width: 100%;
+        min-width: 0;
+        margin-right: 0 !important;
+    }
+
+    .audit-result-summary {
+        align-items: flex-start !important;
+    }
+}
