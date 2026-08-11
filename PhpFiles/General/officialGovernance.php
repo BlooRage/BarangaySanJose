@@ -73,6 +73,7 @@ if (!function_exists('ogw_ensure_schema')) {
                 outgoing_official_id VARCHAR(20) DEFAULT NULL,
                 incoming_official_id VARCHAR(20) DEFAULT NULL,
                 effective_date DATE DEFAULT NULL,
+                assignment_end_date DATE DEFAULT NULL,
                 acting_until_date DATE DEFAULT NULL,
                 reason VARCHAR(255) DEFAULT NULL,
                 notes TEXT DEFAULT NULL,
@@ -93,6 +94,10 @@ if (!function_exists('ogw_ensure_schema')) {
                 KEY idx_governance_transition_incoming (incoming_official_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         ");
+
+        if (!ogw_column_exists($conn, 'officialgovernancetransitiontbl', 'assignment_end_date')) {
+            $conn->query("ALTER TABLE officialgovernancetransitiontbl ADD COLUMN assignment_end_date DATE DEFAULT NULL AFTER effective_date");
+        }
 
         if (!ogw_column_exists($conn, 'officialaccessprofiletbl', 'display_role')) {
             $conn->query("ALTER TABLE officialaccessprofiletbl ADD COLUMN display_role VARCHAR(40) DEFAULT NULL AFTER user_id");

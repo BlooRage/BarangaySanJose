@@ -213,19 +213,19 @@
         ...(body ? { body } : {})
       });
     } catch (error) {
-      throw new Error(describeRequestFailure(error, `Request to ${params?.action || 'official transitions'} failed before reaching the server`));
+      throw new Error(describeRequestFailure(error, `Request to ${params?.action || 'official assignments'} failed before reaching the server`));
     }
 
     const rawText = await res.text();
     if (!res.ok && !rawText.trim()) {
-      throw new Error(`Server returned HTTP ${res.status} with an empty response for ${params?.action || 'official transitions'}.`);
+      throw new Error(`Server returned HTTP ${res.status} with an empty response for ${params?.action || 'official assignments'}.`);
     }
     try {
       return rawText ? JSON.parse(rawText) : {};
     } catch (error) {
       const preview = rawText.trim().slice(0, 180);
       throw new Error(
-        `Server returned an unreadable response for ${params?.action || 'official transitions'} ` +
+        `Server returned an unreadable response for ${params?.action || 'official assignments'} ` +
         `(HTTP ${res.status}).${preview ? ` Response preview: ${preview}` : ''}`
       );
     }
@@ -437,9 +437,7 @@
 
   const pageTool = document.body?.dataset.otTool || 'current_term';
   const autoStart = document.body?.dataset.otAutostart || '';
-  const emptyQueueMessage = pageTool === 'create_new_term'
-    ? 'No governance cycle records yet. Create the cycle first, then encode the elected winners and appointed officials.'
-    : 'No transitions found.';
+  const emptyQueueMessage = 'No assignment activity yet. Use Add & Assign Official to begin.';
 
   // ── Status badge ──────────────────────────────────────────────────────────
   function statusBadge(status) {
@@ -456,7 +454,7 @@
 
   function typeBadge(type) {
     const labels = {
-      BarangayElection: 'Brgy. Election',
+      BarangayElection: 'Elected / Re-elected',
       SKElection:       'SK Election',
       Appointment:      'Appointment',
       Reappointment:    'Reappointment',
@@ -520,11 +518,13 @@
           ? `<div>${esc(r.outgoing_name)}</div>`
           : '',
       ].filter(Boolean);
-      const outgoing = outgoingParts.join('');
+      const outgoing = outgoingParts.join('') || '<span class="text-muted small">Vacant seat</span>';
       const batch = r.batch_label
         ? `<div><span class="badge bg-secondary">${esc(r.batch_label)}</span></div>`
-        : '<span class="text-muted small">—</span>';
-      const effDate   = r.effective_date   ? fmtDate(r.effective_date) : '<span class="text-muted">—</span>';
+        : '<span class="text-muted small">Manual</span>';
+      const startDate = r.effective_date ? fmtDate(r.effective_date) : '—';
+      const endDate = r.assignment_end_date ? fmtDate(r.assignment_end_date) : 'Open-ended';
+      const assignmentPeriod = `<div>${startDate}</div><div class="small text-muted">to ${endDate}</div>`;
       const actingTag = r.is_acting == 1   ? ' <span class="badge bg-info text-dark ms-1">Acting</span>' : '';
 
       const actions = buildRowActions(r);
@@ -536,7 +536,7 @@
           <td>${esc(r.position || '—')}${actingTag}</td>
           <td>${outgoing}</td>
           <td>${batch}</td>
-          <td>${effDate}</td>
+          <td>${assignmentPeriod}</td>
           <td>${statusBadge(r.status)}</td>
           <td>${actions}</td>
         </tr>`;
@@ -551,13 +551,15 @@
     const btns = [];
 
     if (s !== 'Completed' && s !== 'Cancelled') {
-      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Prepare incoming seat holder and complete turnover"><i class="fas fa-user-plus me-1"></i>Complete Turnover</button>`);
+      btns.push(`<button class="btn btn-sm btn-primary" onclick="otOpenCandidates('${esc(tid)}')" title="Continue official setup"><i class="fas fa-arrow-right me-1"></i>Continue Setup</button>`);
     }
     if (s !== 'Completed' && s !== 'Cancelled') {
-      btns.push(`<button class="btn btn-xs btn-outline-danger py-0 px-2" onclick="otCancelTransition('${esc(tid)}')" title="Cancel"><i class="fas fa-times"></i></button>`);
+      btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="otCancelTransition('${esc(tid)}')" title="Cancel setup"><i class="fas fa-times"></i></button>`);
     }
 
-    return `<div class="d-flex gap-1">${btns.join('')}</div>`;
+    return btns.length
+      ? `<div class="d-flex gap-1">${btns.join('')}</div>`
+      : '<span class="text-muted small">Complete</span>';
   }
 
   function renderPagination(total) {
@@ -612,21 +614,18 @@
   const ntBatchWrap  = document.getElementById('ntBatchLabelWrap');
   const ntReasonLbl  = document.getElementById('ntReasonLabel');
   const ntSeatWrap   = document.getElementById('ntSeatInfoWrap');
+  const ntEffectiveDate = document.getElementById('ntEffectiveDate');
+  const ntAssignmentEndDate = document.getElementById('ntAssignmentEndDate');
 
   // Transition type options per selection_method
   const ELECTED_TYPES = [
-    ['BarangayElection', 'Barangay Election (Term End)'],
-    ['SKElection',       'SK Election (Term End)'],
-    ['Resignation',      'Resignation'],
-    ['Removal',          'Removal'],
-    ['Retirement',       'Retirement'],
+    ['BarangayElection', 'Elected / Re-elected'],
+    ['Replacement',      'Replacement'],
   ];
   const APPOINTED_TYPES = [
     ['Appointment',   'New Appointment'],
-    ['Reappointment', 'Reappointment'],
-    ['Resignation',   'Resignation'],
-    ['Removal',       'Removal'],
-    ['Retirement',    'Retirement'],
+    ['Reappointment', 'Renew Appointment'],
+    ['Replacement',   'Replacement'],
   ];
 
   function populateTransitionTypes(method) {
@@ -648,6 +647,7 @@
     const method     = opt.dataset.method      || 'Elected';
     const holderName = opt.dataset.officialName || 'Vacant';
     const acctStatus = opt.dataset.accountStatus || '';
+    const seatRecord = (window.OT_DATA?.councilSeats || []).find((row) => String(row.council_id || '') === String(opt.value || '')) || {};
 
     // Show seat info card
     if (ntSeatWrap) {
@@ -674,40 +674,157 @@
     // Reset dependent fields
     if (ntType) ntType.value = '';
     if (ntBatchWrap) ntBatchWrap.style.display = 'none';
-    if (ntReasonLbl) ntReasonLbl.textContent = 'Reason';
+    if (ntReasonLbl) ntReasonLbl.textContent = 'Assignment Notes';
+    if (ntEffectiveDate) ntEffectiveDate.value = String(seatRecord.term_start || '').slice(0, 10);
+    if (ntAssignmentEndDate) ntAssignmentEndDate.value = String(seatRecord.term_end || '').slice(0, 10);
   });
 
   ntType?.addEventListener('change', () => {
     const v          = ntType.value;
     const isElection = ['BarangayElection','SKElection'].includes(v);
     const isRemoval  = v === 'Removal';
-    if (ntBatchWrap) ntBatchWrap.style.display = isElection ? '' : 'none';
-    if (ntReasonLbl) ntReasonLbl.textContent   = isRemoval ? 'Reason *' : 'Reason';
+    if (ntBatchWrap) ntBatchWrap.style.display = 'none';
+    if (ntReasonLbl) ntReasonLbl.textContent   = isRemoval ? 'Reason *' : 'Assignment Notes';
+  });
+
+  document.querySelectorAll('.ot-start-assignment').forEach((button) => {
+    button.addEventListener('click', () => {
+      const councilId = String(button.dataset.councilId || '');
+      if (ntCouncilId && councilId) {
+        ntCouncilId.value = councilId;
+        ntCouncilId.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      getModal('modalNewTransition')?.show();
+    });
   });
 
   document.getElementById('formNewTransition')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btnSubmitNewTransition');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Creating…';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Preparing…';
 
     const fd = new FormData(e.target);
     fd.append('action', 'new_transition');
     const params = {};
     fd.forEach((v, k) => params[k] = v);
 
-    const data = await apiFetch(params, 'POST');
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-save me-1"></i> Create Transition';
-
-    if (data.success) {
-      showToast(data.message || 'Transition created.');
+    try {
+      const data = await apiFetch(params, 'POST');
+      if (!data.success) throw new Error(data.message || 'Unable to prepare the assignment.');
+      showToast('Position prepared. Add or select the official next.');
       getModal('modalNewTransition')?.hide();
       e.target.reset();
       loadTransitions();
       updateStats();
-    } else {
-      showToast(data.message || 'Failed to create.', 'error');
+      window.setTimeout(() => {
+        if (data.transition_id) window.otOpenCandidates(data.transition_id);
+      }, 220);
+    } catch (error) {
+      showToast(error?.message || 'Unable to prepare the assignment.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Continue to Official <i class="fas fa-arrow-right ms-1"></i>';
+    }
+  });
+
+  // Council seat setup
+  const seatSetupForm = document.getElementById('formCouncilSeat');
+  const seatSetupId = document.getElementById('seatSetupCouncilId');
+  const seatSetupName = document.getElementById('seatSetupName');
+  const seatSetupGroup = document.getElementById('seatSetupGroup');
+  const seatSetupMethod = document.getElementById('seatSetupMethod');
+  const seatSetupStart = document.getElementById('seatSetupTermStart');
+  const seatSetupEnd = document.getElementById('seatSetupTermEnd');
+  const seatSetupSort = document.getElementById('seatSetupSortOrder');
+  const seatSetupTitle = document.getElementById('seatSetupFormTitle');
+  const seatSetupBadge = document.getElementById('seatSetupModeBadge');
+  const deactivateSeatButton = document.getElementById('btnDeactivateCouncilSeat');
+
+  function resetSeatSetupForm() {
+    seatSetupForm?.reset();
+    if (seatSetupId) seatSetupId.value = '';
+    if (seatSetupGroup) seatSetupGroup.value = 'Sangguniang Barangay';
+    if (seatSetupMethod) seatSetupMethod.value = 'Elected';
+    if (seatSetupSort) seatSetupSort.value = '0';
+    if (seatSetupTitle) seatSetupTitle.textContent = 'Add New Seat';
+    if (seatSetupBadge) seatSetupBadge.textContent = 'New';
+    deactivateSeatButton?.classList.add('d-none');
+    seatSetupName?.focus();
+  }
+
+  function editSeatSetup(seat) {
+    if (seatSetupId) seatSetupId.value = String(seat.council_id || '');
+    if (seatSetupName) seatSetupName.value = String(seat.seat_name || '');
+    if (seatSetupGroup) seatSetupGroup.value = String(seat.seat_group || 'Sangguniang Barangay');
+    if (seatSetupMethod) seatSetupMethod.value = String(seat.selection_method || 'Elected');
+    if (seatSetupStart) seatSetupStart.value = String(seat.term_start || '').slice(0, 10);
+    if (seatSetupEnd) seatSetupEnd.value = String(seat.term_end || '').slice(0, 10);
+    if (seatSetupSort) seatSetupSort.value = String(seat.sort_order || 0);
+    if (seatSetupTitle) seatSetupTitle.textContent = 'Edit Seat';
+    if (seatSetupBadge) seatSetupBadge.textContent = 'Editing';
+    if (deactivateSeatButton) {
+      deactivateSeatButton.classList.toggle('d-none', Boolean(String(seat.current_official_id || '').trim()));
+    }
+  }
+
+  document.getElementById('btnAddCouncilSeat')?.addEventListener('click', resetSeatSetupForm);
+  document.querySelectorAll('.ot-edit-seat').forEach((button) => {
+    button.addEventListener('click', () => {
+      try {
+        editSeatSetup(JSON.parse(String(button.dataset.seat || '{}')));
+      } catch (error) {
+        showToast('Unable to load this seat for editing.', 'error');
+      }
+    });
+  });
+
+  seatSetupForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!seatSetupForm.checkValidity()) {
+      seatSetupForm.reportValidity();
+      return;
+    }
+    const button = document.getElementById('btnSaveCouncilSeat');
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving…';
+    }
+    try {
+      const params = Object.fromEntries(new FormData(seatSetupForm).entries());
+      params.action = 'save_council_seat';
+      const data = await apiFetch(params, 'POST');
+      if (!data.success) throw new Error(data.message || 'Unable to save the seat.');
+      showToast(data.message || 'Council seat saved.');
+      window.setTimeout(() => window.location.reload(), 450);
+    } catch (error) {
+      showToast(error?.message || 'Unable to save the seat.', 'error');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-save me-1"></i> Save Seat';
+      }
+    }
+  });
+
+  deactivateSeatButton?.addEventListener('click', async () => {
+    const councilId = String(seatSetupId?.value || '');
+    const seatName = String(seatSetupName?.value || 'this seat');
+    if (!councilId) return;
+    if (!(await UniversalModal.confirm(`Deactivate ${seatName}?\n\nThe seat will no longer be available for official assignments.`, { confirmLabel: 'Deactivate', confirmClass: 'btn btn-danger' }))) return;
+    try {
+      const secureConfirmation = await requestSecureConfirmation(
+        'deactivate_council_seat',
+        { council_id: councilId },
+        `deactivate ${seatName}`
+      );
+      if (!secureConfirmation) return;
+      const data = await apiFetch({ action: 'deactivate_council_seat', council_id: councilId, ...secureConfirmation }, 'POST');
+      if (!data.success) throw new Error(data.message || 'Unable to deactivate the seat.');
+      showToast(data.message || 'Council seat deactivated.');
+      window.setTimeout(() => window.location.reload(), 450);
+    } catch (error) {
+      showToast(error?.message || 'Unable to deactivate the seat.', 'error');
     }
   });
 
@@ -883,6 +1000,11 @@
     const pos = t.position || transitionId;
     if (posLabel) posLabel.textContent = pos;
     document.getElementById('candidatesTransitionStatus').value = t.status || '';
+    if (renewCurrentOfficialOptionEl) {
+      const canRenewCurrent = Boolean(String(t.outgoing_official_id || '').trim());
+      renewCurrentOfficialOptionEl.disabled = !canRenewCurrent;
+      renewCurrentOfficialOptionEl.hidden = !canRenewCurrent;
+    }
 
     if (t.outgoing_name) {
       outInfo.classList.remove('d-none');
@@ -894,7 +1016,7 @@
 
     const currentOfficial = transitionDrafts.get(String(transitionId || '')) || null;
     if (!currentOfficial) {
-      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No incoming official is staged yet for this transition. Fill out the form below, review it, then complete the transition.</p>';
+      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No official has been selected for this assignment yet. Fill out the form below, review it, then continue to account and access.</p>';
       return;
     }
 
@@ -906,12 +1028,12 @@
     const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
     listEl.innerHTML = `
       <div class="border rounded p-3 bg-light">
-        <div class="fw-semibold text-muted small mb-2">Current Transition Draft</div>
+        <div class="fw-semibold text-muted small mb-2">Current Assignment Draft</div>
         <div class="fw-semibold">${esc(displayName)} ${typePill}</div>
         ${emailLine ? `<div class="text-muted small">${esc(emailLine)}</div>` : ''}
         ${mobileLine ? `<div class="text-muted small">${esc(mobileLine)}</div>` : ''}
         ${currentOfficial.notes ? `<div class="text-muted small fst-italic mt-1">${esc(currentOfficial.notes)}</div>` : ''}
-        <div class="small text-muted mt-2">Editing the form below will replace this in-page draft until you complete the transition.</div>
+        <div class="small text-muted mt-2">Editing the form below will replace this draft until you confirm the assignment.</div>
       </div>`;
   }
 
@@ -962,7 +1084,7 @@
   }
 
   function usesExistingOfficialMode(mode) {
-    return mode === 'former' || mode === 'active';
+    return mode === 'former' || mode === 'active' || mode === 'current';
   }
 
   const linkedIdWrap  = document.getElementById('linkedIdWrap');
@@ -984,6 +1106,10 @@
   const winnerActingOptionsEl = document.getElementById('winnerActingOptions');
   const winnerUseActingReplacementEl = document.getElementById('winnerUseActingReplacement');
   const winnerActingUntilDateEl = document.getElementById('winnerActingUntilDate');
+  const winnerAccessModeEl = document.getElementById('winnerAccessMode');
+  const winnerOutgoingAccountWrapEl = document.getElementById('winnerOutgoingAccountWrap');
+  const winnerOutgoingAccountActionEl = document.getElementById('winnerOutgoingAccountAction');
+  const renewCurrentOfficialOptionEl = document.getElementById('renewCurrentOfficialOption');
   const linkedOfficialCache = new Map();
   let linkedSearchTimer = null;
 
@@ -1007,10 +1133,19 @@
   }
 
   function getExistingOfficialModeConfig(mode) {
+    if (mode === 'current') {
+      return {
+        label: 'Current Official',
+        help: 'The current profile and account will be reused. Confirm the contact details below before renewing the assignment.',
+        placeholder: 'Current seat holder',
+        selectedPrefix: 'Current official selected',
+      };
+    }
+
     if (mode === 'active') {
       return {
         label: 'Search Active Officials',
-        help: 'Search an active official record to move or temporarily assign that account to this position. You can still review and change the email and mobile below before completing the turnover.',
+        help: 'Search an active official record to move or temporarily assign that account to this position. You can still review and change the email and mobile below before confirming the assignment.',
         placeholder: 'Search active official by name, ID, or position',
         selectedPrefix: 'Active official selected',
       };
@@ -1018,7 +1153,7 @@
 
     return {
       label: 'Search Former Officials',
-      help: 'Search a former official record to auto-fill the details and reactivate the previous account. You can still review and change the email and mobile below before completing the turnover.',
+      help: 'Search a former official record to auto-fill the details and reactivate the previous account. You can still review and change the email and mobile below before confirming the assignment.',
       placeholder: 'Search former official by name, ID, or position',
       selectedPrefix: 'Former official selected',
     };
@@ -1144,11 +1279,16 @@
     const outgoingOfficialId = String(transitionMeta.outgoing_official_id || '').trim();
     let officials = [];
 
-    if (mode === 'active') {
+    if (mode === 'current') {
+      officials = (window.OT_DATA?.activeOfficials || []).filter((row) => {
+        return String(row.official_id || '').trim() === outgoingOfficialId;
+      });
+    } else if (mode === 'active') {
       const qLower = String(query || '').trim().toLowerCase();
       officials = (window.OT_DATA?.activeOfficials || []).filter((row) => {
         const officialId = String(row.official_id || '').trim();
         if (!officialId || officialId === outgoingOfficialId) return false;
+        if (!/active|suspended|acting/i.test(String(row.account_status || ''))) return false;
         if (!qLower) return true;
         const haystack = [
           row.official_id,
@@ -1169,7 +1309,7 @@
       if (!officialId) return;
       linkedOfficialCache.set(officialId, o);
     });
-    renderLinkedOfficialResults(officials, mode === 'active' ? 'ActiveOfficial' : 'ReturningOfficial', query);
+    renderLinkedOfficialResults(officials, ['active', 'current'].includes(mode) ? 'ActiveOfficial' : 'ReturningOfficial', query);
     return officials;
   }
 
@@ -1201,8 +1341,13 @@
     clearAccessIdentityFields();
     setFormerOfficialMode(mode);
     if (usesExistingOfficialMode(mode)) {
-      populateLinkedOfficialSelect();
-      linkedSearchInput?.focus();
+      populateLinkedOfficialSelect().then((officials) => {
+        if (mode === 'current' && officials.length === 1) {
+          selectLinkedOfficial(officials[0].official_id);
+        } else {
+          linkedSearchInput?.focus();
+        }
+      });
     }
   });
 
@@ -1217,8 +1362,8 @@
     const notes        = document.getElementById('newCandidateNotes').value.trim();
     const linkedId     = linkedIdInput?.value || '';
     const selectedMode = formerOfficialModeEl?.value || '';
-    const usesExistingRecord = selectedMode === 'former' || selectedMode === 'active';
-    const type = selectedMode === 'active'
+    const usesExistingRecord = ['former', 'active', 'current'].includes(selectedMode);
+    const type = selectedMode === 'active' || selectedMode === 'current'
       ? 'ActiveOfficial'
       : linkedId ? 'ReturningOfficial' : 'New';
     const lastName     = lastNameEl?.value.trim() || '';
@@ -1286,7 +1431,7 @@
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-key me-1"></i> Review and Continue';
 
-    showToast('Official information prepared. Review it, then complete the transition.');
+    showToast('Official information prepared. Review the account and access, then confirm the assignment.');
     loadCandidates(transitionId);
     getModal('modalCandidates')?.hide();
     setTimeout(() => {
@@ -1303,19 +1448,27 @@
     const mode = String(currentOfficial?.linked_source_mode || '').trim();
     const hasLinkedOfficial = Boolean(String(currentOfficial?.linked_official_id || '').trim());
 
+    if (mode === 'current' && hasLinkedOfficial) {
+      return {
+        outcome: 'ReElected',
+        label: 'Renew Current Official',
+        description: 'The existing profile, login, verification, and account settings will continue. A new assignment period will be recorded without sending a new-account invitation.',
+      };
+    }
+
     if (mode === 'active' && hasLinkedOfficial) {
       const actingReplacement = !!winnerUseActingReplacementEl?.checked;
       if (actingReplacement) {
         return {
           outcome: 'ActingReplacement',
           label: 'Temporary Acting Replacement',
-          description: 'The selected active official will temporarily cover this position, the outgoing account will be suspended, and the acting assignment will remain in place until you end it or reach the acting-until date.',
+          description: 'The selected active official will temporarily cover this position, the outgoing account will be disabled, and the acting assignment will remain in place until you end it or reach the acting-until date.',
         };
       }
       return {
         outcome: 'PositionChange',
         label: 'Direct Position Change',
-        description: 'The selected active official will be moved into this position and the system will automatically open a follow-up transition for the vacated seat.',
+        description: 'The selected active official will be moved into this position. Their previous seat will become vacant and can be assigned separately.',
       };
     }
 
@@ -1341,10 +1494,13 @@
     const winnerOutcomeSummaryEl = document.getElementById('winnerOutcomeSummary');
     const mode = String(currentOfficial?.linked_source_mode || '').trim();
     const usingActiveOfficial = mode === 'active' && String(currentOfficial?.linked_official_id || '').trim() !== '';
+    const hasOutgoingOfficial = Boolean(String(transitionMeta.outgoing_official_id || '').trim());
+    const renewingCurrentOfficial = mode === 'current';
 
     if (winnerActingOptionsEl) {
       winnerActingOptionsEl.classList.toggle('d-none', !usingActiveOfficial);
     }
+    winnerOutgoingAccountWrapEl?.classList.toggle('d-none', !hasOutgoingOfficial || renewingCurrentOfficial);
     if (winnerActingUntilDateEl) {
       winnerActingUntilDateEl.disabled = !usingActiveOfficial || !winnerUseActingReplacementEl?.checked;
       if (!usingActiveOfficial) {
@@ -1376,6 +1532,9 @@
       winnerActingUntilDateEl.value = '';
       winnerActingUntilDateEl.disabled = true;
     }
+    if (winnerAccessModeEl) winnerAccessModeEl.value = 'seat_template';
+    if (winnerOutgoingAccountActionEl) winnerOutgoingAccountActionEl.value = 'disable';
+    winnerOutgoingAccountWrapEl?.classList.add('d-none');
     if (winnerActingOptionsEl) winnerActingOptionsEl.classList.add('d-none');
     getModal('modalSelectWinner')?.show();
     loadWinnerCandidates(transitionId);
@@ -1397,7 +1556,7 @@
     const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
     listEl.innerHTML = `
       <div class="border rounded p-3 bg-light">
-        <div class="fw-semibold small text-muted mb-2">Transition Review</div>
+        <div class="fw-semibold small text-muted mb-2">Assignment Review</div>
         <div class="fw-semibold">${esc(formatAccessEntryName(currentOfficial))} ${candidateTypePill(currentOfficial.candidate_type || (currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New'))}</div>
         ${emailLine ? `<small class="text-muted d-block">${esc(emailLine)}</small>` : ''}
         ${mobileLine ? `<small class="text-muted d-block">${esc(mobileLine)}</small>` : ''}
@@ -1443,12 +1602,14 @@
       candidate_suffix:     draft.candidate_suffix || '',
       candidate_email:      draft.candidate_email || '',
       candidate_mobile:     draft.candidate_mobile || '',
+      access_mode:          winnerAccessModeEl?.value || 'seat_template',
+      outgoing_account_action: winnerOutgoingAccountActionEl?.value || 'disable',
     };
     try {
       const secureConfirmation = await requestSecureConfirmation(
         'complete_transition',
         { transition_id: transitionId },
-        'complete this official turnover'
+        'confirm this official assignment'
       );
       if (!secureConfirmation) {
         return;
@@ -1479,6 +1640,7 @@
         getModal('modalSelectWinner')?.hide();
         loadTransitions();
         updateStats();
+        window.setTimeout(() => window.location.reload(), 650);
       } else {
         showToast(data.message || 'Failed.', 'error');
       }
@@ -1486,7 +1648,7 @@
       showToast(error?.message || 'Failed.', 'error');
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete and Notify';
+      btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Confirm Assignment';
     }
   });
 
@@ -1495,12 +1657,12 @@
   // ══════════════════════════════════════════════════════════════════════════
   window.otCancelTransition = async function (transitionId) {
     try {
-      const reason = await UniversalModal.prompt(`Cancel transition ${transitionId}?\n\nOptional reason:`, '', { title: 'Cancel Transition' });
+      const reason = await UniversalModal.prompt(`Cancel assignment setup ${transitionId}?\n\nOptional reason:`, '', { title: 'Cancel Assignment Setup' });
       if (reason === null) return;
       const secureConfirmation = await requestSecureConfirmation(
         'cancel_transition',
         { transition_id: transitionId },
-        'cancel this transition'
+        'cancel this assignment setup'
       );
       if (!secureConfirmation) return;
       const data = await apiFetch({
@@ -1511,7 +1673,7 @@
       }, 'POST');
       if (data.success) {
         transitionDrafts.delete(String(transitionId || ''));
-        showToast('Transition cancelled.');
+        showToast('Assignment setup cancelled.');
         loadTransitions();
         updateStats();
       } else {
@@ -1773,12 +1935,12 @@
 
   window.otDemoteOfficial = async function (officialId, name) {
     try {
-      const reason = await UniversalModal.prompt(`Demote ${name}?\n\nOptional reason:`, '', { title: 'Demote Official' });
+      const reason = await UniversalModal.prompt(`End the current assignment for ${name}?\n\nEnter the resignation, retirement, removal, or other reason:`, '', { title: 'End Official Assignment' });
       if (reason === null) return;
       const secureConfirmation = await requestSecureConfirmation(
         'demote_official',
         { official_id: officialId },
-        `demote ${name}`
+        `end the assignment for ${name}`
       );
       if (!secureConfirmation) return;
       const data = await apiFetch({
@@ -1788,7 +1950,7 @@
         ...secureConfirmation,
       }, 'POST');
       if (data.success) {
-        showToast(data.message || 'Official demoted.');
+        showToast(data.message || 'Official assignment ended.');
         loadTransitions();
         updateStats();
         location.reload();
@@ -1833,8 +1995,10 @@
   async function updateStats() {
     const data = await apiFetch({ action: 'fetch_transitions', tab: 'active', limit: 1 });
     if (!data.success) return;
-    // Re-fetch page for updated stat counts
-    // Stats are rendered server-side but we can update from total counts
+    const pendingEl = document.getElementById('pendingAssignmentCount');
+    if (pendingEl && Number.isFinite(Number(data.pending_total))) {
+      pendingEl.textContent = String(Number(data.pending_total));
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

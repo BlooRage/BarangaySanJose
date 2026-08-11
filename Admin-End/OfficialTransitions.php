@@ -107,16 +107,7 @@ if (!function_exists('ot_ignored_transition_seat_names')) {
 if (!function_exists('ot_is_managed_transition_seat')) {
     function ot_is_managed_transition_seat(string $seatName): bool
     {
-        static $ignored = null;
-        if ($ignored === null) {
-            $ignored = array_map(
-                static fn (string $value): string => strtolower(trim($value)),
-                ot_ignored_transition_seat_names()
-            );
-        }
-
-        $normalized = strtolower(trim($seatName));
-        return $normalized !== '' && !in_array($normalized, $ignored, true);
+        return trim($seatName) !== '';
     }
 }
 
@@ -206,38 +197,22 @@ if (!function_exists('ot_permission_summary')) {
 
 ot_ensure_transition_schema($conn);
 
-$transitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
+$transitionTool = 'current_term';
 $transitionPanel = strtolower(trim((string)($_GET['panel'] ?? 'seat')));
-if ($transitionTool === '' || in_array($transitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
-    $transitionTool = 'current_term';
-}
-if (!in_array($transitionTool, ['current_term', 'create_new_term'], true)) {
-    $transitionTool = 'current_term';
-}
 if (!in_array($transitionPanel, ['seat', 'access'], true)) {
     $transitionPanel = 'seat';
 }
 
 $autoOpenNewTermModal = false;
 $transitionPageTitle = $transitionPanel === 'access'
-    ? 'Official Access Control'
-    : 'Seat Assignment';
+    ? 'Access Templates'
+    : 'Council Seats & Accounts';
 $transitionPageDescription = $transitionPanel === 'access'
-    ? 'Manage the module access template assigned to each governance seat and its current or future holder.'
-    : 'Handle seat assignment, turnover, replacement, and demotion while keeping incoming access pending for Access Control review.';
-if ($transitionTool === 'create_new_term') {
-    $transitionPageTitle = 'Governance Cycle';
-    $transitionPageDescription = 'Create a governance cycle, open the elected seats for reassignment, and prepare the incoming office holders before access is granted.';
-}
-$transitionQueueTitle = $transitionTool === 'create_new_term'
-    ? 'Governance Cycle Queue'
-    : 'Seat Assignment Queue';
-$transitionQueueDescription = $transitionTool === 'create_new_term'
-    ? 'After creating the governance cycle, use this queue to encode elected winners and any replacement or appointed seat holders before access review.'
-    : 'Monitor the outgoing and incoming seat changes that belong to the currently active governance cycle.';
-$scheduleSectionTitle = $transitionTool === 'create_new_term'
-    ? 'Governance Cycle Templates'
-    : 'Governance Cycle Records';
+    ? 'Set the recommended module access for each seat. Templates apply to the current official and future assignees.'
+    : 'Set up council seats, assign officials, and manage each account through one guided onboarding process.';
+$transitionQueueTitle = 'Assignment Activity';
+$transitionQueueDescription = 'Continue pending setups and review completed seat assignments from the same workspace.';
+$scheduleSectionTitle = '';
 
 $officialTransitionFlash = null;
 if (!empty($_SESSION['official_transition_flash']) && is_array($_SESSION['official_transition_flash'])) {
@@ -332,7 +307,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
                 $conn,
                 $actorUserId,
                 (string)($_SESSION['role'] ?? 'SuperAdmin'),
-                'OfficialTransitions',
+                'Officials & Access',
                 'council_seat',
                 (string)$targetRow['council_id'],
                 'save_official_permissions',
@@ -428,12 +403,19 @@ $aoRes = $conn->query("
            oi.department, oi.area_number,
            oi.acting_for_id,
            ua.email, ua.phone_number,
-           COALESCE(se.status_name,'') AS employment_status
+           COALESCE(se.status_name,'') AS employment_status,
+           COALESCE(sa.status_name,'') AS account_status
     FROM officialinformationtbl oi
     LEFT JOIN statuslookuptbl se ON se.status_id = oi.status_id_employment
     INNER JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
     INNER JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
     WHERE sa.status_name IN ('Active','Suspended','Acting')
+       OR EXISTS (
+            SELECT 1
+            FROM barangaycounciltbl current_seat
+            WHERE current_seat.current_official_id = oi.official_id
+              AND current_seat.is_active = 1
+       )
     ORDER BY oi.lastname, oi.firstname
 ");
 if ($aoRes instanceof mysqli_result) {
@@ -472,25 +454,8 @@ if ($hasTransTbl) {
 
 $currentTermEditableSchedule = $electionSchedules[0] ?? null;
 $newTermEditableSchedule = $electionSchedules[0] ?? null;
-$termEditSchedule = $transitionTool === 'create_new_term'
-    ? $newTermEditableSchedule
-    : $currentTermEditableSchedule;
+$termEditSchedule = $currentTermEditableSchedule;
 $hasConfiguredTermSchedule = !empty($electionSchedules);
-
-if (!$hasConfiguredTermSchedule) {
-    foreach ($councilSeats as &$seat) {
-        $seat['current_official_id'] = '';
-        $seat['current_position_access'] = '';
-        $seat['department'] = '';
-        $seat['area_number'] = '';
-        $seat['current_official_name'] = '';
-        $seat['account_status'] = '';
-        $seat['term_start'] = '';
-        $seat['term_end'] = '';
-    }
-    unset($seat);
-    $activeOfficials = [];
-}
 
 foreach ($councilSeats as $cs) {
     $councilSeatsByGroup[$cs['seat_group']][] = $cs;
@@ -512,6 +477,22 @@ $currentTermElectedCount = count(array_filter(
     static fn (array $seat): bool => strcasecmp((string)($seat['selection_method'] ?? ''), 'Elected') === 0
 ));
 $currentTermAppointedCount = max($currentTermSeatCount - $currentTermElectedCount, 0);
+$currentActiveAccountCount = count(array_filter(
+    $councilSeats,
+    static fn (array $seat): bool => strcasecmp(trim((string)($seat['account_status'] ?? '')), 'Active') === 0
+));
+$pendingAssignmentCount = 0;
+if ($hasTransTbl) {
+    $pendingAssignmentResult = $conn->query("
+        SELECT COUNT(*) AS total
+        FROM officialgovernancetransitiontbl
+        WHERE status NOT IN ('Completed', 'Cancelled')
+    ");
+    if ($pendingAssignmentResult instanceof mysqli_result) {
+        $pendingAssignmentCount = (int)(($pendingAssignmentResult->fetch_assoc()['total'] ?? 0));
+        $pendingAssignmentResult->close();
+    }
+}
 
 foreach ($councilSeats as $cs) {
     $selectionMethod = (string)($cs['selection_method'] ?? '');
@@ -573,7 +554,7 @@ if ($hasCouncilTbl) {
             if (!ot_is_managed_transition_seat((string)($row['seat_name'] ?? ''))) {
                 continue;
             }
-            $officialId = $hasConfiguredTermSchedule ? trim((string)($row['official_id'] ?? '')) : '';
+            $officialId = trim((string)($row['official_id'] ?? ''));
             $councilId = (int)($row['council_id'] ?? 0);
             $seatRole = (string)($row['account_role_access'] ?? $row['info_role_access'] ?? 'Official');
             $permissionMap = amp_get_effective_permission_keys_for_council($conn, $councilId, $seatRole);
@@ -590,25 +571,29 @@ if ($hasCouncilTbl) {
                 'seat_group' => (string)($row['seat_group'] ?? ''),
                 'selection_method' => (string)($row['selection_method'] ?? ''),
                 'official_id' => $officialId,
-                'user_id' => $hasConfiguredTermSchedule ? (string)($row['user_id'] ?? '') : '',
-                'full_name' => ($hasConfiguredTermSchedule && $fullName !== '') ? $fullName : 'Vacant',
-                'position_access' => $hasConfiguredTermSchedule ? (string)($row['position_access'] ?? '') : '',
-                'department' => $hasConfiguredTermSchedule ? (string)($row['department'] ?? '') : '',
-                'area_number' => $hasConfiguredTermSchedule ? (string)($row['area_number'] ?? '') : '',
-                'term_end' => $hasConfiguredTermSchedule ? (string)($row['term_end'] ?? '') : '',
-                'email' => $hasConfiguredTermSchedule ? (string)($row['email'] ?? '') : '',
-                'phone_number' => $hasConfiguredTermSchedule ? (string)($row['phone_number'] ?? '') : '',
-                'account_status' => $hasConfiguredTermSchedule ? (string)($row['account_status'] ?? '') : '',
+                'user_id' => (string)($row['user_id'] ?? ''),
+                'full_name' => $fullName !== '' ? $fullName : 'Vacant',
+                'position_access' => (string)($row['position_access'] ?? ''),
+                'department' => (string)($row['department'] ?? ''),
+                'area_number' => (string)($row['area_number'] ?? ''),
+                'term_end' => (string)($row['term_end'] ?? ''),
+                'email' => (string)($row['email'] ?? ''),
+                'phone_number' => (string)($row['phone_number'] ?? ''),
+                'account_status' => (string)($row['account_status'] ?? ''),
                 'has_saved_template' => amp_has_saved_seat_access_profile($conn, $councilId),
                 'permission_keys' => array_keys($permissionMap),
                 'permission_count' => count($permissionMap),
                 'permission_summary' => ot_permission_summary(array_keys($permissionMap)),
                 'access_source' => amp_has_saved_seat_access_profile($conn, $councilId) ? 'Custom Template' : 'Default Template',
-                'has_official' => $hasConfiguredTermSchedule && $officialId !== '',
+                'has_official' => $officialId !== '',
             ];
         }
         $kgStmt->close();
     }
+}
+$seatAccessByCouncilId = [];
+foreach ($seatAccessOfficials as $seatAccessOfficial) {
+    $seatAccessByCouncilId[(int)($seatAccessOfficial['council_id'] ?? 0)] = $seatAccessOfficial;
 }
 ?>
 <!DOCTYPE html>
@@ -623,6 +608,7 @@ if ($hasCouncilTbl) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/OfficialWorkspaceStyle.css?v=20260812-1">
   <style>
     #main-display { min-width: 0; }
 
@@ -1097,77 +1083,80 @@ if ($hasCouncilTbl) {
   <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
 
     <!-- ══════════════════════════════════════════════════════════ HEADER -->
-    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+    <header class="official-workspace-header">
       <div>
-        <h2 style="font-family:'Charis SIL Bold';color:#DE710C;">
-          <?= htmlspecialchars($transitionPageTitle, ENT_QUOTES, 'UTF-8') ?>
-        </h2>
-        <p class="text-muted mb-0" style="font-size:.9rem;">
-          <?= htmlspecialchars($transitionPageDescription, ENT_QUOTES, 'UTF-8') ?>
-        </p>
+        <h1 class="official-workspace-title"><?= htmlspecialchars($transitionPageTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+        <p class="official-workspace-description"><?= htmlspecialchars($transitionPageDescription, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
-      <?php if ($transitionTool === 'current_term' && $transitionPanel === 'seat'): ?>
-      <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-outline-secondary btn-sm" id="btnOtQuickActions"
-                data-bs-toggle="modal" data-bs-target="#modalQuickActions"
-                <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
-          <i class="fas fa-bolt me-1"></i> Transition Actions
-        </button>
-        <a class="btn btn-outline-primary btn-sm" href="OfficialTransitions.php?tool=create_new_term">
-          <i class="fas fa-layer-group me-1"></i> Create Governance Cycle
-        </a>
-        <button class="btn btn-primary btn-sm" id="btnNewTransition"
-                data-bs-toggle="modal" data-bs-target="#modalNewTransition"
-                <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
-          <i class="fas fa-plus me-1"></i> New Seat Assignment
-        </button>
-      </div>
+      <?php if ($transitionPanel === 'seat'): ?>
+        <div class="official-workspace-header__actions">
+          <button class="btn btn-outline-secondary" id="btnOpenSeatSetup" type="button" data-bs-toggle="modal" data-bs-target="#modalSeatSetup">
+            <i class="fas fa-gear me-1"></i> Set Up Seats
+          </button>
+          <button class="btn btn-primary" id="btnNewTransition" type="button" data-bs-toggle="modal" data-bs-target="#modalNewTransition">
+            <i class="fas fa-user-plus me-1"></i> Add &amp; Assign Official
+          </button>
+        </div>
       <?php endif; ?>
-    </div>
-    <hr class="mb-4">
+    </header>
+
+    <?php include __DIR__ . '/includes/official_workspace_nav.php'; ?>
 
     <?php if (!empty($officialTransitionFlash['message'])): ?>
       <div class="alert alert-<?= htmlspecialchars((string)($officialTransitionFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> mb-4">
         <?= htmlspecialchars((string)$officialTransitionFlash['message'], ENT_QUOTES, 'UTF-8') ?>
       </div>
     <?php endif; ?>
-    <?php if ($transitionTool === 'current_term' && $transitionPanel === 'seat' && !$hasConfiguredTermSchedule): ?>
-      <div class="alert alert-warning mb-4">
-        No governance cycle is configured yet. Create the initial cycle first so turnover and seat assignment tracking can begin.
+    <?php if ($transitionPanel === 'seat'): ?>
+    <section class="official-process" aria-label="Official onboarding process">
+      <div class="official-process__step">
+        <span class="official-process__number">1</span>
+        <div>
+          <div class="official-process__title">Set Up Seats</div>
+          <div class="official-process__copy">Create the positions, selection method, display order, and term dates.</div>
+        </div>
       </div>
-    <?php endif; ?>
+      <div class="official-process__step">
+        <span class="official-process__number">2</span>
+        <div>
+          <div class="official-process__title">Add &amp; Assign Official</div>
+          <div class="official-process__copy">Choose a position, then create or reuse the official's existing record.</div>
+        </div>
+      </div>
+      <div class="official-process__step">
+        <span class="official-process__number">3</span>
+        <div>
+          <div class="official-process__title">Invite or Continue Account</div>
+          <div class="official-process__copy">Apply seat access, reactivate a returning account, or continue a re-elected account.</div>
+        </div>
+      </div>
+    </section>
 
-    <?php if ($transitionTool === 'current_term' && $transitionPanel === 'seat'): ?>
     <div class="ot-overview-grid mb-4">
       <div class="ot-overview-card">
-        <div class="ot-overview-label">Council Seats</div>
+        <div class="ot-overview-label">Active Seats</div>
         <div class="ot-overview-value"><?= (int)$currentTermSeatCount ?></div>
-        <div class="ot-overview-note">Active seats in the current council structure.</div>
-      </div>
-      <div class="ot-overview-card">
-        <div class="ot-overview-label">Seats Filled</div>
-        <div class="ot-overview-value"><?= (int)$currentTermFilledCount ?></div>
-        <div class="ot-overview-note">Seats that already have an assigned current official.</div>
+        <div class="ot-overview-note">Configured positions available for assignment.</div>
       </div>
       <div class="ot-overview-card">
         <div class="ot-overview-label">Vacant Seats</div>
         <div class="ot-overview-value"><?= (int)$currentTermVacantCount ?></div>
-        <div class="ot-overview-note">Seats that still need a current term official.</div>
+        <div class="ot-overview-note">Positions that are ready for an official.</div>
       </div>
       <div class="ot-overview-card">
-        <div class="ot-overview-label">Elected Seats</div>
-        <div class="ot-overview-value"><?= (int)$currentTermElectedCount ?></div>
-        <div class="ot-overview-note">Seats that normally change through election-based term turnover.</div>
+        <div class="ot-overview-label">Active Accounts</div>
+        <div class="ot-overview-value"><?= (int)$currentActiveAccountCount ?></div>
+        <div class="ot-overview-note">Assigned officials with an active account.</div>
       </div>
       <div class="ot-overview-card">
-        <div class="ot-overview-label">Appointed Seats</div>
-        <div class="ot-overview-value"><?= (int)$currentTermAppointedCount ?></div>
-        <div class="ot-overview-note">Seats that are encoded through appointment or reappointment.</div>
+        <div class="ot-overview-label">Pending Setup</div>
+        <div class="ot-overview-value" id="pendingAssignmentCount"><?= (int)$pendingAssignmentCount ?></div>
+        <div class="ot-overview-note">Assignments waiting for official or account confirmation.</div>
       </div>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ TERM DETAILS -->
-    <div class="bg-white rounded-3 shadow-sm border mb-4" id="seat-assignment">
+    <div class="d-none" aria-hidden="true">
       <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <i class="fas fa-calendar-alt text-primary"></i>
@@ -1238,27 +1227,34 @@ if ($hasCouncilTbl) {
       </div>
     </div>
 
-    <div class="bg-white rounded-3 shadow-sm border mb-4">
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-bottom">
+    <section class="official-section-card mb-4" id="seat-assignment">
+      <div class="official-section-card__header">
         <div>
-          <div class="fw-semibold">Current Term Officials</div>
-          <div class="small text-muted">View the official currently assigned to each active council seat and the seat details that will be reused during transition.</div>
+          <h2 class="official-section-card__title">Council Seat Directory</h2>
+          <p class="official-section-card__copy">Assign a vacant seat, renew a current official, replace an officeholder, or review the seat's access template.</p>
         </div>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalQuickActions">
+          <i class="fas fa-ellipsis me-1"></i> Other Account Actions
+        </button>
       </div>
       <div class="p-3">
         <?php if (empty($councilSeats)): ?>
-          <div class="text-center text-muted py-4">No active council seats were found for the current term.</div>
+          <div class="text-center py-5">
+            <i class="fas fa-chair fa-2x text-muted mb-3"></i>
+            <div class="fw-semibold">No active council seats yet</div>
+            <p class="small text-muted mb-3">Create the first seat before adding an official.</p>
+            <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalSeatSetup">Set Up First Seat</button>
+          </div>
         <?php else: ?>
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 ot-roster-table">
               <thead class="table-light">
                 <tr>
-                  <th>Seat</th>
-                  <th>Selection</th>
-                  <th>Current Official</th>
-                  <th>Access Profile</th>
-                  <th>Department</th>
-                  <th>Term Dates</th>
+                  <th>Position / Seat</th>
+                  <th>Official</th>
+                  <th>Term</th>
+                  <th>Account</th>
+                  <th>Access Template</th>
                   <th class="text-end">Actions</th>
                 </tr>
               </thead>
@@ -1267,46 +1263,70 @@ if ($hasCouncilTbl) {
                   <?php
                     $holderName = trim((string)($seat['current_official_name'] ?? ''));
                     $selectionMethod = trim((string)($seat['selection_method'] ?? ''));
-                    $selectionClass = strcasecmp($selectionMethod, 'Elected') === 0
-                        ? 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'
-                        : 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
                     $termStartLabel = $otFormatDateLabel((string)($seat['term_start'] ?? ''));
                     $termEndLabel = $otFormatDateLabel((string)($seat['term_end'] ?? ''));
                     $positionAccess = trim((string)($seat['current_position_access'] ?? ''));
-                    $departmentLabel = trim((string)($seat['department'] ?? ''));
+                    $accountStatus = trim((string)($seat['account_status'] ?? ''));
+                    $seatAccess = $seatAccessByCouncilId[(int)($seat['council_id'] ?? 0)] ?? null;
                   ?>
                   <tr>
-                    <td class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
                     <td>
-                      <span class="badge <?= htmlspecialchars($selectionClass, ENT_QUOTES, 'UTF-8') ?>">
-                        <?= htmlspecialchars($selectionMethod !== '' ? $selectionMethod : '—', ENT_QUOTES, 'UTF-8') ?>
-                      </span>
+                      <div class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small text-muted"><?= htmlspecialchars($selectionMethod !== '' ? $selectionMethod : 'Unspecified', ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars((string)($seat['seat_group'] ?? 'Council'), ENT_QUOTES, 'UTF-8') ?></div>
                     </td>
                     <td>
                       <?php if ($holderName !== ''): ?>
-                        <?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?>
+                        <div class="fw-semibold"><?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="small text-muted"><?= htmlspecialchars($positionAccess !== '' ? $positionAccess : (string)($seat['seat_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                       <?php else: ?>
-                        <span class="text-muted fst-italic">Vacant</span>
+                        <span class="official-seat-status is-vacant"><i class="fas fa-circle fa-2xs"></i> Vacant</span>
                       <?php endif; ?>
                     </td>
-                    <td><?= htmlspecialchars($positionAccess !== '' ? $positionAccess : '—', ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars($departmentLabel !== '' ? $departmentLabel : '—', ENT_QUOTES, 'UTF-8') ?></td>
                     <td>
-                      <div><?= htmlspecialchars($termStartLabel, ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small"><?= htmlspecialchars($termStartLabel, ENT_QUOTES, 'UTF-8') ?></div>
                       <div class="small text-muted">to <?= htmlspecialchars($termEndLabel, ENT_QUOTES, 'UTF-8') ?></div>
                     </td>
+                    <td>
+                      <?php if ($holderName === ''): ?>
+                        <span class="text-muted small">No account</span>
+                      <?php elseif (strcasecmp($accountStatus, 'Active') === 0): ?>
+                        <span class="official-seat-status is-filled"><i class="fas fa-circle fa-2xs"></i> Active</span>
+                      <?php else: ?>
+                        <span class="badge text-bg-warning"><?= htmlspecialchars($accountStatus !== '' ? $accountStatus : 'Pending', ENT_QUOTES, 'UTF-8') ?></span>
+                      <?php endif; ?>
+                    </td>
+                    <td>
+                      <div class="small fw-semibold"><?= htmlspecialchars((string)($seatAccess['access_source'] ?? 'Default Template'), ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small text-muted"><?= (int)($seatAccess['permission_count'] ?? 0) ?> modules enabled</div>
+                    </td>
                     <td class="text-end">
-                      <?php if (!empty($seat['current_official_id']) && $holderName !== ''): ?>
+                      <div class="official-seat-actions">
                         <button
                           type="button"
-                          class="btn btn-xs btn-outline-danger py-0 px-2"
-                          onclick="otDemoteOfficial(<?= htmlspecialchars(json_encode((string)$seat['current_official_id']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($holderName), ENT_QUOTES, 'UTF-8') ?>)"
-                          title="Demote this official and vacate the seat">
-                          <i class="fas fa-user-minus me-1"></i> Demote
+                          class="btn btn-sm <?= $holderName === '' ? 'btn-primary' : 'btn-outline-primary' ?> ot-start-assignment"
+                          data-council-id="<?= (int)($seat['council_id'] ?? 0) ?>">
+                          <i class="fas <?= $holderName === '' ? 'fa-user-plus' : 'fa-arrows-rotate' ?> me-1"></i>
+                          <?= $holderName === '' ? 'Assign Official' : 'Renew / Replace' ?>
                         </button>
-                      <?php else: ?>
-                        <span class="text-muted small">—</span>
-                      <?php endif; ?>
+                        <?php if ($seatAccess): ?>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary ot-manage-access"
+                            data-seat-access="<?= htmlspecialchars(json_encode($seatAccess, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"
+                            title="Manage seat access template">
+                            <i class="fas fa-shield-halved"></i>
+                          </button>
+                        <?php endif; ?>
+                        <?php if ($holderName !== '' && !empty($seat['current_official_id'])): ?>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            onclick="otDemoteOfficial(<?= htmlspecialchars(json_encode((string)$seat['current_official_id']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($holderName), ENT_QUOTES, 'UTF-8') ?>)"
+                            title="End current assignment">
+                            <i class="fas fa-user-minus"></i>
+                          </button>
+                        <?php endif; ?>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -1315,22 +1335,22 @@ if ($hasCouncilTbl) {
           </div>
         <?php endif; ?>
       </div>
-    </div>
+    </section>
 
-    <?php elseif ($transitionTool === 'current_term' && $transitionPanel === 'access'): ?>
-    <div class="bg-white rounded-3 shadow-sm border mb-4" id="official-access-control">
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-bottom">
+    <?php elseif ($transitionPanel === 'access'): ?>
+    <section class="official-section-card mb-4" id="official-access-control">
+      <div class="official-section-card__header">
         <div>
-          <div class="fw-semibold">Official Access Control</div>
-          <div class="small text-muted">Manage seat-based module access templates for governance positions separately from personnel access profiles.</div>
+          <h2 class="official-section-card__title">Seat Access Templates</h2>
+          <p class="official-section-card__copy">Define the recommended modules for each official position before assigning the account.</p>
         </div>
         <div class="small text-muted">
-          Templates apply to the current seat holder now and to future occupants after transition.
+          Saving a template updates the current account and future assignees.
         </div>
       </div>
       <div class="p-3">
         <?php if (empty($seatAccessOfficials)): ?>
-          <div class="text-center text-muted py-4">No active governance seats are available for official access templates yet.</div>
+          <div class="text-center text-muted py-4">Set up at least one council seat before configuring access.</div>
         <?php else: ?>
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -1382,7 +1402,7 @@ if ($hasCouncilTbl) {
           </div>
         <?php endif; ?>
       </div>
-    </div>
+    </section>
     <?php elseif ($transitionTool === 'create_new_term'): ?>
     <div class="row g-4 mb-4">
       <div class="col-xl-7">
@@ -1542,8 +1562,8 @@ if ($hasCouncilTbl) {
     </div>
     <?php endif; ?>
 
-    <?php if ($transitionTool === 'create_new_term'): ?>
-    <!-- ══════════════════════════════════════════════════════════ TERM DETAILS -->
+    <?php if (false): ?>
+    <!-- Legacy bulk-term records retained for historical compatibility. -->
     <div class="bg-white rounded-3 shadow-sm border mb-4">
       <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
         <div class="d-flex align-items-center gap-2">
@@ -1615,9 +1635,9 @@ if ($hasCouncilTbl) {
     </div>
     <?php endif; ?>
 
-    <?php if ($transitionTool === 'create_new_term'): ?>
-    <!-- ══════════════════════════════════════════════════════════ TRANSITIONS TABLE -->
-    <div class="bg-white rounded-3 shadow-sm border">
+    <?php if ($transitionPanel === 'seat'): ?>
+    <!-- Assignment activity -->
+    <section class="official-section-card">
       <!-- Toolbar -->
       <div class="p-3 border-bottom">
         <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
@@ -1634,10 +1654,10 @@ if ($hasCouncilTbl) {
             <div class="ot-table-toolbar-controls">
               <select class="form-select form-select-sm" id="otTypeFilter">
                 <option value="">All types</option>
-                <option value="BarangayElection">Barangay Election</option>
-                <option value="SKElection">SK Election</option>
+                <option value="BarangayElection">Elected / Re-elected</option>
                 <option value="Appointment">Appointment</option>
                 <option value="Reappointment">Reappointment</option>
+                <option value="Replacement">Replacement</option>
                 <option value="Resignation">Resignation</option>
                 <option value="Removal">Removal</option>
                 <option value="Retirement">Retirement</option>
@@ -1655,12 +1675,12 @@ if ($hasCouncilTbl) {
         <table class="table table-hover align-middle ot-table mb-0" id="otTable">
           <thead class="table-light">
             <tr>
-              <th>Transition ID</th>
+              <th>Assignment ID</th>
               <th>Type</th>
               <th>Position</th>
               <th>Outgoing Official</th>
-              <th>Cycle</th>
-              <th>Effective Date</th>
+              <th>Reference</th>
+              <th>Assignment Period</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -1675,11 +1695,112 @@ if ($hasCouncilTbl) {
         </table>
         <div id="otTablePagination" class="d-flex justify-content-end mt-2"></div>
       </div>
-    </div>
+    </section>
     <?php endif; ?>
 
   </main><!-- /main -->
 </div><!-- /flex wrapper -->
+
+<div class="modal fade" id="modalSeatSetup" tabindex="-1" aria-labelledby="modalSeatSetupLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <div class="text-uppercase small fw-semibold text-primary mb-1">Council structure</div>
+          <h5 class="modal-title" id="modalSeatSetupLabel">Set Up Council Seats</h5>
+          <p class="small text-muted mb-0">Create the positions first. Officials and accounts are assigned afterward.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+              <div>
+                <div class="fw-semibold">Active Seats</div>
+                <div class="small text-muted">Select a seat to update its definition.</div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddCouncilSeat"><i class="fas fa-plus me-1"></i> New Seat</button>
+            </div>
+            <div class="official-seat-setup-list">
+              <?php if ($councilSeats === []): ?>
+                <div class="border rounded-3 p-4 text-center text-muted">No seats have been configured.</div>
+              <?php else: ?>
+                <?php foreach ($councilSeats as $seat): ?>
+                  <?php $setupHolderName = trim((string)($seat['current_official_name'] ?? '')); ?>
+                  <div class="official-seat-setup-item">
+                    <div>
+                      <div class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small text-muted">
+                        <?= htmlspecialchars((string)($seat['selection_method'] ?? ''), ENT_QUOTES, 'UTF-8') ?> ·
+                        <?= htmlspecialchars((string)($seat['seat_group'] ?? ''), ENT_QUOTES, 'UTF-8') ?> ·
+                        <?= $setupHolderName !== '' ? 'Occupied' : 'Vacant' ?>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary ot-edit-seat"
+                      data-seat="<?= htmlspecialchars(json_encode($seat, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>">
+                      Edit
+                    </button>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <form id="formCouncilSeat" class="border rounded-3 p-3 bg-light" novalidate>
+              <input type="hidden" name="council_id" id="seatSetupCouncilId" value="">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                <div class="fw-semibold" id="seatSetupFormTitle">Add New Seat</div>
+                <span class="badge bg-primary-subtle text-primary-emphasis" id="seatSetupModeBadge">New</span>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold" for="seatSetupName">Seat Name <span class="text-danger">*</span></label>
+                <input class="form-control" id="seatSetupName" name="seat_name" maxlength="150" placeholder="e.g. Barangay Kagawad 1" required>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-sm-7">
+                  <label class="form-label fw-semibold" for="seatSetupGroup">Seat Group <span class="text-danger">*</span></label>
+                  <input class="form-control" id="seatSetupGroup" name="seat_group" maxlength="50" value="Sangguniang Barangay" required>
+                </div>
+                <div class="col-sm-5">
+                  <label class="form-label fw-semibold" for="seatSetupMethod">Selection <span class="text-danger">*</span></label>
+                  <select class="form-select" id="seatSetupMethod" name="selection_method" required>
+                    <option value="Elected">Elected</option>
+                    <option value="Appointed">Appointed</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                  <label class="form-label fw-semibold" for="seatSetupTermStart">Term Start</label>
+                  <input type="date" class="form-control" id="seatSetupTermStart" name="term_start">
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label fw-semibold" for="seatSetupTermEnd">Term End</label>
+                  <input type="date" class="form-control" id="seatSetupTermEnd" name="term_end">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold" for="seatSetupSortOrder">Display Order</label>
+                <input type="number" class="form-control" id="seatSetupSortOrder" name="sort_order" min="0" step="1" value="0">
+              </div>
+              <div class="small text-muted mb-3">For an occupied seat, term changes also update the current official. Access permissions are configured under Access Templates.</div>
+              <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-danger d-none" id="btnDeactivateCouncilSeat">Deactivate Seat</button>
+                <button type="submit" class="btn btn-primary ms-auto" id="btnSaveCouncilSeat"><i class="fas fa-save me-1"></i> Save Seat</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 
 <!-- ══════════════════════════════════════════════════════════════════════════
@@ -1690,16 +1811,21 @@ if ($hasCouncilTbl) {
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalNewTransitionLabel">
-          <i class="fas fa-plus-circle me-2 text-primary"></i> New Official Handover
+          <i class="fas fa-user-plus me-2 text-primary"></i> Add &amp; Assign Official
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form id="formNewTransition" novalidate>
         <div class="modal-body">
+          <div class="official-modal-progress" aria-label="Setup progress">
+            <div class="official-modal-progress__step is-active">1. Position</div>
+            <div class="official-modal-progress__step">2. Official</div>
+            <div class="official-modal-progress__step">3. Account &amp; Access</div>
+          </div>
           <?php if (empty($councilSeats)): ?>
             <div class="alert alert-warning">
               <i class="fas fa-exclamation-triangle me-2"></i>
-              No council seats found. Run <code>20260323_create_barangaycouncil_schema.sql</code> and assign officials to their seats first.
+              No council seats are available. Close this window and use <strong>Set Up Seats</strong> first.
             </div>
           <?php else: ?>
           <div class="row g-3">
@@ -1749,7 +1875,7 @@ if ($hasCouncilTbl) {
 
             <!-- Transition Type — options filtered by selection_method -->
             <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Transition Type <span class="text-danger">*</span></label>
+              <label class="form-label fw-semibold">Assignment Type <span class="text-danger">*</span></label>
               <select class="form-select" name="transition_type" id="ntType" required>
                 <option value="">— Select a seat first —</option>
               </select>
@@ -1757,20 +1883,21 @@ if ($hasCouncilTbl) {
 
             <!-- Effective Date -->
             <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold">Effective Date</label>
-              <input type="date" class="form-control" name="effective_date" id="ntEffectiveDate" data-date-modal-style="calendar">
+              <label class="form-label fw-semibold">Assignment Start <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="effective_date" id="ntEffectiveDate" data-date-modal-style="calendar" required>
             </div>
 
-            <!-- Governance Cycle Label (turnover types only) -->
-            <div class="col-12 col-md-6" id="ntBatchLabelWrap" style="display:none;">
-              <label class="form-label fw-semibold">Governance Cycle Label</label>
-              <input type="text" class="form-control" name="batch_label" id="ntBatchLabel"
-                     placeholder="e.g. 2026 Governance Cycle">
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold">Assignment End</label>
+              <input type="date" class="form-control" name="assignment_end_date" id="ntAssignmentEndDate" data-date-modal-style="calendar">
+              <div class="form-text">Optional for open-ended or temporary assignments.</div>
             </div>
+
+            <input type="hidden" name="batch_label" id="ntBatchLabel" value="">
 
             <!-- Reason -->
             <div class="col-12">
-              <label class="form-label fw-semibold" id="ntReasonLabel">Reason</label>
+              <label class="form-label fw-semibold" id="ntReasonLabel">Assignment Notes</label>
               <textarea class="form-control" name="reason" id="ntReason" rows="2"
                         placeholder="Optional — required for Removal"></textarea>
             </div>
@@ -1780,7 +1907,7 @@ if ($hasCouncilTbl) {
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnSubmitNewTransition">
-            <i class="fas fa-save me-1"></i> Create Official Handover
+            Continue to Official <i class="fas fa-arrow-right ms-1"></i>
           </button>
         </div>
       </form>
@@ -1898,7 +2025,7 @@ if ($hasCouncilTbl) {
     <div class="modal-content">
       <form method="post" id="officialAccessControlForm">
         <div class="modal-header">
-          <h5 class="modal-title fw-bold" id="officialAccessControlModalTitle">Manage Official Access Control</h5>
+          <h5 class="modal-title fw-bold" id="officialAccessControlModalTitle">Manage Seat Access Template</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
@@ -1907,7 +2034,7 @@ if ($hasCouncilTbl) {
 
           <div class="alert alert-info py-2 small mb-3">
             <i class="fas fa-info-circle me-1"></i>
-            This governance template controls the modules granted to the current holder of the seat and to future officials assigned to the same position.
+            This seat template controls the modules granted to the current holder and to future officials assigned to the same position.
           </div>
 
           <div class="row g-3 mb-3">
@@ -1941,7 +2068,7 @@ if ($hasCouncilTbl) {
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary me-auto" id="btnOfficialAccessReset">Reset To Default Template</button>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn btn-primary">Save Official Access</button>
+          <button type="submit" class="btn btn-primary">Save Access Template</button>
         </div>
       </form>
     </div>
@@ -1957,11 +2084,16 @@ if ($hasCouncilTbl) {
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fas fa-users me-2 text-primary"></i>
-          Official Access Setup — <span id="candidatesModalPositionLabel" class="text-muted fw-normal"></span>
+          Add or Select Official — <span id="candidatesModalPositionLabel" class="text-muted fw-normal"></span>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <div class="official-modal-progress" aria-label="Setup progress">
+          <div class="official-modal-progress__step">1. Position</div>
+          <div class="official-modal-progress__step is-active">2. Official</div>
+          <div class="official-modal-progress__step">3. Account &amp; Access</div>
+        </div>
         <input type="hidden" id="candidatesTransitionId">
         <input type="hidden" id="candidatesTransitionStatus">
 
@@ -1982,10 +2114,11 @@ if ($hasCouncilTbl) {
           <p class="fw-semibold mb-2 small">Incoming Official Information</p>
           <div class="row g-2">
             <div class="col-12 col-md-5">
-              <label for="formerOfficialMode" class="form-label small fw-semibold mb-1">Existing Official Record?</label>
+              <label for="formerOfficialMode" class="form-label small fw-semibold mb-1">How should this official be added?</label>
               <select class="form-select form-select-sm" id="formerOfficialMode">
                 <option value="" selected>— Select option —</option>
                 <option value="new">No, this is a new official</option>
+                <option value="current" id="renewCurrentOfficialOption">Renew the current official</option>
                 <option value="former">Use former official</option>
                 <option value="active">Use active official</option>
               </select>
@@ -2008,7 +2141,7 @@ if ($hasCouncilTbl) {
 	            <div class="border rounded p-3 mb-3">
 	              <div class="fw-semibold text-muted mb-3">Identity</div>
 	              <div id="existingOfficialIdentityHint" class="small text-muted mb-3 d-none">
-	                This official record will be reused. Identity fields stay tied to the selected profile, while email and mobile below can still be updated before completing the turnover.
+                This official record will be reused. Identity fields stay tied to the selected profile, while email and mobile below can still be updated before confirming the assignment.
 	              </div>
 	              <div class="row g-2">
                 <div class="col-12 col-md-3">
@@ -2069,7 +2202,7 @@ if ($hasCouncilTbl) {
             </div>
             <div class="col-12">
               <div class="small text-muted">
-                This position accepts one official only. Nothing is stored in a separate incoming-official table. Review the encoded details first, then complete the transition.
+                This position accepts one official only. Review the details, then continue to the account and access confirmation.
               </div>
             </div>
           </div>
@@ -2077,8 +2210,8 @@ if ($hasCouncilTbl) {
       </div>
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-        <button class="btn btn-warning btn-sm" id="btnMarkPendingDecision">
-          <i class="fas fa-key me-1"></i> Review and Continue
+        <button class="btn btn-primary" id="btnMarkPendingDecision">
+          Continue to Account &amp; Access <i class="fas fa-arrow-right ms-1"></i>
         </button>
       </div>
     </div>
@@ -2093,12 +2226,17 @@ if ($hasCouncilTbl) {
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
-          <i class="fas fa-key me-2 text-warning"></i>
-          Finalize Access, Assign Account, and Notify
+          <i class="fas fa-shield-halved me-2 text-primary"></i>
+          Review Account &amp; Access
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <div class="official-modal-progress" aria-label="Setup progress">
+          <div class="official-modal-progress__step">1. Position</div>
+          <div class="official-modal-progress__step">2. Official</div>
+          <div class="official-modal-progress__step is-active">3. Account &amp; Access</div>
+        </div>
         <input type="hidden" id="winnerTransitionId">
 
         <div class="alert alert-info py-2 small mb-3">
@@ -2132,11 +2270,30 @@ if ($hasCouncilTbl) {
             <input type="date" class="form-control form-control-sm" id="winnerActingUntilDate" disabled>
           </div>
         </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="winnerAccessMode">Incoming Account Access</label>
+            <select class="form-select" id="winnerAccessMode">
+              <option value="seat_template" selected>Use seat template (Recommended)</option>
+              <option value="no_access">No module access until reviewed</option>
+            </select>
+            <div class="form-text">You can customize individual modules later from Access Templates or Official Records.</div>
+          </div>
+          <div class="col-md-6 d-none" id="winnerOutgoingAccountWrap">
+            <label class="form-label fw-semibold" for="winnerOutgoingAccountAction">Outgoing Account</label>
+            <select class="form-select" id="winnerOutgoingAccountAction">
+              <option value="disable" selected>Disable after replacement (Recommended)</option>
+              <option value="keep_active">Keep active for manual review</option>
+            </select>
+            <div class="form-text">This does not apply when the same official is being renewed.</div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-success" id="btnCompleteTransition">
-          <i class="fas fa-check-circle me-1"></i> Complete and Notify
+        <button class="btn btn-primary" id="btnCompleteTransition">
+          <i class="fas fa-check-circle me-1"></i> Confirm Assignment
         </button>
       </div>
     </div>
@@ -2150,7 +2307,7 @@ if ($hasCouncilTbl) {
         <div>
           <div class="text-uppercase small fw-semibold text-primary mb-1">Secure Confirmation</div>
           <h5 class="modal-title mb-1">Password and OTP Verification</h5>
-          <p class="text-muted small mb-0" id="secureConfirmActionText">Verify your identity before the turnover action continues.</p>
+          <p class="text-muted small mb-0" id="secureConfirmActionText">Verify your identity before the account or assignment action continues.</p>
         </div>
         <button type="button" class="btn-close" id="secureConfirmCloseBtn" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -2237,7 +2394,7 @@ if ($hasCouncilTbl) {
       </div>
       <div class="modal-body">
         <p class="text-muted small mb-3">
-          These actions apply directly without a full transition workflow.
+          These controls apply directly to an existing official account or assignment.
         </p>
         <div class="d-grid gap-2">
           <button class="btn btn-outline-success quick-action-btn" id="btnQaRestoreAccess">
@@ -2380,7 +2537,7 @@ if ($hasCouncilTbl) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260628-03"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-1"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};

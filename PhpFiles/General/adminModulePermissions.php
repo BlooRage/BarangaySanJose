@@ -381,17 +381,17 @@ if (!function_exists('amp_get_permission_catalog')) {
                 ],
             ],
             [
-                'section' => 'Barangay Official Governance',
+                'section' => 'Barangay Officials & Access',
                 'items' => [
                     [
                         'key' => 'official_records_management',
-                        'label' => 'Official Management',
+                        'label' => 'Official Records',
                         'path' => 'Admin-End/OfficialsManagement.php',
                         'admin_only' => true,
                     ],
                     [
                         'key' => 'official_transition',
-                        'label' => 'Official Transition',
+                        'label' => 'Council Seats & Accounts',
                         'path' => 'Admin-End/OfficialTransitions.php',
                         'admin_only' => true,
                     ],

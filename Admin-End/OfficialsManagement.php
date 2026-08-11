@@ -27,12 +27,12 @@ $managementEntityPlural = match ($managementMode) {
 $managementPageTitle = match ($managementMode) {
   'personnel' => 'Personnel Tracker',
   'admin' => 'Admin Management',
-  default => 'Official Management',
+  default => 'Official Records',
 };
 $managementDescription = match ($managementMode) {
   'personnel' => 'Maintain personnel profile records, check readiness for onboarding, and lock or unlock accounts without changing seat assignments.',
   'admin' => 'Maintain admin profile records separately from barangay officials, monitor onboarding readiness, and manage onboarding-safe account locking.',
-  default => 'Maintain official profile records, check invite readiness, and manage onboarding-safe account locking without changing seats or permissions here.',
+  default => 'Review current and past official profiles, onboarding status, and account state. Seat assignments are managed from Seats & Onboarding.',
 };
 $managementCurrentLabel = match ($managementMode) {
   'personnel' => 'Current Personnel',
@@ -194,6 +194,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/OfficialWorkspaceStyle.css?v=20260812-1">
   <style>
     #main-display {
       min-width: 0;
@@ -586,15 +587,26 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     <?php include "includes/sidebar.php"; ?>
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
-      <div class="mb-4 officials-page-header">
-        <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-          <?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?>
-        </h2>
-        <p class="text-muted mb-0">
-          <?= htmlspecialchars($managementDescription, ENT_QUOTES, 'UTF-8') ?>
-        </p>
-      </div>
-      <hr><br>
+      <?php if ($managementMode === 'official'): ?>
+        <header class="official-workspace-header">
+          <div>
+            <h1 class="official-workspace-title"><?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+            <p class="official-workspace-description"><?= htmlspecialchars($managementDescription, ENT_QUOTES, 'UTF-8') ?></p>
+          </div>
+          <div class="official-workspace-header__actions">
+            <a class="btn btn-primary" href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?panel=seat'), ENT_QUOTES, 'UTF-8') ?>">
+              <i class="fas fa-user-plus me-1"></i> Add &amp; Assign Official
+            </a>
+          </div>
+        </header>
+        <?php include __DIR__ . '/includes/official_workspace_nav.php'; ?>
+      <?php else: ?>
+        <div class="mb-4 officials-page-header">
+          <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C; "><?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+          <p class="text-muted mb-0"><?= htmlspecialchars($managementDescription, ENT_QUOTES, 'UTF-8') ?></p>
+        </div>
+        <hr><br>
+      <?php endif; ?>
 
       <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell officials-masterlist-shell">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
@@ -605,8 +617,8 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
           </div>
           <?php endif; ?>
           <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2 ms-auto">
-            <button id="btnOfficialsMgmtSendAllInvites" class="btn btn-primary btn-sm" type="button" title="Send onboarding invites for all ready profiles">
-              <i class="fas fa-paper-plane me-1"></i> Send All Invites
+            <button id="btnOfficialsMgmtSendAllInvites" class="btn btn-outline-primary btn-sm" type="button" title="Send onboarding invitations for profiles marked ready">
+              <i class="fas fa-paper-plane me-1"></i> Send Ready Invites
             </button>
             <div class="input-group admin-search">
               <input id="officialsMgmtSearch" class="form-control" placeholder="<?= htmlspecialchars($managementSearchPlaceholder, ENT_QUOTES, 'UTF-8') ?>" />
@@ -1128,7 +1140,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
         </div>
 
         <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
-          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Close</button>
           <button type="submit" class="btn btn-primary px-4" id="btnOfficialsMgmtProfileSave">Save Changes</button>
         </div>
       </form>

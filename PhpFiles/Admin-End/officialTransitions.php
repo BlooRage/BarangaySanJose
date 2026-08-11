@@ -432,16 +432,7 @@ function otIgnoredTransitionSeatNames(): array {
 }
 
 function otIsManagedTransitionSeat(string $seatName): bool {
-    static $ignored = null;
-    if ($ignored === null) {
-        $ignored = array_map(
-            static fn (string $value): string => strtolower(trim($value)),
-            otIgnoredTransitionSeatNames()
-        );
-    }
-
-    $normalized = strtolower(trim($seatName));
-    return $normalized !== '' && !in_array($normalized, $ignored, true);
+    return trim($seatName) !== '';
 }
 
 function otIgnoredTransitionSeatSql(mysqli $conn, string $field): string {
@@ -656,9 +647,12 @@ function otResolveIncomingAccessProfile(array $transition): array {
     $positionLower = strtolower($position);
     $department = trim((string)($transition['department'] ?? ''));
     $areaNumber = otNormalizeAreaNumber((string)($transition['area_number'] ?? ''));
-    $selectionMethod = in_array((string)($transition['transition_type'] ?? ''), ['BarangayElection', 'SKElection'], true)
-        ? 'Elected'
-        : 'Appointed';
+    $configuredSelectionMethod = trim((string)($transition['selection_method'] ?? ''));
+    $selectionMethod = in_array($configuredSelectionMethod, ['Elected', 'Appointed'], true)
+        ? $configuredSelectionMethod
+        : (in_array((string)($transition['transition_type'] ?? ''), ['BarangayElection', 'SKElection'], true)
+            ? 'Elected'
+            : 'Appointed');
 
     $accountRole = 'Official';
     $officialRole = 'Official';
@@ -1010,8 +1004,6 @@ if ($action === 'fetch_council_seats') {
     if (!otTableExists($conn, 'barangaycounciltbl')) {
         otJson(['success' => true, 'seats' => []]);
     }
-    $hasConfiguredTermSchedule = otHasConfiguredTermSchedule($conn);
-
     $res = $conn->query("
         SELECT
             bc.council_id,
@@ -1047,19 +1039,176 @@ if ($action === 'fetch_council_seats') {
             }
             $row = otDecryptOfficialContactRow($row);
             $row['current_official_name'] = otFormatOfficialName($row, true);
-            if (!$hasConfiguredTermSchedule) {
-                $row['current_official_id'] = '';
-                $row['current_official_name'] = '';
-                $row['account_status'] = '';
-                $row['term_start'] = '';
-                $row['term_end'] = '';
-            }
             $seats[] = $row;
         }
         $res->close();
     }
 
     otJson(['success' => true, 'seats' => $seats]);
+}
+
+if ($action === 'save_council_seat') {
+    if (!otTableExists($conn, 'barangaycounciltbl')) {
+        otError('Council seat storage is not available.');
+    }
+
+    $councilId = max(0, (int)($_POST['council_id'] ?? 0));
+    $seatName = trim((string)($_POST['seat_name'] ?? ''));
+    $selectionMethod = trim((string)($_POST['selection_method'] ?? ''));
+    $seatGroup = trim((string)($_POST['seat_group'] ?? ''));
+    $sortOrder = max(0, (int)($_POST['sort_order'] ?? 0));
+    $termStartInput = trim((string)($_POST['term_start'] ?? ''));
+    $termEndInput = trim((string)($_POST['term_end'] ?? ''));
+    $termStart = otNormalizeDateOrNull($termStartInput);
+    $termEnd = otNormalizeDateOrNull($termEndInput);
+
+    if ($seatName === '' || mb_strlen($seatName) > 150) {
+        otError('Enter a seat name with no more than 150 characters.');
+    }
+    if (!in_array($selectionMethod, ['Elected', 'Appointed'], true)) {
+        otError('Choose whether the seat is elected or appointed.');
+    }
+    if ($seatGroup === '' || mb_strlen($seatGroup) > 50) {
+        otError('Enter a seat group with no more than 50 characters.');
+    }
+    if (($termStartInput !== '' && $termStart === null) || ($termEndInput !== '' && $termEnd === null)) {
+        otError('Enter valid seat term dates.');
+    }
+    if ($termStart !== null && $termEnd !== null && $termEnd < $termStart) {
+        otError('The default term end date cannot be earlier than the start date.');
+    }
+
+    $duplicateStmt = $conn->prepare("
+        SELECT council_id
+        FROM barangaycounciltbl
+        WHERE is_active = 1
+          AND LOWER(TRIM(seat_name)) = LOWER(TRIM(?))
+          AND council_id <> ?
+        LIMIT 1
+    ");
+    if (!$duplicateStmt) {
+        otError('Unable to validate the seat name.');
+    }
+    $duplicateStmt->bind_param('si', $seatName, $councilId);
+    $duplicateStmt->execute();
+    $duplicate = $duplicateStmt->get_result()->fetch_assoc();
+    $duplicateStmt->close();
+    if ($duplicate) {
+        otError('An active seat with this name already exists.');
+    }
+
+    if ($councilId > 0) {
+        $stmt = $conn->prepare("
+            UPDATE barangaycounciltbl
+            SET seat_name = ?,
+                selection_method = ?,
+                seat_group = ?,
+                sort_order = ?,
+                term_start = ?,
+                term_end = ?,
+                updated_at = NOW()
+            WHERE council_id = ? AND is_active = 1
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            otError('Unable to prepare the seat update.');
+        }
+        $stmt->bind_param('sssissi', $seatName, $selectionMethod, $seatGroup, $sortOrder, $termStart, $termEnd, $councilId);
+        if (!$stmt->execute()) {
+            $message = $stmt->error;
+            $stmt->close();
+            otError('Unable to update the seat: ' . $message);
+        }
+        $stmt->close();
+        $syncAssignmentStmt = $conn->prepare("
+            UPDATE officialinformationtbl
+            SET selection_method = ?,
+                term_start = ?,
+                term_end = ?,
+                last_updated = CURRENT_TIMESTAMP
+            WHERE official_id = (
+                SELECT current_official_id
+                FROM barangaycounciltbl
+                WHERE council_id = ?
+            )
+            LIMIT 1
+        ");
+        if ($syncAssignmentStmt) {
+            $syncAssignmentStmt->bind_param('sssi', $selectionMethod, $termStart, $termEnd, $councilId);
+            $syncAssignmentStmt->execute();
+            $syncAssignmentStmt->close();
+        }
+        $auditAction = 'update_seat';
+        $message = 'Council seat updated.';
+    } else {
+        $stmt = $conn->prepare("
+            INSERT INTO barangaycounciltbl
+                (seat_name, selection_method, seat_group, sort_order, term_start, term_end, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+        ");
+        if (!$stmt) {
+            otError('Unable to prepare the new seat.');
+        }
+        $stmt->bind_param('sssiss', $seatName, $selectionMethod, $seatGroup, $sortOrder, $termStart, $termEnd);
+        if (!$stmt->execute()) {
+            $message = $stmt->error;
+            $stmt->close();
+            otError('Unable to add the seat: ' . $message);
+        }
+        $councilId = (int)$stmt->insert_id;
+        $stmt->close();
+        $auditAction = 'create_seat';
+        $message = 'Council seat added.';
+    }
+
+    insertUnifiedAuditLog(
+        $conn,
+        $actorId,
+        $actorRole,
+        'Official Setup',
+        'council_seat',
+        (string)$councilId,
+        $auditAction,
+        'seat_definition',
+        null,
+        $seatName,
+        $selectionMethod . ' | ' . $seatGroup
+    );
+    otJson(['success' => true, 'message' => $message, 'council_id' => $councilId]);
+}
+
+if ($action === 'deactivate_council_seat') {
+    $councilId = (int)($_POST['council_id'] ?? 0);
+    if ($councilId <= 0) {
+        otError('Council seat is required.');
+    }
+    otRequireSecureChallenge($conn, $actorId, $otSecureModuleKey, 'deactivate_council_seat');
+
+    $seatStmt = $conn->prepare("SELECT seat_name, current_official_id FROM barangaycounciltbl WHERE council_id = ? AND is_active = 1 LIMIT 1");
+    if (!$seatStmt) {
+        otError('Unable to load the council seat.');
+    }
+    $seatStmt->bind_param('i', $councilId);
+    $seatStmt->execute();
+    $seat = $seatStmt->get_result()->fetch_assoc();
+    $seatStmt->close();
+    if (!$seat) {
+        otError('The council seat was not found.');
+    }
+    if (trim((string)($seat['current_official_id'] ?? '')) !== '') {
+        otError('End or replace the current official assignment before deactivating this seat.');
+    }
+
+    $stmt = $conn->prepare("UPDATE barangaycounciltbl SET is_active = 0, updated_at = NOW() WHERE council_id = ? LIMIT 1");
+    if (!$stmt) {
+        otError('Unable to prepare the seat deactivation.');
+    }
+    $stmt->bind_param('i', $councilId);
+    $stmt->execute();
+    $stmt->close();
+
+    insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Setup', 'council_seat', (string)$councilId, 'deactivate_seat', 'is_active', '1', '0', (string)($seat['seat_name'] ?? ''));
+    otJson(['success' => true, 'message' => 'Council seat deactivated.']);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1076,9 +1225,10 @@ if (!function_exists('ot_governance_fetch_transition')) {
     function ot_governance_fetch_transition(mysqli $conn, string $transitionId): ?array
     {
         $stmt = $conn->prepare("
-            SELECT *
-            FROM officialgovernancetransitiontbl
-            WHERE transition_id = ?
+            SELECT t.*, bc.selection_method
+            FROM officialgovernancetransitiontbl t
+            LEFT JOIN barangaycounciltbl bc ON bc.council_id = t.council_id
+            WHERE t.transition_id = ?
             LIMIT 1
         ");
         if (!$stmt) {
@@ -1100,6 +1250,7 @@ if (!function_exists('ot_governance_create_shell')) {
             'department' => (string)($transition['department'] ?? ''),
             'area_number' => (string)($transition['area_number'] ?? ''),
             'transition_type' => (string)($transition['transition_type'] ?? ''),
+            'selection_method' => (string)($transition['selection_method'] ?? ''),
         ]);
         $email = strtolower(trim((string)($candidate['candidate_email'] ?? '')));
         $phone10 = oi_normalize_phone10((string)($candidate['candidate_mobile'] ?? ''));
@@ -1243,6 +1394,7 @@ if ($action === 'request_secure_action_otp') {
         'end_acting',
         'demote_official',
         'demote_batch',
+        'deactivate_council_seat',
     ];
     if (!in_array($secureAction, $allowedSecureActions, true)) {
         otError('This action cannot use secure confirmation.');
@@ -1252,6 +1404,7 @@ if ($action === 'request_secure_action_otp') {
     $transitionId = trim((string)($_POST['transition_id'] ?? ''));
     $officialId = trim((string)($_POST['official_id'] ?? $_POST['acting_official_id'] ?? ''));
     $batchLabel = trim((string)($_POST['batch_label'] ?? ''));
+    $councilId = (int)($_POST['council_id'] ?? 0);
 
     if ($transitionId !== '') {
         $transition = ot_governance_fetch_transition($conn, $transitionId);
@@ -1265,6 +1418,17 @@ if ($action === 'request_secure_action_otp') {
         }
     } elseif ($batchLabel !== '') {
         $targetLabel = 'governance cycle ' . $batchLabel;
+    } elseif ($councilId > 0 && otTableExists($conn, 'barangaycounciltbl')) {
+        $seatStmt = $conn->prepare("SELECT seat_name FROM barangaycounciltbl WHERE council_id = ? LIMIT 1");
+        if ($seatStmt) {
+            $seatStmt->bind_param('i', $councilId);
+            $seatStmt->execute();
+            $seatRow = $seatStmt->get_result()->fetch_assoc();
+            $seatStmt->close();
+            if ($seatRow) {
+                $targetLabel = (string)($seatRow['seat_name'] ?? 'council seat');
+            }
+        }
     }
 
     try {
@@ -1324,6 +1488,7 @@ if ($action === 'fetch_transitions') {
                t.seat_name AS position,
                t.batch_label,
                t.effective_date,
+               t.assignment_end_date,
                t.status,
                t.reason,
                t.acting_until_date,
@@ -1366,7 +1531,13 @@ if ($action === 'fetch_transitions') {
     $stmt->close();
     $total = count($filteredRows);
     $rows = array_slice($filteredRows, $offset, $limit);
-    otJson(['success' => true, 'data' => $rows, 'total' => $total]);
+    $pendingTotal = 0;
+    $pendingResult = $conn->query("SELECT COUNT(*) AS total FROM officialgovernancetransitiontbl WHERE status NOT IN ('Completed', 'Cancelled')");
+    if ($pendingResult instanceof mysqli_result) {
+        $pendingTotal = (int)($pendingResult->fetch_assoc()['total'] ?? 0);
+        $pendingResult->close();
+    }
+    otJson(['success' => true, 'data' => $rows, 'total' => $total, 'pending_total' => $pendingTotal]);
 }
 
 if ($action === 'fetch_candidates') {
@@ -1397,12 +1568,22 @@ if ($action === 'new_transition') {
     $councilId = (int)($_POST['council_id'] ?? 0);
     $transType = trim((string)($_POST['transition_type'] ?? ''));
     $effectiveDate = trim((string)($_POST['effective_date'] ?? ''));
+    $assignmentEndDate = trim((string)($_POST['assignment_end_date'] ?? ''));
     $reason = trim((string)($_POST['reason'] ?? ''));
     $batchLabel = trim((string)($_POST['batch_label'] ?? ''));
     if ($councilId <= 0) otError('Council seat is required.');
     if ($transType === '') otError('Transition type is required.');
     if ($effectiveDate === '') {
         $effectiveDate = date('Y-m-d');
+    }
+    if (otNormalizeDateOrNull($effectiveDate) === null) {
+        otError('Enter a valid assignment start date.');
+    }
+    if ($assignmentEndDate !== '' && otNormalizeDateOrNull($assignmentEndDate) === null) {
+        otError('Enter a valid assignment end date.');
+    }
+    if ($assignmentEndDate !== '' && $assignmentEndDate < $effectiveDate) {
+        otError('The assignment end date cannot be earlier than the start date.');
     }
     $seatStmt = $conn->prepare("
         SELECT bc.council_id, bc.seat_name, bc.current_official_id, oi.department, oi.area_number
@@ -1421,8 +1602,8 @@ if ($action === 'new_transition') {
     $transitionId = ogw_generate_transition_id();
     $stmt = $conn->prepare("
         INSERT INTO officialgovernancetransitiontbl
-            (transition_id, council_id, batch_label, transition_type, seat_name, department, area_number, outgoing_official_id, effective_date, reason, status, created_by_user_id)
-        VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 'PendingSuperAdminApproval', ?)
+            (transition_id, council_id, batch_label, transition_type, seat_name, department, area_number, outgoing_official_id, effective_date, assignment_end_date, reason, status, created_by_user_id)
+        VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 'PendingSuperAdminApproval', ?)
     ");
     if (!$stmt) otError('Insert failed: ' . $conn->error);
     $seatName = (string)($seat['seat_name'] ?? '');
@@ -1439,13 +1620,14 @@ if ($action === 'new_transition') {
         $areaNumber,
         $outgoingId,
         $effectiveDate,
+        $assignmentEndDate,
         $reason,
         $actorId
     ]);
     if (!$stmt->execute()) otError('Failed to create transition: ' . $stmt->error);
     $stmt->close();
-    insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Transition', 'transition', $transitionId, 'create_transition', 'transition_type', null, $transType, 'Created transition draft.');
-    otJson(['success' => true, 'message' => 'Transition created.', 'transition_id' => $transitionId]);
+    insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Assignments', 'assignment', $transitionId, 'create_assignment', 'assignment_type', null, $transType, 'Prepared official assignment setup.');
+    otJson(['success' => true, 'message' => 'Assignment setup prepared.', 'transition_id' => $transitionId]);
 }
 
 if ($action === 'new_batch') {
@@ -1537,6 +1719,8 @@ if ($action === 'complete_transition') {
     otRequireSecureChallenge($conn, $actorId, $otSecureModuleKey, 'complete_transition');
     $transitionId = trim((string)($_POST['transition_id'] ?? ''));
     $outcome = trim((string)($_POST['outcome'] ?? ''));
+    $accessMode = trim((string)($_POST['access_mode'] ?? 'seat_template'));
+    $outgoingAccountAction = trim((string)($_POST['outgoing_account_action'] ?? 'disable'));
     $linkedOfficialId = trim((string)($_POST['linked_official_id'] ?? ''));
     $notes = trim((string)($_POST['notes'] ?? ''));
     $candidate = [
@@ -1548,6 +1732,15 @@ if ($action === 'complete_transition') {
         'candidate_mobile' => preg_replace('/[^0-9]/', '', (string)($_POST['candidate_mobile'] ?? '')),
     ];
     if ($transitionId === '' || $outcome === '') otError('Transition and outcome are required.');
+    if (!in_array($outcome, ['ReElected', 'ActingReplacement', 'PositionChange', 'Reactivated', 'NewPerson', 'NoSuccessor'], true)) {
+        otError('Choose a valid assignment outcome.');
+    }
+    if (!in_array($accessMode, ['seat_template', 'no_access'], true)) {
+        otError('Choose a valid incoming account access option.');
+    }
+    if (!in_array($outgoingAccountAction, ['disable', 'keep_active'], true)) {
+        otError('Choose a valid outgoing account action.');
+    }
     $transition = ot_governance_fetch_transition($conn, $transitionId);
     if (!$transition) otError('Transition not found.');
 
@@ -1561,6 +1754,10 @@ if ($action === 'complete_transition') {
     $incomingUserId = '';
     $outgoingId = (string)($transition['outgoing_official_id'] ?? '');
     $councilId = (int)($transition['council_id'] ?? 0);
+    $assignmentEndDate = trim((string)($transition['assignment_end_date'] ?? ''));
+    if ($outcome === 'ReElected' && $outgoingId === '') {
+        otError('The current official account could not be found for renewal.');
+    }
     $inviteResponse = [
         'invite_link' => '',
         'invite_email_sent' => null,
@@ -1571,7 +1768,7 @@ if ($action === 'complete_transition') {
 
     $conn->begin_transaction();
     try {
-        if ($outgoingId !== '' && $outcome !== 'ReElected') {
+        if ($outgoingId !== '' && $outcome !== 'ReElected' && $outgoingAccountAction !== 'keep_active') {
             $outgoing = otGetOfficialUser($conn, $outgoingId);
             if ($outgoing && !empty($outgoing['user_id'])) {
                 $upAcct = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
@@ -1587,6 +1784,14 @@ if ($action === 'complete_transition') {
             $incomingOfficialId = $outgoingId;
             $existing = $incomingOfficialId !== '' ? otGetOfficialUser($conn, $incomingOfficialId) : null;
             $incomingUserId = (string)($existing['user_id'] ?? '');
+            if ($incomingUserId !== '') {
+                $continueAccountStmt = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
+                if ($continueAccountStmt) {
+                    $continueAccountStmt->bind_param('is', $activeStatusId, $incomingUserId);
+                    $continueAccountStmt->execute();
+                    $continueAccountStmt->close();
+                }
+            }
             if ($incomingOfficialId !== '' && $incomingUserId !== '' && ($candidate['candidate_email'] !== '' || $candidate['candidate_mobile'] !== '')) {
                 $contactEmail = $candidate['candidate_email'] !== ''
                     ? $candidate['candidate_email']
@@ -1597,6 +1802,22 @@ if ($action === 'complete_transition') {
 
                 if ($contactEmail !== '' && $contactPhone10 !== '') {
                     otUpdateOfficialContacts($conn, $incomingOfficialId, $incomingUserId, $contactEmail, $contactPhone10);
+                }
+            }
+            if ($incomingOfficialId !== '') {
+                $renewStmt = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET term_start = ?,
+                        term_end = NULLIF(?, ''),
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE official_id = ?
+                    LIMIT 1
+                ");
+                if ($renewStmt) {
+                    $renewStart = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
+                    $renewStmt->bind_param('sss', $renewStart, $assignmentEndDate, $incomingOfficialId);
+                    $renewStmt->execute();
+                    $renewStmt->close();
                 }
             }
         } elseif ($outcome !== 'NoSuccessor') {
@@ -1634,6 +1855,7 @@ if ($action === 'complete_transition') {
                 'department' => (string)($transition['department'] ?? ''),
                 'area_number' => (string)($transition['area_number'] ?? ''),
                 'transition_type' => (string)($transition['transition_type'] ?? ''),
+                'selection_method' => (string)($transition['selection_method'] ?? ''),
             ]);
             $effectiveDate = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
             $upOfficial = $conn->prepare("
@@ -1644,6 +1866,7 @@ if ($action === 'complete_transition') {
                     area_number = ?,
                     selection_method = ?,
                     term_start = ?,
+                    term_end = NULLIF(?, ''),
                     batch_label = NULLIF(?, ''),
                     last_updated = CURRENT_TIMESTAMP
                 WHERE official_id = ?
@@ -1658,6 +1881,7 @@ if ($action === 'complete_transition') {
                     $assignment['area_number'],
                     $assignment['selection_method'],
                     $effectiveDate,
+                    $assignmentEndDate,
                     $batchLabel,
                     $incomingOfficialId
                 ]);
@@ -1674,11 +1898,13 @@ if ($action === 'complete_transition') {
             // Materialize the seat template on the incoming account before the
             // profile is marked initialized. Marking an empty profile initialized
             // causes the authorization guard to deny every admin page.
-            $seatPermissionKeys = array_keys(amp_get_effective_permission_keys_for_council(
-                $conn,
-                $councilId,
-                $assignment['account_role']
-            ));
+            $seatPermissionKeys = $accessMode === 'no_access'
+                ? []
+                : array_keys(amp_get_effective_permission_keys_for_council(
+                    $conn,
+                    $councilId,
+                    $assignment['account_role']
+                ));
             amp_replace_official_module_permissions(
                 $conn,
                 $incomingOfficialId,
@@ -1713,18 +1939,45 @@ if ($action === 'complete_transition') {
             ogw_sync_profile_workflow($conn, $incomingOfficialId);
         }
 
+        if ($outcome === 'ReElected' && $incomingOfficialId !== '' && $incomingUserId !== '') {
+            $renewedPermissionKeys = $accessMode === 'no_access'
+                ? []
+                : array_keys(amp_get_effective_permission_keys_for_council(
+                    $conn,
+                    $councilId,
+                    (string)($existing['ua_role'] ?? 'Official')
+                ));
+            amp_replace_official_module_permissions($conn, $incomingOfficialId, $incomingUserId, $renewedPermissionKeys, $actorId);
+            amp_upsert_official_access_profile($conn, $incomingOfficialId, $incomingUserId);
+        }
+
         if ($councilId > 0) {
+            if ($incomingOfficialId !== '') {
+                $clearOtherSeatStmt = $conn->prepare("
+                    UPDATE barangaycounciltbl
+                    SET current_official_id = NULL,
+                        updated_at = NOW()
+                    WHERE current_official_id = ?
+                      AND council_id <> ?
+                ");
+                if ($clearOtherSeatStmt) {
+                    $clearOtherSeatStmt->bind_param('si', $incomingOfficialId, $councilId);
+                    $clearOtherSeatStmt->execute();
+                    $clearOtherSeatStmt->close();
+                }
+            }
             $seatStmt = $conn->prepare("
                 UPDATE barangaycounciltbl
                 SET current_official_id = NULLIF(?, ''),
                     term_start = COALESCE(NULLIF(?, ''), term_start),
+                    term_end = NULLIF(?, ''),
                     updated_at = NOW()
                 WHERE council_id = ?
                 LIMIT 1
             ");
             if ($seatStmt) {
                 $effectiveDate = trim((string)($transition['effective_date'] ?? '')) ?: date('Y-m-d');
-                $seatStmt->bind_param('ssi', $incomingOfficialId, $effectiveDate, $councilId);
+                $seatStmt->bind_param('sssi', $incomingOfficialId, $effectiveDate, $assignmentEndDate, $councilId);
                 $seatStmt->execute();
                 $seatStmt->close();
             }
@@ -1735,8 +1988,8 @@ if ($action === 'complete_transition') {
             SET incoming_official_id = NULLIF(?, ''),
                 notes = NULLIF(?, ''),
                 status = 'Completed',
-                account_action = CASE WHEN ? = 'NoSuccessor' THEN 'DemotedOnly' ELSE 'DemotedAndReassigned' END,
-                access_action = CASE WHEN ? = 'NoSuccessor' THEN 'NoIncomingAccess' ELSE 'PendingAccessReview' END,
+                account_action = ?,
+                access_action = ?,
                 approved_by_user_id = ?,
                 approved_at = NOW(),
                 completed_at = NOW(),
@@ -1747,11 +2000,19 @@ if ($action === 'complete_transition') {
         if (!$completeStmt) {
             throw new RuntimeException('Failed to finalize transition.');
         }
+        $accountActionValue = $outcome === 'NoSuccessor'
+            ? 'DemotedOnly'
+            : ($outcome === 'ReElected'
+                ? 'AccountContinued'
+                : ($outgoingAccountAction === 'keep_active' ? 'OutgoingRetainedAndReassigned' : 'DemotedAndReassigned'));
+        $accessActionValue = $outcome === 'NoSuccessor'
+            ? 'NoIncomingAccess'
+            : ($accessMode === 'no_access' ? 'NoModuleAccess' : 'PendingAccessReview');
         otBindStringParams($completeStmt, [
             $incomingOfficialId,
             $notes,
-            $outcome,
-            $outcome,
+            $accountActionValue,
+            $accessActionValue,
             $actorId,
             $transitionId
         ]);
@@ -1803,10 +2064,15 @@ if ($action === 'complete_transition') {
         }
     }
 
-    insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Transition', 'transition', $transitionId, 'complete_transition', 'status', 'PendingSuperAdminApproval', 'Completed', 'Completed transition workflow.');
+    insertUnifiedAuditLog($conn, $actorId, $actorRole, 'Official Assignments', 'assignment', $transitionId, 'complete_assignment', 'status', 'PendingSuperAdminApproval', 'Completed', 'Completed official assignment and account setup.');
+    $completionMessage = $outcome === 'ReElected'
+        ? 'Assignment renewed. The official will continue using the existing account.'
+        : ($accessMode === 'no_access'
+            ? 'Assignment completed. The account has no module access until an administrator reviews it.'
+            : 'Assignment completed. The seat access template was applied and onboarding access was sent when needed.');
     otJson([
         'success' => true,
-        'message' => 'Transition completed successfully. Incoming access stays pending until Access Control approves it.',
+        'message' => $completionMessage,
         'invite_link' => $inviteResponse['invite_link'],
         'invite_email_sent' => $inviteResponse['invite_email_sent'],
         'invite_email_error' => $inviteResponse['invite_email_error'],
@@ -1888,7 +2154,7 @@ if ($action === 'cancel_transition') {
         'cancel_transition', 'status', null, 'Cancelled', $reason ?: null
     );
 
-    otJson(['success' => true, 'message' => 'Transition cancelled.']);
+    otJson(['success' => true, 'message' => 'Assignment setup cancelled.']);
 }
 
 if ($action === 'demote_official') {
@@ -1947,7 +2213,7 @@ if ($action === 'demote_official') {
 
     otJson([
         'success' => true,
-        'message' => ($name !== '' ? $name : 'Official') . ' was demoted and removed from the active seat assignment.',
+        'message' => 'The assignment for ' . ($name !== '' ? $name : 'this official') . ' ended and the account was disabled.',
     ]);
 }
 

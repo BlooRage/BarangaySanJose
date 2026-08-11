@@ -124,8 +124,15 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
     $addModuleCard($isSuperAdminSidebar && ($sbCan('user_masterlist') || $sbCan('user_archive')), 'user-management', 'User Management', appUrl($sbCan('user_masterlist') ? 'Admin-End/UserMasterlist.php' : 'Admin-End/UserArchive.php'), 'fa-users-cog', 'Review user access, archive records, and account maintenance.', $userAttention);
     $addModuleCard($isSuperAdminSidebar && ($sbCan('officials_management') || $sbCan('personnel_invite')), 'personnel-management', 'Personnel Management', appUrl($sbCan('officials_management') ? 'Admin-End/PersonnelTracker.php' : 'Admin-End/OfficialInvites.php'), 'fa-user-tie', 'Open the personnel tracker, invites, and access control workspace.', 0);
     $addModuleCard($isSuperAdminSidebar && $sbCan('website_settings'), 'website-settings', 'Website Settings', appUrl('Admin-End/WebsiteSettings.php'), 'fa-screwdriver-wrench', 'Toggle maintenance mode and control public website availability.', 0);
-    $addModuleCard($isSuperAdminSidebar && $sbCan('official_records_management'), 'official-management', 'Official Management', appUrl('Admin-End/OfficialsManagement.php'), 'fa-user-shield', 'Manage official records and assigned barangay offices.', 0);
-    $addModuleCard($isSuperAdminSidebar && $sbCan('official_transition'), 'official-transition', 'Official Transition', appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=seat'), 'fa-right-left', 'Manage seat assignments, access, and governance cycles.', 0);
+    $addModuleCard(
+      $isSuperAdminSidebar && ($sbCan('official_records_management') || $sbCan('official_transition')),
+      'officials-access',
+      'Officials & Access',
+      appUrl($sbCan('official_transition') ? 'Admin-End/OfficialTransitions.php?panel=seat' : 'Admin-End/OfficialsManagement.php'),
+      'fa-user-shield',
+      'Set up council seats, assign officials, and manage account access.',
+      0
+    );
     $addModuleCard($isSuperAdminSidebar && $sbCan('audit_logs'), 'audit-logs', 'Audit Logs', appUrl('Admin-End/AuditLogs.php'), 'fa-clipboard-list', 'Review recent system actions and accountability trails.', 0);
 
     $staffViewerContext = ann_audience_fetch_staff_context(

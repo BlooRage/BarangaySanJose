@@ -19,15 +19,8 @@ $adminMgmtPages = ['UserMasterlist.php', 'UserArchive.php', 'AdminManagement.php
 $barangayOfficialMgmtPages = ['OfficialsManagement.php', 'OfficialTransitions.php'];
 $officialTransitionPages = ['OfficialTransitions.php'];
 
-$officialTransitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
+$officialTransitionTool = 'current_term';
 $officialTransitionPanel = strtolower(trim((string)($_GET['panel'] ?? '')));
-if ($officialTransitionTool === '' || in_array($officialTransitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
-    $officialTransitionTool = 'current_term';
-} elseif ($officialTransitionTool === 'create_new_term') {
-    $officialTransitionTool = 'create_new_term';
-} else {
-    $officialTransitionTool = 'current_term';
-}
 
 $appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if (!in_array($appointmentTool, ['tracker', 'settings', 'schedule'], true)) {
@@ -435,7 +428,6 @@ $isPersonnelManagementMainNavActive = $sbMainNavActiveWithoutSubtab($isPersonnel
 ]);
 $isOfficialTransitionMainNavActive = $sbMainNavActiveWithoutSubtab($isOfficialTransitionActive, [
     $sbCan('official_transition') && $current === 'OfficialTransitions.php' && $officialTransitionTool === 'current_term',
-    $sbCan('official_transition') && $current === 'OfficialTransitions.php' && $officialTransitionTool === 'create_new_term',
 ]);
 
 $sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
@@ -1953,56 +1945,48 @@ if ($sbSidebarUserId !== '') {
       </li>
       <?php endif; ?>
       <?php if ($sbCan('official_records_management') || $sbCan('official_transition')): ?>
-      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Barangay Official Governance</li>
-      <?php if ($sbCan('official_records_management')): ?>
+      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Barangay Officials</li>
       <li class="mb-1">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>"
-           style="<?= $current == 'OfficialsManagement.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+        <button type="button"
+                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBarangayOfficialMgmtActive ? 'active' : '' ?> <?= $isBarangayOfficialMgmtActive ? '' : 'collapsed' ?>"
+                data-sidebar-toggle="collapse"
+                data-sidebar-target="#officialworkspace-collapse"
+                aria-controls="officialworkspace-collapse"
+                aria-expanded="<?= $isBarangayOfficialMgmtActive ? 'true' : 'false' ?>">
           <span class="sidebar-icon-wrap">
             <i class="fas fa-user-shield"></i>
           </span>
-          <span class="sidebar-button-label">Official Management</span>
-        </a>
-      </li>
-      <?php endif; ?>
-      <?php if ($sbCan('official_transition')): ?>
-      <li class="mb-1">
-        <button type="button"
-                class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionMainNavActive ? 'active' : '' ?> <?= $isOfficialTransitionActive ? '' : 'collapsed' ?>"
-                data-sidebar-toggle="collapse"
-                data-sidebar-target="#officialtransition-collapse"
-                aria-controls="officialtransition-collapse"
-                aria-expanded="<?= $isOfficialTransitionActive ? 'true' : 'false' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-right-left"></i>
-          </span>
-          <span class="sidebar-button-label">Official Transition</span>
+          <span class="sidebar-button-label">Officials &amp; Access</span>
         </button>
-        <div class="collapse <?= $isOfficialTransitionActive ? 'show' : '' ?>" id="officialtransition-collapse">
+        <div class="collapse <?= $isBarangayOfficialMgmtActive ? 'show' : '' ?>" id="officialworkspace-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('official_transition')): ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=seat')) ?>"
-                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' && $officialTransitionPanel !== 'access' ? 'active' : '' ?>">
-                Seat Assignment
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?panel=seat')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionPanel !== 'access' ? 'active' : '' ?>">
+                Seats &amp; Onboarding
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('official_records_management')): ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term&panel=access')) ?>"
-                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' && $officialTransitionPanel === 'access' ? 'active' : '' ?>">
-                Official Access Control
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
+                Official Records
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('official_transition')): ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=create_new_term')) ?>"
-                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'create_new_term' ? 'active' : '' ?>">
-                Governance Cycle
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?panel=access')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionPanel === 'access' ? 'active' : '' ?>">
+                Access Templates
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
-      <?php endif; ?>
       <?php endif; ?>
       <?php endif; ?>
 
