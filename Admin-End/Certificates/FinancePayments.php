@@ -1658,6 +1658,9 @@ if ($financeSection === 'fees') {
   </main>
 </div>
 
+<script>
+window.DOCUMENT_WORKFLOW_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+</script>
 <?php if ($financeSection === 'tracker' || $financeSection === 'fees'): ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <?php endif; ?>
@@ -1864,7 +1867,7 @@ if ($financeSection === 'fees') {
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260805-tracker-all-rows"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260815-workflow-csrf-2"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
@@ -2098,6 +2101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const body = new FormData();
       body.append('action', 'delete_fee_type');
       body.append('fee_type_id', id);
+      body.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Delete failed.');
@@ -2131,6 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
       body.append('fee_name', name);
       body.append('default_amount', String(amount));
       body.append('status', active ? 'approved' : 'rejected');
+      body.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Save failed.');
@@ -2239,6 +2244,7 @@ document.addEventListener('DOMContentLoaded', () => {
       fd.append('action', 'process_fee_change_request');
       fd.append('fee_type_id', id);
       fd.append('decision', 'approved');
+      fd.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Approve failed.');
@@ -2254,6 +2260,7 @@ document.addEventListener('DOMContentLoaded', () => {
       fd.append('fee_type_id', id);
       fd.append('decision', 'rejected');
       fd.append('review_notes', reviewNotes);
+      fd.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Reject failed.');

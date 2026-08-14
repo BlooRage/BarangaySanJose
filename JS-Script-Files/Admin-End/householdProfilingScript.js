@@ -275,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    new bootstrap.Modal(document.getElementById("modal-viewHousehold"), {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("modal-viewHousehold"), {
       backdrop: "static",
       keyboard: true
     }).show();

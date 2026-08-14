@@ -1,5 +1,16 @@
 <?php
-header('Content-Type: application/json');
+declare(strict_types=1);
+
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    header('Allow: POST');
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Method not allowed.']);
+    exit;
+}
+
 require_once '../General/connection.php';
 require_once '../General/sendSMS.php';
 require_once '../General/uniqueIDGenerate.php';
@@ -129,14 +140,14 @@ function otpHandlerUserPhone10ByUserId(mysqli $conn, string $userId): string
 }
 
 // ===== Validate input =====
-if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
+if (!is_string($_POST['recipient'] ?? null) || !is_string($_POST['purpose'] ?? null)) {
     echo json_encode(['success' => false, 'error' => 'Missing parameters']);
     exit;
 }
 
-$rawRecipient = trim($_POST['recipient']);
-$purpose      = trim($_POST['purpose']);
-$user_id      = $_POST['user_id'] ?? null;
+$rawRecipient = trim((string)$_POST['recipient']);
+$purpose      = trim((string)$_POST['purpose']);
+$user_id      = is_string($_POST['user_id'] ?? null) ? trim((string)$_POST['user_id']) : null;
 $captchaAnswer = trim((string)($_POST['captcha_answer'] ?? ''));
 $recaptchaToken = trim((string)($_POST['recaptcha_token'] ?? ''));
 
@@ -253,7 +264,7 @@ if ($purpose === 'guest_appointment') {
     }
 }
 
-if ($purpose === 'signup' || $purpose === 'forgot' || $purpose === 'inactive') {
+if ($purpose === 'signup' || $purpose === 'forgot' || $purpose === 'inactive' || $purpose === 'admin_2fa') {
     $recentOtpRequest = otpHandlerRecentOtpRequest($conn, $recipient_db, $purpose, 60);
     if (is_array($recentOtpRequest)) {
         $remainingSeconds = (int)($recentOtpRequest['remaining_seconds'] ?? 0);

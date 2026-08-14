@@ -4,11 +4,16 @@ session_start();
 require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/security.php";
+require_once "../General/adminModulePermissions.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/uploadLimits.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 verifyCsrfToken(false);
+if (!amp_current_user_has_module_permission($conn, 'blotter_log_new_incident')) {
+    http_response_code(403);
+    exit('Access denied.');
+}
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 function str_field($value): ?string {

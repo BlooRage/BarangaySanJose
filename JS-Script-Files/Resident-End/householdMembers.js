@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
     const grid = document.getElementById("householdMembersGrid");
     const empty = document.getElementById("householdMembersEmpty");
     if (!grid) return;
@@ -235,13 +236,19 @@ document.addEventListener("DOMContentLoaded", () => {
             if (infoMemberId) {
                 res = await fetch("../PhpFiles/Resident-End/household_member_info_action.php", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+                    },
                     body: JSON.stringify({ household_member_id: infoMemberId }),
                 });
             } else {
                 res = await fetch("../PhpFiles/Resident-End/household_member_action.php", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+                    },
                     body: JSON.stringify({ action: "remove", resident_id: residentId }),
                 });
             }
@@ -264,7 +271,10 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch("../PhpFiles/Resident-End/household_member_action.php", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+                },
                 body: JSON.stringify({ action: "leave" }),
             });
             const data = await res.json().catch(() => ({}));

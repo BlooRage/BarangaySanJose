@@ -4,8 +4,12 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/adminModulePermissions.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
+amp_require_json_module_permission($conn, 'resident_archive', [
+    'error' => 'You do not have permission to access the resident archive.',
+]);
 
 $sql = "
     SELECT

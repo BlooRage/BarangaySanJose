@@ -782,8 +782,7 @@ $positionDisplayLabel = ap_format_position_label(
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../JS-Script-Files/modalHandler.js"></script>
-<script src="../JS-Script-Files/Resident-End/profileChangePassword.js"></script>
+<script src="../JS-Script-Files/Resident-End/profileChangePassword.js?v=20260815-modal-flow-1"></script>
 <script src="../JS-Script-Files/Resident-End/profileChangePhone.js"></script>
 <script src="../JS-Script-Files/Resident-End/profileChangeEmail.js"></script>
 <script>

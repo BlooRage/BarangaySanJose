@@ -5,9 +5,16 @@ require_once "../General/connection.php";
 require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/complaintTypeDetails.php";
 require_once "../General/security.php";
+require_once "../General/adminModulePermissions.php";
 require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
+amp_require_json_module_permission($conn, 'blotter_review_queue', [
+    'success' => false,
+    'message' => 'You do not have permission to access the blotter review queue.',
+    'items' => null,
+    'detail' => null,
+]);
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 header('Content-Type: application/json; charset=utf-8');

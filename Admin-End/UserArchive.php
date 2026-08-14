@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/includes/admin_guard.php";
+requireRoleSession(['SuperAdmin'], false);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,9 +47,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php
-      require_once "../PhpFiles/General/connection.php";
-      require_once "includes/admin_guard.php";
-      requireRoleSession(['SuperAdmin'], false);
       include "includes/sidebar.php";
     ?>
 
@@ -117,6 +115,9 @@ require_once __DIR__ . "/includes/admin_guard.php";
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="../JS-Script-Files/Admin-End/archiveUserScript.js?v=20260815-1"></script>
+  <script>
+    window.ADMIN_USER_ARCHIVE_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES) ?>;
+  </script>
+  <script src="../JS-Script-Files/Admin-End/archiveUserScript.js?v=20260815-2"></script>
 </body>
 </html>

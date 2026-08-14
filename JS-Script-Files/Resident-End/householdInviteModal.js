@@ -12,6 +12,17 @@ document.addEventListener("DOMContentLoaded", () => {
         householdMemberSubmitSuccessModalEl && window.bootstrap?.Modal
             ? bootstrap.Modal.getOrCreateInstance(householdMemberSubmitSuccessModalEl)
             : null;
+    const showSuccessAfterInviteCloses = () => {
+        const currentModal = getHouseholdInviteModal();
+        const successModal = getHouseholdMemberSubmitSuccessModal();
+        if (!successModal) return;
+        if (!currentModal || !householdInviteModalEl?.classList.contains("show")) {
+            successModal.show();
+            return;
+        }
+        householdInviteModalEl.addEventListener("hidden.bs.modal", () => successModal.show(), { once: true });
+        currentModal.hide();
+    };
     let pendingBirthdateModalRestore = false;
     let birthdateWindowFocusHandlerBound = false;
     const restoreHouseholdInviteModal = () => {
@@ -337,6 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 const res = await fetch("../PhpFiles/Resident-End/household_member_add.php", {
                     method: "POST",
+                    headers: csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {},
                     body: formData,
                 });
                 const data = await res.json().catch(() => ({}));
@@ -359,8 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     successMessageEl.textContent = data.message || "Household member verification request submitted. Please wait for admin review.";
                 }
                 window.dispatchEvent(new CustomEvent("household:updated"));
-                getHouseholdInviteModal()?.hide();
-                getHouseholdMemberSubmitSuccessModal()?.show();
+                showSuccessAfterInviteCloses();
             } catch (err) {
                 if (result) {
                     result.className = "small mt-2 text-danger";

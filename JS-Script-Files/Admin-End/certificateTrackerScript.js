@@ -6,6 +6,7 @@
     return window.location.pathname.slice(0, idx);
   })();
   const endpoint = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php`;
+  const workflowCsrfToken = String(window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('searchInput');
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
@@ -6065,6 +6066,10 @@
       headers.set('Accept', 'application/json');
     }
     headers.set('X-Requested-With', 'XMLHttpRequest');
+    const requestMethod = String(options.method || 'GET').toUpperCase();
+    if (requestMethod !== 'GET' && requestMethod !== 'HEAD' && workflowCsrfToken) {
+      headers.set('X-CSRF-TOKEN', workflowCsrfToken);
+    }
 
     const res = await fetch(url, { ...options, headers, credentials: 'same-origin' });
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
@@ -6315,6 +6320,7 @@
       .filter(matchesSearchFilter);
 
     itemById = new Map(items.map((it) => [String(it.request_id), it]));
+    bindFeeCatalogModal();
     if (!items.length) {
       tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No requests found.</td></tr>';
       return;
@@ -6323,7 +6329,6 @@
     tableBody.innerHTML = items.map(rowHtml).join('');
     applyFinanceColumnVisibility();
     bindActionButtons();
-    bindFeeCatalogModal();
   }
 
   async function load(options = {}) {
@@ -7013,8 +7018,8 @@
           <td>₱${Number(ft.default_amount).toFixed(2)}</td>
           <td><span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">${ft.status === 'approved' ? 'Active' : esc(ft.status)}</span></td>
           <td class="text-end">
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="editFeeType(${ft.fee_type_id},'${esc(ft.fee_name)}',${ft.default_amount},${ft.is_active})">Edit</button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteFeeType(${ft.fee_type_id},'${esc(ft.fee_name)}')">Delete</button>
+            <button type="button" class="btn btn-sm btn-outline-primary me-1" data-fee-catalog-action="edit" data-fee-type-id="${esc(ft.fee_type_id)}" data-fee-name="${esc(ft.fee_name)}" data-fee-amount="${esc(ft.default_amount)}" data-fee-active="${esc(ft.is_active)}">Edit</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-fee-catalog-action="delete" data-fee-type-id="${esc(ft.fee_type_id)}" data-fee-name="${esc(ft.fee_name)}">Delete</button>
           </td>
         </tr>`).join('');
     } catch (_) {
@@ -7066,6 +7071,21 @@
   function bindFeeCatalogModal() {
     if (feeCatalogModalBound) return;
     feeCatalogModalBound = true;
+    const catalogTableBody = document.getElementById('feeCatalogTableBody');
+    catalogTableBody?.addEventListener('click', (event) => {
+      if (!(event.target instanceof Element)) return;
+      const trigger = event.target.closest('[data-fee-catalog-action]');
+      if (!trigger || !catalogTableBody.contains(trigger)) return;
+
+      const action = trigger.dataset.feeCatalogAction || '';
+      const id = trigger.dataset.feeTypeId || '';
+      const name = trigger.dataset.feeName || '';
+      if (action === 'edit') {
+        window.editFeeType(id, name, trigger.dataset.feeAmount || '0', trigger.dataset.feeActive || '0');
+      } else if (action === 'delete') {
+        window.deleteFeeType(id, name);
+      }
+    });
     const saveBtn = document.getElementById('feeCatalogSaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', saveFeeCatalogForm);
     const submitBtn = document.getElementById('feeTaggingSubmitBtn');
@@ -11829,6 +11849,7 @@
         fd.append('proposed_fee_name', name);
         fd.append('proposed_amount', String(amount));
         fd.append('notes', notes);
+        fd.append('csrf_token', workflowCsrfToken);
         const res  = await fetch(API, { method: 'POST', body: fd });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Submit failed.');
@@ -11955,6 +11976,7 @@
         fd.append('current_amount', current);
         fd.append('proposed_amount', String(proposed));
         fd.append('notes', notes);
+        fd.append('csrf_token', workflowCsrfToken);
         const res  = await fetch(API, { method: 'POST', body: fd });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Submit failed.');
@@ -12000,7 +12022,7 @@
           <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
           <td class="text-end">
             ${r.status === 'pending'
-              ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="fcrCancelRequest(${r.fee_type_id})">Cancel</button>`
+              ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" data-fcr-action="cancel" data-fee-type-id="${esc(r.fee_type_id)}">Cancel</button>`
               : '—'}
           </td>
         </tr>`).join('');
@@ -12045,7 +12067,7 @@
           <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
           <td class="text-end">
             ${String(r.status || '').trim().toLowerCase() === 'pending'
-              ? `<div class="compact-table-actions justify-content-end"><button class="btn btn-sm compact-table-btn btn-danger" onclick="fcrOpenCancelModal(${r.fee_type_id})">Cancel</button></div>`
+              ? `<div class="compact-table-actions justify-content-end"><button type="button" class="btn btn-sm compact-table-btn btn-danger" data-fcr-action="cancel" data-fee-type-id="${esc(r.fee_type_id)}">Cancel</button></div>`
               : '-'}
           </td>
         </tr>`).join('');
@@ -12087,11 +12109,19 @@
       }
     };
 
+    document.getElementById('fcrListBody')?.addEventListener('click', (event) => {
+      if (!(event.target instanceof Element)) return;
+      const trigger = event.target.closest('[data-fcr-action="cancel"]');
+      const feeTypeId = trigger?.dataset.feeTypeId || '';
+      if (feeTypeId) window.fcrOpenCancelModal(feeTypeId);
+    });
+
     async function fcrCancelRequest(id) {
       try {
         const fd = new FormData();
         fd.append('action', 'cancel_fee_change_request');
         fd.append('fee_type_id', id);
+        fd.append('csrf_token', workflowCsrfToken);
         const res  = await fetch(API, { method: 'POST', body: fd });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Cancel failed.');

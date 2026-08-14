@@ -69,10 +69,9 @@ if ($residentAddressPreview === '') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <script src="../JS-Script-Files/modalHandler.js" defer></script>
     <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
-    <script src="../JS-Script-Files/Resident-End/householdMembers.js?v=20260328-2" defer></script>
-    <script src="../JS-Script-Files/Resident-End/householdInviteModal.js?v=20260328-3" defer></script>
+    <script src="../JS-Script-Files/Resident-End/householdMembers.js?v=20260815-1" defer></script>
+    <script src="../JS-Script-Files/Resident-End/householdInviteModal.js?v=20260815-1" defer></script>
     <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <style>

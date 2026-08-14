@@ -432,7 +432,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       visibility: hidden;
       pointer-events: none;
       transition: opacity 0.18s ease, visibility 0.18s ease;
-      z-index: 2055;
+      z-index: 2070;
     }
     .officials-confirm-modal.show {
       opacity: 1;
@@ -1208,6 +1208,6 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
   </script>
   <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260812-1"></script>
+  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260815-modal-focus-1"></script>
 </body>
 </html>

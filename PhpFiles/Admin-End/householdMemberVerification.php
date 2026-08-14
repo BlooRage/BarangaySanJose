@@ -4,10 +4,15 @@ declare(strict_types=1);
 session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/adminModulePermissions.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/householdMemberVerification.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
+amp_require_json_module_permission($conn, 'household_member_verification', [
+    'success' => false,
+    'message' => 'You do not have permission to review household member requests.',
+]);
 
 header('Content-Type: application/json; charset=utf-8');
 

@@ -101,7 +101,6 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/DocumentUpload.css">
-    <script src="../JS-Script-Files/modalHandler.js"></script>
 </head>
 <body>
 <div class="page-wrapper d-flex" style="min-height: 100vh;">
@@ -116,6 +115,7 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                     <div id="uploadRequirementsNotice" class="alert alert-info d-none small" role="alert"></div>
 
                     <form id="documentUploadForm" method="POST" action="../PhpFiles/Resident-End/residentDocumentUpload.php" enctype="multipart/form-data">
+                        <?= csrfTokenField() ?>
                         <input type="hidden" name="resubmit_mode" value="<?= htmlspecialchars($resubmitMode, ENT_QUOTES, 'UTF-8') ?>">
                         <div id="proofRequirementSection">
                         <div class="row g-3 mb-4" id="proofTypeWrapper">

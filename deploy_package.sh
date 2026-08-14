@@ -13,6 +13,24 @@ zip -r "$OUT_DIR/$OUT_FILE" . \
   -x ".gitignore" \
   -x ".DS_Store" \
   -x "desktop.ini" \
+  -x ".env" \
+  -x ".env.*" \
+  -x "config.runtime.php" \
+  -x "config.runtime.local.php" \
+  -x "PhpFiles/General/runtime.php" \
+  -x "PhpFiles/General/runtime.local.php" \
+  -x "scripts" \
+  -x "scripts/*" \
+  -x "./scripts" \
+  -x "./scripts/*" \
+  -x "QA" \
+  -x "QA/*" \
+  -x "./QA" \
+  -x "./QA/*" \
+  -x "tmp_*" \
+  -x "tmp_*/*" \
+  -x "./tmp_*" \
+  -x "./tmp_*/*" \
   -x "UnifiedFileAttachment" \
   -x "UnifiedFileAttachment/*" \
   -x "dist/*"

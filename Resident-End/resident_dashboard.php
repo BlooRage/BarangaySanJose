@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once __DIR__ . "/../PhpFiles/Admin-End/contentStore.php";
@@ -183,7 +183,7 @@ $dashboardCards = [
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260815-modal-layer-1">
   <style>
     .verify-cta-card {
       position: relative;

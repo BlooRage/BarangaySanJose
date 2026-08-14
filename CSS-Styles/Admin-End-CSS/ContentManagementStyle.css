@@ -1088,13 +1088,13 @@
 .announcement-create-shell .note-modal,
 .announcement-shell .note-modal,
 body .note-modal {
-  z-index: 2006 !important;
+  z-index: 2080 !important;
 }
 
 .announcement-create-shell .note-modal-backdrop,
 .announcement-shell .note-modal-backdrop,
 body .note-modal-backdrop {
-  z-index: 2005 !important;
+  z-index: 2070 !important;
 }
 
 .announcement-create-shell .note-popover,
@@ -1106,7 +1106,7 @@ body .note-modal-backdrop {
 body .note-popover,
 body .note-dropdown-menu,
 body .dropdown-menu.note-check {
-  z-index: 2007 !important;
+  z-index: 2081 !important;
 }
 
 

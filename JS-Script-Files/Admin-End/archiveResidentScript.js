@@ -5,6 +5,14 @@ document.addEventListener("DOMContentLoaded", () => {
 	    const btnRefreshTable = document.getElementById("btnArchiveRefresh");
     const entriesPerPageInput = document.getElementById("archiveEntriesPerPageInput");
     const paginationEl = document.getElementById("archivePagination");
+    const csrfToken = String(window.ADMIN_RESIDENT_ARCHIVE_CSRF_TOKEN || "").trim();
+
+    const escapeHtml = (value) => String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 
     let allArchivedResidents = [];
     let activeFilters = {};
@@ -140,28 +148,42 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        pageRows.forEach(resident => {
+        tableBody.innerHTML = pageRows.map((resident) => {
+            const residentId = String(resident.resident_id ?? "");
             const archivedDate = resident.archived_at ?? "N/A";
-            tableBody.innerHTML += `
+            return `
                 <tr>
-                    <td>${resident.resident_id}</td>
-                    <td>${resident.full_name}</td>
+                    <td>${escapeHtml(residentId)}</td>
+                    <td>${escapeHtml(resident.full_name)}</td>
                     <td><span class="badge bg-secondary">Archived</span></td>
-                    <td>${archivedDate}</td>
+                    <td>${escapeHtml(archivedDate)}</td>
                     <td>
-                        <button class="btn btn-sm btn-primary" 
-                            onclick="restoreResident(${resident.resident_id})">
+                        <button type="button" class="btn btn-sm btn-primary"
+                            data-archive-action="restore" data-resident-id="${escapeHtml(residentId)}">
                             Restore
                         </button>
-                        <button class="btn btn-sm btn-danger ms-1"
-                            onclick="deleteResident(${resident.resident_id})">
+                        <button type="button" class="btn btn-sm btn-danger ms-1"
+                            data-archive-action="delete" data-resident-id="${escapeHtml(residentId)}">
                             Delete
                         </button>
                     </td>
                 </tr>
             `;
-        });
+        }).join("");
     }
+
+    document.getElementById("tableBody")?.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest("[data-archive-action][data-resident-id]");
+        if (!button) return;
+        const residentId = String(button.dataset.residentId || "").trim();
+        if (!residentId) return;
+        if (button.dataset.archiveAction === "restore") {
+            window.restoreResident(residentId);
+        } else if (button.dataset.archiveAction === "delete") {
+            window.deleteResident(residentId);
+        }
+    });
 
     function renderPagination(totalPages, totalRows) {
         if (!paginationEl) return;
@@ -212,35 +234,48 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.fetchArchivedResidents = fetchArchivedResidents;
+    window.ADMIN_RESIDENT_ARCHIVE_CSRF_TOKEN = csrfToken;
     scheduleAutoRefresh();
 });
 
 async function restoreResident(residentId) {
     if (!(await UniversalModal.confirm("Restore this resident and the linked user account?", { confirmLabel: "Restore", confirmClass: "btn btn-success" }))) return;
 
-    fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restore", resident_id: residentId })
-    })
-    .then(res => res.json())
-    .then(data => {
+    try {
+        const res = await fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": String(window.ADMIN_RESIDENT_ARCHIVE_CSRF_TOKEN || ""),
+            },
+            body: JSON.stringify({ action: "restore", resident_id: residentId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.message || "Unable to restore the resident.");
         alert(data.message || "Resident restored.");
         if (window.fetchArchivedResidents) window.fetchArchivedResidents();
-    });
+    } catch (error) {
+        alert(error?.message || "Unable to restore the resident.");
+    }
 }
 
 async function deleteResident(residentId) {
     if (!(await UniversalModal.confirm("Permanently delete this resident? This cannot be undone.", { confirmLabel: "Delete", confirmClass: "btn btn-danger" }))) return;
 
-    fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", resident_id: residentId })
-    })
-    .then(res => res.json())
-    .then(data => {
+    try {
+        const res = await fetch("../PhpFiles/Admin-End/archiveResidentActions.php", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": String(window.ADMIN_RESIDENT_ARCHIVE_CSRF_TOKEN || ""),
+            },
+            body: JSON.stringify({ action: "delete", resident_id: residentId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.message || "Unable to delete the resident.");
         alert(data.message || "Resident deleted.");
         if (window.fetchArchivedResidents) window.fetchArchivedResidents();
-    });
+    } catch (error) {
+        alert(error?.message || "Unable to delete the resident.");
+    }
 }

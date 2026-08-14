@@ -58,9 +58,9 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix" />
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260801-vertical-center2" />
-    <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
+    <link id="universalModalStylesheet" rel="stylesheet" href="../CSS-Styles/modalStyle.css?v=20260815-02" />
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" defer></script>
     <script>
       window.APP_LOGIN_RESOLVE_REDIRECT = <?= json_encode($serviceAwareRedirect) ?>;
       window.APP_LOGIN_AUTH_MODE = <?= json_encode($requestedAuthMode) ?>;
@@ -71,7 +71,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
     <!-- ✅ OLD ORDER (keep this) -->
     <script src="../JS-Script-Files/loginScripts.js?v=20260801-admin-2fa-fix2" defer></script>
-    <script src="../JS-Script-Files/modalHandler.js?v=20260801-02" defer></script>
+    <script src="../JS-Script-Files/modalHandler.js?v=20260815-02" defer></script>
   </head>
 
   <body data-cms-page="login" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">

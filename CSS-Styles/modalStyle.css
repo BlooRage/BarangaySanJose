@@ -27,6 +27,11 @@
     z-index: 2010;
 }
 
+.uniform-modal.um-nested-modal {
+    z-index: 2080 !important;
+    background: rgba(15, 23, 42, 0.48);
+}
+
 .uniform-modal .modal-content {
     background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
     border: 1px solid rgba(222, 113, 12, 0.14);
@@ -35,18 +40,18 @@
     overflow: hidden;
 }
 
-#umContent .modal-header {
+.uniform-modal .modal-header {
     color: var(--um-text);
     padding: 22px 26px 0;
 }
 
-#umContent .modal-title,
+.uniform-modal .modal-title,
 .modal .modal-title,
 .modal .modal-header {
     color: var(--um-text);
 }
 
-#umContent .modal-title {
+.uniform-modal .modal-title {
     font-size: 1.18rem;
     font-weight: 800;
     letter-spacing: -0.02em;
@@ -61,20 +66,20 @@
     transition: transform 0.18s ease-out, opacity 0.18s ease-out;
 }
 
-#umContent hr {
+.uniform-modal .modal-content > hr {
     border-color: var(--um-border);
     margin: 0 24px;
     opacity: 1;
 }
 
-#umContent .modal-body {
+.uniform-modal .modal-body {
     color: var(--um-text);
     font-size: 0.97rem;
     line-height: 1.6;
     padding: 24px 26px 10px;
 }
 
-#umContent .modal-footer {
+.uniform-modal .modal-footer {
     padding: 10px 26px 24px;
 }
 

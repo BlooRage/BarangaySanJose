@@ -2,6 +2,16 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Robots-Tag: noindex, nofollow');
+
+$requestMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+if (!in_array($requestMethod, ['GET', 'HEAD'], true)) {
+    header('Allow: GET, HEAD');
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
+    exit;
+}
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
@@ -71,6 +81,9 @@ $verificationCode = trim((string)($_GET['vc'] ?? ''));
 if ($requestId === '') {
     ti_json(422, ['success' => false, 'message' => 'Missing request_id.']);
 }
+if (strlen($requestId) > 64 || strlen($verificationCode) > 128) {
+    ti_json(422, ['success' => false, 'message' => 'Invalid verification link.']);
+}
 
 $statusColumn = dr_request_status_column($conn);
 if ($statusColumn === null) {
@@ -92,6 +105,9 @@ $selectDocumentValidity = dr_column_exists($conn, 'documentrequesttbl', 'documen
 $selectReleaseTimestamp = dr_column_exists($conn, 'documentrequesttbl', 'release_timestamp')
     ? 'release_timestamp'
     : (dr_column_exists($conn, 'documentrequesttbl', 'ready_at') ? 'ready_at AS release_timestamp' : "'' AS release_timestamp");
+$selectIssuedFilePath = dr_column_exists($conn, 'documentrequesttbl', 'issued_file_path')
+    ? 'issued_file_path'
+    : "'' AS issued_file_path";
 
 $stmt = $conn->prepare("
     SELECT
@@ -102,7 +118,8 @@ $stmt = $conn->prepare("
         (SELECT sl.status_name FROM statuslookuptbl sl WHERE sl.status_id = documentrequesttbl.{$statusColumn} LIMIT 1) AS status_lookup_name,
         {$selectRequestTimestamp},
         {$selectDocumentValidity},
-        {$selectReleaseTimestamp}
+        {$selectReleaseTimestamp},
+        {$selectIssuedFilePath}
     FROM documentrequesttbl
     WHERE request_id = ?
     LIMIT 1
@@ -186,11 +203,23 @@ if ($statusMappedStage !== null) {
 }
 
 $expectedCode = trim((string)($row['verification_code'] ?? ''));
+$legacyVerification = false;
 if ($expectedCode === '') {
-    $expectedCode = (string)$row['request_id'];
-}
+    // Preserve old issued-document QR links without treating every predictable
+    // request ID as authorization to retrieve a resident's personal details.
+    $legacyStage = strtolower(trim((string)($row['stage'] ?? '')));
+    $hasIssuedArtifact = trim((string)($row['certificate_number'] ?? '')) !== ''
+        || trim((string)($row['issued_file_path'] ?? '')) !== '';
+    $isIssuedStage = in_array($legacyStage, ['ready_for_claim', 'completed'], true);
+    $legacyVerification = $verificationCode !== ''
+        && hash_equals(strtolower((string)$row['request_id']), strtolower($verificationCode))
+        && $hasIssuedArtifact
+        && $isIssuedStage;
 
-if ($verificationCode === '' || strcasecmp($verificationCode, $expectedCode) !== 0) {
+    if (!$legacyVerification) {
+        ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
+    }
+} elseif ($verificationCode === '' || !hash_equals(strtolower($expectedCode), strtolower($verificationCode))) {
     ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
 }
 
@@ -228,25 +257,44 @@ if ($validity === '') {
     $validity = trim((string)($row['completed_at'] ?? $row['ready_at'] ?? $row['release_timestamp'] ?? ''));
 }
 
+$responseData = [
+    'request_id' => (string)$row['request_id'],
+    'or_number' => (string)($row['or_number'] ?? ''),
+    'certificate_number' => (string)($row['certificate_number'] ?? ''),
+    'status' => ti_stage_label((string)($row['stage'] ?? 'submitted')),
+    'status_raw' => (string)($row['stage'] ?? 'submitted'),
+    'reason' => (string)($row['status_remarks'] ?? ''),
+    'document_type' => $documentType,
+    'full_name' => $fullName,
+    'purpose' => $purpose,
+    'address' => $address,
+    'amount' => $row['amount'] !== null ? (float)$row['amount'] : null,
+    'validity' => $validity,
+    'submitted_at' => (string)($row['submitted_at'] ?? ''),
+    'hard_copy_status' => (string)($row['hard_copy_status'] ?? ''),
+    'hard_copy_status_label' => (string)($row['hard_copy_status_label'] ?? ''),
+    'hard_copy_notice' => (string)($row['hard_copy_notice'] ?? ''),
+    'legacy_verification' => $legacyVerification,
+];
+
+if ($legacyVerification) {
+    // Keep the existing response shape for old QR pages, but expose only the
+    // minimum non-personal facts needed to confirm an issued record.
+    $responseData['or_number'] = '';
+    $responseData['reason'] = '';
+    $responseData['full_name'] = '';
+    $responseData['purpose'] = '';
+    $responseData['address'] = '';
+    $responseData['amount'] = null;
+    $responseData['submitted_at'] = '';
+    $responseData['hard_copy_status'] = '';
+    $responseData['hard_copy_status_label'] = '';
+    $responseData['hard_copy_notice'] = '';
+    $responseData['verification_notice'] = 'Legacy verification link. Reissue this document to use a secure verification code.';
+}
+
 ti_json(200, [
     'success' => true,
     'verified' => true,
-    'data' => [
-        'request_id' => (string)$row['request_id'],
-        'or_number' => (string)($row['or_number'] ?? ''),
-        'certificate_number' => (string)($row['certificate_number'] ?? ''),
-        'status' => ti_stage_label((string)($row['stage'] ?? 'submitted')),
-        'status_raw' => (string)($row['stage'] ?? 'submitted'),
-        'reason' => (string)($row['status_remarks'] ?? ''),
-        'document_type' => $documentType,
-        'full_name' => $fullName,
-        'purpose' => $purpose,
-        'address' => $address,
-        'amount' => $row['amount'] !== null ? (float)$row['amount'] : null,
-        'validity' => $validity,
-        'submitted_at' => (string)($row['submitted_at'] ?? ''),
-        'hard_copy_status' => (string)($row['hard_copy_status'] ?? ''),
-        'hard_copy_status_label' => (string)($row['hard_copy_status_label'] ?? ''),
-        'hard_copy_notice' => (string)($row['hard_copy_notice'] ?? ''),
-    ],
+    'data' => $responseData,
 ]);

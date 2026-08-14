@@ -648,6 +648,87 @@ if (!function_exists('amp_permission_key_allowed')) {
     }
 }
 
+if (!function_exists('amp_current_user_has_module_permission')) {
+    /**
+     * Resolve a backend permission against the same access profile used by the
+     * admin page guard. SuperAdmin sessions intentionally bypass the database
+     * lookup so lightweight/cached endpoints keep their fast path.
+     */
+    function amp_current_user_has_module_permission(
+        ?mysqli $conn,
+        string $permissionKey,
+        ?string $userId = null,
+        ?string $sessionRole = null
+    ): bool {
+        $permissionKey = trim($permissionKey);
+        if ($permissionKey === '' || amp_get_permission_meta($permissionKey) === null) {
+            return false;
+        }
+
+        $resolvedRole = trim((string)($sessionRole ?? ($_SESSION['role'] ?? '')));
+        if (amp_normalize_storage_role($resolvedRole) === 'SuperAdmin') {
+            return true;
+        }
+
+        $resolvedUserId = trim((string)($userId ?? ($_SESSION['user_id'] ?? '')));
+        if (!$conn instanceof mysqli || $resolvedUserId === '') {
+            return false;
+        }
+
+        try {
+            $allowedPermissions = amp_get_allowed_permission_keys($conn, $resolvedUserId, $resolvedRole);
+            return amp_permission_key_allowed($allowedPermissions, $permissionKey);
+        } catch (Throwable $e) {
+            error_log('[adminModulePermissions] Permission lookup failed for ' . $permissionKey . ': ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('amp_require_json_module_permission')) {
+    /**
+     * Fail closed with a JSON response suitable for fetch/AJAX endpoints.
+     * Callers may provide their existing failure shape (for example `error`
+     * instead of `message`) so adding the guard does not alter API contracts.
+     */
+    function amp_require_json_module_permission(
+        ?mysqli $conn,
+        string $permissionKey,
+        array $deniedPayload = [],
+        int $statusCode = 403
+    ): void {
+        if (amp_current_user_has_module_permission($conn, $permissionKey)) {
+            return;
+        }
+
+        if ($deniedPayload === []) {
+            $deniedPayload = [
+                'success' => false,
+                'message' => 'You do not have permission to access this module.',
+            ];
+        }
+        if (array_key_exists('success', $deniedPayload)) {
+            $deniedPayload['success'] = false;
+        }
+        if (!array_key_exists('message', $deniedPayload) && !array_key_exists('error', $deniedPayload)) {
+            $deniedPayload['message'] = 'You do not have permission to access this module.';
+        }
+
+        if ($statusCode < 400 || $statusCode > 599) {
+            $statusCode = 403;
+        }
+        http_response_code($statusCode);
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+            header('Cache-Control: no-store');
+        }
+
+        $encoded = json_encode($deniedPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo is_string($encoded) ? $encoded : '{"success":false,"message":"Access denied."}';
+        exit;
+    }
+}
+
 if (!function_exists('amp_column_exists')) {
     function amp_column_exists(mysqli $conn, string $table, string $column): bool
     {
@@ -1673,6 +1754,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'AdminDashboard.php' => 'dashboard',
             'BarangayStatistics.php' => 'dashboard',
             'AppointmentTracker.php' => 'appointments',
+            'WalkInAppointmentForm.php' => 'appointments',
             'ResidentTracker.php' => 'resident_masterlist',
             'ResidentMasterlist.php' => 'resident_masterlist',
             'EditRequests.php' => 'resident_edit_requests',
@@ -1684,6 +1766,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'AreaStatistics.php' => 'area_statistics_summary',
             'AreaProfile.php' => amp_area_value_to_key((string)($_GET['area'] ?? '')),
             'BusinessMonitoring.php' => 'business_monitoring',
+            'EstablishmentMonitoring.php' => 'business_monitoring',
             'BlotterForm.php' => 'blotter_log_new_incident',
             'BlotterTracker.php' => 'blotter_tracker',
             'ReviewQueue.php' => 'blotter_review_queue',
@@ -1743,6 +1826,13 @@ if (!function_exists('amp_resolve_certificate_tracker_permission_key')) {
         $entry = strtolower(trim((string)($_GET['entry'] ?? '')));
         $stage = strtolower(trim((string)($_GET['stage'] ?? '')));
         $filterDocument = strtolower(trim((string)($_GET['filter_document'] ?? '')));
+        $feeScope = strtolower(trim((string)($_GET['fee_scope'] ?? '')));
+
+        if ($tab === 'fees') {
+            return $feeScope === 'monitoring'
+                ? 'clearance_issuance'
+                : 'certificate_issuance';
+        }
 
         if ($tab === 'manual' && $document === 'barangay_id') {
             return 'id_issuance_manual';

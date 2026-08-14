@@ -653,7 +653,7 @@ $contentToolsDescription = $isNewsManagementView
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260722-announcement-tracker-tabs-4">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260815-modal-layer-1">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
   <style>
@@ -2215,8 +2215,39 @@ $contentToolsDescription = $isNewsManagementView
       let requiresDeniedResubmitConfirm = false;
       let canShowPrimarySubmit = false;
       let pendingDeniedEditId = "";
+      let deniedDraftReturnModal = null;
       let editSubmitMode = "save";
       let currentEditContentType = "page";
+      let resumingEditAfterConfirmation = false;
+      const confirmationsReturningToEdit = new WeakSet();
+      const runAfterModalHidden = (sourceEl, callback) => {
+        const sourceInstance = sourceEl ? bootstrap.Modal.getInstance(sourceEl) : null;
+        if (!sourceInstance || !sourceEl.classList.contains("show")) {
+          callback();
+          return;
+        }
+        sourceEl.addEventListener("hidden.bs.modal", callback, { once: true });
+        sourceInstance.hide();
+      };
+      const showModalAfterHidden = (sourceEl, targetEl, relatedTarget) => {
+        runAfterModalHidden(sourceEl, () => {
+          bootstrap.Modal.getOrCreateInstance(targetEl).show(relatedTarget);
+        });
+      };
+      const showEditConfirmation = (targetEl) => {
+        if (!targetEl) return;
+        confirmationsReturningToEdit.add(targetEl);
+        targetEl.addEventListener("hidden.bs.modal", () => {
+          if (confirmationsReturningToEdit.delete(targetEl) && !editModal.classList.contains("show")) {
+            resumingEditAfterConfirmation = true;
+            bootstrap.Modal.getOrCreateInstance(editModal).show();
+          }
+        }, { once: true });
+        showModalAfterHidden(editModal, targetEl);
+      };
+      const finishEditConfirmation = (targetEl) => {
+        if (targetEl) confirmationsReturningToEdit.delete(targetEl);
+      };
       const fullToolbar = [
         ["style", ["style"]],
         ["font", ["bold", "italic", "underline", "clear"]],
@@ -2868,48 +2899,42 @@ $contentToolsDescription = $isNewsManagementView
           if (editSubmitMode === "save" && isAdminPendingEdit && !pendingSaveConfirmed) {
             event.preventDefault();
             if (pendingSaveModalEl) {
-              const modalInstance = bootstrap.Modal.getOrCreateInstance(pendingSaveModalEl);
-              modalInstance.show();
+              showEditConfirmation(pendingSaveModalEl);
             }
             return;
           }
           if (editSubmitMode === "save" && isSuperAdminSession && !isDeniedDraftEdit && !superAdminEditConfirmed) {
             event.preventDefault();
             if (superAdminRepostModalEl) {
-              const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
-              modalInstance.show();
+              showEditConfirmation(superAdminRepostModalEl);
             }
             return;
           }
           if (editSubmitMode === "save" && isApprovedReviewEdit && !approvedSaveConfirmed) {
             event.preventDefault();
             if (approvedSaveModalEl) {
-              const modalInstance = bootstrap.Modal.getOrCreateInstance(approvedSaveModalEl);
-              modalInstance.show();
+              showEditConfirmation(approvedSaveModalEl);
             }
             return;
           }
           if (editSubmitMode === "save" && isDeniedDraftEdit && !deniedSaveConfirmed) {
             event.preventDefault();
             if (deniedSaveModalEl) {
-              const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedSaveModalEl);
-              modalInstance.show();
+              showEditConfirmation(deniedSaveModalEl);
             }
             return;
           }
           if (editSubmitMode === "submit_review" && requiresDeniedResubmitConfirm && !deniedResubmitConfirmed) {
             event.preventDefault();
             if (deniedResubmitModalEl) {
-              const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedResubmitModalEl);
-              modalInstance.show();
+              showEditConfirmation(deniedResubmitModalEl);
             }
             return;
           }
           if (isSuperAdminSession && canShowPrimarySubmit && editSubmitMode === "submit_review" && !isDeniedDraftEdit && !superAdminEditConfirmed) {
             event.preventDefault();
             if (superAdminRepostModalEl) {
-              const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
-              modalInstance.show();
+              showEditConfirmation(superAdminRepostModalEl);
             }
           }
         });
@@ -2924,6 +2949,7 @@ $contentToolsDescription = $isNewsManagementView
       if (confirmApprovedSaveBtn && editForm) {
         confirmApprovedSaveBtn.addEventListener("click", function () {
           approvedSaveConfirmed = true;
+          finishEditConfirmation(approvedSaveModalEl);
           if (approvedSaveModalEl) {
             const modalInstance = bootstrap.Modal.getOrCreateInstance(approvedSaveModalEl);
             modalInstance.hide();
@@ -2935,6 +2961,7 @@ $contentToolsDescription = $isNewsManagementView
       if (confirmPendingSaveBtn && editForm) {
         confirmPendingSaveBtn.addEventListener("click", function () {
           pendingSaveConfirmed = true;
+          finishEditConfirmation(pendingSaveModalEl);
           if (pendingSaveModalEl) {
             const modalInstance = bootstrap.Modal.getOrCreateInstance(pendingSaveModalEl);
             modalInstance.hide();
@@ -2946,6 +2973,7 @@ $contentToolsDescription = $isNewsManagementView
       if (confirmDeniedSaveBtn && editForm) {
         confirmDeniedSaveBtn.addEventListener("click", function () {
           deniedSaveConfirmed = true;
+          finishEditConfirmation(deniedSaveModalEl);
           if (deniedSaveModalEl) {
             const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedSaveModalEl);
             modalInstance.hide();
@@ -2957,6 +2985,7 @@ $contentToolsDescription = $isNewsManagementView
       if (confirmDeniedResubmitBtn && editForm) {
         confirmDeniedResubmitBtn.addEventListener("click", function () {
           deniedResubmitConfirmed = true;
+          finishEditConfirmation(deniedResubmitModalEl);
           if (deniedResubmitModalEl) {
             const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedResubmitModalEl);
             modalInstance.hide();
@@ -2970,35 +2999,39 @@ $contentToolsDescription = $isNewsManagementView
         if (!pendingDeniedEditId || !deniedDraftNoticeModalEl) {
           return;
         }
-        const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedDraftNoticeModalEl);
-        modalInstance.show();
+        deniedDraftReturnModal = viewModal.classList.contains("show") ? viewModal : null;
+        deniedDraftNoticeModalEl.addEventListener("hidden.bs.modal", function () {
+          const returnModal = deniedDraftReturnModal;
+          deniedDraftReturnModal = null;
+          if (returnModal && !returnModal.classList.contains("show")) {
+            bootstrap.Modal.getOrCreateInstance(returnModal).show();
+          }
+        }, { once: true });
+        if (deniedDraftReturnModal) {
+          showModalAfterHidden(deniedDraftReturnModal, deniedDraftNoticeModalEl);
+        } else {
+          bootstrap.Modal.getOrCreateInstance(deniedDraftNoticeModalEl).show();
+        }
       }
 
       if (confirmDeniedDraftNoticeBtn) {
         confirmDeniedDraftNoticeBtn.addEventListener("click", function () {
           const id = pendingDeniedEditId;
-          if (deniedDraftNoticeModalEl) {
-            const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedDraftNoticeModalEl);
-            modalInstance.hide();
-          }
+          deniedDraftReturnModal = null;
           const data = ANNOUNCEMENT_DATA[id];
           if (!data || !editModal) {
             return;
           }
-          const viewInstance = bootstrap.Modal.getInstance(viewModal);
-          if (viewInstance) {
-            viewInstance.hide();
-          }
           const editTrigger = document.querySelector('.btn-edit-announcement[data-id="' + CSS.escape(id) + '"]');
-          const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
           editModal._deniedDraftTrigger = editTrigger || null;
-          editInstance.show(editTrigger || undefined);
+          showModalAfterHidden(deniedDraftNoticeModalEl, editModal, editTrigger || undefined);
         });
       }
 
       if (confirmSuperAdminRepostBtn && editForm) {
         confirmSuperAdminRepostBtn.addEventListener("click", function () {
           superAdminEditConfirmed = true;
+          finishEditConfirmation(superAdminRepostModalEl);
           if (superAdminRepostModalEl) {
             const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
             modalInstance.hide();
@@ -3009,6 +3042,7 @@ $contentToolsDescription = $isNewsManagementView
 
       if (confirmSuperAdminApprovedCloseBtn && editModal) {
         confirmSuperAdminApprovedCloseBtn.addEventListener("click", function () {
+          finishEditConfirmation(superAdminApprovedCloseModalEl);
           if (superAdminApprovedCloseModalEl) {
             const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminApprovedCloseModalEl);
             modalInstance.hide();
@@ -3020,6 +3054,10 @@ $contentToolsDescription = $isNewsManagementView
 
       if (editModal) {
         editModal.addEventListener("show.bs.modal", function () {
+          if (resumingEditAfterConfirmation) {
+            resumingEditAfterConfirmation = false;
+            return;
+          }
           superAdminEditConfirmed = false;
           deniedSaveConfirmed = false;
           deniedResubmitConfirmed = false;
@@ -3055,8 +3093,7 @@ $contentToolsDescription = $isNewsManagementView
       if (editCancelBtn) {
         editCancelBtn.addEventListener("click", function () {
           if (isSuperAdminApprovedEdit && superAdminApprovedCloseModalEl) {
-            const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminApprovedCloseModalEl);
-            modalInstance.show();
+            showEditConfirmation(superAdminApprovedCloseModalEl);
             return;
           }
           const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
@@ -3092,10 +3129,7 @@ $contentToolsDescription = $isNewsManagementView
           deleteQueueTypeEl.value = "<?= htmlspecialchars($queueTypeFilter, ENT_QUOTES, 'UTF-8') ?>";
           deleteQueueQueryEl.value = "<?= htmlspecialchars($queueSearchTerm, ENT_QUOTES, 'UTF-8') ?>";
 
-          const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
-          editInstance.hide();
-          const deleteInstance = bootstrap.Modal.getOrCreateInstance(deleteModalEl);
-          deleteInstance.show();
+          showModalAfterHidden(editModal, deleteModalEl);
         });
       }
 
@@ -3134,12 +3168,7 @@ $contentToolsDescription = $isNewsManagementView
           deleteQueueQueryEl.value = "<?= htmlspecialchars($queueSearchTerm, ENT_QUOTES, 'UTF-8') ?>";
           deleteTitleEl.textContent = title;
 
-          const viewInstance = bootstrap.Modal.getInstance(viewModal);
-          if (viewInstance) {
-            viewInstance.hide();
-          }
-          const deleteInstance = new bootstrap.Modal(deleteModalEl);
-          deleteInstance.show();
+          showModalAfterHidden(viewModal, deleteModalEl);
         });
       }
 
@@ -3380,7 +3409,7 @@ $contentToolsDescription = $isNewsManagementView
     (function () {
       const flashModalEl = document.getElementById("modalAnnouncementFlash");
       if (!flashModalEl) return;
-      const flashModal = new bootstrap.Modal(flashModalEl);
+      const flashModal = bootstrap.Modal.getOrCreateInstance(flashModalEl);
       flashModal.show();
     })();
 

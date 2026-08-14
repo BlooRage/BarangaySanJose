@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
+require_once __DIR__ . "/../General/adminModulePermissions.php";
 require_once __DIR__ . "/../General/caseUserAccountForeignKeys.php";
 require_once __DIR__ . "/../General/complaintTypeDetails.php";
 require_once __DIR__ . "/../General/sendSMS.php";
@@ -8,6 +9,10 @@ require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 verifyCsrfToken(false);
+if (!amp_current_user_has_module_permission($conn, 'complaint_log_new_incident')) {
+    header('Location: ' . appUrl('/Admin-End/Complaints/ComplaintForm.php?error=' . rawurlencode('You do not have permission to create complaints.')));
+    exit;
+}
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 function str_field($value): ?string

@@ -13,6 +13,8 @@ if (!isset($baseUrl)) {
         $baseUrl = '';
     }
 }
+$allowUnregistered = true;
+require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
 
 <!DOCTYPE html>
@@ -40,7 +42,7 @@ if (!isset($baseUrl)) {
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
   <!-- Optional: server-side alert handling (if you use it) -->
-  <script src="../JS-Script-Files/modalHandler.js"></script>
+  <script src="../JS-Script-Files/modalHandler.js?v=20260815-02"></script>
 
   <!-- Your wizard/validation JS -->
   <script>
@@ -50,11 +52,6 @@ if (!isset($baseUrl)) {
 </head>
 
 <body>
-  <?php
-$allowUnregistered = true;
-require_once __DIR__ . "/includes/resident_access_guard.php";
-?>
-
   <!-- ================= NAVBAR ================= -->
   <div class="navbarWrapper">
 
@@ -101,6 +98,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       enctype="multipart/form-data"
       autocomplete="on"
     >
+      <?= csrfTokenField() ?>
       <input type="hidden" name="wizardStep" id="wizardStep" value="0" />
       <input type="hidden" name="clientSubmittedAt" value="" id="clientSubmittedAt" />
 
@@ -1409,12 +1407,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   </section>
 
   <!-- Logout Confirm Modal -->
-  <div class="modal fade residency-picker-modal" id="barangayResidencyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade residency-picker-modal" id="barangayResidencyModal" tabindex="-1" aria-labelledby="barangayResidencyModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <div class="residency-picker-panel-title">Select Residency Month</div>
+            <div class="residency-picker-panel-title" id="barangayResidencyModalTitle">Select Residency Month</div>
             <p class="residency-picker-panel-note mb-0">Choose when the resident started living in the barangay.</p>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -1456,12 +1454,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     </div>
   </div>
 
-  <div class="modal fade residency-picker-modal" id="residencyStartModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade residency-picker-modal" id="residencyStartModal" tabindex="-1" aria-labelledby="residencyStartModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <div class="residency-picker-panel-title">Residency Start Date</div>
+            <div class="residency-picker-panel-title" id="residencyStartModalTitle">Residency Start Date</div>
             <p class="residency-picker-panel-note mb-0">Choose when the resident started living in the said residence.</p>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -1503,12 +1501,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     </div>
   </div>
 
-  <div class="modal fade residency-picker-modal" id="barangayAreaGuideModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade residency-picker-modal" id="barangayAreaGuideModal" tabindex="-1" aria-labelledby="barangayAreaGuideModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <div class="residency-picker-panel-title">Barangay Area Guide</div>
+            <div class="residency-picker-panel-title" id="barangayAreaGuideModalTitle">Barangay Area Guide</div>
             <p class="residency-picker-panel-note mb-0">Use this guide to identify the correct area for the resident's home address.</p>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

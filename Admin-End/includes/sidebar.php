@@ -747,7 +747,7 @@ if ($sbSidebarUserId !== '') {
 }
 ?>
 
-<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260812-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260815-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= htmlspecialchars(appUrl('CSS-Styles/Admin-End-CSS/TablePagination.css?v=20260805-admin-table-unification'), ENT_QUOTES, 'UTF-8') ?>">
 <script defer src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/tablePagination.js?v=20260805-admin-table-unification'), ENT_QUOTES, 'UTF-8') ?>"></script>
 

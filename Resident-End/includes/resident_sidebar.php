@@ -13,32 +13,6 @@ if (!isset($baseUrl)) {
     $baseUrl = '';
   }
 }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    
-  <link rel="icon" href="<?= htmlspecialchars((string)$baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/favicon_sanjose.png?v=20260211">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resident Dashboard - Barangay San Jose</title>
-
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-
-    <!-- Bootstrap Icons (for logout icon) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/NavbarFooterStyle.css">
-    <script src="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/JS-Script-Files/modalHandler.js" defer></script>
-</head>
-
-
-<body>
-<?php
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
@@ -271,6 +245,16 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 }
 ?>
 
+<!--
+  Body fragment shared by resident pages. Parent documents provide the page
+  metadata and framework assets; these local styles are retained because some
+  standalone resident pages rely on the include for them.
+-->
+<link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+<link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+<link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/NavbarFooterStyle.css">
+<script src="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/JS-Script-Files/modalHandler.js?v=20260815-02" defer></script>
+
 <aside id="div-sidebarWrapper"
        class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
@@ -443,7 +427,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
          href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/logout"
          title="Logout"
          data-logout-message="Are you sure you want to logout?">
-        <i class="bi bi-box-arrow-right me-1"></i><span class="sidebar-action-text">Logout</span>
+        <i class="fa-solid fa-right-from-bracket me-1" aria-hidden="true"></i><span class="sidebar-action-text">Logout</span>
       </a>
     </div>
   </div>
@@ -907,5 +891,3 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 </script>
 
 <script src="<?= htmlspecialchars(appUrl('/JS-Script-Files/websitePreferences.js'), ENT_QUOTES, 'UTF-8') ?>" data-endpoint="<?= htmlspecialchars(appUrl('/PhpFiles/GET/getWebsitePreferences.php'), ENT_QUOTES, 'UTF-8') ?>"></script>
-</body>
-</html>

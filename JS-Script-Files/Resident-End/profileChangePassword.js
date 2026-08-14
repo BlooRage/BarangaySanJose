@@ -119,6 +119,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let transitioningToConfirm = false;
   let changeCompleted = false;
 
+  const runAfterModalHidden = (element, instance, callback) => {
+    if (!element?.classList.contains("show")) {
+      callback();
+      return;
+    }
+    element.addEventListener("hidden.bs.modal", callback, { once: true });
+    instance.hide();
+  };
+
 	  openConfirmBtn?.addEventListener("click", () => {
 	    (async () => {
 	      if (!validate()) return;
@@ -149,8 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         transitioningToConfirm = true;
-        modal.hide();
-        confirmModal.show();
+        runAfterModalHidden(modalEl, modal, () => confirmModal.show());
       } catch (err) {
         showError(err?.message || "Unable to verify current password. Please try again.");
       } finally {
@@ -253,29 +261,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
       changeCompleted = true;
       transitioningToConfirm = false;
-      confirmModal.hide();
       clearFields();
-
-      window.UniversalModal?.open({
-        title: "Success",
-        message: data.message || "Password changed successfully.",
-        buttons: [{ label: "OK", class: "btn btn-success", onClick: () => {} }],
+      runAfterModalHidden(confirmEl, confirmModal, () => {
+        window.UniversalModal?.open({
+          title: "Success",
+          message: data.message || "Password changed successfully.",
+          buttons: [{ label: "OK", class: "btn btn-success", onClick: () => {} }],
+        });
       });
     } catch (err) {
       transitioningToConfirm = false;
-      confirmModal.hide();
-      modal.show();
       const msg = err?.message || "Unable to change password. Please try again.";
-      // Try to highlight the most relevant field for common server-side errors.
-      clearAllInvalid();
-      if (/current password/i.test(msg)) {
-        showError(msg, currentPwEl);
-      } else if (/different from current/i.test(msg) || /at least 8|uppercase|lowercase|special|number/i.test(msg)) {
-        showError(msg, newPwEl, true);
-        markInvalid(confirmPwEl);
-      } else {
-        showError(msg);
-      }
+      runAfterModalHidden(confirmEl, confirmModal, () => {
+        modal.show();
+        // Try to highlight the most relevant field for common server-side errors.
+        clearAllInvalid();
+        if (/current password/i.test(msg)) {
+          showError(msg, currentPwEl);
+        } else if (/different from current/i.test(msg) || /at least 8|uppercase|lowercase|special|number/i.test(msg)) {
+          showError(msg, newPwEl, true);
+          markInvalid(confirmPwEl);
+        } else {
+          showError(msg);
+        }
+      });
     } finally {
       setBusy(false);
     }

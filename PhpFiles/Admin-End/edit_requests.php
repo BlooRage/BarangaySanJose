@@ -3,13 +3,10 @@ require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (empty($_SESSION['user_id']) || !in_array(normalizeRoleName((string)($_SESSION['role'] ?? '')), ['superadmin', 'official', 'personnel'], true)) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit;
-}
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/adminModulePermissions.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 require_once __DIR__ . '/../General/residentTransaction.php';
 
@@ -18,6 +15,11 @@ if (!isset($conn) || !($conn instanceof mysqli)) {
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable']);
     exit;
 }
+
+amp_require_json_module_permission($conn, 'resident_edit_requests', [
+    'success' => false,
+    'message' => 'You do not have permission to review resident edit requests.',
+]);
 
 function getStatusId(mysqli $conn, string $name, string $type): ?int {
     $stmt = $conn->prepare("

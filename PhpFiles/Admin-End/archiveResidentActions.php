@@ -4,10 +4,19 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/adminModulePermissions.php";
 require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/userAccountLocks.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
+amp_require_json_module_permission($conn, 'resident_archive', [
+    'success' => false,
+    'message' => 'You do not have permission to manage the resident archive.',
+]);
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    sendJsonErrorAndExit(405, 'Method not allowed.');
+}
+verifyCsrfToken(true);
 
 cuafk_ensure_case_useraccount_foreign_keys($conn, true);
 

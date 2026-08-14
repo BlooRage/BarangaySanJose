@@ -2,8 +2,13 @@
 session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/adminModulePermissions.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
+amp_require_json_module_permission($conn, 'household_profiling_main', [
+    'success' => false,
+    'message' => 'You do not have permission to access household profiling.',
+]);
 
 function normalize_simple($value) {
     $value = strtolower(trim((string)$value));

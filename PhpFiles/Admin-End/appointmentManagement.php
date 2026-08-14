@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
+require_once __DIR__ . "/../General/adminModulePermissions.php";
 require_once __DIR__ . "/../General/appointmentCouncilMembers.php";
 require_once __DIR__ . "/../General/appointmentSettings.php";
 require_once __DIR__ . "/../General/appointmentOfficialSchedules.php";
@@ -12,6 +13,10 @@ require_once __DIR__ . "/../EmailHandlers/emailSender.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 verifyCsrfToken(false);
+if (!amp_current_user_has_module_permission($conn, 'appointments')) {
+    header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php?error=' . rawurlencode('You do not have permission to manage appointments.')));
+    exit;
+}
 
 function am_redirect_with_message(string $type, string $message, array $extra = []): void
 {

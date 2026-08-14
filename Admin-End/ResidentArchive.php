@@ -230,7 +230,10 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/archiveResidentScript.js?v=20260804-1"></script>
+<script>
+  window.ADMIN_RESIDENT_ARCHIVE_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES) ?>;
+</script>
+<script src="../JS-Script-Files/Admin-End/archiveResidentScript.js?v=20260815-2"></script>
 </body>
 </html>
 

@@ -1,32 +1,14 @@
 <?php
-require_once '../General/sendSMS.php';
+declare(strict_types=1);
 
-header('Content-Type: application/json');
-
-// Validate POST parameters
-if (!isset($_POST['recipient']) || !isset($_POST['otp_code'])) {
-    echo json_encode(['success' => false, 'error' => 'Missing parameters']);
-    exit;
-}
-
-$recipient = $_POST['recipient'];
-$otp_code  = $_POST['otp_code'];
-$message   = "Your OTP code is $otp_code";
-
-
-try {
-    // Send OTP using sendSMS function
-    $sent = sendSMS($recipient, $message, $otp_code);
-
-    if ($sent) {
-        echo json_encode(['success' => true]);
-    } else {
-        echo json_encode([
-            'success' => false,
-            'error' => getLastSmsError() !== '' ? getLastSmsError() : 'Failed to send SMS. Check API key, sender, and recipient number.',
-        ]);
-    }
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-}
-?>
+// Retired: accepting an OTP value from the caller allowed arbitrary SMS sends.
+// Active flows must use generate_otp.php, which generates, stores, throttles,
+// and sends the OTP entirely on the server.
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+http_response_code(410);
+echo json_encode([
+    'success' => false,
+    'error' => 'This legacy OTP endpoint is disabled.',
+], JSON_UNESCAPED_SLASHES);
+exit;
