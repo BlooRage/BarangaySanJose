@@ -398,6 +398,6 @@ $csrfToken = ensureCsrfToken();
   window.ADMIN_EDIT_REQUESTS_CSRF_TOKEN = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260804-resident-role"></script>
+<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260815-action-portal"></script>
 </body>
 </html>

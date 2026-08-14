@@ -523,8 +523,13 @@
     }
 
     if (tbody) {
-      tbody.addEventListener("click", (event) => {
-        const button = event.target.closest('[data-action="manage-lock"]');
+      document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+
+        // The shared admin table helper portals action dropdown menus to <body>.
+        // Delegate from document so those controls remain clickable after moving.
+        const button = target.closest('[data-action="manage-lock"]');
         if (button) {
           const row = findRow(button.dataset.userId || "");
           if (!row) return;
@@ -533,7 +538,7 @@
           return;
         }
 
-        const archiveButton = event.target.closest('[data-action="archive-account"]');
+        const archiveButton = target.closest('[data-action="archive-account"]');
         if (!archiveButton) return;
 
         submitArchiveAction(archiveButton.dataset.userId || "").catch(() => {});
