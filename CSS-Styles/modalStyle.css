@@ -86,6 +86,47 @@
     color: var(--um-text);
 }
 
+.uniform-modal__otp-inputs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.uniform-modal__otp-inputs input.form-control {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    max-width: 48px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid #ced4da;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--um-text);
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.uniform-modal__otp-inputs input.form-control:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25);
+    outline: none;
+}
+
+@media (max-width: 420px) {
+    .uniform-modal__otp-inputs {
+        gap: 7px;
+    }
+
+    .uniform-modal__otp-inputs input.form-control {
+        height: 46px;
+        border-radius: 12px;
+        font-size: 1rem;
+    }
+}
+
 .modalBtn {
     border-radius: 14px;
     min-height: 46px;

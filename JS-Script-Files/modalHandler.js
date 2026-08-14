@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260801-02";
+  const MODAL_VERSION = "20260812-01";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -249,6 +249,75 @@
       });
 
       window.setTimeout(() => document.getElementById(inputId)?.focus(), 350);
+    });
+  }
+
+  function otpPromptDialog(message, options = {}) {
+    return new Promise((resolve) => {
+      const groupId = `umOtpInputs-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+      const readValue = () => Array.from(document.querySelectorAll(`#${groupId} input`))
+        .map((input) => input.value)
+        .join("");
+
+      open({
+        tone: options.tone || "info",
+        title: options.title || "OTP Verification",
+        messageHtml: `
+          <p class="mb-3">${escapeHtml(String(message ?? ""))}</p>
+          <div class="uniform-modal__otp-inputs" id="${groupId}" role="group" aria-label="6-digit OTP code">
+            ${Array.from({ length: 6 }, (_, index) => `<input class="form-control" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="${index === 0 ? "one-time-code" : "off"}" aria-label="OTP digit ${index + 1}">`).join("")}
+          </div>`,
+        forceTemplate: false,
+        buttons: [
+          { label: options.cancelLabel || "Cancel", class: "btn btn-outline-secondary", onClick: () => finish(null) },
+          { label: options.confirmLabel || "Verify", class: options.confirmClass || "btn btn-primary", disabled: true, onClick: () => finish(readValue()) },
+        ],
+      });
+
+      window.setTimeout(() => {
+        const group = document.getElementById(groupId);
+        const inputs = Array.from(group?.querySelectorAll("input") || []);
+        const verifyButton = document.querySelector("#umActions button:last-child");
+        const sync = () => {
+          const complete = readValue().length === 6;
+          if (verifyButton) verifyButton.disabled = !complete;
+        };
+        const fillFrom = (startIndex, value) => {
+          String(value || "").replace(/\D/g, "").slice(0, 6).split("").forEach((digit, offset) => {
+            if (inputs[startIndex + offset]) inputs[startIndex + offset].value = digit;
+          });
+          const nextIndex = Math.min(startIndex + String(value || "").replace(/\D/g, "").length, inputs.length - 1);
+          inputs[nextIndex]?.focus();
+          sync();
+        };
+
+        inputs.forEach((input, index) => {
+          input.addEventListener("input", () => {
+            const digits = input.value.replace(/\D/g, "");
+            input.value = digits.slice(-1);
+            if (input.value && index < inputs.length - 1) inputs[index + 1].focus();
+            sync();
+          });
+          input.addEventListener("keydown", (event) => {
+            if (event.key === "Backspace" && !input.value && index > 0) inputs[index - 1].focus();
+            if (event.key === "ArrowLeft" && index > 0) inputs[index - 1].focus();
+            if (event.key === "ArrowRight" && index < inputs.length - 1) inputs[index + 1].focus();
+            if (event.key === "Enter" && readValue().length === 6) verifyButton?.click();
+          });
+          input.addEventListener("paste", (event) => {
+            event.preventDefault();
+            fillFrom(index, event.clipboardData?.getData("text") || "");
+          });
+        });
+        inputs[0]?.focus();
+        sync();
+      }, 350);
     });
   }
 
@@ -554,6 +623,7 @@
     danger,
     confirm: confirmDialog,
     prompt: promptDialog,
+    promptOtp: otpPromptDialog,
     upgradeVisibleAlerts,
   };
 })();

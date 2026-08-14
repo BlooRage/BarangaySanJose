@@ -904,7 +904,7 @@
     }
 
     const deliveryLabel = String(data.delivery_label || "").trim();
-    const otpCode = await window.UniversalModal.prompt(
+    const otpCode = await window.UniversalModal.promptOtp(
       deliveryLabel
         ? `Enter the 6-digit OTP sent to ${deliveryLabel}:`
         : "Enter the 6-digit OTP sent to your verified contact:",
