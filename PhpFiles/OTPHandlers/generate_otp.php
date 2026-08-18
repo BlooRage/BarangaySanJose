@@ -279,7 +279,7 @@ if ($purpose === 'signup' || $purpose === 'forgot' || $purpose === 'inactive' ||
 }
 
 // ===== Generate 6-digit OTP =====
-$otp_code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+$otp_code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
 // ===== Hash OTP =====
 $otp_hash = password_hash($otp_code, PASSWORD_DEFAULT);
