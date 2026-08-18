@@ -4,6 +4,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,17 +24,23 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       height: 100vh;
       overflow: hidden;
     }
+
     #img-sidebarAvatar {
       width: 90px;
       height: 90px;
     }
+
     @media (min-width: 769px) {
       #div-sidebarWrapper {
         width: 280px;
         min-height: 100vh;
       }
     }
-    .tracker-shell { border-color: #f1e1cf !important; }
+
+    .tracker-shell {
+      border-color: #f1e1cf !important;
+    }
+
     .tracker-title {
       font-family: 'Charis SIL Bold', serif;
       color: #DE710C;
@@ -41,21 +48,25 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       line-height: 1.1;
       margin: 0 0 0.65rem 0;
     }
+
     .tracker-shell .admin-list-tabs {
       gap: 12px;
       overflow: visible;
     }
+
     .tracker-shell .status-filter-btn {
       border-radius: 10px;
       border-width: 1px;
       overflow: visible;
     }
+
     .tracker-shell .btn-icon.admin-filter,
     .tracker-shell .btn-icon.admin-columns,
     .tracker-shell .btn-icon.admin-refresh {
       outline: none;
       box-shadow: none;
     }
+
     .tracker-shell .btn-icon.admin-filter {
       border-color: rgba(108, 117, 125, 0.28);
       color: #495057;
@@ -64,6 +75,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       letter-spacing: 0.2px;
       transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
     }
+
     .tracker-shell .btn-icon.admin-filter:hover {
       border-color: rgba(73, 80, 87, 0.45);
       color: #343a40;
@@ -71,16 +83,19 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       box-shadow: 0 10px 18px rgba(73, 80, 87, 0.10);
       transform: translateY(-1px);
     }
+
     .tracker-shell .btn-icon.admin-filter:active {
       transform: translateY(0);
       box-shadow: 0 6px 12px rgba(73, 80, 87, 0.10);
     }
+
     .tracker-shell .btn-icon.admin-filter:focus,
     .tracker-shell .btn-icon.admin-filter:focus-visible {
       outline: none;
       border-color: rgba(108, 117, 125, 0.28);
       box-shadow: 0 0 0 .2rem rgba(108, 117, 125, 0.18);
     }
+
     .tracker-shell .btn-icon.admin-columns {
       border-color: rgba(13, 110, 253, 0.25);
       color: #0d47a1;
@@ -89,6 +104,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       letter-spacing: 0.2px;
       transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
     }
+
     .tracker-shell .btn-icon.admin-columns:hover {
       border-color: rgba(13, 110, 253, 0.45);
       color: #0a3a84;
@@ -96,16 +112,19 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       box-shadow: 0 10px 18px rgba(13, 110, 253, 0.10);
       transform: translateY(-1px);
     }
+
     .tracker-shell .btn-icon.admin-columns:active {
       transform: translateY(0);
       box-shadow: 0 6px 12px rgba(13, 110, 253, 0.10);
     }
+
     .tracker-shell .btn-icon.admin-columns:focus,
     .tracker-shell .btn-icon.admin-columns:focus-visible {
       outline: none;
       border-color: rgba(13, 110, 253, 0.25);
       box-shadow: 0 0 0 .2rem rgba(13, 110, 253, 0.18);
     }
+
     .tracker-shell .btn-icon.admin-refresh {
       border-color: rgba(254, 153, 60, 0.45);
       color: #b85b00;
@@ -114,6 +133,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       letter-spacing: 0.2px;
       transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
     }
+
     .tracker-shell .btn-icon.admin-refresh:hover {
       border-color: rgba(254, 153, 60, 0.7);
       color: #a04f00;
@@ -121,36 +141,43 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
       transform: translateY(-1px);
     }
+
     .tracker-shell .btn-icon.admin-refresh:active {
       transform: translateY(0);
       box-shadow: 0 6px 12px rgba(222, 113, 12, 0.12);
     }
+
     .tracker-shell .btn-icon.admin-refresh:focus,
     .tracker-shell .btn-icon.admin-refresh:focus-visible {
       outline: none;
       border-color: rgba(254, 153, 60, 0.45);
       box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.25);
     }
+
     .tracker-shell .btn-icon.admin-refresh.is-loading i {
       animation: adminSpin 900ms linear infinite;
     }
+
     .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter="ALL"],
     .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter=""] {
       color: #0d6efd;
       border-color: #0d6efd;
       background: #fff;
     }
+
     .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]) {
       color: #495057;
       border-color: #495057;
       background: #fff;
     }
+
     .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):hover,
     .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):focus-visible {
       color: #343a40;
       border-color: #343a40;
       background: #f8f9fa;
     }
+
     .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter="ALL"].active,
     .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter=""].active {
       color: #fff !important;
@@ -158,12 +185,14 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       border-color: #0d6efd !important;
       font-weight: 700;
     }
+
     .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]).active {
       color: #fff !important;
       background-color: #495057 !important;
       border-color: #495057 !important;
       font-weight: 700;
     }
+
     .tracker-shell .status-pill.info,
     .tracker-shell .status-pill.rescheduled,
     .tracker-shell .status-pill.completed,
@@ -174,12 +203,14 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       background: #dbeafe;
       border: 2px solid #bfdbfe;
     }
+
     .tracker-shell .status-pill.completed,
     #appointmentViewModal .status-pill.completed {
       color: #0f5132;
       background: #d1e7dd;
       border-color: #badbcc;
     }
+
     .tracker-shell .status-pill.denied,
     .tracker-shell .status-pill.archived,
     #appointmentViewModal .status-pill.denied,
@@ -188,23 +219,28 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       background: #e8cfd3;
       border: 2px solid #e0bcc2;
     }
+
     .tracker-table-responsive {
       display: block;
     }
+
     #appointmentTable {
       table-layout: fixed;
       min-width: 980px;
     }
+
     #appointmentTable th:first-child,
     #appointmentTable td:first-child {
       width: 15%;
       white-space: nowrap;
     }
+
     #appointmentTable th:nth-child(2),
     #appointmentTable td:nth-child(2) {
       width: 18%;
       white-space: nowrap;
     }
+
     #appointmentTable th:nth-child(3),
     #appointmentTable td:nth-child(3),
     #appointmentTable th:nth-child(4),
@@ -212,28 +248,34 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       width: 21%;
       white-space: nowrap;
     }
+
     #appointmentTable th:nth-child(5),
     #appointmentTable td:nth-child(5) {
       width: 14%;
       white-space: nowrap;
     }
+
     #appointmentTable th:nth-child(6),
     #appointmentTable td:nth-child(6) {
       width: 11%;
       white-space: nowrap;
       text-align: left;
     }
+
     #appointmentTable td:nth-child(6) {
       padding-left: 1rem;
     }
+
     .tracker-shell #appointmentPagination .page-link {
       color: #495057;
     }
+
     .tracker-shell #appointmentPagination .page-item.active .page-link {
       background-color: #0d6efd;
       border-color: #0d6efd;
       color: #fff;
     }
+
     .tracker-card {
       border: 1px solid #eceff3;
       border-radius: 12px;
@@ -241,6 +283,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       background: #fff;
       margin-bottom: 0.75rem;
     }
+
     .tracker-label {
       font-size: 0.78rem;
       color: #495057;
@@ -248,45 +291,61 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       letter-spacing: .02em;
       font-weight: 800;
     }
+
     .tracker-value {
       font-size: 0.96rem;
       color: #212529;
       word-break: break-word;
       white-space: normal;
     }
-    #appointmentCards { display: none; }
+
+    #appointmentCards {
+      display: none;
+    }
+
     @media (max-width: 991.98px) {
       .tracker-shell .admin-list-toolbar {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
       }
+
       .tracker-shell .admin-list-tabs,
       .tracker-shell .admin-list-actions {
         width: 100%;
       }
+
       .tracker-shell .admin-list-tabs {
         overflow-x: auto;
         padding-bottom: 4px;
       }
+
       .tracker-shell .admin-list-actions {
         margin-left: 0;
         justify-content: flex-start;
         overflow-x: auto;
         padding-bottom: 2px;
       }
+
       .tracker-shell .admin-search {
         min-width: 0;
         max-width: none;
         width: 100%;
       }
     }
+
     @media (max-width: 767.98px) {
-      .tracker-table-responsive { display: none; }
-      #appointmentCards { display: block; }
+      .tracker-table-responsive {
+        display: none;
+      }
+
+      #appointmentCards {
+        display: block;
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="d-flex" style="min-height: 100vh;">
     <?php include __DIR__ . '/includes/resident_sidebar.php'; ?>
@@ -334,7 +393,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
               </tr>
             </thead>
             <tbody id="appointmentTbody">
-              <tr><td colspan="6" class="text-center text-muted py-4">Loading appointments...</td></tr>
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">Loading appointments...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -417,17 +478,39 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-md-6"><strong>Appointment ID:</strong><div id="appointmentViewId" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Status:</strong><div id="appointmentViewStatus"></div></div>
-            <div class="col-md-6"><strong>Subject:</strong><div id="appointmentViewSubject" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Council Member:</strong><div id="appointmentViewOfficial" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Preferred Schedule:</strong><div id="appointmentViewPreferred" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Confirmed Schedule:</strong><div id="appointmentViewConfirmed" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Meeting Location:</strong><div id="appointmentViewMeetingLocation" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Requested At:</strong><div id="appointmentViewRequested" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Reviewed At:</strong><div id="appointmentViewReviewed" class="text-muted"></div></div>
-            <div class="col-12"><strong>Purpose:</strong><div id="appointmentViewPurpose" class="text-muted"></div></div>
-            <div class="col-12"><strong>Office Remarks:</strong><div id="appointmentViewRemarks" class="text-muted"></div></div>
+            <div class="col-md-6"><strong>Appointment ID:</strong>
+              <div id="appointmentViewId" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Status:</strong>
+              <div id="appointmentViewStatus"></div>
+            </div>
+            <div class="col-md-6"><strong>Subject:</strong>
+              <div id="appointmentViewSubject" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Council Member:</strong>
+              <div id="appointmentViewOfficial" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Preferred Schedule:</strong>
+              <div id="appointmentViewPreferred" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Confirmed Schedule:</strong>
+              <div id="appointmentViewConfirmed" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Meeting Location:</strong>
+              <div id="appointmentViewMeetingLocation" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Requested At:</strong>
+              <div id="appointmentViewRequested" class="text-muted"></div>
+            </div>
+            <div class="col-md-6"><strong>Reviewed At:</strong>
+              <div id="appointmentViewReviewed" class="text-muted"></div>
+            </div>
+            <div class="col-12"><strong>Purpose:</strong>
+              <div id="appointmentViewPurpose" class="text-muted"></div>
+            </div>
+            <div class="col-12"><strong>Office Remarks:</strong>
+              <div id="appointmentViewRemarks" class="text-muted"></div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -496,9 +579,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         return formatDateTime(preferredValue, "Same as requested schedule");
       }
 
-      return appointmentStatusLabel(item?.status_name) === "Confirmed"
-        ? "Confirmed upon submission"
-        : "To be scheduled";
+      return appointmentStatusLabel(item?.status_name) === "Confirmed" ?
+        "Confirmed upon submission" :
+        "To be scheduled";
     }
 
     function reviewedTimestampDisplay(item) {
@@ -507,9 +590,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         return formatDateTime(reviewValue);
       }
 
-      return appointmentStatusLabel(item?.status_name) === "Confirmed"
-        ? "Confirmed upon submission"
-        : "Not reviewed yet";
+      return appointmentStatusLabel(item?.status_name) === "Confirmed" ?
+        "Confirmed upon submission" :
+        "Not reviewed yet";
     }
 
     function paginateRows(rows, currentPage, perPage) {
@@ -673,7 +756,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       try {
         const res = await fetch(`../PhpFiles/Resident-End/get_resident_appointments.php`, {
           credentials: "same-origin",
-          headers: { "Accept": "application/json" }
+          headers: {
+            "Accept": "application/json"
+          }
         });
         const data = await res.json().catch(() => null);
         if (!res.ok || !data?.success) {
@@ -754,4 +839,5 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js"></script>
 </body>
+
 </html>
