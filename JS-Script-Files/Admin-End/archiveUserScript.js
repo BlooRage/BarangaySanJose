@@ -276,12 +276,8 @@
     }
 
     if (tbody) {
-      document.addEventListener("click", (event) => {
-        const target = event.target instanceof Element ? event.target : null;
-        if (!target) return;
-
-        // Action menus are moved to <body> by the shared admin table helper.
-        const button = target.closest('[data-action="restore"], [data-action="delete"]');
+      tbody.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-action]");
         if (!button) return;
 
         const action = String(button.dataset.action || "").trim();

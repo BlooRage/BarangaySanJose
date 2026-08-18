@@ -2162,11 +2162,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') { e.preventDefault(); saveFeeType(); }
   });
 
-  document.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-
-    const editBtn = target.closest('.js-finance-edit-fee');
+  feeTypesTableBody.addEventListener('click', (event) => {
+    const editBtn = event.target.closest('.js-finance-edit-fee');
     if (editBtn) {
       financeEditFee(
         editBtn.dataset.feeId || '',
@@ -2177,7 +2174,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const deleteBtn = target.closest('.js-finance-delete-fee');
+    const deleteBtn = event.target.closest('.js-finance-delete-fee');
     if (deleteBtn) {
       financeDeleteFee(
         deleteBtn.dataset.feeId || '',
@@ -2268,17 +2265,14 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { alert(e.message); }
   }
 
-  document.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-
-    const approveBtn = target.closest('.js-finance-approve-fcr');
+  pendingRequestsBody.addEventListener('click', (event) => {
+    const approveBtn = event.target.closest('.js-finance-approve-fcr');
     if (approveBtn) {
       financeApproveFcr(approveBtn.dataset.feeId || '');
       return;
     }
 
-    const rejectBtn = target.closest('.js-finance-reject-fcr');
+    const rejectBtn = event.target.closest('.js-finance-reject-fcr');
     if (rejectBtn) {
       financeRejectFcr(rejectBtn.dataset.feeId || '');
     }

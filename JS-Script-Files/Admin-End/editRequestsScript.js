@@ -365,10 +365,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (tbody) {
-    document.addEventListener("click", (event) => {
-      const eventTarget = event.target instanceof Element ? event.target : null;
-      const target = eventTarget?.closest('[data-action][data-id]');
-      if (!target || !["approve", "deny", "view"].includes(target.dataset.action || "")) return;
+    tbody.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!target || !target.dataset?.action) return;
       const action = target.dataset.action;
       const requestId = target.dataset.id;
       if (!requestId) return;
