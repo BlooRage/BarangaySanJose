@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260815-02";
+  const MODAL_VERSION = "20260812-01";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -12,9 +12,6 @@
   const queuedRequests = [];
   let modalInstance = null;
   let activeRequest = null;
-  let nestedParentModalEl = null;
-  let nestedParentFocusEl = null;
-  let generatedModalLabelId = 0;
 
   const toneMeta = {
     info: {
@@ -117,7 +114,7 @@
     document.body.insertAdjacentHTML(
       "beforeend",
       `
-      <div class="modal fade uniform-modal" id="${MODAL_ID}" tabindex="-1" aria-labelledby="umTitle" aria-describedby="umMessage" aria-hidden="true">
+      <div class="modal fade uniform-modal" id="${MODAL_ID}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" id="umDialog">
           <div class="modal-content modalContainer" id="umContent" data-tone="info">
             <div class="modal-header justify-content-center border-0 pb-0">
@@ -138,44 +135,7 @@
 
     const modalEl = document.getElementById(MODAL_ID);
     modalEl.addEventListener("hidden.bs.modal", () => {
-      const parentModalEl = nestedParentModalEl;
-      const parentFocusEl = nestedParentFocusEl;
-      nestedParentModalEl = null;
-      nestedParentFocusEl = null;
       activeRequest = null;
-      if (modalEl.classList.contains("um-nested-modal")) {
-        modalEl.classList.remove("um-nested-modal");
-        if (modalEl.parentElement !== document.body) {
-          document.body.appendChild(modalEl);
-        }
-      }
-      if (document.querySelector(".modal.show")) {
-        document.body.classList.add("modal-open");
-      }
-      if (parentModalEl?.classList.contains("show")) {
-        const parentInstance = window.bootstrap?.Modal?.getInstance?.(parentModalEl);
-        const parentFocusTrap = parentInstance?._focustrap;
-
-        // Bootstrap focus traps share document-level handlers. Activating the
-        // nested modal replaces the parent's handlers, while the trap's own
-        // state can still say it is active. Cycle it so the visible parent is
-        // actually trapped again after the child closes.
-        if (typeof parentFocusTrap?.deactivate === "function" && typeof parentFocusTrap?.activate === "function") {
-          parentFocusTrap.deactivate();
-          parentFocusTrap.activate();
-        }
-
-        const focusTarget = parentFocusEl?.isConnected && parentModalEl.contains(parentFocusEl)
-          ? parentFocusEl
-          : parentModalEl;
-        if (typeof focusTarget?.focus === "function") {
-          try {
-            focusTarget.focus({ preventScroll: true });
-          } catch (error) {
-            focusTarget.focus();
-          }
-        }
-      }
       if (queuedRequests.length > 0) {
         renderAndShow(queuedRequests.shift());
       }
@@ -602,49 +562,11 @@
         ? event.target.closest(".modal")
         : null;
 
-      if (modalEl) {
-        const titleEl = modalEl.querySelector(".modal-title");
-        if (!modalEl.hasAttribute("aria-labelledby") && !modalEl.hasAttribute("aria-label") && titleEl) {
-          if (!titleEl.id) {
-            generatedModalLabelId += 1;
-            titleEl.id = `${modalEl.id || "modal"}-title-${generatedModalLabelId}`;
-          }
-          modalEl.setAttribute("aria-labelledby", titleEl.id);
-        }
-
-        modalEl.querySelectorAll(".btn-close").forEach((closeButton) => {
-          if (!closeButton.hasAttribute("aria-label")) {
-            closeButton.setAttribute("aria-label", "Close");
-          }
-        });
-      }
-
-      // Keep UniversalModal within an already-open modal's focus boundary.
-      // Its own full-screen dim layer avoids a second visible Bootstrap
-      // backdrop while preserving the parent form and its unsaved state.
-      const visibleParentModals = modalEl?.id === MODAL_ID
-        ? Array.from(document.querySelectorAll(".modal.show")).filter((candidate) => candidate !== modalEl)
-        : [];
-      const activeParentModal = visibleParentModals[visibleParentModals.length - 1] || null;
-      if (modalEl?.id === MODAL_ID && activeParentModal) {
-        nestedParentModalEl = activeParentModal;
-        nestedParentFocusEl = activeParentModal.contains(document.activeElement)
-          ? document.activeElement
-          : null;
-        activeParentModal.appendChild(modalEl);
-        modalEl.classList.add("um-nested-modal");
       // Bootstrap inserts its backdrop directly under <body>. A modal nested
-      // inside any other positioned/transformed container can otherwise be
-      // trapped in a lower stacking context and covered by that backdrop.
-      } else if (modalEl) {
-        if (modalEl.id === MODAL_ID) {
-          nestedParentModalEl = null;
-          nestedParentFocusEl = null;
-        }
-        if (modalEl.parentElement !== document.body) {
-          modalEl.classList.remove("um-nested-modal");
-          document.body.appendChild(modalEl);
-        }
+      // inside a positioned/transformed admin content area can otherwise be
+      // trapped in a lower stacking context and become covered by that backdrop.
+      if (modalEl && modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
       }
     }, true);
   }

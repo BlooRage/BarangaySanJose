@@ -1,17 +1,15 @@
 <?php
-require_once "../General/security.php";
-header('Content-Type: application/json; charset=utf-8');
-
-requireRoleSession(['SuperAdmin']);
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-    sendJsonErrorAndExit(405, 'Method not allowed.');
-}
-verifyCsrfToken(true);
+session_start();
 
 require_once "../General/connection.php";
+require_once "../General/security.php";
 require_once "../General/audit.php";
 require_once "../General/adminModulePermissions.php";
 require_once "../General/userAccountLocks.php";
+
+requireRoleSession(['SuperAdmin']);
+
+header('Content-Type: application/json; charset=utf-8');
 
 ual_ensure_archive_support($conn);
 

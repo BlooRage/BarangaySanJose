@@ -1,13 +1,6 @@
 <?php
 declare(strict_types=1);
 
-if (PHP_SAPI !== 'cli') {
-    http_response_code(404);
-    exit('Not found.');
-}
-
-define('BARANGAY_DOCUMENT_WORKFLOW_CLI', true);
-
 require_once __DIR__ . '/../PhpFiles/General/security.php';
 
 $maintenanceUserId = trim((string)(getenv('BARANGAY_MAINT_USER_ID') ?: 'CLI_MAINT'));

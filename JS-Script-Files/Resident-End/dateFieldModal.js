@@ -363,7 +363,7 @@
 
     const modalHost = document.createElement("div");
     modalHost.innerHTML = `
-      <div class="modal fade resident-date-modal" id="residentDateModal" tabindex="-1" aria-labelledby="residentDateModalTitle" aria-describedby="residentDateModalSubtitle" aria-hidden="true">
+      <div class="modal fade resident-date-modal" id="residentDateModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
             <div class="modal-header">
@@ -490,8 +490,6 @@
 
     let activeInput = null;
     let activeProxy = null;
-    let activeParentModal = null;
-    let activeParentFocus = null;
     let activeMode = "select";
     let calendarCursorYear = 0;
     let calendarCursorMonth = 0;
@@ -961,12 +959,6 @@
 
       activeInput = input;
       activeProxy = proxy;
-      const visibleParentModals = Array.from(document.querySelectorAll(".modal.show"))
-        .filter((candidate) => candidate !== modalEl);
-      activeParentModal = visibleParentModals[visibleParentModals.length - 1] || null;
-      activeParentFocus = activeParentModal?.contains(document.activeElement)
-        ? document.activeElement
-        : (activeParentModal?.contains(proxy) ? proxy : null);
       modalEl.classList.toggle("resident-date-modal--complaint", isComplaintDateInput(input));
 
       const label = document.querySelector(`label[for="${input.id}"]`);
@@ -1117,39 +1109,10 @@
     });
 
     modalEl.addEventListener("hidden.bs.modal", () => {
-      const parentModalEl = activeParentModal;
-      const parentFocusEl = activeParentFocus;
-      activeParentModal = null;
-      activeParentFocus = null;
       document.querySelectorAll(".resident-date-modal-backdrop").forEach((backdrop) => {
         backdrop.classList.remove("resident-date-modal-backdrop");
         backdrop.style.removeProperty("z-index");
       });
-      // Bootstrap removes modal-open whenever a modal finishes hiding. Restore
-      // it when this picker was opened above another still-visible modal so the
-      // underlying page cannot scroll while its parent dialog remains active.
-      if (document.querySelector(".modal.show")) {
-        document.body.classList.add("modal-open");
-      }
-      if (parentModalEl?.classList.contains("show")) {
-        const parentInstance = window.bootstrap?.Modal?.getInstance?.(parentModalEl);
-        const parentFocusTrap = parentInstance?._focustrap;
-        if (typeof parentFocusTrap?.deactivate === "function" && typeof parentFocusTrap?.activate === "function") {
-          parentFocusTrap.deactivate();
-          parentFocusTrap.activate();
-        }
-
-        const focusTarget = parentFocusEl?.isConnected && parentModalEl.contains(parentFocusEl)
-          ? parentFocusEl
-          : parentModalEl;
-        if (typeof focusTarget?.focus === "function") {
-          try {
-            focusTarget.focus({ preventScroll: true });
-          } catch (error) {
-            focusTarget.focus();
-          }
-        }
-      }
       activeInput = null;
       activeProxy = null;
       calendarSelectedIso = "";

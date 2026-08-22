@@ -116,17 +116,6 @@
   const confirmOkBtn = el("btnOfficialsMgmtConfirmOk");
   let confirmResolver = null;
   let confirmFocusReturnEl = null;
-  const confirmOriginalParent = confirmModalEl?.parentNode || null;
-  const confirmOriginalNextSibling = confirmModalEl?.nextSibling || null;
-
-  const restoreConfirmModalRoot = () => {
-    if (!confirmModalEl || !confirmOriginalParent || confirmModalEl.parentNode === confirmOriginalParent) return;
-    if (confirmOriginalNextSibling?.parentNode === confirmOriginalParent) {
-      confirmOriginalParent.insertBefore(confirmModalEl, confirmOriginalNextSibling);
-    } else {
-      confirmOriginalParent.appendChild(confirmModalEl);
-    }
-  };
 
   const safe = (value) => {
     const normalized = String(value ?? "").trim();
@@ -197,7 +186,6 @@
 
     confirmModalEl.classList.remove("show");
     confirmModalEl.setAttribute("aria-hidden", "true");
-    restoreConfirmModalRoot();
     confirmOkBtn?.classList.remove("btn-danger", "btn-success", "btn-warning", "btn-secondary");
     confirmOkBtn?.classList.add("btn-primary");
 
@@ -236,15 +224,6 @@
     confirmOkBtn.textContent = String(confirmLabel || "Confirm").trim() || "Confirm";
     confirmOkBtn.classList.remove("btn-primary", "btn-danger", "btn-success", "btn-warning", "btn-secondary");
     confirmOkBtn.classList.add(`btn-${confirmTone || "primary"}`);
-
-    // When confirmation originates inside a Bootstrap modal, keep the custom
-    // dialog inside that modal's focus-trap boundary. This avoids stacking a
-    // second Bootstrap modal and preserves the parent's unsaved form state.
-    const visibleParentModals = Array.from(document.querySelectorAll(".modal.show"));
-    const activeParentModal = visibleParentModals[visibleParentModals.length - 1] || null;
-    if (activeParentModal && !activeParentModal.contains(confirmModalEl)) {
-      activeParentModal.appendChild(confirmModalEl);
-    }
 
     confirmModalEl.classList.add("show");
     confirmModalEl.setAttribute("aria-hidden", "false");

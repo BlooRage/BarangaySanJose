@@ -1,15 +1,10 @@
 <?php
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
-require_once __DIR__ . '/../General/adminModulePermissions.php';
 require_once __DIR__ . '/../General/appointmentSubmissionShared.php';
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], false);
 verifyCsrfToken(false);
-if (!amp_current_user_has_module_permission($conn, 'appointments')) {
-    header('Location: ' . appUrl('/Admin-End/Appointments/WalkInAppointmentForm.php?error=' . rawurlencode('You do not have permission to create appointments.')));
-    exit;
-}
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);

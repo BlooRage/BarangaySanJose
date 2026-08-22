@@ -1,6 +1,5 @@
 <?php
 require_once "../General/security.php";
-require_once "../General/adminModulePermissions.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -8,7 +7,6 @@ $allowedRoles = ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $requestAction = trim((string)($_GET['action'] ?? 'list'));
 $authChecked = false;
-$permissionChecked = false;
 $jsonInput = [];
 if ($requestMethod === 'POST') {
     $raw = file_get_contents('php://input');
@@ -103,19 +101,6 @@ if ($requestMethod === 'GET' && $requestAction === 'list') {
     requireRoleSession($allowedRoles);
     $authChecked = true;
 
-    if (amp_normalize_storage_role((string)($_SESSION['role'] ?? '')) !== 'SuperAdmin') {
-        require_once "../General/connection.php";
-    }
-    $permissionConnection = isset($conn) && $conn instanceof mysqli ? $conn : null;
-    amp_require_json_module_permission($permissionConnection, 'complaint_tracker', [
-        'success' => false,
-        'message' => 'You do not have permission to access the complaint tracker.',
-        'items' => null,
-        'detail' => null,
-        'meta' => null,
-    ]);
-    $permissionChecked = true;
-
     $listCacheKey = complaintTrackerListCacheKey(
         $_GET,
         trim((string)($_SESSION['user_id'] ?? '')),
@@ -136,15 +121,6 @@ require_once "../General/sendSMS.php";
 
 if (!$authChecked) {
     requireRoleSession($allowedRoles);
-}
-if (!$permissionChecked) {
-    amp_require_json_module_permission($conn, 'complaint_tracker', [
-        'success' => false,
-        'message' => 'You do not have permission to access the complaint tracker.',
-        'items' => null,
-        'detail' => null,
-        'meta' => null,
-    ]);
 }
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 

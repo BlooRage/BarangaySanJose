@@ -13,59 +13,16 @@ if (!($conn instanceof mysqli)) {
     throw new RuntimeException('Database connection is unavailable.');
 }
 
-$trustedCliMaintenance = PHP_SAPI === 'cli'
-    && defined('BARANGAY_DOCUMENT_WORKFLOW_CLI')
-    && BARANGAY_DOCUMENT_WORKFLOW_CLI === true;
-if (!$trustedCliMaintenance) {
-    requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], true);
-}
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin'], true);
 
 $action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
 if ($action === '') {
     dr_respond_json(400, ['success' => false, 'message' => 'Missing action.']);
 }
-if ($trustedCliMaintenance && $action !== 'bulk_regenerate_issued') {
-    dr_respond_json(403, ['success' => false, 'message' => 'This CLI entry point only supports document regeneration.']);
-}
-
-$mutationActions = [
-    'maintenance_run',
-    'optimize_indexes',
-    'bulk_regenerate_issued',
-    'create_manual_request',
-    'regenerate_issued_document',
-    'personnel_approve',
-    'personnel_reject',
-    'interview_pass',
-    'interview_fail',
-    'inspection_pass',
-    'inspection_fail',
-    'finance_verify',
-    'finance_reject',
-    'mark_ready',
-    'mark_completed',
-    'save_fee_type',
-    'delete_fee_type',
-    'submit_fee_change_request',
-    'cancel_fee_change_request',
-    'process_fee_change_request',
-    'tag_clearance_fees',
-];
-if (PHP_SAPI !== 'cli' && in_array($action, $mutationActions, true) && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-    header('Allow: POST');
-    dr_respond_json(405, ['success' => false, 'message' => 'Method not allowed.']);
-}
-if (PHP_SAPI !== 'cli' && in_array($action, $mutationActions, true)) {
-    verifyCsrfToken(true);
-}
-
-$maintenanceActions = ['maintenance_run', 'optimize_indexes', 'bulk_regenerate_issued'];
-if (PHP_SAPI !== 'cli' && in_array($action, $maintenanceActions, true)) {
-    requireRoleSession(['SuperAdmin'], true);
-}
 
 // NOTE: avoid expensive schema/backfill maintenance on hot request paths.
-// Maintenance actions are CLI-safe and require SuperAdmin + POST + CSRF on web.
+// Run maintenance manually when needed:
+//   /PhpFiles/Admin-End/documentRequestWorkflow.php?action=maintenance_run
 if ($action === 'maintenance_run') {
     dr_ensure_table($conn);
     dr_ensure_general_fees_table($conn);
@@ -6659,10 +6616,9 @@ function dra_docx_contains_text(string $docxDiskPath, string $needle): bool
 
 function dra_stamp_cohabitation_letterhead($pdf, float $pageWidth, float $pageHeight): void
 {
-    $leftLogoPath = __DIR__ . '/../../Images/San_Jose_LOGO.jpg';
-    $rightLogoPath = __DIR__ . '/../../Images/Montalban_Logo.png';
-    $leftLogo = is_file($leftLogoPath) ? $leftLogoPath : null;
-    $rightLogo = is_file($rightLogoPath) ? $rightLogoPath : null;
+    $templatePath = __DIR__ . '/../../Resident-End/Certificates/DocumentIssuance/CertificateOfCohabitationWithChild.docx';
+    $leftLogo = dra_extract_docx_media_asset($templatePath, 'image1.jpg');
+    $rightLogo = dra_extract_docx_media_asset($templatePath, 'image2.png');
 
     $pdf->SetFillColor(255, 255, 255);
     $pdf->Rect(10.0, 5.0, max(0.0, $pageWidth - 20.0), 43.0, 'F');

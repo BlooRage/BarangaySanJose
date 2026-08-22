@@ -1,6 +1,5 @@
 (() => {
   const el = (id) => document.getElementById(id);
-  const csrfToken = String(window.ADMIN_USER_ARCHIVE_CSRF_TOKEN || "");
 
   const state = {
     rowsRaw: [],
@@ -185,7 +184,6 @@
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          "X-CSRF-TOKEN": csrfToken,
         },
         body: JSON.stringify({ action, user_id: row.user_id }),
       });

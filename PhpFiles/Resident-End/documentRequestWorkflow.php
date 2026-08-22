@@ -6,6 +6,7 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
 require_once __DIR__ . '/../General/documentModuleSettings.php';
+require_once __DIR__ . '/../General/financePaymentSettings.php';
 
 requireRoleSession(['Resident'], true);
 
@@ -2212,6 +2213,9 @@ if ($action === 'submit_payment') {
     if ($paymentMethod !== 'gcash') {
         dr_respond_json(422, ['success' => false, 'message' => 'Online submission is only for GCash payments. For barangay payment, pay at the finance window.']);
     }
+    if (empty(fps_resolve_payment_settings($conn)['online_payment_enabled'])) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Online payment is currently unavailable. Please choose Pay in Barangay.']);
+    }
 
     $proofPath = null;
     $paymentReference = null;
@@ -2448,6 +2452,9 @@ if ($action === 'select_payment_mode') {
     $paymentMethod = strtolower(trim((string)($_POST['payment_method'] ?? '')));
     if (!in_array($paymentMethod, ['gcash', 'barangay'], true)) {
         dr_respond_json(422, ['success' => false, 'message' => 'Please choose a valid payment method.']);
+    }
+    if ($paymentMethod === 'gcash' && empty(fps_resolve_payment_settings($conn)['online_payment_enabled'])) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Online payment is currently unavailable. Please choose Pay in Barangay.']);
     }
 
     // Fast-path update: avoid expensive full workflow recalculation for simple mode selection.
@@ -2875,7 +2882,16 @@ if ($action === 'list') {
         unset($it);
     }
 
-    dr_respond_json(200, ['success' => true, 'items' => $items]);
+    $paymentSettings = fps_resolve_payment_settings($conn);
+    dr_respond_json(200, [
+        'success' => true,
+        'items' => $items,
+        'payment_settings' => [
+            'online_payment_enabled' => !empty($paymentSettings['online_payment_enabled']),
+            'online_payment_label' => (string)($paymentSettings['online_payment_label'] ?? 'GCash'),
+            'online_payment_qr_path' => (string)($paymentSettings['online_payment_qr_path'] ?? '/Images/GCASH_QR.jpg'),
+        ],
+    ]);
 }
 
 if ($action === 'get_clearance_fees') {

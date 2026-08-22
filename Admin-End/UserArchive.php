@@ -115,13 +115,9 @@ requireRoleSession(['SuperAdmin'], false);
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<<<<<<< HEAD
   <script>
     window.ADMIN_USER_ARCHIVE_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES) ?>;
   </script>
   <script src="../JS-Script-Files/Admin-End/archiveUserScript.js?v=20260815-2"></script>
-=======
-  <script src="../JS-Script-Files/Admin-End/archiveUserScript.js?v=20260327-1"></script>
->>>>>>> parent of c4fc1b0 (update on tables)
 </body>
 </html>

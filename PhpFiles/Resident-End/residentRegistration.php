@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once __DIR__ . "/../General/security.php";
 include "../General/connection.php";
 require_once "../General/uniqueIDGenerate.php";
@@ -12,7 +13,14 @@ use setasign\Fpdi\Fpdi;
 
 header('Content-Type: application/json; charset=utf-8');
 
-requireRoleSession(['Resident']);
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode([
+        "success" => false,
+        "message" => "Access denied. You must be logged in."
+    ]);
+    exit;
+}
 
 $user_id = $_SESSION['user_id'];
 
@@ -24,8 +32,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     ]);
     exit;
 }
-
-verifyCsrfToken(true);
 
 $conn->set_charset("utf8mb4");
 

@@ -61,45 +61,22 @@ if (!function_exists('aps_settings_ensure_table')) {
         if ($done) {
             return;
         }
-
-        // Keep schema work off the normal request path. Running CREATE/ALTER on
-        // every page load can wait on metadata locks and makes unrelated AJAX
-        // actions appear unresponsive. Existing installations only perform
-        // read-only metadata checks here; DDL is reserved for missing/outdated
-        // schemas.
-        $tableResult = $conn->query("SHOW TABLES LIKE 'appointmentsettingstbl'");
-        $tableExists = $tableResult instanceof mysqli_result && $tableResult->num_rows > 0;
-        if ($tableResult instanceof mysqli_result) {
-            $tableResult->free();
+        $created = $conn->query("
+            CREATE TABLE IF NOT EXISTS appointmentsettingstbl (
+                setting_key VARCHAR(100) NOT NULL,
+                setting_value TEXT NOT NULL,
+                updated_by_user_id VARCHAR(20) DEFAULT NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (setting_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+        if ($created === false) {
+            throw new RuntimeException('Failed to prepare appointment settings storage.');
         }
 
-        if (!$tableExists) {
-            $created = $conn->query("
-                CREATE TABLE IF NOT EXISTS appointmentsettingstbl (
-                    setting_key VARCHAR(100) NOT NULL,
-                    setting_value TEXT NOT NULL,
-                    updated_by_user_id VARCHAR(20) DEFAULT NULL,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (setting_key)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-            ");
-            if ($created === false) {
-                throw new RuntimeException('Failed to prepare appointment settings storage.');
-            }
-        }
-
-        $columnResult = $conn->query("SHOW COLUMNS FROM appointmentsettingstbl LIKE 'setting_value'");
-        $column = $columnResult instanceof mysqli_result ? $columnResult->fetch_assoc() : null;
-        if ($columnResult instanceof mysqli_result) {
-            $columnResult->free();
-        }
-
-        $columnType = strtolower(trim((string)($column['Type'] ?? '')));
-        if ($columnType !== 'text') {
-            $altered = $conn->query("ALTER TABLE appointmentsettingstbl MODIFY setting_value TEXT NOT NULL");
-            if ($altered === false) {
-                throw new RuntimeException('Failed to update appointment settings storage.');
-            }
+        $altered = $conn->query("ALTER TABLE appointmentsettingstbl MODIFY setting_value TEXT NOT NULL");
+        if ($altered === false) {
+            throw new RuntimeException('Failed to update appointment settings storage.');
         }
 
         $done = true;

@@ -187,17 +187,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!el || !window.bootstrap?.Modal) return null;
     return bootstrap.Modal.getOrCreateInstance(el, { backdrop: "static", keyboard: false });
   };
-  const swapStaticModal = (currentEl, nextEl) => {
-    const nextModal = getStaticModal(nextEl);
-    if (!nextModal) return;
-    const currentModal = getStaticModal(currentEl);
-    if (!currentModal || !currentEl?.classList.contains("show")) {
-      nextModal.show();
-      return;
-    }
-    currentEl.addEventListener("hidden.bs.modal", () => nextModal.show(), { once: true });
-    currentModal.hide();
-  };
 
   const renderDetailList = (el, items) => {
     if (!el) return;
@@ -574,14 +563,16 @@ document.addEventListener("DOMContentLoaded", () => {
             editDocViewerBody.innerHTML = `<img src="${url}" alt="${title}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`;
           }
         }
-        swapStaticModal(viewModalEl, editDocViewerEl);
+        getStaticModal(viewModalEl)?.hide();
+        getStaticModal(editDocViewerEl)?.show();
       }
     });
   }
 
   if (editDocViewerReturn) {
     editDocViewerReturn.addEventListener("click", () => {
-      swapStaticModal(editDocViewerEl, viewModalEl);
+      getStaticModal(editDocViewerEl)?.hide();
+      getStaticModal(viewModalEl)?.show();
     });
   }
 

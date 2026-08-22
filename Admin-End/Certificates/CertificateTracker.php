@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
 
@@ -4154,12 +4154,12 @@ if ($certificateLaunchStage === 'release') {
   </div>
 </div>
 
-<div class="modal fade tracker-profile-modal" id="residentProfileModal" tabindex="-1" aria-labelledby="residentProfileModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade tracker-profile-modal" id="residentProfileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing">
     <div class="modal-content border-0 rounded-2 p-4">
       <div class="modal-header border-0">
-        <h3 class="fw-bold" id="residentProfileModalTitle">Resident Details: <span id="span-displayID" class="text-warning">#&mdash;</span></h3>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning">#&mdash;</span></h3>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
 
       <div class="modal-body">
@@ -4323,7 +4323,6 @@ if ($certificateLaunchStage === 'release') {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
-  window.DOCUMENT_WORKFLOW_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.BARANGAY_ID_SETTINGS = <?= json_encode($barangayIdOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.ISSUANCE_SETTINGS = <?= json_encode($issuanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.CLEARANCE_SETTINGS = <?= json_encode($clearanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
@@ -4344,7 +4343,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260815-workflow-csrf-2"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260811-action-dropdown-neutral"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');

@@ -3010,25 +3010,19 @@ foreach ($appointmentCouncilMembers as $member) {
                         : (action === "complete_appointment" ? "Mark Completed" : "Confirm Denial");
                 }
 
-                if (viewModalEl?.classList.contains("show") && viewModalInstance) {
-                    viewModalEl.addEventListener("hidden.bs.modal", () => confirmModalInstance?.show(), { once: true });
-                    viewModalInstance.hide();
-                } else {
-                    confirmModalInstance?.show();
-                }
+                viewModalInstance?.hide();
+                confirmModalInstance?.show();
             });
         });
 
         confirmModalReturnBtn?.addEventListener("click", () => {
+            confirmModalInstance?.hide();
             if (confirmModalConfirmBtn) {
                 confirmModalConfirmBtn.textContent = "Continue";
             }
-            if (confirmModalEl?.classList.contains("show") && confirmModalInstance) {
-                confirmModalEl.addEventListener("hidden.bs.modal", () => viewModalInstance?.show(), { once: true });
-                confirmModalInstance.hide();
-            } else {
+            window.setTimeout(() => {
                 viewModalInstance?.show();
-            }
+            }, 150);
         });
 
         confirmModalConfirmBtn?.addEventListener("click", async () => {

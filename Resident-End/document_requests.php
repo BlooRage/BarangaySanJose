@@ -17,6 +17,13 @@ if (!isset($baseUrl)) {
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . '/includes/resident_access_guard.php';
+require_once __DIR__ . '/../PhpFiles/General/financePaymentSettings.php';
+
+$financePaymentSettings = fps_resolve_payment_settings($conn);
+$onlinePaymentEnabled = !empty($financePaymentSettings['online_payment_enabled']);
+$onlinePaymentLabel = trim((string)($financePaymentSettings['online_payment_label'] ?? 'GCash')) ?: 'GCash';
+$onlinePaymentQrPath = trim((string)($financePaymentSettings['online_payment_qr_path'] ?? '/Images/GCASH_QR.jpg')) ?: '/Images/GCASH_QR.jpg';
+$onlinePaymentQrUrl = fps_public_asset_url($onlinePaymentQrPath, (string)$baseUrl);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -566,8 +573,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         <select class="form-select" id="paymentModeSelect" name="payment_method" required>
           <option value="">Select an option</option>
           <option value="barangay">Pay in Barangay</option>
-          <option value="gcash">Pay via GCash</option>
+          <?php if ($onlinePaymentEnabled): ?>
+          <option value="gcash">Pay via <?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?></option>
+          <?php endif; ?>
         </select>
+        <?php if (!$onlinePaymentEnabled): ?>
+          <div class="form-text text-muted mt-2">Online payment is currently unavailable.</div>
+        <?php endif; ?>
         <div class="alert alert-danger d-none mt-3" id="paymentModeError"></div>
       </div>
       <div class="modal-footer">
@@ -607,28 +619,28 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <div class="modal-dialog modal-dialog-centered">
     <form class="modal-content" id="gcashPaymentForm" enctype="multipart/form-data">
       <div class="modal-header">
-        <h5 class="modal-title">Pay via GCash</h5>
+        <h5 class="modal-title">Pay via <?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="gcashRequestId" name="request_id">
         <input type="hidden" name="payment_method" value="gcash">
         <div class="mb-3 text-center">
-          <div class="form-text mb-2">Scan this QR for GCash payment.</div>
+          <div class="form-text mb-2">Scan this QR for <?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?> payment.</div>
           <img
             id="gcashQrImage"
-            src="<?= htmlspecialchars((string)$baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/GCASH_QR.jpg"
-            alt="GCash QR Code"
+            src="<?= htmlspecialchars($onlinePaymentQrUrl, ENT_QUOTES, 'UTF-8') ?>"
+            alt="<?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?> QR Code"
             style="max-width:220px;width:100%;height:auto;border:1px solid #ddd;border-radius:8px;"
             onerror="this.style.display='none';document.getElementById('gcashQrMissing')?.classList.remove('d-none');"
           >
-          <div id="gcashQrMissing" class="form-text text-danger d-none">GCash QR image not found. Please contact the barangay office.</div>
+          <div id="gcashQrMissing" class="form-text text-danger d-none"><?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?> QR image not found. Please contact the barangay office.</div>
         </div>
         <label class="form-label">Reference ID / Transaction Number</label>
-        <input type="text" class="form-control mb-3" name="payment_reference" id="gcashReference" placeholder="Enter GCash transaction number" required>
+        <input type="text" class="form-control mb-3" name="payment_reference" id="gcashReference" placeholder="Enter <?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?> transaction number" required>
         <label class="form-label">Payment Proof</label>
         <input type="file" class="form-control" name="payment_proof" id="gcashProof" accept=".jpg,.jpeg,.png,.webp,image/*" required>
-        <div class="form-text">Upload your GCash payment proof.</div>
+        <div class="form-text">Upload your <?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?> payment proof.</div>
         <div class="alert alert-danger d-none mt-3" id="gcashError"></div>
       </div>
       <div class="modal-footer">
@@ -679,6 +691,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 (() => {
   const endpoint = '<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php';
   const digitalBarangayIdPage = '<?= htmlspecialchars($baseUrl) ?>/Resident-End/BarangayId/DigitalId.php';
+  const onlinePaymentEnabled = <?= $onlinePaymentEnabled ? 'true' : 'false' ?>;
   const tbody = document.getElementById('requestRows');
   const cards = document.getElementById('requestCards');
   const btnRefresh = document.getElementById('btnRefresh');
@@ -1072,9 +1085,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     const hasMode = method === 'gcash' || method === 'barangay';
     const modeLabel = hasMode ? 'Change Mode of Payment' : 'Select Mode of Payment';
     const modeBtn = `<button type="button" class="btn btn-sm compact-table-btn btn-invoice" data-open-mode="${escapeHtml(requestId)}"><i class="fa-solid fa-credit-card me-1"></i>${escapeHtml(modeLabel)}</button>`;
-    const payNowBtn = `<button class="btn btn-sm compact-table-btn btn-invoice" data-pay-now="${escapeHtml(requestId)}"><i class="fa-solid fa-money-bill-wave me-1"></i>Pay Now</button>`;
+    const payNowBtn = onlinePaymentEnabled
+      ? `<button class="btn btn-sm compact-table-btn btn-invoice" data-pay-now="${escapeHtml(requestId)}"><i class="fa-solid fa-money-bill-wave me-1"></i>Pay Now</button>`
+      : '';
 
-    if (method === 'gcash') {
+    if (method === 'gcash' && onlinePaymentEnabled) {
       return `<span class="request-actions">${viewBtn}${payNowBtn}${modeBtn}</span>`;
     }
     if (method === 'barangay') {
@@ -1306,6 +1321,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   function openGcashModal(requestId) {
     gcashError.classList.add('d-none');
     gcashError.textContent = '';
+    if (!onlinePaymentEnabled) {
+      gcashError.textContent = 'Online payment is currently unavailable. Please choose Pay in Barangay.';
+      gcashError.classList.remove('d-none');
+      return;
+    }
     gcashPaymentForm.reset();
     gcashRequestId.value = String(requestId || '');
     gcashPaymentModal.show();
@@ -1458,6 +1478,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       paymentModeError.classList.remove('d-none');
       return;
     }
+    if (mode === 'gcash' && !onlinePaymentEnabled) {
+      paymentModeError.textContent = 'Online payment is currently unavailable. Please choose Pay in Barangay.';
+      paymentModeError.classList.remove('d-none');
+      return;
+    }
 
     try {
       await setPaymentMode(requestId, mode);
@@ -1476,6 +1501,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       if (mode === 'barangay') {
         updateBarangayDeadlineNote(requestId);
         barangayPaymentModal.show();
+      } else if (mode === 'gcash') {
+        openGcashModal(requestId);
       }
       load().catch(() => {});
     } catch (err) {

@@ -1,6 +1,5 @@
 (() => {
   const el = (id) => document.getElementById(id);
-  const csrfToken = String(window.ADMIN_USER_MASTERLIST_CSRF_TOKEN || "").trim();
 
   const state = {
     rowsRaw: [],
@@ -398,7 +397,6 @@
     const formData = new FormData();
     formData.set("action", action);
     formData.set("user_id", row.user_id);
-    formData.set("csrf_token", csrfToken);
 
     if (action === "lock_account") {
       const mode = getSelectedLockMode();
@@ -449,7 +447,6 @@
     const formData = new FormData();
     formData.set("action", "archive_account");
     formData.set("user_id", row.user_id);
-    formData.set("csrf_token", csrfToken);
 
     if (refreshBtn) {
       refreshBtn.classList.add("is-loading");

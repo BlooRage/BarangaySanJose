@@ -394,7 +394,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const modalEl = document.getElementById("modalApproveHead");
     if (!modalEl) return;
-    bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: "static", keyboard: false }).show();
+    new bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false }).show();
   };
 
   const openViewModal = (row) => {

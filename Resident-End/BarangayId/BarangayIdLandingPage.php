@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/General/documentRequestWorkflow.php";
@@ -150,7 +150,7 @@ $actionButtonLabel = match ($submissionMode) {
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/barangayIdNav.css">
-    <link id="universalModalStylesheet" rel="stylesheet" href="../../CSS-Styles/modalStyle.css?v=20260815-02">
+    <link rel="stylesheet" href="../../CSS-Styles/modalStyle.css">
     <style>
         :root {
             --bid-page-accent: #de710c;
@@ -872,7 +872,7 @@ $actionButtonLabel = match ($submissionMode) {
 
     <div class="modal fade uniform-modal barangay-id-lost-modal" id="barangayIdLostModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" id="barangayIdRequestModalContent">
+            <div class="modal-content" id="umContent">
                 <div class="modal-header">
                     <h5 class="modal-title text-black" id="barangayIdLostModalLabel">Confirm Lost Barangay ID</h5>
                 </div>
