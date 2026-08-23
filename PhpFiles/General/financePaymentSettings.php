@@ -7,7 +7,7 @@ if (!function_exists('fps_default_payment_settings')) {
     function fps_default_payment_settings(): array
     {
         return [
-            'online_payment_enabled' => true,
+            'online_payment_enabled' => false,
             'online_payment_label' => 'GCash',
             'online_payment_qr_path' => '/Images/GCASH_QR.jpg',
             'updated_by_user_id' => '',
@@ -19,10 +19,15 @@ if (!function_exists('fps_default_payment_settings')) {
 if (!function_exists('fps_ensure_payment_settings_table')) {
     function fps_ensure_payment_settings_table(mysqli $conn): void
     {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+
         $conn->query("
             CREATE TABLE IF NOT EXISTS financepaymentsettingstbl (
                 setting_id TINYINT UNSIGNED NOT NULL DEFAULT 1,
-                online_payment_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                online_payment_enabled TINYINT(1) NOT NULL DEFAULT 0,
                 online_payment_label VARCHAR(60) NOT NULL DEFAULT 'GCash',
                 online_payment_qr_path VARCHAR(500) NOT NULL DEFAULT '/Images/GCASH_QR.jpg',
                 updated_by_user_id VARCHAR(64) DEFAULT NULL,
@@ -30,6 +35,8 @@ if (!function_exists('fps_ensure_payment_settings_table')) {
                 PRIMARY KEY (setting_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
+
+        $done = true;
     }
 }
 
@@ -50,7 +57,7 @@ if (!function_exists('fps_resolve_payment_settings')) {
         }
 
         $settings = $defaults;
-        $settings['online_payment_enabled'] = (int)($row['online_payment_enabled'] ?? 1) === 1;
+        $settings['online_payment_enabled'] = (int)($row['online_payment_enabled'] ?? 0) === 1;
         $settings['online_payment_label'] = $defaults['online_payment_label'];
         $settings['online_payment_qr_path'] = trim((string)($row['online_payment_qr_path'] ?? '')) ?: $defaults['online_payment_qr_path'];
         $settings['updated_by_user_id'] = (string)($row['updated_by_user_id'] ?? '');
