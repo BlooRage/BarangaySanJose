@@ -378,8 +378,6 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
                 <div class="registration-requirement-card h-100">
                   <h6>Resident Profiling Tabs</h6>
                   <ul>
-                    <li>Privacy Notice</li>
-                    <li>Head of the Family</li>
                     <li>Personal Information</li>
                     <li>Home Address</li>
                     <li>Documents</li>
@@ -393,8 +391,6 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
                   <ul>
                     <li>Active mobile number starting with 9</li>
                     <li>Working email address</li>
-                    <li>Password with uppercase, lowercase, number, special character, and at least 8 characters</li>
-                    <li>Password confirmation</li>
                     <li>OTP access for mobile verification</li>
                   </ul>
                 </div>

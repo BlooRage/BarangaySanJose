@@ -297,6 +297,39 @@ body {
     column-gap: 28px;
 }
 
+#registrationRequirementsModal .modal-footer .btn {
+    min-height: 44px;
+    padding: 9px 18px;
+    border-radius: var(--border-radius);
+    font-weight: 700;
+}
+
+#registrationRequirementsCancelBtn {
+    background: #ffffff;
+    border-color: var(--accent-color);
+    color: #8a4b00;
+}
+
+#registrationRequirementsCancelBtn:hover,
+#registrationRequirementsCancelBtn:focus {
+    background: rgba(255, 153, 51, 0.12);
+    border-color: var(--accent-color);
+    color: #6f3c00;
+}
+
+#registrationRequirementsContinueBtn {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #ffffff;
+}
+
+#registrationRequirementsContinueBtn:hover,
+#registrationRequirementsContinueBtn:focus {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #ffffff;
+}
+
 /* ===== Other Forms (Forgot / OTP) ===== */
 .otherforms {
     position: absolute;
