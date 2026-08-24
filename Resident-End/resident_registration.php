@@ -357,70 +357,6 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
             </div>
           </div>
 
-          <div class="birthplace-group mb-3">
-            <div class="birthplace-group-header">
-              <div>
-                <h3 class="birthplace-group-title">Place of Birth <span class="text-danger">*</span></h3>
-                <p class="birthplace-group-copy">Select where you were born, then complete the location details below.</p>
-              </div>
-            </div>
-
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label" for="birthInPhilippines">Birthplace Type <span class="text-danger">*</span></label>
-                <select class="form-select" id="birthInPhilippines" name="birthInPhilippines" required>
-                  <option value="">Select</option>
-                  <option value="yes">Born in the Philippines</option>
-                  <option value="no">Born outside the Philippines</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="row g-3 mt-1 d-none" id="birthplacePhilippinesRow">
-              <div class="col-md-4">
-                <label class="form-label" for="birthRegion">Region <span class="text-danger">*</span></label>
-                <select class="form-select" id="birthRegion" name="birthRegion">
-                  <option value="">Select region</option>
-                </select>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="birthProvince">
-                  <span id="birthProvinceLabelText">Province</span>
-                  <span class="text-danger" id="birthProvinceRequiredMark">*</span>
-                  <span class="text-muted small d-none" id="birthProvinceOptionalNote">(if applicable)</span>
-                </label>
-                <select class="form-select" id="birthProvince" name="birthProvince">
-                  <option value="">Select province</option>
-                </select>
-                <input type="hidden" id="birthProvinceApplicable" name="birthProvinceApplicable" value="">
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="birthCity">Municipality / City <span class="text-danger">*</span></label>
-                <select class="form-select" id="birthCity" name="birthCity" disabled>
-                  <option value="">Select municipality / city</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="row g-3 mt-1 d-none" id="birthplaceInternationalRow">
-              <div class="col-md-6">
-                <label class="form-label" for="birthCountry">Country <span class="text-danger">*</span></label>
-                <select class="form-select" id="birthCountry" name="birthCountry">
-                  <option value="">Select country</option>
-                </select>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" for="birthState">State / Province</label>
-                <select class="form-select" id="birthState" name="birthState" disabled>
-                  <option value="">Select state / province</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
           <div class="row mb-3">
             <div class="col-md-3">
               <label class="form-label" for="civilStatus">Civil Status <span class="text-danger">*</span></label>
@@ -518,6 +454,70 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               >
               <input type="hidden" name="emailAddress" id="emailAddressHidden" value="">
               <div class="small text-muted mt-1">This is your account email and cannot be edited here.</div>
+            </div>
+          </div>
+
+          <div class="birthplace-group mb-3">
+            <div class="birthplace-group-header">
+              <div>
+                <h3 class="birthplace-group-title">Place of Birth <span class="text-danger">*</span></h3>
+                <p class="birthplace-group-copy">Select where you were born, then complete the location details below.</p>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="birthInPhilippines">Birthplace Type <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthInPhilippines" name="birthInPhilippines" required>
+                  <option value="">Select</option>
+                  <option value="yes">Born in the Philippines</option>
+                  <option value="no">Born outside the Philippines</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1 d-none" id="birthplacePhilippinesRow">
+              <div class="col-md-4">
+                <label class="form-label" for="birthRegion">Region <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthRegion" name="birthRegion">
+                  <option value="">Select region</option>
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="birthProvince">
+                  <span id="birthProvinceLabelText">Province</span>
+                  <span class="text-danger" id="birthProvinceRequiredMark">*</span>
+                  <span class="text-muted small d-none" id="birthProvinceOptionalNote">(if applicable)</span>
+                </label>
+                <select class="form-select" id="birthProvince" name="birthProvince">
+                  <option value="">Select province</option>
+                </select>
+                <input type="hidden" id="birthProvinceApplicable" name="birthProvinceApplicable" value="">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="birthCity">Municipality / City <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthCity" name="birthCity" disabled>
+                  <option value="">Select municipality / city</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1 d-none" id="birthplaceInternationalRow">
+              <div class="col-md-6">
+                <label class="form-label" for="birthCountry">Country <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthCountry" name="birthCountry">
+                  <option value="">Select country</option>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="birthState">State / Province</label>
+                <select class="form-select" id="birthState" name="birthState" disabled>
+                  <option value="">Select state / province</option>
+                </select>
+              </div>
             </div>
           </div>
 
