@@ -750,7 +750,7 @@ if ($sbSidebarUserId !== '') {
 ?>
 
 <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260812-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
-<link rel="stylesheet" href="<?= htmlspecialchars(appUrl('CSS-Styles/Admin-End-CSS/TablePagination.css?v=20260805-admin-table-unification'), ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="<?= htmlspecialchars(appUrl('CSS-Styles/Admin-End-CSS/TablePagination.css?v=20260825-mobile-controls'), ENT_QUOTES, 'UTF-8') ?>">
 <script defer src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/tablePagination.js?v=20260805-admin-table-unification'), ENT_QUOTES, 'UTF-8') ?>"></script>
 
 <style>
@@ -1147,6 +1147,24 @@ if ($sbSidebarUserId !== '') {
   @media (max-width: 480px) {
     #main-display {
       padding: 0.85rem !important;
+    }
+
+    #admin-mobile-header .d-flex {
+      min-height: 54px;
+      padding-left: 0.75rem !important;
+      padding-right: 0.75rem !important;
+    }
+
+    #admin-mobile-header .logo-name {
+      max-width: calc(100vw - 112px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.98rem;
+    }
+
+    #dashboard-sidebar {
+      width: min(86vw, 320px) !important;
     }
   }
 

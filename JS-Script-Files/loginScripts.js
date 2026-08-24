@@ -54,6 +54,8 @@ const accountVerifiedModalEl = document.getElementById("accountVerifiedModal");
 const accountVerifiedModalTitle = document.getElementById("accountVerifiedModalTitle");
 const accountVerifiedModalBody = document.getElementById("accountVerifiedModalBody");
 const verifiedContinueBtn = document.getElementById("verifiedContinueBtn");
+const registrationRequirementsModalEl = document.getElementById("registrationRequirementsModal");
+const registrationRequirementsContinueBtn = document.getElementById("registrationRequirementsContinueBtn");
 
 // Back link (new preferred) + fallback (old)
 const otpBackLink = document.getElementById("otpBackLink") || document.getElementById("returnToSignup");
@@ -75,6 +77,9 @@ let otpSending = false;
 let otpVerifying = false;
 const signupEscalatedFields = new Set();
 let authSuccessModalInstance = null;
+let registrationRequirementsModalInstance = null;
+let registrationRequirementsPromptShown = false;
+let continueSignupAfterRequirementsModal = false;
 const AUTH_SUCCESS_FALLBACK_DELAY_MS = 700;
 
 const tryAutoVerifyOtp = () => {
@@ -416,6 +421,47 @@ const switchToLogin = () => {
   inactiveSession.phoneMasked = "+63 •••••• XXXX";
   inactiveSession.redirect = defaultLoginResolveRedirect;
 };
+
+const continueToSignupAfterRequirements = () => {
+  registrationRequirementsPromptShown = true;
+
+  if (!registrationRequirementsModalEl || !window.bootstrap?.Modal) {
+    switchToSignup();
+    return;
+  }
+
+  continueSignupAfterRequirementsModal = true;
+  registrationRequirementsModalEl.addEventListener(
+    "hidden.bs.modal",
+    () => {
+      if (!continueSignupAfterRequirementsModal) return;
+      continueSignupAfterRequirementsModal = false;
+      switchToSignup();
+    },
+    { once: true }
+  );
+
+  registrationRequirementsModalInstance = bootstrap.Modal.getOrCreateInstance(registrationRequirementsModalEl);
+  registrationRequirementsModalInstance.hide();
+};
+
+const showRegistrationRequirementsPrompt = () => {
+  if (registrationRequirementsPromptShown || !registrationRequirementsModalEl || !window.bootstrap?.Modal) {
+    switchToSignup();
+    return;
+  }
+
+  continueSignupAfterRequirementsModal = false;
+  registrationRequirementsModalInstance = bootstrap.Modal.getOrCreateInstance(registrationRequirementsModalEl);
+  registrationRequirementsModalInstance.show();
+};
+
+if (registrationRequirementsContinueBtn) {
+  registrationRequirementsContinueBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    continueToSignupAfterRequirements();
+  });
+}
 
 // ===== Normalize Phone =====
 // 10-digit DB format (9XXXXXXXXX)
@@ -1484,5 +1530,6 @@ if (requestedLoginAuthMode === "signup") {
 
 // ===== Expose (HTML uses onclick="...") =====
 window.switchToSignup = switchToSignup;
+window.showRegistrationRequirementsPrompt = showRegistrationRequirementsPrompt;
 window.switchToLogin = switchToLogin;
 window.backToLogin = backToLogin;

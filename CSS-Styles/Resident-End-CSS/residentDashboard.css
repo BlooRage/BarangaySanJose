@@ -931,6 +931,18 @@ body {
         padding: 1rem !important;
     }
 
+    #div-mainDisplay *,
+    #div-mainDisplay *::before,
+    #div-mainDisplay *::after {
+        min-width: 0;
+    }
+
+    #div-mainDisplay h1,
+    #div-mainDisplay h2,
+    #div-mainDisplay h3 {
+        overflow-wrap: anywhere;
+    }
+
     #div-sidebarWrapper.show {
         transform: translateX(0);
     }
@@ -942,8 +954,19 @@ body {
     }
 
     #div-mainDisplay .table-responsive {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
         border-radius: 16px;
         -webkit-overflow-scrolling: touch;
+    }
+
+    #div-mainDisplay .table-responsive > table,
+    #div-mainDisplay table.compact-admin-table,
+    #div-mainDisplay table.table {
+        width: max-content;
+        min-width: 100%;
     }
 
     #div-mainDisplay table {
@@ -953,6 +976,41 @@ body {
     #div-mainDisplay .modal-dialog {
         margin: 0.75rem auto;
         max-width: calc(100vw - 1rem);
+    }
+
+    #div-mainDisplay .modal-footer,
+    #div-mainDisplay .modal-footer .btn,
+    #div-mainDisplay .application-form-actions,
+    #div-mainDisplay .tracker-actions {
+        flex-wrap: wrap;
+    }
+
+    #div-mainDisplay .modal-footer .btn,
+    #div-mainDisplay .application-form-actions .btn,
+    #div-mainDisplay .tracker-actions .btn {
+        flex: 1 1 100%;
+        white-space: normal;
+    }
+
+    #div-mainDisplay .resident-table-footer,
+    #div-mainDisplay .table-pagination-controls,
+    #div-mainDisplay .tracker-toolbar,
+    #div-mainDisplay .tracker-actions,
+    #div-mainDisplay .application-form-actions {
+        align-items: stretch !important;
+        flex-direction: column !important;
+        width: 100%;
+    }
+
+    #div-mainDisplay .resident-table-footer > *,
+    #div-mainDisplay .table-pagination-controls > *,
+    #div-mainDisplay .tracker-toolbar > *,
+    #div-mainDisplay .tracker-actions > *,
+    #div-mainDisplay .application-form-actions > *,
+    #div-mainDisplay .input-group,
+    #div-mainDisplay .form-control,
+    #div-mainDisplay .form-select {
+        max-width: 100%;
     }
 
     .profile-tabs {
@@ -968,6 +1026,30 @@ body {
 
     body {
         padding-top: 60px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    #mobile-header .d-flex {
+        min-height: 54px;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    #mobile-header .logo-name {
+        max-width: calc(100vw - 112px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.95rem;
+    }
+
+    #div-sidebarWrapper {
+        width: min(86vw, 320px);
+    }
+
+    #div-mainDisplay {
+        padding: 0.85rem !important;
     }
 }
 
