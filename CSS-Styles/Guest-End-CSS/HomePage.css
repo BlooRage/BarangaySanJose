@@ -188,6 +188,20 @@ body {
         width: 100%;
         z-index: 1000;
     }
+    .navbarMain .navbar-collapse {
+        background: rgba(255, 255, 255, 0.98);
+    }
+    .navbarMain #navbarLinks .nav-link {
+        color: #111827 !important;
+        text-shadow: none !important;
+    }
+    .navbarMain #navbarLinks .nav-link::after,
+    .navbarMain.navbar--scrolled #navbarLinks .nav-link::after {
+        background-color: rgba(17, 24, 39, 0.12);
+    }
+    .navbarMain #navbarLinks .nav-item:last-child .nav-link {
+        color: #ffffff !important;
+    }
     .council-card {
         flex: 0 0 100%;
         max-width: 100%;
