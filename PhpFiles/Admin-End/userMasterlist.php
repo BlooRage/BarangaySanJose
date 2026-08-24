@@ -360,6 +360,8 @@ $deletedStatusId = $statusIds['deleted'] ?? null;
 ual_release_expired_locks($conn, $lockedStatusId, $activeStatusId);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    verifyCsrfToken(true);
+
     try {
         $action = trim((string)($_POST['action'] ?? ''));
         $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
@@ -390,6 +392,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $targetStatusStmt->close();
         if ($statusRow) {
             $target['account_status'] = (string)($statusRow['account_status'] ?? '');
+        }
+
+        if ($action === 'archive_account') {
+            [$canArchive, $archiveReason] = currentArchiveability(
+                $conn,
+                $target,
+                $actorUserId,
+                $activeStatusId,
+                $lockedStatusId,
+                $archivedStatusId,
+                $deletedStatusId
+            );
+            if (!$canArchive) {
+                throw new Exception($archiveReason !== '' ? $archiveReason : 'This account cannot be archived here.');
+            }
+
+            if ($archivedStatusId === null) {
+                throw new Exception('Archived status is not configured yet.');
+            }
+
+            $currentStatusId = (int)($target['status_id_account'] ?? 0);
+            $restoreStatusId = $currentStatusId;
+            if ($lockedStatusId !== null && $restoreStatusId === (int)$lockedStatusId) {
+                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
+            }
+            if ($archivedStatusId !== null && $restoreStatusId === (int)$archivedStatusId) {
+                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
+            }
+            if ($deletedStatusId !== null && $restoreStatusId === (int)$deletedStatusId) {
+                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
+            }
+
+            $oldStatusLabel = currentStatusLabel($target, $lockedStatusId);
+
+            $update = $conn->prepare("
+                UPDATE useraccountstbl
+                SET status_id_account = ?,
+                    failed_logins = 0,
+                    lock_start = NULL,
+                    lock_until = NULL,
+                    lock_type = NULL,
+                    lock_reason = NULL,
+                    locked_by_user_id = NULL,
+                    archived_at = NOW(),
+                    archived_prev_status_id = ?,
+                    updated_at = NOW()
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            if (!$update) {
+                throw new Exception('Failed to archive the account.');
+            }
+            $update->bind_param('iis', $archivedStatusId, $restoreStatusId, $userId);
+            $update->execute();
+            $update->close();
+
+            $noticeRecipient = userMasterlistLoadArchiveNoticeRecipient($conn, $userId);
+            $noticeSummary = '';
+            if ($noticeRecipient) {
+                $noticeSummary = userMasterlistArchiveNoticeSummary(userMasterlistSendArchiveNotice($noticeRecipient));
+            }
+
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                'User Masterlist',
+                'UserAccount',
+                $userId,
+                'USER_ACCOUNT_ARCHIVE',
+                'status_id_account',
+                $oldStatusLabel,
+                'Archived',
+                null,
+                $archivedStatusId
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => trim('Account archived successfully. ' . $noticeSummary),
+            ]);
+            exit;
         }
 
         [$canManage, $manageReason] = currentLockability($conn, $target, $actorUserId, $activeStatusId, $lockedStatusId);
@@ -553,88 +637,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             echo json_encode([
                 'success' => true,
                 'message' => 'Account unlocked successfully.',
-            ]);
-            exit;
-        }
-
-        if ($action === 'archive_account') {
-            [$canArchive, $archiveReason] = currentArchiveability(
-                $conn,
-                $target,
-                $actorUserId,
-                $activeStatusId,
-                $lockedStatusId,
-                $archivedStatusId,
-                $deletedStatusId
-            );
-            if (!$canArchive) {
-                throw new Exception($archiveReason !== '' ? $archiveReason : 'This account cannot be archived here.');
-            }
-
-            if ($archivedStatusId === null) {
-                throw new Exception('Archived status is not configured yet.');
-            }
-
-            $currentStatusId = (int)($target['status_id_account'] ?? 0);
-            $restoreStatusId = $currentStatusId;
-            if ($lockedStatusId !== null && $restoreStatusId === (int)$lockedStatusId) {
-                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
-            }
-            if ($archivedStatusId !== null && $restoreStatusId === (int)$archivedStatusId) {
-                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
-            }
-            if ($deletedStatusId !== null && $restoreStatusId === (int)$deletedStatusId) {
-                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
-            }
-
-            $oldStatusLabel = currentStatusLabel($target, $lockedStatusId);
-
-            $update = $conn->prepare("
-                UPDATE useraccountstbl
-                SET status_id_account = ?,
-                    failed_logins = 0,
-                    lock_start = NULL,
-                    lock_until = NULL,
-                    lock_type = NULL,
-                    lock_reason = NULL,
-                    locked_by_user_id = NULL,
-                    archived_at = NOW(),
-                    archived_prev_status_id = ?,
-                    updated_at = NOW()
-                WHERE user_id = ?
-                LIMIT 1
-            ");
-            if (!$update) {
-                throw new Exception('Failed to archive the account.');
-            }
-            $update->bind_param('iis', $archivedStatusId, $restoreStatusId, $userId);
-            $update->execute();
-            $update->close();
-
-            $noticeRecipient = userMasterlistLoadArchiveNoticeRecipient($conn, $userId);
-            $noticeSummary = '';
-            if ($noticeRecipient) {
-                $noticeSummary = userMasterlistArchiveNoticeSummary(userMasterlistSendArchiveNotice($noticeRecipient));
-            }
-
-            insertUnifiedAuditLog(
-                $conn,
-                $actorUserId,
-                $actorRole,
-                'User Masterlist',
-                'UserAccount',
-                $userId,
-                'USER_ACCOUNT_ARCHIVE',
-                'status_id_account',
-                $oldStatusLabel,
-                'Archived',
-                null,
-                $archivedStatusId
-            );
-
-            echo json_encode([
-                'success' => true,
-                'message' => trim('Account archived successfully. ' . $noticeSummary),
             ]);
             exit;
         }

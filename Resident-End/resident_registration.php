@@ -36,7 +36,7 @@ if (!isset($baseUrl)) {
     crossorigin="anonymous"
   />
 
-  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6" />
+  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260825-birthplace-group" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
   <!-- Optional: server-side alert handling (if you use it) -->
@@ -342,7 +342,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           </div>
 
           <div class="row mb-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label" for="sex">Sex <span class="text-danger">*</span></label>
               <select class="form-select" id="sex" name="sex" required>
                 <option value="">Select</option>
@@ -351,62 +351,73 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               </select>
             </div>
 
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label" for="dateOfBirth">Date of Birth <span class="text-danger">*</span></label>
               <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar" required>
             </div>
-
-            <div class="col-md-4">
-              <label class="form-label" for="birthInPhilippines">Place of Birth <span class="text-danger">*</span></label>
-              <select class="form-select" id="birthInPhilippines" name="birthInPhilippines" required>
-                <option value="">Select</option>
-                <option value="yes">Born in the Philippines</option>
-                <option value="no">Born outside the Philippines</option>
-              </select>
-            </div>
           </div>
 
-          <div class="row mb-3 d-none" id="birthplacePhilippinesRow">
-            <div class="col-md-4">
-              <label class="form-label" for="birthRegion">Region <span class="text-danger">*</span></label>
-              <select class="form-select" id="birthRegion" name="birthRegion">
-                <option value="">Select region</option>
-              </select>
+          <div class="birthplace-group mb-3">
+            <div class="birthplace-group-header">
+              <div>
+                <h3 class="birthplace-group-title">Place of Birth <span class="text-danger">*</span></h3>
+                <p class="birthplace-group-copy">Select where you were born, then complete the location details below.</p>
+              </div>
             </div>
 
-            <div class="col-md-4">
-              <label class="form-label" for="birthProvince">
-                <span id="birthProvinceLabelText">Province</span>
-                <span class="text-danger" id="birthProvinceRequiredMark">*</span>
-                <span class="text-muted small d-none" id="birthProvinceOptionalNote">(if applicable)</span>
-              </label>
-              <select class="form-select" id="birthProvince" name="birthProvince">
-                <option value="">Select province</option>
-              </select>
-              <input type="hidden" id="birthProvinceApplicable" name="birthProvinceApplicable" value="">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="birthInPhilippines">Birthplace Type <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthInPhilippines" name="birthInPhilippines" required>
+                  <option value="">Select</option>
+                  <option value="yes">Born in the Philippines</option>
+                  <option value="no">Born outside the Philippines</option>
+                </select>
+              </div>
             </div>
 
-            <div class="col-md-4">
-              <label class="form-label" for="birthCity">Municipality / City <span class="text-danger">*</span></label>
-              <select class="form-select" id="birthCity" name="birthCity" disabled>
-                <option value="">Select municipality / city</option>
-              </select>
-            </div>
-          </div>
+            <div class="row g-3 mt-1 d-none" id="birthplacePhilippinesRow">
+              <div class="col-md-4">
+                <label class="form-label" for="birthRegion">Region <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthRegion" name="birthRegion">
+                  <option value="">Select region</option>
+                </select>
+              </div>
 
-          <div class="row mb-3 d-none" id="birthplaceInternationalRow">
-            <div class="col-md-6">
-              <label class="form-label" for="birthCountry">Country <span class="text-danger">*</span></label>
-              <select class="form-select" id="birthCountry" name="birthCountry">
-                <option value="">Select country</option>
-              </select>
+              <div class="col-md-4">
+                <label class="form-label" for="birthProvince">
+                  <span id="birthProvinceLabelText">Province</span>
+                  <span class="text-danger" id="birthProvinceRequiredMark">*</span>
+                  <span class="text-muted small d-none" id="birthProvinceOptionalNote">(if applicable)</span>
+                </label>
+                <select class="form-select" id="birthProvince" name="birthProvince">
+                  <option value="">Select province</option>
+                </select>
+                <input type="hidden" id="birthProvinceApplicable" name="birthProvinceApplicable" value="">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="birthCity">Municipality / City <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthCity" name="birthCity" disabled>
+                  <option value="">Select municipality / city</option>
+                </select>
+              </div>
             </div>
 
-            <div class="col-md-6">
-              <label class="form-label" for="birthState">State / Province</label>
-              <select class="form-select" id="birthState" name="birthState" disabled>
-                <option value="">Select state / province</option>
-              </select>
+            <div class="row g-3 mt-1 d-none" id="birthplaceInternationalRow">
+              <div class="col-md-6">
+                <label class="form-label" for="birthCountry">Country <span class="text-danger">*</span></label>
+                <select class="form-select" id="birthCountry" name="birthCountry">
+                  <option value="">Select country</option>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="birthState">State / Province</label>
+                <select class="form-select" id="birthState" name="birthState" disabled>
+                  <option value="">Select state / province</option>
+                </select>
+              </div>
             </div>
           </div>
 

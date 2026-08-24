@@ -322,69 +322,117 @@ h1, h2, h3, h4, h5, h6 {
 }
 .serviceAuthModal .modal-content {
     border: none;
-    border-radius: 18px;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 22px 60px rgba(70, 34, 4, 0.22);
 }
 .serviceAuthModal .modal-body {
     position: relative;
-    padding: 28px 28px 24px;
+    padding: 34px 32px 28px;
     text-align: center;
+    background:
+        linear-gradient(180deg, rgba(254, 153, 60, 0.11), rgba(255, 255, 255, 0) 42%),
+        #FFFFFF;
 }
 .serviceAuthClose {
     position: absolute;
     top: 16px;
     right: 16px;
-    padding: 6px;
-    opacity: 0.9;
+    width: 36px;
+    height: 36px;
+    padding: 10px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.82);
+    opacity: 0.75;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+.serviceAuthClose:hover,
+.serviceAuthClose:focus {
+    background-color: #FFF1E3;
+    opacity: 1;
+}
+.serviceAuthIcon {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #DE710C;
+    background: #FFF1E3;
+    border: 1px solid rgba(254, 153, 60, 0.36);
+    box-shadow: 0 12px 28px rgba(254, 153, 60, 0.22);
+}
+.serviceAuthIcon i {
+    font-size: 24px;
 }
 .serviceAuthEyebrow {
-    margin-bottom: 12px;
-    color: #111111;
+    margin-bottom: 8px;
+    color: #8A4B00;
     font-size: 12px;
-    font-weight: 700;
+    font-family: 'Geist', sans-serif;
+    font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
 }
 .serviceAuthTitle {
-    margin-bottom: 10px;
-    color: #111111;
-    font-size: 34px;
+    margin-bottom: 12px;
+    color: #222222;
+    font-size: 32px;
     font-weight: 700;
-    line-height: 1.08;
+    line-height: 1.12;
 }
 .serviceAuthCopy {
-    margin-bottom: 20px;
-    color: #202020;
+    max-width: 410px;
+    margin: 0 auto 22px;
+    color: #4B4B4B;
     font-size: 15px;
     line-height: 1.6;
 }
 .serviceAuthCopy strong {
-    color: #111111;
+    color: #222222;
 }
 .serviceAuthActions {
     display: grid;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 12px;
+    margin-bottom: 14px;
 }
 .serviceAuthPrimary,
 .serviceAuthSecondary {
     width: 100%;
+    min-height: 50px;
     padding: 12px 18px;
     border-radius: 10px;
     font-size: 16px;
-    font-weight: 600;
+    font-family: 'Geist', sans-serif;
+    font-weight: 750;
+}
+.serviceAuthPrimary {
+    border: 1px solid #FE993C !important;
+    background-color: #FE993C !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 10px 22px rgba(254, 153, 60, 0.25);
+}
+.serviceAuthPrimary:hover,
+.serviceAuthPrimary:focus {
+    border-color: #DE710C !important;
+    background-color: #DE710C !important;
+    color: #FFFFFF !important;
 }
 .serviceAuthSecondary {
-    border: 1px solid #d9d9d9;
-    color: #111111;
+    border: 1px solid rgba(222, 113, 12, 0.36);
+    color: #8A4B00;
     background-color: #FFFFFF;
 }
-.serviceAuthSecondary:hover {
-    background-color: #f6f6f6;
-    color: #111111;
+.serviceAuthSecondary:hover,
+.serviceAuthSecondary:focus {
+    background-color: #FFF1E3;
+    border-color: #DE710C;
+    color: #6F3C00;
 }
 .serviceAuthHint {
-    color: #444444;
+    color: #6B5F55;
     font-size: 13px;
     line-height: 1.5;
 }
@@ -510,6 +558,14 @@ h1, h2, h3, h4, h5, h6 {
     }
     .serviceAuthModal .modal-body {
         padding: 24px 20px 20px;
+    }
+    .serviceAuthIcon {
+        width: 54px;
+        height: 54px;
+        margin-bottom: 12px;
+    }
+    .serviceAuthIcon i {
+        font-size: 21px;
     }
     .serviceAuthTitle {
         font-size: 28px;
