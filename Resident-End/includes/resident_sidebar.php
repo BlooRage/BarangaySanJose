@@ -629,6 +629,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         if (url.toString() === currentUrl.toString()) {
           return null;
         }
+        if (/\/(?:logout|PhpFiles\/Login\/logout\.php)(?:\?|$)/i.test(url.pathname)) {
+          return null;
+        }
+        if (/\/PhpFiles\//i.test(url.pathname)) {
+          return null;
+        }
         return url.toString();
       } catch (error) {
         return null;
@@ -654,6 +660,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       "#nav-sidebarLinks a[href], #resident-transactions-collapse a[href], .sidebar-actions a[href]"
     )).filter((link) => {
       if (!link || !link.href) {
+        return false;
+      }
+      if (link.classList.contains("logout-link")) {
         return false;
       }
       const href = String(link.getAttribute("href") || "");
