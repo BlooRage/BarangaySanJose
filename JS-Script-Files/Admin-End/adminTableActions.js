@@ -6,13 +6,13 @@
     .admin-table-action-dropdown{display:inline-block;white-space:nowrap}
     .admin-table-action-dropdown>.dropdown-toggle{min-width:92px}
     .admin-table-action-dropdown .dropdown-menu{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;min-width:12rem;padding:.4rem;border:1px solid #e2e8f0;border-radius:.65rem;box-shadow:0 .5rem 1.25rem rgba(15,23,42,.14);z-index:2060}
-    .admin-table-action-dropdown .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;color:#1f2937;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
+    .admin-table-action-dropdown .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;color:#1f2937!important;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
     .admin-table-action-dropdown .dropdown-item:hover,.admin-table-action-dropdown .dropdown-item:focus,.admin-table-action-dropdown .dropdown-item:active,.admin-table-action-dropdown .dropdown-item.active{background:#f8fafc!important;color:#0f172a!important}
-    .admin-table-action-dropdown .dropdown-item.action-effect-view{color:#1f2937;background:transparent}
-    .admin-table-action-dropdown .dropdown-item.action-effect-success{color:#087443;background:transparent}
-    .admin-table-action-dropdown .dropdown-item.action-effect-warning{color:#9a5708;background:transparent}
-    .admin-table-action-dropdown .dropdown-item.action-effect-danger{color:#b42318;background:transparent}
-    .admin-table-action-dropdown .dropdown-item.action-effect-neutral{color:#667085;background:transparent}
+    .admin-table-action-dropdown .dropdown-item.action-effect-view{color:#1f2937!important;background:transparent}
+    .admin-table-action-dropdown .dropdown-item.action-effect-success{color:#087443!important;background:transparent}
+    .admin-table-action-dropdown .dropdown-item.action-effect-warning{color:#9a5708!important;background:transparent}
+    .admin-table-action-dropdown .dropdown-item.action-effect-danger{color:#b42318!important;background:transparent}
+    .admin-table-action-dropdown .dropdown-item.action-effect-neutral{color:#667085!important;background:transparent}
     .admin-table-action-dropdown .dropdown-item.action-effect-view:hover,.admin-table-action-dropdown .dropdown-item.action-effect-view:focus,.admin-table-action-dropdown .dropdown-item.action-effect-view:active,.admin-table-action-dropdown .dropdown-item.action-effect-view.active{background:#f8fafc!important;color:#0f172a!important}
     .admin-table-action-dropdown .dropdown-item.action-effect-success:hover,.admin-table-action-dropdown .dropdown-item.action-effect-success:focus,.admin-table-action-dropdown .dropdown-item.action-effect-success:active,.admin-table-action-dropdown .dropdown-item.action-effect-success.active{background:#f8fafc!important;color:#087443!important}
     .admin-table-action-dropdown .dropdown-item.action-effect-warning:hover,.admin-table-action-dropdown .dropdown-item.action-effect-warning:focus,.admin-table-action-dropdown .dropdown-item.action-effect-warning:active,.admin-table-action-dropdown .dropdown-item.action-effect-warning.active{background:#f8fafc!important;color:#9a5708!important}
@@ -28,7 +28,12 @@
     body #main-display .table-responsive .dropdown-menu,body main .table-responsive .dropdown-menu{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;z-index:2060}
     body #main-display .table-responsive .dropdown-menu .dropdown-item:focus,body #main-display .table-responsive .dropdown-menu .dropdown-item:active,body #main-display .table-responsive .dropdown-menu .dropdown-item.active,body main .table-responsive .dropdown-menu .dropdown-item:focus,body main .table-responsive .dropdown-menu .dropdown-item:active,body main .table-responsive .dropdown-menu .dropdown-item.active{background:#f8fafc!important;color:#0f172a!important}
     body>.admin-table-action-menu-portal{--bs-dropdown-link-hover-bg:#f8fafc;--bs-dropdown-link-hover-color:#0f172a;--bs-dropdown-link-active-bg:#f8fafc;--bs-dropdown-link-active-color:#0f172a;position:fixed!important;min-width:12rem;max-height:calc(100vh - 16px);overflow-y:auto;margin:0!important;padding:.4rem;border:1px solid #e2e8f0;border-radius:.65rem;box-shadow:0 .5rem 1.25rem rgba(15,23,42,.14);z-index:2060}
-    body>.admin-table-action-menu-portal .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
+    body>.admin-table-action-menu-portal .dropdown-item{display:flex;align-items:center;width:100%;gap:.45rem;margin:0!important;padding:.55rem .7rem;border:0;border-radius:.4rem;background:transparent;color:#1f2937!important;font-size:.875rem;text-align:left;text-decoration:none;white-space:nowrap}
+    body>.admin-table-action-menu-portal .dropdown-item.action-effect-view{color:#1f2937!important}
+    body>.admin-table-action-menu-portal .dropdown-item.action-effect-success{color:#087443!important}
+    body>.admin-table-action-menu-portal .dropdown-item.action-effect-warning{color:#9a5708!important}
+    body>.admin-table-action-menu-portal .dropdown-item.action-effect-danger{color:#b42318!important}
+    body>.admin-table-action-menu-portal .dropdown-item.action-effect-neutral{color:#667085!important}
     body>.admin-table-action-menu-portal .dropdown-item:hover,body>.admin-table-action-menu-portal .dropdown-item:focus,body>.admin-table-action-menu-portal .dropdown-item:active{background:#f8fafc!important}
     body>.admin-table-action-menu-portal form{display:block!important;width:100%;margin:0!important;padding:0!important}
     body>.admin-table-action-menu-portal .dropdown-item+.dropdown-item,body>.admin-table-action-menu-portal form+.dropdown-item,body>.admin-table-action-menu-portal .dropdown-item+form{margin-top:.25rem!important}
@@ -114,6 +119,7 @@
         .filter(name => name !== 'btn'
           && name !== 'btn-sm'
           && !/^btn-(?:primary|secondary|success|danger|warning|info|light|dark|link|outline-.+)$/.test(name)
+          && !/^text-(?:primary|secondary|success|danger|warning|info|light|dark|body|muted|white|black|reset|opacity-\d+)$/.test(name)
           && name !== 'me-1' && name !== 'me-2' && name !== 'ms-1' && name !== 'ms-2')
         .join(' ');
       control.classList.add('dropdown-item');
