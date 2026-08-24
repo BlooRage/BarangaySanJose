@@ -996,18 +996,9 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
     const sendingModalEl = document.getElementById('inviteSendingModal');
     if (!form || !openBtn || !confirmBtn || !hiddenPwd || !modalPwd || !modalEl || !summary || !precheckError || !sendingModalEl || typeof bootstrap === 'undefined') return;
 
-    const authModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    const sendingModal = bootstrap.Modal.getOrCreateInstance(sendingModalEl);
+    const authModal = new bootstrap.Modal(modalEl);
+    const sendingModal = new bootstrap.Modal(sendingModalEl);
     let pendingSubmit = null;
-
-    const runAfterAuthorizationHidden = function (callback) {
-      if (!modalEl.classList.contains('show')) {
-        callback();
-        return;
-      }
-      modalEl.addEventListener('hidden.bs.modal', callback, { once: true });
-      authModal.hide();
-    };
 
     const openAuthorizationModal = function (config) {
       modalPwd.value = '';
@@ -1072,10 +1063,9 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
           danger: false,
           onConfirm: function (pwd) {
             hiddenPwd.value = pwd;
-            runAfterAuthorizationHidden(function () {
-              sendingModal.show();
-              form.submit();
-            });
+            authModal.hide();
+            sendingModal.show();
+            form.submit();
           }
         });
       }).catch(function () {
@@ -1139,7 +1129,7 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
       titleEl.textContent = 'Invite Status';
       bodyEl.textContent = flash.message;
     }
-    const resultModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    const resultModal = new bootstrap.Modal(modalEl);
     resultModal.show();
   })();
 </script>

@@ -249,7 +249,8 @@ $isCertificateIndigencyActive = $isCertificateIssuanceSectionActive
     );
 $isFinanceCreateActive = $current === 'FinancePayments.php' && $financeSection === 'create';
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
-$isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'create'], true);
+$isFinanceSettingsActive = $current === 'FinancePayments.php' && $financeSection === 'settings';
+$isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'create', 'settings'], true);
 $contentCreateType = strtolower(trim((string)($_GET['type'] ?? 'page')));
 if (!in_array($contentCreateType, ['page', 'news', 'delivery', 'faq'], true)) {
     $contentCreateType = 'page';
@@ -507,6 +508,7 @@ $sbFinanceKeys = [
     'finance_payment_tracker',
     'finance_create_transaction',
     'finance_fee_management',
+    'finance_payment_settings',
 ];
 $sbBlotterKeys = [
     'blotter_log_new_incident',
@@ -747,7 +749,7 @@ if ($sbSidebarUserId !== '') {
 }
 ?>
 
-<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260815-02'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js?v=20260812-01'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <link rel="stylesheet" href="<?= htmlspecialchars(appUrl('CSS-Styles/Admin-End-CSS/TablePagination.css?v=20260805-admin-table-unification'), ENT_QUOTES, 'UTF-8') ?>">
 <script defer src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/tablePagination.js?v=20260805-admin-table-unification'), ENT_QUOTES, 'UTF-8') ?>"></script>
 
@@ -1638,6 +1640,14 @@ if ($sbSidebarUserId !== '') {
                  class="link-dark rounded sidebar-subnav-link <?= $isFinanceFeesActive ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">Fee Management</span>
                 <?= $sbRenderAttentionBadge($sbCount('finance_fee_management')) ?>
+              </a>
+            </li>
+            <?php endif; ?>
+            <?php if ($sbCan('finance_payment_settings')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=settings"
+                 class="link-dark rounded sidebar-subnav-link <?= $isFinanceSettingsActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Finance Settings</span>
               </a>
             </li>
             <?php endif; ?>

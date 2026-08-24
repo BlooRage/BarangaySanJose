@@ -360,7 +360,6 @@ $deletedStatusId = $statusIds['deleted'] ?? null;
 ual_release_expired_locks($conn, $lockedStatusId, $activeStatusId);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    verifyCsrfToken(true);
     try {
         $action = trim((string)($_POST['action'] ?? ''));
         $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));

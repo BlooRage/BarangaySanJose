@@ -2,10 +2,11 @@
 require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/uniqueIDGenerate.php';
+require_once __DIR__ . '/../../PhpFiles/General/financePaymentSettings.php';
 
 $financeBaseUrl = appUrl('/Admin-End/Certificates/FinancePayments.php');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
-if (!in_array($financeSection, ['tracker', 'fees', 'create', 'transactions'], true)) {
+if (!in_array($financeSection, ['tracker', 'fees', 'create', 'transactions', 'settings'], true)) {
   $financeSection = 'tracker';
 }
 
@@ -323,6 +324,10 @@ if ($financeSection === 'create' || $financeSection === 'transactions' || trim((
   fp_ensure_manual_transactions_table($conn);
 }
 
+if ($financeSection === 'settings' || trim((string)($_POST['action'] ?? '')) === 'save_payment_settings') {
+  fps_ensure_payment_settings_table($conn);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   verifyCsrfToken(false);
   $action = trim((string)($_POST['action'] ?? ''));
@@ -421,6 +426,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $insertStmt->close();
 
       fp_set_flash('success', 'Transaction created successfully.');
+    } elseif ($action === 'save_payment_settings') {
+      $redirectSection = 'settings';
+      fps_save_payment_settings($conn, $_POST, $_FILES, trim((string)($_SESSION['user_id'] ?? '')));
+      fp_set_flash('success', 'Finance payment settings saved.');
     } elseif ($action === 'add_fee') {
       $documentTypeId = (int)($_POST['document_type_id'] ?? 0);
       if ($documentTypeId <= 0) {
@@ -515,6 +524,7 @@ $editingFee = null;
 $pendingFeeChangeCount = 0;
 $manualDepartmentOptions = [];
 $manualTransactionRows = [];
+$financePaymentSettings = [];
 
 if ($financeSection === 'fees') {
   $feeRowsResult = $conn->query("
@@ -580,6 +590,8 @@ if ($financeSection === 'fees') {
 } elseif ($financeSection === 'create' || $financeSection === 'transactions') {
   $manualDepartmentOptions = fp_fetch_department_options($conn);
   $manualTransactionRows = fp_fetch_manual_transactions($conn, 25);
+} elseif ($financeSection === 'settings') {
+  $financePaymentSettings = fps_resolve_payment_settings($conn);
 }
 ?>
 <!DOCTYPE html>
@@ -1118,7 +1130,7 @@ if ($financeSection === 'fees') {
       <?php include __DIR__ . '/includes/barangay_id_admin_nav.php'; ?>
     <?php endif; ?>
 
-    <?php if ($financeSection === 'create' || $financeSection === 'transactions'): ?>
+    <?php if ($financeSection === 'create' || $financeSection === 'transactions' || $financeSection === 'settings'): ?>
       <ul class="nav nav-tabs mb-0" id="transactionTabs">
         <li class="nav-item">
           <a class="nav-link <?= $financeSection === 'create' ? 'active' : '' ?>"
@@ -1130,6 +1142,12 @@ if ($financeSection === 'fees') {
           <a class="nav-link <?= $financeSection === 'transactions' ? 'active' : '' ?>"
              href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=transactions">
             <i class="fas fa-list-check me-1"></i>Transactions
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $financeSection === 'settings' ? 'active' : '' ?>"
+             href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=settings">
+            <i class="fas fa-gear me-1"></i>Settings
           </a>
         </li>
       </ul>
@@ -1417,6 +1435,84 @@ if ($financeSection === 'fees') {
         </div>
       </div>
 
+    <?php elseif ($financeSection === 'settings'): ?>
+      <?php
+        $onlinePaymentEnabled = !empty($financePaymentSettings['online_payment_enabled']);
+        $onlinePaymentLabel = trim((string)($financePaymentSettings['online_payment_label'] ?? 'GCash')) ?: 'GCash';
+        $onlinePaymentQrPath = trim((string)($financePaymentSettings['online_payment_qr_path'] ?? '/Images/GCASH_QR.jpg')) ?: '/Images/GCASH_QR.jpg';
+        $onlinePaymentQrUrl = fps_public_asset_url($onlinePaymentQrPath);
+      ?>
+      <div class="finance-fee-shell">
+        <div class="row g-4 finance-fee-card transaction-tab-panel p-4 mx-0 mt-0">
+          <?php if ($pageFlash): ?>
+          <div class="col-12">
+            <div class="alert alert-<?= htmlspecialchars((string)($pageFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm mb-0" role="alert">
+              <?= htmlspecialchars((string)($pageFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+            </div>
+          </div>
+          <?php endif; ?>
+
+          <div class="col-lg-7">
+            <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=settings" enctype="multipart/form-data" class="finance-fee-editor d-grid gap-3">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="action" value="save_payment_settings">
+
+              <div>
+                <h5 class="fw-bold mb-1">Online Payment</h5>
+                <p class="text-muted mb-0">Control whether residents can select and submit online payments.</p>
+              </div>
+
+              <label class="border rounded-3 p-3 bg-white">
+                <span class="form-check form-switch mb-0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="onlinePaymentEnabled" name="online_payment_enabled" value="1" <?= $onlinePaymentEnabled ? 'checked' : '' ?>>
+                  <span class="form-check-label fw-semibold ms-2">Enable online payment</span>
+                </span>
+                <span class="small text-muted d-block ms-5 mt-1">When disabled, residents can only choose Pay in Barangay.</span>
+              </label>
+
+              <div>
+                <label for="onlinePaymentQr" class="form-label fw-semibold">Upload QR Code</label>
+                <input id="onlinePaymentQr" type="file" name="online_payment_qr" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/*">
+                <div class="form-text">Leave blank to keep the current QR code.</div>
+              </div>
+
+              <div class="text-end">
+                <button type="submit" class="btn btn-primary px-4">
+                  <i class="fas fa-save me-1"></i>Save Settings
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="col-lg-5">
+            <div class="finance-fee-editor h-100">
+              <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Current QR Code</h5>
+                  <p class="text-muted small mb-0"><?= $onlinePaymentEnabled ? 'Visible to residents choosing online payment.' : 'Saved but hidden while online payment is disabled.' ?></p>
+                </div>
+                <span class="badge <?= $onlinePaymentEnabled ? 'text-bg-success' : 'text-bg-secondary' ?>">
+                  <?= $onlinePaymentEnabled ? 'Enabled' : 'Disabled' ?>
+                </span>
+              </div>
+              <div class="text-center bg-white border rounded-3 p-3">
+                <img
+                  src="<?= htmlspecialchars($onlinePaymentQrUrl, ENT_QUOTES, 'UTF-8') ?>"
+                  alt="<?= htmlspecialchars($onlinePaymentLabel, ENT_QUOTES, 'UTF-8') ?> QR Code"
+                  style="max-width:260px;width:100%;height:auto;border:1px solid #e5e7eb;border-radius:8px;"
+                >
+              </div>
+              <div class="small text-muted mt-3">
+                Path: <code><?= htmlspecialchars($onlinePaymentQrPath, ENT_QUOTES, 'UTF-8') ?></code>
+              </div>
+              <?php if (trim((string)($financePaymentSettings['updated_at'] ?? '')) !== ''): ?>
+                <div class="small text-muted mt-1">Last updated: <?= htmlspecialchars(fp_format_datetime((string)$financePaymentSettings['updated_at']), ENT_QUOTES, 'UTF-8') ?></div>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+      </div>
+
     <?php elseif ($financeSection === 'create' || $financeSection === 'transactions'): ?>
       <div class="finance-fee-shell">
         <div class="row g-4 finance-fee-card transaction-tab-panel p-4 mx-0 mt-0">
@@ -1658,9 +1754,6 @@ if ($financeSection === 'fees') {
   </main>
 </div>
 
-<script>
-window.DOCUMENT_WORKFLOW_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-</script>
 <?php if ($financeSection === 'tracker' || $financeSection === 'fees'): ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <?php endif; ?>
@@ -1867,7 +1960,7 @@ window.DOCUMENT_WORKFLOW_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UN
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260815-workflow-csrf-2"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260805-tracker-all-rows"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
@@ -2101,7 +2194,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const body = new FormData();
       body.append('action', 'delete_fee_type');
       body.append('fee_type_id', id);
-      body.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Delete failed.');
@@ -2135,7 +2227,6 @@ document.addEventListener('DOMContentLoaded', () => {
       body.append('fee_name', name);
       body.append('default_amount', String(amount));
       body.append('status', active ? 'approved' : 'rejected');
-      body.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Save failed.');
@@ -2162,11 +2253,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') { e.preventDefault(); saveFeeType(); }
   });
 
-  document.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-
-    const editBtn = target.closest('.js-finance-edit-fee');
+  feeTypesTableBody.addEventListener('click', (event) => {
+    const editBtn = event.target.closest('.js-finance-edit-fee');
     if (editBtn) {
       financeEditFee(
         editBtn.dataset.feeId || '',
@@ -2177,7 +2265,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const deleteBtn = target.closest('.js-finance-delete-fee');
+    const deleteBtn = event.target.closest('.js-finance-delete-fee');
     if (deleteBtn) {
       financeDeleteFee(
         deleteBtn.dataset.feeId || '',
@@ -2244,7 +2332,6 @@ document.addEventListener('DOMContentLoaded', () => {
       fd.append('action', 'process_fee_change_request');
       fd.append('fee_type_id', id);
       fd.append('decision', 'approved');
-      fd.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Approve failed.');
@@ -2260,7 +2347,6 @@ document.addEventListener('DOMContentLoaded', () => {
       fd.append('fee_type_id', id);
       fd.append('decision', 'rejected');
       fd.append('review_notes', reviewNotes);
-      fd.append('csrf_token', window.DOCUMENT_WORKFLOW_CSRF_TOKEN || '');
       const res  = await fetch(API, { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Reject failed.');
@@ -2268,17 +2354,14 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { alert(e.message); }
   }
 
-  document.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-
-    const approveBtn = target.closest('.js-finance-approve-fcr');
+  pendingRequestsBody.addEventListener('click', (event) => {
+    const approveBtn = event.target.closest('.js-finance-approve-fcr');
     if (approveBtn) {
       financeApproveFcr(approveBtn.dataset.feeId || '');
       return;
     }
 
-    const rejectBtn = target.closest('.js-finance-reject-fcr');
+    const rejectBtn = event.target.closest('.js-finance-reject-fcr');
     if (rejectBtn) {
       financeRejectFcr(rejectBtn.dataset.feeId || '');
     }

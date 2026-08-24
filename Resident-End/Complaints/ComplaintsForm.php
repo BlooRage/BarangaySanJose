@@ -457,12 +457,12 @@ $areaOptions = [
             </form>
         </main>
     </div>
-    <div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-labelledby="complaintTimeModalTitle" aria-hidden="true">
+    <div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <div class="complaint-form-modal__heading" id="complaintTimeModalTitle">Select Time</div>
+                        <div class="complaint-form-modal__heading">Select Time</div>
                         <div class="complaint-form-modal__subheading">Choose the incident time or use the current time.</div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -523,6 +523,7 @@ $areaOptions = [
         });
     }
 </script>
+<script src="../../JS-Script-Files/modalHandler.js"></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>

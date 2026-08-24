@@ -1,6 +1,5 @@
 (() => {
   const el = (id) => document.getElementById(id);
-  const csrfToken = String(window.ADMIN_USER_ARCHIVE_CSRF_TOKEN || "");
 
   const state = {
     rowsRaw: [],
@@ -185,7 +184,6 @@
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          "X-CSRF-TOKEN": csrfToken,
         },
         body: JSON.stringify({ action, user_id: row.user_id }),
       });
@@ -276,12 +274,8 @@
     }
 
     if (tbody) {
-      document.addEventListener("click", (event) => {
-        const target = event.target instanceof Element ? event.target : null;
-        if (!target) return;
-
-        // Action menus are moved to <body> by the shared admin table helper.
-        const button = target.closest('[data-action="restore"], [data-action="delete"]');
+      tbody.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-action]");
         if (!button) return;
 
         const action = String(button.dataset.action || "").trim();

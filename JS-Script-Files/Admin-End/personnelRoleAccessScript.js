@@ -63,16 +63,6 @@
   const modalSourceEl = el("personnelRoleAccessSource");
   const modalModulesSummaryEl = el("personnelRoleAccessModulesSummary");
 
-  const runAfterModalHidden = (element, callback) => {
-    const instance = element ? bootstrap.Modal.getInstance(element) : null;
-    if (!instance || !element.classList.contains("show")) {
-      callback();
-      return;
-    }
-    element.addEventListener("hidden.bs.modal", callback, { once: true });
-    instance.hide();
-  };
-
   const escapeHtml = (value) =>
     String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -682,14 +672,13 @@
 
   const resetProfile = async () => {
     const row = state.modal.row;
-    if (!row) return false;
-    if (!(await window.UniversalModal.confirm("Reset this position permission profile back to the default permissions?"))) return false;
+    if (!row) return;
+    if (!(await window.UniversalModal.confirm("Reset this position permission profile back to the default permissions?"))) return;
 
     await postProfileAction("reset_profile_permissions", {
       department: row.department || "",
       position_access: row.position_access || "",
     });
-    return true;
   };
 
   const setLoadingState = (loading) => {
@@ -786,15 +775,14 @@
         return;
       }
 
+      bootstrap.Modal.getOrCreateInstance(createModalEl).hide();
       const existingRow = findRowByScope(department, positionAccess);
-      runAfterModalHidden(createModalEl, () => {
-        if (existingRow) {
-          openAccessModalFromRow(existingRow, "edit");
-          return;
-        }
+      if (existingRow) {
+        openAccessModalFromRow(existingRow, "edit");
+        return;
+      }
 
-        openAccessModalFromRow(createPendingRow(department, positionAccess), "create");
-      });
+      openAccessModalFromRow(createPendingRow(department, positionAccess), "create");
     });
   }
 
@@ -824,8 +812,7 @@
     resetBtn.addEventListener("click", async () => {
       try {
         setLoadingState(true);
-        const didReset = await resetProfile();
-        if (!didReset) return;
+        await resetProfile();
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         await load();
       } catch (error) {

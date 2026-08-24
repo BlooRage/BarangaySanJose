@@ -18,7 +18,7 @@
   function getModal(id) {
     if (!modalInstances[id]) {
       const el = document.getElementById(id);
-      if (el) modalInstances[id] = bootstrap.Modal.getOrCreateInstance(el);
+      if (el) modalInstances[id] = new bootstrap.Modal(el);
     }
     return modalInstances[id] || null;
   }
@@ -51,24 +51,6 @@
     const shown = waitForModalEvent(element, 'shown.bs.modal');
     bootstrap.Modal.getOrCreateInstance(element).show();
     await shown;
-  }
-
-  async function swapModal(currentId, nextId) {
-    const currentElement = document.getElementById(currentId);
-    if (currentElement?.classList.contains('show')) {
-      const hidden = waitForModalEvent(currentElement, 'hidden.bs.modal');
-      getModal(currentId)?.hide();
-      await hidden;
-    }
-    getModal(nextId)?.show();
-  }
-
-  async function hideModal(currentId) {
-    const currentElement = document.getElementById(currentId);
-    if (!currentElement?.classList.contains('show')) return;
-    const hidden = waitForModalEvent(currentElement, 'hidden.bs.modal');
-    getModal(currentId)?.hide();
-    await hidden;
   }
 
   const secureConfirmModalEl = document.getElementById('modalSecureConfirmation');
@@ -561,10 +543,10 @@
     const btns = [];
 
     if (s !== 'Completed' && s !== 'Cancelled') {
-      btns.push(`<button type="button" class="btn btn-sm btn-primary" data-ot-action="open-candidates" data-transition-id="${esc(tid)}" title="Continue official setup"><i class="fas fa-arrow-right me-1"></i>Continue Setup</button>`);
+      btns.push(`<button class="btn btn-sm btn-primary" onclick="otOpenCandidates('${esc(tid)}')" title="Continue official setup"><i class="fas fa-arrow-right me-1"></i>Continue Setup</button>`);
     }
     if (s !== 'Completed' && s !== 'Cancelled') {
-      btns.push(`<button type="button" class="btn btn-sm btn-outline-danger" data-ot-action="cancel-transition" data-transition-id="${esc(tid)}" title="Cancel setup"><i class="fas fa-times me-1" aria-hidden="true"></i>Cancel Setup</button>`);
+      btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="otCancelTransition('${esc(tid)}')" title="Cancel setup"><i class="fas fa-times me-1" aria-hidden="true"></i>Cancel Setup</button>`);
     }
 
     return btns.length
@@ -578,11 +560,11 @@
     const totalPages = Math.ceil(total / PAGE_SIZE);
     if (totalPages <= 1) { el.innerHTML = ''; return; }
     let html = '<nav><ul class="pagination pagination-sm mb-0">';
-    html += `<li class="page-item ${currentPage === 0 ? 'disabled' : ''}"><a class="page-link" href="#" data-ot-action="go-page" data-ot-page="${currentPage - 1}">‹</a></li>`;
+    html += `<li class="page-item ${currentPage === 0 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="otGoPage(${currentPage - 1});return false;">‹</a></li>`;
     for (let i = 0; i < totalPages; i++) {
-      html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" data-ot-action="go-page" data-ot-page="${i}">${i + 1}</a></li>`;
+      html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="otGoPage(${i});return false;">${i + 1}</a></li>`;
     }
-    html += `<li class="page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}"><a class="page-link" href="#" data-ot-action="go-page" data-ot-page="${currentPage + 1}">›</a></li>`;
+    html += `<li class="page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="otGoPage(${currentPage + 1});return false;">›</a></li>`;
     html += '</ul></nav>';
     el.innerHTML = html;
   }
@@ -591,36 +573,6 @@
     currentPage = page;
     loadTransitions();
   };
-
-  document.addEventListener('click', (event) => {
-    if (!(event.target instanceof Element)) return;
-    const trigger = event.target.closest('[data-ot-action]');
-    if (!trigger) return;
-    event.preventDefault();
-    if (trigger.closest('.page-item.disabled')) return;
-
-    const action = trigger.dataset.otAction || '';
-    if (!action) return;
-
-    if (action === 'go-page') {
-      const page = Number.parseInt(trigger.dataset.otPage || '', 10);
-      if (Number.isInteger(page)) window.otGoPage(page);
-      return;
-    }
-
-    const transitionId = trigger.dataset.transitionId || '';
-    if (action === 'open-candidates' && transitionId) {
-      window.otOpenCandidates(transitionId);
-    } else if (action === 'cancel-transition' && transitionId) {
-      window.otCancelTransition(transitionId);
-    } else if (action === 'restore-official') {
-      const officialId = trigger.dataset.officialId || '';
-      if (officialId) window.otRestoreOfficial(officialId, trigger.dataset.officialName || 'this official');
-    } else if (action === 'select-credential-official') {
-      const officialId = trigger.dataset.officialId || '';
-      if (officialId) window.otSelectCredOfficial(officialId, trigger.dataset.officialName || '');
-    }
-  });
 
   // Tab switching
   document.querySelectorAll('[data-ot-tab]').forEach(btn => {
@@ -1712,25 +1664,26 @@
   // ══════════════════════════════════════════════════════════════════════════
   // QUICK ACTIONS
   // ══════════════════════════════════════════════════════════════════════════
-  document.getElementById('btnQaRestoreAccess')?.addEventListener('click', async () => {
-    await swapModal('modalQuickActions', 'modalRestoreAccess');
+  document.getElementById('btnQaRestoreAccess')?.addEventListener('click', () => {
+    getModal('modalQuickActions')?.hide();
+    getModal('modalRestoreAccess')?.show();
     loadInactiveOfficials();
   });
 
-  document.getElementById('btnQaChangeCredentials')?.addEventListener('click', async () => {
-    await hideModal('modalQuickActions');
+  document.getElementById('btnQaChangeCredentials')?.addEventListener('click', () => {
+    getModal('modalQuickActions')?.hide();
     otCredStep(1);
     getModal('modalChangeCredentials')?.show();
     loadCredOfficials();
   });
 
-  document.getElementById('btnQaEndActing')?.addEventListener('click', async () => {
-    await hideModal('modalQuickActions');
-    await endActingFlow();
+  document.getElementById('btnQaEndActing')?.addEventListener('click', () => {
+    getModal('modalQuickActions')?.hide();
+    endActingFlow();
   });
 
-  document.getElementById('btnQaChangePosition')?.addEventListener('click', async () => {
-    await hideModal('modalQuickActions');
+  document.getElementById('btnQaChangePosition')?.addEventListener('click', () => {
+    getModal('modalQuickActions')?.hide();
     showToast('Use New Official Handover → Appointment/Reappointment for a direct position change.', 'warning');
   });
 
@@ -1748,7 +1701,7 @@
           <td>${transitionOut ? esc(transitionOut) : '<span class="text-muted small">—</span>'}</td>
           <td>${o.can_return == 1 ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '<span class="text-danger"><i class="fas fa-times"></i></span>'}</td>
           <td>
-            <button type="button" class="btn btn-xs btn-success py-0 px-2" data-ot-action="restore-official" data-official-id="${esc(o.official_id)}" data-official-name="${esc(o.full_name)}">
+            <button class="btn btn-xs btn-success py-0 px-2" onclick="otRestoreOfficial('${esc(o.official_id)}','${esc(o.full_name)}')">
               <i class="fas fa-unlock me-1"></i> Restore
             </button>
           </td>
@@ -1845,7 +1798,7 @@
           <span class="fw-semibold">${esc(o.lastname)}, ${esc(o.firstname)}</span>
           <small class="text-muted ms-2">${esc(o.position || '')}</small>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" data-ot-action="select-credential-official" data-official-id="${esc(o.official_id)}" data-official-name="${esc(o.lastname + ', ' + o.firstname)}">
+        <button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otSelectCredOfficial('${esc(o.official_id)}','${esc(o.lastname+', '+o.firstname)}')">
           Select
         </button>
       </div>`).join('');

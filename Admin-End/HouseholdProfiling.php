@@ -279,6 +279,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/householdProfilingScript.js?v=20260815-modal-instance-1"></script>
+<script src="../JS-Script-Files/Admin-End/householdProfilingScript.js"></script>
 </body>
 </html>

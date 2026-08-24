@@ -1,6 +1,5 @@
 (() => {
   const el = (id) => document.getElementById(id);
-  const csrfToken = String(window.ADMIN_USER_MASTERLIST_CSRF_TOKEN || "").trim();
 
   const state = {
     rowsRaw: [],
@@ -398,7 +397,6 @@
     const formData = new FormData();
     formData.set("action", action);
     formData.set("user_id", row.user_id);
-    formData.set("csrf_token", csrfToken);
 
     if (action === "lock_account") {
       const mode = getSelectedLockMode();
@@ -449,7 +447,6 @@
     const formData = new FormData();
     formData.set("action", "archive_account");
     formData.set("user_id", row.user_id);
-    formData.set("csrf_token", csrfToken);
 
     if (refreshBtn) {
       refreshBtn.classList.add("is-loading");
@@ -526,13 +523,8 @@
     }
 
     if (tbody) {
-      document.addEventListener("click", (event) => {
-        const target = event.target instanceof Element ? event.target : null;
-        if (!target) return;
-
-        // The shared admin table helper portals action dropdown menus to <body>.
-        // Delegate from document so those controls remain clickable after moving.
-        const button = target.closest('[data-action="manage-lock"]');
+      tbody.addEventListener("click", (event) => {
+        const button = event.target.closest('[data-action="manage-lock"]');
         if (button) {
           const row = findRow(button.dataset.userId || "");
           if (!row) return;
@@ -541,7 +533,7 @@
           return;
         }
 
-        const archiveButton = target.closest('[data-action="archive-account"]');
+        const archiveButton = event.target.closest('[data-action="archive-account"]');
         if (!archiveButton) return;
 
         submitArchiveAction(archiveButton.dataset.userId || "").catch(() => {});

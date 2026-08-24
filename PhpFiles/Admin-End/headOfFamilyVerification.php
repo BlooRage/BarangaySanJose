@@ -2,14 +2,9 @@
 session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
-require_once "../General/adminModulePermissions.php";
 require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin']);
-amp_require_json_module_permission($conn, 'head_of_family_verification', [
-    'success' => false,
-    'message' => 'You do not have permission to review head-of-family applications.',
-]);
 
 header('Content-Type: application/json; charset=utf-8');
 

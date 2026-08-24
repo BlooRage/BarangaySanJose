@@ -70,7 +70,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260801-admin-2fa-fix2" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260818-otp-flow" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260815-02" defer></script>
   </head>
 

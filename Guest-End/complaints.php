@@ -1123,7 +1123,6 @@ $areaOptions = [
                                                     type="submit"
                                                     class="submit-btn"
                                                     id="complaintSubmitBtn"
-                                                    form="complaintForm"
                                                     data-default-label="SUBMIT COMPLAINT"
                                                     data-loading-label="Submitting complaint..."
                                                 >
@@ -1175,12 +1174,12 @@ $areaOptions = [
         </footer>
     </div>
 
-    <div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-labelledby="complaintTimeModalTitle" aria-hidden="true">
+    <div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <div class="complaint-form-modal__heading" id="complaintTimeModalTitle">Select Time</div>
+                        <div class="complaint-form-modal__heading">Select Time</div>
                         <div class="complaint-form-modal__subheading">Choose the incident time or use the current time.</div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -1233,7 +1232,7 @@ $areaOptions = [
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../JS-Script-Files/modalHandler.js?v=20260815-02"></script>
+    <script src="../JS-Script-Files/modalHandler.js"></script>
     <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
     <script>
         let topBtn = document.getElementById("goToTop");

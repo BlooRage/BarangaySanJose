@@ -536,7 +536,7 @@ $areaOptions = [
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/modalHandler.js?v=20260815-02"></script>
+<script src="../../JS-Script-Files/modalHandler.js"></script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>

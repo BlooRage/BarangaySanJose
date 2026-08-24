@@ -1231,7 +1231,7 @@ if ($mode === 'password') {
     <title>Official Account Onboarding</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
-    <script src="../JS-Script-Files/modalHandler.js?v=20260815-02" defer></script>
+    <script src="../JS-Script-Files/modalHandler.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix">
     <style>

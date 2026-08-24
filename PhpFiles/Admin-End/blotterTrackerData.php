@@ -1,6 +1,5 @@
 <?php
 require_once "../General/security.php";
-require_once "../General/adminModulePermissions.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -8,7 +7,6 @@ $allowedRoles = ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $requestAction = trim((string)($_GET['action'] ?? 'list'));
 $authChecked = false;
-$permissionChecked = false;
 
 function blotterTrackerCachePath(string $key): string {
     $safeKey = preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $key) ?? 'cache';
@@ -88,19 +86,6 @@ if ($requestMethod === 'GET' && $requestAction === 'list') {
     requireRoleSession($allowedRoles);
     $authChecked = true;
 
-    if (amp_normalize_storage_role((string)($_SESSION['role'] ?? '')) !== 'SuperAdmin') {
-        require_once "../General/connection.php";
-    }
-    $permissionConnection = isset($conn) && $conn instanceof mysqli ? $conn : null;
-    amp_require_json_module_permission($permissionConnection, 'blotter_tracker', [
-        'success' => false,
-        'message' => 'You do not have permission to access the blotter tracker.',
-        'items' => null,
-        'detail' => null,
-        'meta' => null,
-    ]);
-    $permissionChecked = true;
-
     $listCacheKey = blotterTrackerListCacheKey(
         $_GET,
         trim((string)($_SESSION['user_id'] ?? '')),
@@ -118,15 +103,6 @@ require_once "../General/caseUserAccountForeignKeys.php";
 
 if (!$authChecked) {
     requireRoleSession($allowedRoles);
-}
-if (!$permissionChecked) {
-    amp_require_json_module_permission($conn, 'blotter_tracker', [
-        'success' => false,
-        'message' => 'You do not have permission to access the blotter tracker.',
-        'items' => null,
-        'detail' => null,
-        'meta' => null,
-    ]);
 }
 cuafk_ensure_case_useraccount_foreign_keys($conn);
 

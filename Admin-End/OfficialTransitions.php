@@ -1693,7 +1693,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
 </div><!-- /flex wrapper -->
 
 <div class="modal fade" id="modalSeatSetup" tabindex="-1" aria-labelledby="modalSeatSetupLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <div>
@@ -1788,7 +1788,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: New Official Handover
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalNewTransition" tabindex="-1" aria-labelledby="modalNewTransitionLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalNewTransitionLabel">
@@ -1886,7 +1886,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Create Governance Cycle
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalNewBatch" tabindex="-1" aria-labelledby="modalNewBatchLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
+  <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalNewBatchLabel">
@@ -1953,7 +1953,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Edit Governance Cycle Label
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalAddElection" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="fas fa-pen-to-square me-2 text-primary"></i> Edit Governance Cycle Label</h5>
@@ -1988,7 +1988,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Official Access Control
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalOfficialAccessControl" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <form method="post" id="officialAccessControlForm">
         <div class="modal-header">
@@ -2046,7 +2046,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Official Access Setup
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalCandidates" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
@@ -2189,7 +2189,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Select Winner & Complete Transition
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalSelectWinner" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
@@ -2412,7 +2412,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Restore Access
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalRestoreAccess" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="fas fa-unlock me-2 text-success"></i> Restore Official Access</h5>
@@ -2437,7 +2437,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
      MODAL: Change Credentials
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalChangeCredentials" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="fas fa-key me-2 text-primary"></i> Change Credentials</h5>
@@ -2520,7 +2520,7 @@ foreach ($seatAccessOfficials as $seatAccessOfficial) {
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260815-table-actions-1"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260812-4"></script>
   <script>
     (function () {
       const config = window.OT_OFFICIAL_ACCESS_DATA || {};
