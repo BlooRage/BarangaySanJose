@@ -179,6 +179,36 @@ body {
     border: 1px solid #DBDBDB;
 }
 
+.birthplace-group {
+    border: 1px solid #e5ded5;
+    border-radius: 16px;
+    padding: 18px;
+    background: #fffaf5;
+}
+
+.birthplace-group-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(222, 113, 12, 0.18);
+}
+
+.birthplace-group-title {
+    margin: 0;
+    font-size: 20px !important;
+    font-family: 'Geist', sans-serif !important;
+    font-weight: 700;
+    color: #2f2f2f !important;
+}
+
+.birthplace-group-copy {
+    margin: 4px 0 0;
+    color: #6b6259;
+    font-size: 0.92rem;
+}
+
 #headQualifications ul {
     margin-bottom: 0;
 }

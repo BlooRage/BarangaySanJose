@@ -235,7 +235,8 @@ requireRoleSession(['SuperAdmin'], false);
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../JS-Script-Files/modalHandler.js?v=20260815-02"></script>
   <script>window.ADMIN_USER_MASTERLIST_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES) ?>;</script>
-  <script src="../JS-Script-Files/Admin-End/userMasterlistScript.js?v=20260815-2"></script>
+  <script src="../JS-Script-Files/Admin-End/userMasterlistScript.js?v=20260825-actions-fix"></script>
 </body>
 </html>

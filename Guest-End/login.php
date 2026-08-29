@@ -57,7 +57,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <?php endif; ?>
 
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix" />
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260801-vertical-center2" />
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/LoginModule.css?v=20260825-registration-requirements" />
     <link id="universalModalStylesheet" rel="stylesheet" href="../CSS-Styles/modalStyle.css?v=20260815-02" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" defer></script>
@@ -70,7 +70,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260818-otp-flow" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260825-registration-requirements" defer></script>
     <script src="../JS-Script-Files/modalHandler.js?v=20260815-02" defer></script>
   </head>
 
@@ -141,7 +141,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
             <p class="mt-3 text-center">
               Don't have an account?
               <?php if ($registrationOpen): ?>
-                <a href="javascript:void(0)" class="text-primary text-decoration-underline" onclick="switchToSignup()">Register</a> now.
+                <a href="javascript:void(0)" class="text-primary text-decoration-underline" onclick="showRegistrationRequirementsPrompt()">Register</a> now.
               <?php else: ?>
                 <span class="text-muted">Registration is currently closed.</span>
               <?php endif; ?>
@@ -353,6 +353,66 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
           <div class="modal-body" id="accountVerifiedModalBody">Account verification successful.</div>
           <div class="modal-footer">
             <button type="button" id="verifiedContinueBtn" class="btn btn-success w-100">Continue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="registrationRequirementsModal" tabindex="-1" aria-labelledby="registrationRequirementsModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <p class="text-uppercase text-muted fw-semibold small mb-1">Before you register</p>
+              <h5 class="modal-title" id="registrationRequirementsModalTitle">Resident Profiling Requirements</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel registration"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted mb-4">
+              Please prepare these details before creating an account and continuing to resident profiling.
+            </p>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="registration-requirement-card h-100">
+                  <h6>Resident Profiling Tabs</h6>
+                  <ul>
+                    <li>Personal Information</li>
+                    <li>Home Address</li>
+                    <li>Documents</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="registration-requirement-card h-100">
+                  <h6>Account Registration</h6>
+                  <ul>
+                    <li>Active mobile number starting with 9</li>
+                    <li>Working email address</li>
+                    <li>OTP access for mobile verification</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="registration-requirement-card">
+                  <h6>Required Documents</h6>
+                  <ul class="registration-requirement-columns">
+                    <li>Valid ID or supporting residency document</li>
+                    <li>ID front and back photo, or passport page if using passport</li>
+                    <li>Billing statement or HOA signed certification if using document proof</li>
+                    <li>2x2 profile picture with white background</li>
+                    <li>Sector supporting document if applying as PWD, Senior Citizen, Student, Indigenous People, or Single Parent</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="registrationRequirementsCancelBtn" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-success" id="registrationRequirementsContinueBtn">Continue</button>
           </div>
         </div>
       </div>

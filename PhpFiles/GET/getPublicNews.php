@@ -37,6 +37,12 @@ foreach ($items as $item) {
         $sortTimestamp = $ts;
     }
 
+    $articleDateRaw = trim((string)($item['article_date'] ?? ''));
+    $articleDateTs = $articleDateRaw !== '' ? strtotime($articleDateRaw) : false;
+    if ($articleDateTs !== false) {
+        $postedDate = date('F d, Y', $articleDateTs);
+    }
+
     $title = (string)($item['public_news_title'] ?? '');
     if ($title === '') {
         $title = (string)($item['title'] ?? '');
@@ -57,6 +63,7 @@ foreach ($items as $item) {
         'title' => $title,
         'content_html' => $contentHtml,
         'posted_date' => $postedDate,
+        'article_date' => $articleDateRaw,
         'image_url' => $imageUrl,
         'sort_ts' => $sortTimestamp
     ];

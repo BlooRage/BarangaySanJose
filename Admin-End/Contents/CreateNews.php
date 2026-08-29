@@ -13,6 +13,7 @@ $draftInitialState = [
   'announcement_id' => '',
   'title' => '',
   'headline_image_url' => '',
+  'article_date' => '',
   'body_html' => '',
   'sections' => [],
   'schedule_date' => '',
@@ -53,6 +54,12 @@ if ($editingAnnouncementId !== '') {
       $headlineImageUrl = trim((string)($decomposed['headline_image_url'] ?? ''));
     }
 
+    $articleDate = trim((string)($item['article_date'] ?? ''));
+    if ($articleDate !== '') {
+      $articleDateTs = strtotime($articleDate);
+      $articleDate = $articleDateTs !== false ? date('Y-m-d', $articleDateTs) : '';
+    }
+
     $publishDateRaw = trim((string)($item['publish_date'] ?? ''));
     $scheduleDate = '';
     $scheduleTime = '';
@@ -68,6 +75,7 @@ if ($editingAnnouncementId !== '') {
       'announcement_id' => (string)($item['id'] ?? ''),
       'title' => (string)($item['title'] ?? ''),
       'headline_image_url' => $headlineImageUrl,
+      'article_date' => $articleDate,
       'body_html' => (string)($decomposed['body_html'] ?? ''),
       'sections' => $sections,
       'schedule_date' => $scheduleDate,
@@ -947,6 +955,18 @@ if ($editingAnnouncementId !== '') {
 
             <section class="news-form-section">
               <div class="news-form-card-title">
+                <h6>Article Date</h6>
+                <span>Use this for the date the news happened. It appears on the public article and does not control scheduling.</span>
+              </div>
+              <div class="mb-0">
+                <label for="newsArticleDateInput" class="form-label fw-semibold small">Article Date</label>
+                <input type="date" class="form-control" id="newsArticleDateInput" name="article_date" data-date-modal-style="calendar">
+              </div>
+            </section>
+            <hr class="news-form-divider">
+
+            <section class="news-form-section">
+              <div class="news-form-card-title">
                 <h6>News Banner</h6>
                 <span>Upload the lead image that will appear in the public tile preview and article hero.</span>
               </div>
@@ -1124,6 +1144,7 @@ if ($editingAnnouncementId !== '') {
 
       const formEl = document.getElementById("newsCreateForm");
       const headingInput = document.getElementById("newsHeadingInput");
+      const articleDateInput = document.getElementById("newsArticleDateInput");
       const submitActionInput = document.getElementById("newsSubmitActionInput");
       const scheduleDateInput = document.getElementById("newsScheduleDateInput");
       const scheduleTimeInput = document.getElementById("newsScheduleTimeInput");
@@ -1369,6 +1390,18 @@ if ($editingAnnouncementId !== '') {
       }
 
       function formatPreviewDate() {
+        const articleDate = String(articleDateInput?.value || "").trim();
+        if (articleDate !== "") {
+          const parsed = new Date(`${articleDate}T00:00`);
+          if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toLocaleDateString(undefined, {
+              month: "long",
+              day: "numeric",
+              year: "numeric"
+            });
+          }
+        }
+
         const scheduleDate = String(scheduleDateInput?.value || "").trim();
         const scheduleTime = String(scheduleTimeInput?.value || "").trim();
         if (scheduleDate !== "") {
@@ -1682,6 +1715,9 @@ if ($editingAnnouncementId !== '') {
             ? "Draft news banner loaded."
             : "No news banner uploaded yet.";
         }
+        if (articleDateInput) {
+          articleDateInput.value = String(initialDraftState.article_date || "").trim();
+        }
         setScheduleFields(
           String(initialDraftState.schedule_date || "").trim(),
           String(initialDraftState.schedule_time || "").trim()
@@ -1959,6 +1995,9 @@ if ($editingAnnouncementId !== '') {
       });
       if (headingInput) {
         headingInput.addEventListener("input", renderPreview);
+      }
+      if (articleDateInput) {
+        articleDateInput.addEventListener("change", renderPreview);
       }
       if (scheduleDateInput) {
         scheduleDateInput.addEventListener("change", renderPreview);

@@ -841,6 +841,30 @@ body {
         padding: 1rem !important;
     }
 
+    #main-display *,
+    #main-display *::before,
+    #main-display *::after {
+        min-width: 0;
+    }
+
+    #main-display h1,
+    #main-display h2,
+    #main-display h3,
+    #main-display .dashboard-page-title {
+        overflow-wrap: anywhere;
+    }
+
+    #main-display .d-flex {
+        min-width: 0;
+    }
+
+    #main-display .btn:not(.btn-icon):not(.dropdown-toggle),
+    #main-display .form-control,
+    #main-display .form-select,
+    #main-display .input-group {
+        max-width: 100%;
+    }
+
     #main-display > .bg-white.rounded-4,
     #main-display > .bg-white.rounded-5,
     #main-display .bg-white.rounded-4,
@@ -853,12 +877,60 @@ body {
     }
 
     #main-display .table-responsive {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
         -webkit-overflow-scrolling: touch;
+    }
+
+    #main-display .table-responsive > table,
+    #main-display table.compact-admin-table {
+        width: max-content;
+        min-width: 100%;
     }
 
     #main-display .modal-dialog {
         margin: 0.75rem auto;
         max-width: calc(100vw - 1rem);
+    }
+
+    #main-display .modal-footer,
+    #main-display .modal-footer .btn,
+    #main-display .announcement-sticky-actions,
+    #main-display .announcement-modal-footer-start {
+        flex-wrap: wrap;
+    }
+
+    #main-display .modal-footer .btn,
+    #main-display .announcement-sticky-actions .btn,
+    #main-display .announcement-modal-footer-start .btn {
+        flex: 1 1 100%;
+        white-space: normal;
+    }
+
+    #main-display .admin-list-toolbar,
+    #main-display .admin-list-actions,
+    #main-display .resident-table-footer,
+    #main-display .review-queue-toolbar,
+    #main-display .table-pagination-controls {
+        align-items: stretch !important;
+        flex-direction: column !important;
+        width: 100%;
+    }
+
+    #main-display .admin-list-actions > *,
+    #main-display .admin-list-toolbar > *,
+    #main-display .resident-table-footer > *,
+    #main-display .review-queue-toolbar > *,
+    #main-display .admin-search,
+    #main-display .admin-search .input-group {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    #main-display .btn-icon {
+        flex: 0 0 auto;
     }
 
     .dashboard-section-head {
@@ -1025,6 +1097,24 @@ body {
 @media (max-width: 575.98px) {
     #main-display {
         padding: 0.85rem !important;
+    }
+
+    #admin-mobile-header .d-flex {
+        min-height: 54px;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    #admin-mobile-header .logo-name {
+        max-width: calc(100vw - 112px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.98rem;
+    }
+
+    #dashboard-sidebar {
+        width: min(86vw, 320px) !important;
     }
 
     .chart-panel {

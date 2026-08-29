@@ -18,6 +18,7 @@
   const entriesInput = el("userMasterEntriesInput");
   const refreshBtn = el("btnUserMasterRefresh");
   const AUTO_REFRESH_MS = 30000;
+  const csrfToken = String(window.ADMIN_USER_MASTERLIST_CSRF_TOKEN || "");
 
   const lockModalEl = el("userLockModal");
   const lockSummaryName = el("userLockSummaryName");
@@ -397,6 +398,9 @@
     const formData = new FormData();
     formData.set("action", action);
     formData.set("user_id", row.user_id);
+    if (csrfToken) {
+      formData.set("csrf_token", csrfToken);
+    }
 
     if (action === "lock_account") {
       const mode = getSelectedLockMode();
@@ -441,12 +445,18 @@
     const row = findRow(userId);
     if (!row || state.auto.inFlight || state.lock.busy) return;
 
-    const confirmed = await window.UniversalModal.confirm(`Archive ${safe(row.display_name)}? You can permanently delete the account later from User Archive.`, { confirmLabel: "Archive", confirmClass: "btn btn-danger" });
+    const message = `Archive ${safe(row.display_name)}? You can permanently delete the account later from User Archive.`;
+    const confirmed = window.UniversalModal?.confirm
+      ? await window.UniversalModal.confirm(message, { confirmLabel: "Archive", confirmClass: "btn btn-danger" })
+      : window.confirm(message);
     if (!confirmed) return;
 
     const formData = new FormData();
     formData.set("action", "archive_account");
     formData.set("user_id", row.user_id);
+    if (csrfToken) {
+      formData.set("csrf_token", csrfToken);
+    }
 
     if (refreshBtn) {
       refreshBtn.classList.add("is-loading");

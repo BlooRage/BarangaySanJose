@@ -104,14 +104,43 @@ main table.compact-admin-table tbody tr:last-child td {
 
 @media (max-width: 575.98px) {
     .table-pagination-controls {
-        align-items: flex-end;
+        align-items: stretch;
+        flex-direction: column;
+        gap: .75rem;
     }
 
     .table-pagination-entries {
+        width: 100%;
+        justify-content: space-between;
         gap: .5rem;
     }
 
     .table-pagination-entries input {
         width: 76px;
+    }
+
+    .table-pagination-controls .pagination {
+        width: 100%;
+        justify-content: flex-end;
+        overflow-x: auto;
+        padding-bottom: .15rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table-pagination-controls .page-link {
+        min-width: 34px;
+        min-height: 34px;
+        padding: .32rem .55rem;
+        font-size: .88rem;
+    }
+
+    .table-pagination-controls .page-item:first-child .page-link,
+    .table-pagination-controls .page-item:last-child .page-link {
+        min-width: 48px;
+    }
+
+    #main-display .compact-admin-table-shell,
+    main .compact-admin-table-shell {
+        border-radius: 10px;
     }
 }

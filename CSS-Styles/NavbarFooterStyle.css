@@ -350,7 +350,53 @@ h5 {
     }
 }
 
-@media (max-width: 1199.98px) {
+@media (max-width: 768px) {
+    .navbar-collapse {
+        flex: 1 0 100%;
+        width: 100%;
+        max-height: calc(100vh - 92px);
+        overflow-y: auto;
+    }
+
+    #navbarLinks {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 0.2rem;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    #navbarLinks .nav-item {
+        width: 100%;
+        margin: 0;
+    }
+
+    #navbarLinks .nav-link {
+        display: block;
+        width: 100%;
+        padding: 0.72rem 0.85rem;
+        color: #111827 !important;
+        text-align: center;
+        text-shadow: none !important;
+        position: relative;
+    }
+
+    #navbarLinks .nav-link::after {
+        width: calc(100% - 2rem);
+        background-color: rgba(17, 24, 39, 0.12);
+    }
+
+    #navbarLinks .nav-item:last-child .nav-link {
+        margin-top: 0.35rem;
+        padding: 0.82rem 1rem;
+        color: #ffffff !important;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1199.98px) {
     .navbarWrapper .navbar {
         min-height: 74px;
     }

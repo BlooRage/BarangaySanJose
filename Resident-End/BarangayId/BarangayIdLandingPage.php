@@ -196,7 +196,8 @@ $actionButtonLabel = match ($submissionMode) {
         }
 
         .bid-action-shell {
-            max-width: 72rem;
+            width: 100%;
+            max-width: none;
             margin: 0 0 1rem;
         }
 

@@ -195,6 +195,7 @@ $contentHtml = trim((string)($_POST["content_html"] ?? ""));
 $publicNewsTitle = trim((string)($_POST["public_news_title"] ?? ""));
 $publicNewsContentHtml = trim((string)($_POST["public_news_content_html"] ?? ""));
 $headlineImageUrl = trim((string)($_POST["headline_image_url"] ?? ""));
+$articleDate = trim((string)($_POST["article_date"] ?? ""));
 $newsBodyHtml = trim((string)($_POST["news_body_html"] ?? ""));
 $newsSectionsJsonInput = trim((string)($_POST["news_sections_json"] ?? ""));
 $publicTitle = trim((string)($_POST["public_title"] ?? ""));
@@ -305,6 +306,12 @@ if ($contentType === 'page') {
   $area = '';
   $roleGroup = '';
   $audienceScope = 'all';
+  if ($articleDate !== '') {
+    $articleDateParsed = DateTimeImmutable::createFromFormat('!Y-m-d', $articleDate);
+    if (!($articleDateParsed instanceof DateTimeImmutable) || $articleDateParsed->format('Y-m-d') !== $articleDate) {
+      ann_redirect_with_flash($redirectUrl, "warning", "Choose a valid article date.");
+    }
+  }
 
   if ($title === '') {
     ann_redirect_with_flash($redirectUrl, "warning", "News heading is required.");
@@ -438,6 +445,7 @@ $record = [
   "public_news_title" => $publicNewsTitle,
   "public_news_content_html" => $publicNewsContentHtml,
   "news_headline_image_url" => $headlineImageUrl,
+  "article_date" => $contentType === 'news' ? $articleDate : '',
   "news_sections_json" => $newsSectionsJson,
   "public_title" => $publicTitle,
   "public_content_html" => $publicContentHtml,

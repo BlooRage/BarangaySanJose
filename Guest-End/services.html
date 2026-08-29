@@ -9,7 +9,7 @@
     <title>Services</title>
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css?v=20260706-navbar-fix">
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css?v=20260825-service-auth-modal">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css?v=20260706-navbar-fix">
 </head>
 <body data-cms-page="services" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">
@@ -111,6 +111,9 @@
             <div class="modal-content">
                 <div class="modal-body">
                     <button type="button" class="btn-close serviceAuthClose" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="serviceAuthIcon" aria-hidden="true">
+                        <i class="fa-solid fa-user-lock"></i>
+                    </div>
                     <p class="serviceAuthEyebrow">Resident Access Required</p>
                     <h2 class="serviceAuthTitle" id="serviceAuthModalTitle">Login or Register</h2>
                     <p class="serviceAuthCopy">

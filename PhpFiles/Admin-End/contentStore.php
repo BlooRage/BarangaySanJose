@@ -22,6 +22,7 @@ function announcements_ensure_schema(): void
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS area VARCHAR(100) NULL AFTER audience_scope",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS role_group VARCHAR(100) NULL AFTER area",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS news_headline_image_url TEXT NULL AFTER public_news_content_html",
+    "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS article_date DATE NULL AFTER news_headline_image_url",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS news_sections_json LONGTEXT NULL AFTER news_headline_image_url",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS sms_message TEXT NULL AFTER public_content_html",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS email_subject VARCHAR(255) NULL AFTER sms_message",
@@ -86,6 +87,26 @@ function announcements_format_datetime(?string $value, string $fallback = '-'): 
   return date('Y-m-d H:i:s', $ts);
 }
 
+function announcements_normalize_date(?string $value): ?string
+{
+  $value = trim((string)$value);
+  if ($value === '' || $value === '-') {
+    return null;
+  }
+
+  $dt = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+  if ($dt instanceof DateTimeImmutable && $dt->format('Y-m-d') === $value) {
+    return $value;
+  }
+
+  $ts = strtotime($value);
+  if ($ts === false) {
+    return null;
+  }
+
+  return date('Y-m-d', $ts);
+}
+
 function announcements_decode_channels(?string $json): array
 {
   $decoded = json_decode((string)$json, true);
@@ -127,6 +148,7 @@ function announcements_prepare_row(array $row): array
     'public_news_title' => (string)($row['public_news_title'] ?? ''),
     'public_news_content_html' => (string)($row['public_news_content_html'] ?? ''),
     'news_headline_image_url' => (string)($row['news_headline_image_url'] ?? ''),
+    'article_date' => announcements_normalize_date((string)($row['article_date'] ?? '')) ?? '',
     'news_sections_json' => (string)($row['news_sections_json'] ?? ''),
     'public_title' => (string)($row['public_title'] ?? ''),
     'public_content_html' => (string)($row['public_content_html'] ?? ''),
@@ -171,6 +193,7 @@ function announcements_load_all(): array
       public_news_title,
       public_news_content_html,
       news_headline_image_url,
+      article_date,
       news_sections_json,
       public_title,
       public_content_html,
@@ -216,6 +239,7 @@ function announcements_load_all(): array
       'public_news_title' => (string)($row['public_news_title'] ?? ''),
       'public_news_content_html' => (string)($row['public_news_content_html'] ?? ''),
       'news_headline_image_url' => (string)($row['news_headline_image_url'] ?? ''),
+      'article_date' => ($row['article_date'] ?? null) ? (string)$row['article_date'] : '',
       'news_sections_json' => (string)($row['news_sections_json'] ?? ''),
       'public_title' => (string)($row['public_title'] ?? ''),
       'public_content_html' => (string)($row['public_content_html'] ?? ''),
@@ -268,6 +292,7 @@ function announcements_save_all(array $rows): bool
       public_news_title,
       public_news_content_html,
       news_headline_image_url,
+      article_date,
       news_sections_json,
       public_title,
       public_content_html,
@@ -285,7 +310,7 @@ function announcements_save_all(array $rows): bool
       email_sent_at,
       faq_items_json
 	    ) VALUES (
-	      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+	      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 	    )
     ON DUPLICATE KEY UPDATE
       title = VALUES(title),
@@ -304,6 +329,7 @@ function announcements_save_all(array $rows): bool
       public_news_title = VALUES(public_news_title),
       public_news_content_html = VALUES(public_news_content_html),
       news_headline_image_url = VALUES(news_headline_image_url),
+      article_date = VALUES(article_date),
       news_sections_json = VALUES(news_sections_json),
       public_title = VALUES(public_title),
       public_content_html = VALUES(public_content_html),
@@ -351,6 +377,7 @@ function announcements_save_all(array $rows): bool
       $publicNewsTitle = $row['public_news_title'];
       $publicNewsContentHtml = $row['public_news_content_html'];
       $newsHeadlineImageUrl = $row['news_headline_image_url'] !== '' ? $row['news_headline_image_url'] : null;
+      $articleDate = announcements_normalize_date($row['article_date']);
       $newsSectionsJson = $row['news_sections_json'] !== '' ? $row['news_sections_json'] : null;
       $publicTitle = $row['public_title'];
       $publicContentHtml = $row['public_content_html'];
@@ -369,7 +396,7 @@ function announcements_save_all(array $rows): bool
       $faqItemsJson = $row['faq_items_json'] !== '' ? $row['faq_items_json'] : null;
 
       $stmt->bind_param(
-        str_repeat('s', 33),
+        str_repeat('s', 34),
         $id,
         $title,
         $contentType,
@@ -387,6 +414,7 @@ function announcements_save_all(array $rows): bool
         $publicNewsTitle,
         $publicNewsContentHtml,
         $newsHeadlineImageUrl,
+        $articleDate,
         $newsSectionsJson,
         $publicTitle,
         $publicContentHtml,
