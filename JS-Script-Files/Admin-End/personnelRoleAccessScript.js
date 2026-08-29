@@ -229,71 +229,6 @@
     return appendUrlParams(url, getPreviewParams(row));
   };
 
-  const normalizePreviewTarget = (url, baseHref = window.location.href) => {
-    try {
-      const parsed = new URL(String(url || ""), baseHref);
-      [
-        "access_preview",
-        "preview_department",
-        "preview_position",
-        "preview_token",
-      ].forEach((key) => parsed.searchParams.delete(key));
-
-      const path = parsed.pathname
-        .replace(/\/+/g, "/")
-        .replace(/\.php$/i, "")
-        .replace(/\/$/, "")
-        .toLowerCase();
-      const params = Array.from(parsed.searchParams.entries())
-        .sort(([aKey, aValue], [bKey, bValue]) => `${aKey}=${aValue}`.localeCompare(`${bKey}=${bValue}`));
-      const query = params.map(([key, value]) => `${key}=${value}`).join("&");
-
-      return `${path}${query ? `?${query}` : ""}`;
-    } catch (error) {
-      return "";
-    }
-  };
-
-  const normalizePreviewRoute = (url, baseHref = window.location.href) => {
-    const target = normalizePreviewTarget(url, baseHref);
-    return target.split("?")[0] || "";
-  };
-
-  const previewRouteAliases = (item) => {
-    const aliases = [];
-    const key = String(item?.key || "");
-
-    if (key === "announcements_tracker") {
-      aliases.push(buildAppUrl("Admin-End/Contents/ContentManagement.php"));
-    }
-    if (key.startsWith("reports_")) {
-      aliases.push(buildAppUrl("Admin-End/Reports/Reports.php"));
-    }
-    if (key.startsWith("finance_")) {
-      aliases.push(buildAppUrl("Admin-End/Certificates/FinancePayments.php"));
-    }
-    if (key === "appointments") {
-      aliases.push(buildAppUrl("Admin-End/Appointments/AppointmentTracker.php"));
-    }
-
-    return aliases;
-  };
-
-  const previewTargetIsAllowed = (url, baseHref) => {
-    const target = normalizePreviewTarget(url, baseHref);
-    if (!target) return true;
-
-    const targetRoute = target.split("?")[0] || "";
-
-    return state.preview.items.some((item) => (
-      normalizePreviewTarget(item.url, baseHref) === target
-      || normalizePreviewTarget(item.path, baseHref) === target
-      || normalizePreviewRoute(item.url, baseHref) === targetRoute
-      || normalizePreviewRoute(item.path, baseHref) === targetRoute
-      || previewRouteAliases(item).some((alias) => normalizePreviewRoute(alias, baseHref) === targetRoute)
-    ));
-  };
-
   const previewIconClass = (key, parentKey = "") => {
     const iconMap = {
       dashboard: "fa-house",
@@ -931,7 +866,7 @@
           input,
           select,
           textarea,
-          [role="button"],
+          [role="button"]:not([data-bs-toggle]),
           .btn:not(a[href]):not([data-bs-toggle]) {
             cursor: not-allowed !important;
           }
@@ -941,24 +876,6 @@
         `;
         doc.head.appendChild(style);
       }
-
-      const suppressUnauthorizedAnchor = (anchor) => {
-        if (previewTargetIsAllowed(anchor.href || anchor.getAttribute("href"), doc.location.href)) {
-          return false;
-        }
-
-        anchor.setAttribute("aria-disabled", "true");
-        anchor.setAttribute("tabindex", "-1");
-        anchor.style.pointerEvents = "none";
-        anchor.style.opacity = "0.42";
-
-        const cardCol = anchor.closest(".col-12, .col-md-6, .col-lg-3");
-        const attentionCol = anchor.closest(".dashboard-attention-strip > [class*='col-']");
-        const navItem = anchor.closest("li");
-        const container = cardCol || attentionCol || navItem || anchor;
-        container.style.display = "none";
-        return true;
-      };
 
       const applyPreviewHref = (anchor) => {
         const rawHref = String(anchor.getAttribute("href") || "").trim();
@@ -974,10 +891,6 @@
 
         const parsed = new URL(rawHref, doc.location.href);
         if (parsed.origin !== doc.location.origin || !parsed.pathname.includes("/Admin-End/")) {
-          return;
-        }
-
-        if (suppressUnauthorizedAnchor(anchor)) {
           return;
         }
 
@@ -1008,16 +921,48 @@
         }
       });
 
+      const isActionAnchor = (anchor) => {
+        const rawHref = String(anchor.getAttribute("href") || "").trim();
+        const actionHint = [
+          anchor.getAttribute("data-action"),
+          anchor.getAttribute("data-delete-url"),
+          anchor.getAttribute("data-archive-url"),
+          anchor.getAttribute("data-restore-url"),
+          anchor.getAttribute("data-status-url"),
+          anchor.getAttribute("data-method"),
+          anchor.getAttribute("download"),
+          anchor.className,
+          anchor.id,
+        ].join(" ").toLowerCase();
+
+        if (anchor.closest("form")) {
+          return true;
+        }
+
+        if (
+          /\b(delete|remove|archive|restore|approve|reject|deny|cancel|save|submit|update|issue|release|void|complete|confirm|reschedule|send|publish|unpublish)\b/.test(actionHint)
+        ) {
+          return true;
+        }
+
+        if (/\/PhpFiles\//i.test(rawHref)) {
+          return true;
+        }
+
+        return false;
+      };
+
       const isNavigationAnchor = (anchor) => {
         const rawHref = String(anchor.getAttribute("href") || "").trim();
         if (!rawHref || rawHref.startsWith("#") || /^javascript:/i.test(rawHref)) {
           return false;
         }
+        if (isActionAnchor(anchor)) {
+          return false;
+        }
 
         const parsed = new URL(rawHref, doc.location.href);
-        return parsed.origin === doc.location.origin
-          && parsed.pathname.includes("/Admin-End/")
-          && previewTargetIsAllowed(parsed.href, doc.location.href);
+        return parsed.origin === doc.location.origin && parsed.pathname.includes("/Admin-End/");
       };
 
       const blockReadonlyEvent = (event) => {
@@ -1062,11 +1007,6 @@
         }
         const beforeHref = anchor.getAttribute("href") || "";
         applyPreviewHref(anchor);
-        if (anchor.getAttribute("aria-disabled") === "true") {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
         if (anchor.getAttribute("href") !== beforeHref) {
           return;
         }

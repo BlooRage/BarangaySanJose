@@ -775,6 +775,6 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       defaultPermissionKeys: <?= json_encode(array_values(amp_get_default_admin_permission_keys()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
-  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-10"></script>
+  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-11"></script>
 </body>
 </html>
