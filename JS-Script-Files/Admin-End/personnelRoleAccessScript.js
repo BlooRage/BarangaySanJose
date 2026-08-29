@@ -228,6 +228,41 @@
     return appendUrlParams(url, getPreviewParams(row));
   };
 
+  const normalizePreviewTarget = (url, baseHref = window.location.href) => {
+    try {
+      const parsed = new URL(String(url || ""), baseHref);
+      [
+        "access_preview",
+        "preview_department",
+        "preview_position",
+        "preview_token",
+      ].forEach((key) => parsed.searchParams.delete(key));
+
+      const path = parsed.pathname
+        .replace(/\/+/g, "/")
+        .replace(/\.php$/i, "")
+        .replace(/\/$/, "")
+        .toLowerCase();
+      const params = Array.from(parsed.searchParams.entries())
+        .sort(([aKey, aValue], [bKey, bValue]) => `${aKey}=${aValue}`.localeCompare(`${bKey}=${bValue}`));
+      const query = params.map(([key, value]) => `${key}=${value}`).join("&");
+
+      return `${path}${query ? `?${query}` : ""}`;
+    } catch (error) {
+      return "";
+    }
+  };
+
+  const previewTargetIsAllowed = (url, baseHref) => {
+    const target = normalizePreviewTarget(url, baseHref);
+    if (!target) return true;
+
+    return state.preview.items.some((item) => (
+      normalizePreviewTarget(item.url, baseHref) === target
+      || normalizePreviewTarget(item.path, baseHref) === target
+    ));
+  };
+
   const getPreviewItemsFromPermissionMap = (permissionMap, row) => {
     const allowed = permissionMap || {};
     const items = [];
@@ -717,6 +752,24 @@
         doc.head.appendChild(style);
       }
 
+      const suppressUnauthorizedAnchor = (anchor) => {
+        if (previewTargetIsAllowed(anchor.href || anchor.getAttribute("href"), doc.location.href)) {
+          return false;
+        }
+
+        anchor.setAttribute("aria-disabled", "true");
+        anchor.setAttribute("tabindex", "-1");
+        anchor.style.pointerEvents = "none";
+        anchor.style.opacity = "0.42";
+
+        const cardCol = anchor.closest(".col-12, .col-md-6, .col-lg-3");
+        const attentionCol = anchor.closest(".dashboard-attention-strip > [class*='col-']");
+        const navItem = anchor.closest("li");
+        const container = cardCol || attentionCol || navItem || anchor;
+        container.style.display = "none";
+        return true;
+      };
+
       const applyPreviewHref = (anchor) => {
         const rawHref = String(anchor.getAttribute("href") || "").trim();
         if (
@@ -734,6 +787,10 @@
           return;
         }
 
+        if (suppressUnauthorizedAnchor(anchor)) {
+          return;
+        }
+
         anchor.setAttribute("href", withPreviewParams(parsed.href));
       };
 
@@ -745,7 +802,17 @@
       doc.body.setAttribute("data-role-access-preview-links", "1");
       doc.body.addEventListener("click", (event) => {
         const anchor = event.target?.closest?.("a[href]");
-        if (anchor) applyPreviewHref(anchor);
+        if (!anchor) return;
+        const beforeHref = anchor.getAttribute("href") || "";
+        applyPreviewHref(anchor);
+        if (anchor.getAttribute("aria-disabled") === "true") {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (anchor.getAttribute("href") !== beforeHref) {
+          return;
+        }
       }, true);
     } catch (error) {
       // Some browser policies can block iframe document access. The preview
