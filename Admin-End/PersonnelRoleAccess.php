@@ -344,6 +344,12 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       color: #111827;
       font-weight: 700;
     }
+    .role-access-preview-main .role-access-preview-chevron {
+      transition: transform 0.2s ease;
+    }
+    .role-access-preview-main.is-collapsed .role-access-preview-chevron {
+      transform: rotate(-90deg);
+    }
     .role-access-preview-main-left {
       display: inline-flex;
       align-items: center;
@@ -367,6 +373,9 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       margin: 2px 0 6px;
       padding-left: 1.45rem;
       list-style: none;
+    }
+    .role-access-preview-subnav.is-collapsed {
+      display: none;
     }
     .role-access-preview-subnav button {
       width: 100%;
@@ -430,6 +439,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     .role-access-preview-frame-wrap {
       position: relative;
       flex: 1 1 auto;
+      overflow: hidden;
       min-height: 0;
       background: #ffffff;
     }
@@ -439,6 +449,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       min-height: 0;
       border: 0;
       background: #ffffff;
+      overflow: auto;
     }
     .role-access-preview-empty {
       display: grid;
@@ -719,6 +730,6 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       defaultPermissionKeys: <?= json_encode(array_values(amp_get_default_admin_permission_keys()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
-  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-5"></script>
+  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-7"></script>
 </body>
 </html>

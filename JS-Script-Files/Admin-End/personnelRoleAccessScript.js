@@ -33,6 +33,7 @@
       items: [],
       activeKey: "",
       search: "",
+      openGroups: {},
     },
   };
 
@@ -772,17 +773,28 @@
           #admin-mobile-header {
             display: none !important;
           }
+          html {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow-y: auto !important;
+          }
           body {
             padding-top: 0 !important;
+            height: auto !important;
+            min-height: 100% !important;
             overflow-x: hidden !important;
+            overflow-y: auto !important;
           }
           #main-display {
             width: 100% !important;
             max-width: 100% !important;
             padding: 1rem !important;
+            overflow: visible !important;
           }
           .d-flex.flex-column.flex-md-row {
-            min-height: 0 !important;
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
           }
           body::before {
             content: "Preview only - actions are disabled";
@@ -890,6 +902,13 @@
 
       const blockReadonlyEvent = (event) => {
         const target = event.target;
+        if (event.type === "keydown") {
+          const scrollKeys = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+          if (scrollKeys.has(event.key) && !target?.closest?.("input, select, textarea, button, [role='button']")) {
+            return;
+          }
+        }
+
         const anchor = target?.closest?.("a[href]");
         if (anchor) {
           if (isNavigationAnchor(anchor)) {
@@ -992,6 +1011,7 @@
           const active = firstItem.key === state.preview.activeKey
             || childItems.some((item) => item.key === state.preview.activeKey);
           const iconClass = previewIconClass(firstItem.key, group.key);
+          const groupOpen = Boolean(term) || active || state.preview.openGroups[group.key] === true;
 
           if (!childItems.length) {
             return `
@@ -1011,16 +1031,16 @@
           return `
             <li class="mb-1">
               <button type="button"
-                      class="role-access-preview-main ${active ? "is-active" : ""}"
-                      data-preview-key="${escapeHtml(firstItem.key)}"
-                      aria-expanded="true">
+                      class="role-access-preview-main role-access-preview-toggle ${active ? "is-active" : ""} ${groupOpen ? "" : "is-collapsed"}"
+                      data-preview-group="${escapeHtml(group.key)}"
+                      aria-expanded="${groupOpen ? "true" : "false"}">
                 <span class="role-access-preview-main-left">
                   <span class="role-access-preview-icon-wrap"><i class="fas ${escapeHtml(iconClass)}"></i></span>
                   <span class="role-access-preview-label">${escapeHtml(group.label)}</span>
                 </span>
-                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                <i class="fas fa-chevron-down role-access-preview-chevron" aria-hidden="true"></i>
               </button>
-              <ul class="role-access-preview-subnav">
+              <ul class="role-access-preview-subnav ${groupOpen ? "" : "is-collapsed"}">
                 ${childItems.map((item) => `
                   <li>
                     <button type="button"
@@ -1043,6 +1063,14 @@
     }</ul>`;
 
     previewNavEl.innerHTML = html;
+    previewNavEl.querySelectorAll(".role-access-preview-toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        const groupKey = String(button.getAttribute("data-preview-group") || "").trim();
+        if (!groupKey) return;
+        state.preview.openGroups[groupKey] = !state.preview.openGroups[groupKey];
+        renderPreviewNav();
+      });
+    });
     previewNavEl.querySelectorAll("[data-preview-key]").forEach((button) => {
       button.addEventListener("click", () => {
         const key = String(button.getAttribute("data-preview-key") || "").trim();
@@ -1074,6 +1102,7 @@
     state.preview.items = previewItems;
     state.preview.activeKey = initialItem ? initialItem.key : "";
     state.preview.search = "";
+    state.preview.openGroups = {};
 
     if (previewSearchInput) previewSearchInput.value = "";
     if (previewTitleEl) previewTitleEl.textContent = `Preview Access - ${safe(normalizedRow.position_display)}`;
@@ -1373,6 +1402,7 @@
       state.preview.items = [];
       state.preview.activeKey = "";
       state.preview.search = "";
+      state.preview.openGroups = {};
       if (previewSearchInput) previewSearchInput.value = "";
       if (previewFrameEl) previewFrameEl.setAttribute("src", "about:blank");
     });
