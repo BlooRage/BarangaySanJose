@@ -25,9 +25,42 @@ if ($adminGuardNeedsDb) {
 
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
 $currentOfficialAccount = null;
+$adminAccessPreview = null;
 
 if ($adminGuardNeedsDb && isset($conn) && $conn instanceof mysqli) {
     amp_ensure_permission_storage($conn);
+}
+
+if (
+    $roleNorm === 'superadmin'
+    && isset($conn) && $conn instanceof mysqli
+    && strtolower(trim((string)($_GET['access_preview'] ?? ''))) === 'personnel_role'
+) {
+    $sessionPreviewToken = (string)($_SESSION['personnel_access_preview_token'] ?? '');
+    $requestPreviewToken = (string)($_GET['preview_token'] ?? '');
+    $previewDepartment = trim((string)($_GET['preview_department'] ?? ''));
+    $previewPosition = trim((string)($_GET['preview_position'] ?? ''));
+
+    if (
+        $sessionPreviewToken !== ''
+        && $requestPreviewToken !== ''
+        && hash_equals($sessionPreviewToken, $requestPreviewToken)
+        && $previewDepartment !== ''
+        && $previewPosition !== ''
+    ) {
+        $allowedPermissions = amp_get_effective_permission_keys_for_personnel_role(
+            $conn,
+            $previewDepartment,
+            $previewPosition
+        );
+        $adminAccessPreview = [
+            'active' => true,
+            'type' => 'personnel_role',
+            'department' => $previewDepartment,
+            'position' => $previewPosition,
+            'allowed_permissions' => $allowedPermissions,
+        ];
+    }
 }
 
 if ($currentUserId !== '' && isset($conn) && $conn instanceof mysqli) {
@@ -78,8 +111,16 @@ if (in_array($roleNorm, ['official', 'personnel'], true) && isset($conn) && $con
 if ($currentUserId !== '' && isset($conn) && $conn instanceof mysqli) {
     $requiredPermissionKey = amp_resolve_request_permission_key();
     if ($requiredPermissionKey !== null) {
-        $allowedPermissions = amp_get_allowed_permission_keys($conn, $currentUserId, (string)($_SESSION['role'] ?? ''));
+        if (!isset($allowedPermissions) || !is_array($allowedPermissions)) {
+            $allowedPermissions = amp_get_allowed_permission_keys($conn, $currentUserId, (string)($_SESSION['role'] ?? ''));
+        }
         if (!amp_permission_key_allowed($allowedPermissions, $requiredPermissionKey)) {
+            if (is_array($adminAccessPreview) && !empty($adminAccessPreview['active'])) {
+                http_response_code(403);
+                echo 'Access denied in preview.';
+                exit;
+            }
+
             $fallbackPath = amp_get_first_allowed_path($allowedPermissions);
             if ($fallbackPath !== '') {
                 header('Location: ' . appUrl('/' . ltrim($fallbackPath, '/')));

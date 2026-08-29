@@ -116,6 +116,9 @@ $isAdminProfileActive = ($current === 'admin_profile.php');
 $areaManagementTab = strtolower(trim((string)($_GET['tab'] ?? 'summary')));
 $areaManagementArea = trim((string)($_GET['area'] ?? ''));
 $isSuperAdminSidebar = (strtolower(trim((string)($_SESSION['role'] ?? ''))) === 'superadmin');
+if (isset($adminAccessPreview) && is_array($adminAccessPreview) && !empty($adminAccessPreview['active'])) {
+    $isSuperAdminSidebar = false;
+}
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
 $certificateTab = strtolower(trim((string)($_GET['tab'] ?? 'tracker')));
 $certificateDocument = strtolower(trim((string)($_GET['document'] ?? '')));
@@ -274,7 +277,12 @@ $isContentNewsCreateActive = $current === 'CreateNews.php';
 $isNewsManagementActive = ($current === 'Contents.php' && $sidebarContentTypeFilter === 'news') || $isContentNewsCreateActive;
 
 $sbAllowedPermissions = [];
-if ($sbDeferDb && isset($allowedPermissions) && is_array($allowedPermissions)) {
+if (
+    isset($adminAccessPreview) && is_array($adminAccessPreview) && !empty($adminAccessPreview['active'])
+    && isset($allowedPermissions) && is_array($allowedPermissions)
+) {
+    $sbAllowedPermissions = $allowedPermissions;
+} elseif ($sbDeferDb && isset($allowedPermissions) && is_array($allowedPermissions)) {
     // The admin guard already resolved these for the current request. Reuse
     // them so lightweight pages do not repeat the permission queries.
     $sbAllowedPermissions = $allowedPermissions;
@@ -298,6 +306,9 @@ $sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
 
 $sbSidebarUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $sbSidebarRole = trim((string)($_SESSION['role'] ?? ''));
+if (isset($adminAccessPreview) && is_array($adminAccessPreview) && !empty($adminAccessPreview['active'])) {
+    $sbSidebarRole = 'Personnel';
+}
 $sbSidebarCacheScope = md5($sbSidebarUserId . '|' . $sbSidebarRole);
 $sbCurrentOfficialAccount = (isset($currentOfficialAccount) && is_array($currentOfficialAccount))
     ? $currentOfficialAccount

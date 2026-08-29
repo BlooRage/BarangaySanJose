@@ -5,6 +5,10 @@ require_once "../PhpFiles/General/adminModulePermissions.php";
 
 requireRoleSession(['SuperAdmin'], false);
 
+if (empty($_SESSION['personnel_access_preview_token']) || !is_string($_SESSION['personnel_access_preview_token'])) {
+  $_SESSION['personnel_access_preview_token'] = bin2hex(random_bytes(16));
+}
+
 if (!function_exists('pra_filter_catalog_for_personnel_roles')) {
   function pra_filter_catalog_for_personnel_roles(array $catalog): array
   {
@@ -667,6 +671,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     window.PERSONNEL_ROLE_ACCESS_OPTIONS = {
       apiUrl: <?= json_encode(appUrl('PhpFiles/Admin-End/personnelRoleAccess.php'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       appBaseUrl: <?= json_encode(rtrim(appUrl(''), '/'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      previewToken: <?= json_encode((string)$_SESSION['personnel_access_preview_token'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       permissionCatalog: <?= json_encode($personnelRolePermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       defaultPermissionKeys: <?= json_encode(array_values(amp_get_default_admin_permission_keys()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };

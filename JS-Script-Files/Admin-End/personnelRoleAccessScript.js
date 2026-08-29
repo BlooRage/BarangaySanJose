@@ -2,6 +2,7 @@
   const opts = window.PERSONNEL_ROLE_ACCESS_OPTIONS || {};
   const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/personnelRoleAccess.php");
   const appBaseUrl = String(opts.appBaseUrl || "").replace(/\/+$/, "");
+  const previewToken = String(opts.previewToken || "");
   const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
   const defaultPermissionKeysFromOpts = Array.isArray(opts.defaultPermissionKeys) ? opts.defaultPermissionKeys.map(String) : [];
 
@@ -196,7 +197,38 @@
     return appBaseUrl ? `${appBaseUrl}/${cleanPath}` : `/${cleanPath}`;
   };
 
-  const getPreviewItemsFromPermissionMap = (permissionMap) => {
+  const appendUrlParams = (url, params) => {
+    const [baseAndQuery, hash = ""] = String(url || "").split("#", 2);
+    const separator = baseAndQuery.includes("?") ? "&" : "?";
+    const query = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      const normalized = String(value ?? "").trim();
+      if (normalized !== "") query.set(key, normalized);
+    });
+
+    const suffix = query.toString();
+    return suffix
+      ? `${baseAndQuery}${separator}${suffix}${hash ? `#${hash}` : ""}`
+      : url;
+  };
+
+  const getPreviewParams = (row) => ({
+    access_preview: "personnel_role",
+    preview_department: row?.department || row?.department_display || "",
+    preview_position: row?.position_access || row?.position_display || "",
+    preview_token: previewToken,
+  });
+
+  const buildPreviewUrl = (path, row) => appendUrlParams(buildAppUrl(path), getPreviewParams(row));
+
+  const withPreviewParams = (url) => {
+    const row = state.preview.row;
+    if (!row) return url;
+    return appendUrlParams(url, getPreviewParams(row));
+  };
+
+  const getPreviewItemsFromPermissionMap = (permissionMap, row) => {
     const allowed = permissionMap || {};
     const items = [];
 
@@ -214,7 +246,7 @@
               parentLabel: String(item.label || ""),
               section: String(section.section || "Modules"),
               path,
-              url: buildAppUrl(path),
+              url: buildPreviewUrl(path, row),
             });
           });
           return;
@@ -229,7 +261,7 @@
           parentLabel: "",
           section: String(section.section || "Modules"),
           path,
-          url: buildAppUrl(path),
+          url: buildPreviewUrl(path, row),
         });
       });
     });
@@ -657,31 +689,64 @@
 
     try {
       const doc = previewFrameEl.contentDocument;
-      if (!doc || !doc.head || doc.querySelector("style[data-role-access-preview-frame='1']")) {
+      if (!doc || !doc.head) {
         return;
       }
 
-      const style = doc.createElement("style");
-      style.setAttribute("data-role-access-preview-frame", "1");
-      style.textContent = `
-        #dashboard-sidebar,
-        #admin-mobile-header {
-          display: none !important;
+      if (!doc.querySelector("style[data-role-access-preview-frame='1']")) {
+        const style = doc.createElement("style");
+        style.setAttribute("data-role-access-preview-frame", "1");
+        style.textContent = `
+          #dashboard-sidebar,
+          #admin-mobile-header {
+            display: none !important;
+          }
+          body {
+            padding-top: 0 !important;
+            overflow-x: hidden !important;
+          }
+          #main-display {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 1rem !important;
+          }
+          .d-flex.flex-column.flex-md-row {
+            min-height: 0 !important;
+          }
+        `;
+        doc.head.appendChild(style);
+      }
+
+      const applyPreviewHref = (anchor) => {
+        const rawHref = String(anchor.getAttribute("href") || "").trim();
+        if (
+          !rawHref
+          || rawHref.startsWith("#")
+          || /^javascript:/i.test(rawHref)
+          || /^mailto:/i.test(rawHref)
+          || /^tel:/i.test(rawHref)
+        ) {
+          return;
         }
-        body {
-          padding-top: 0 !important;
-          overflow-x: hidden !important;
+
+        const parsed = new URL(rawHref, doc.location.href);
+        if (parsed.origin !== doc.location.origin || !parsed.pathname.includes("/Admin-End/")) {
+          return;
         }
-        #main-display {
-          width: 100% !important;
-          max-width: 100% !important;
-          padding: 1rem !important;
-        }
-        .d-flex.flex-column.flex-md-row {
-          min-height: 0 !important;
-        }
-      `;
-      doc.head.appendChild(style);
+
+        anchor.setAttribute("href", withPreviewParams(parsed.href));
+      };
+
+      doc.querySelectorAll("a[href]").forEach(applyPreviewHref);
+      if (!doc.body || doc.body.getAttribute("data-role-access-preview-links") === "1") {
+        return;
+      }
+
+      doc.body.setAttribute("data-role-access-preview-links", "1");
+      doc.body.addEventListener("click", (event) => {
+        const anchor = event.target?.closest?.("a[href]");
+        if (anchor) applyPreviewHref(anchor);
+      }, true);
     } catch (error) {
       // Some browser policies can block iframe document access. The preview
       // remains usable through its outer granted-module navigator.
@@ -756,7 +821,7 @@
       position_display: String(row.position_display || row.position_access || "").trim(),
     };
     const permissionMap = buildPermissionMapFromRow(normalizedRow);
-    const previewItems = getPreviewItemsFromPermissionMap(permissionMap);
+    const previewItems = getPreviewItemsFromPermissionMap(permissionMap, normalizedRow);
     const initialItem = previewItems.find((item) => item.key === "dashboard") || previewItems[0] || null;
 
     state.preview.row = normalizedRow;
