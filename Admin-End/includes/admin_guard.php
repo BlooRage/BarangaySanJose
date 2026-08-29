@@ -60,6 +60,13 @@ if (
             'position' => $previewPosition,
             'allowed_permissions' => $allowedPermissions,
         ];
+
+        $requestMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if (!in_array($requestMethod, ['GET', 'HEAD', 'OPTIONS'], true)) {
+            http_response_code(403);
+            echo 'Preview is read-only.';
+            exit;
+        }
     }
 }
 

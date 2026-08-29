@@ -263,6 +263,37 @@
     ));
   };
 
+  const previewIconClass = (key, parentKey = "") => {
+    const iconMap = {
+      dashboard: "fa-house",
+      appointments: "fa-calendar-check",
+      resident_profiling: "fa-user-group",
+      household_profiling: "fa-house",
+      area_statistics: "fa-map-location-dot",
+      certificate_issuance: "fa-file-circle-check",
+      id_issuance: "fa-id-card",
+      clearance_issuance: "fa-stamp",
+      business_monitoring: "fa-building",
+      finance_transactions: "fa-money-check-alt",
+      blotter_log_new_incident: "fa-scale-balanced",
+      blotter_tools: "fa-toolbox",
+      complaint_log_new_incident: "fa-comments",
+      complaint_tools: "fa-comments",
+      news_management: "fa-newspaper",
+      announcements: "fa-bullhorn",
+      reports: "fa-chart-bar",
+      user_management: "fa-users-cog",
+      admin_management: "fa-user-gear",
+      personnel_management: "fa-user-tie",
+      official_records_management: "fa-user-shield",
+      official_transition: "fa-user-shield",
+      audit_logs: "fa-clipboard-list",
+      website_settings: "fa-screwdriver-wrench",
+    };
+
+    return iconMap[parentKey] || iconMap[key] || "fa-circle-dot";
+  };
+
   const getPreviewItemsFromPermissionMap = (permissionMap, row) => {
     const allowed = permissionMap || {};
     const items = [];
@@ -279,6 +310,7 @@
               key,
               label: String(child.label || key),
               parentLabel: String(item.label || ""),
+              parentKey: String(item.key || ""),
               section: String(section.section || "Modules"),
               path,
               url: buildPreviewUrl(path, row),
@@ -294,6 +326,7 @@
           key,
           label: String(item.label || key),
           parentLabel: "",
+          parentKey: "",
           section: String(section.section || "Modules"),
           path,
           url: buildPreviewUrl(path, row),
@@ -732,6 +765,9 @@
         const style = doc.createElement("style");
         style.setAttribute("data-role-access-preview-frame", "1");
         style.textContent = `
+          :root {
+            --role-access-preview-readonly: #9a3412;
+          }
           #dashboard-sidebar,
           #admin-mobile-header {
             display: none !important;
@@ -747,6 +783,32 @@
           }
           .d-flex.flex-column.flex-md-row {
             min-height: 0 !important;
+          }
+          body::before {
+            content: "Preview only - actions are disabled";
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            z-index: 2147483647;
+            padding: 0.45rem 0.75rem;
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: var(--role-access-preview-readonly);
+            font: 700 0.78rem/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            pointer-events: none;
+          }
+          button,
+          input,
+          select,
+          textarea,
+          [role="button"],
+          .btn:not(a[href]) {
+            cursor: not-allowed !important;
+          }
+          form {
+            position: relative;
           }
         `;
         doc.head.appendChild(style);
@@ -799,10 +861,59 @@
         return;
       }
 
+      doc.querySelectorAll("form").forEach((form) => {
+        form.setAttribute("data-preview-readonly", "1");
+      });
+
+      doc.querySelectorAll("button, input, select, textarea").forEach((control) => {
+        const type = String(control.getAttribute("type") || "").toLowerCase();
+        if (type === "hidden") return;
+        control.setAttribute("data-preview-readonly", "1");
+        if (control.matches("button, input[type='button'], input[type='submit'], input[type='reset']")) {
+          control.setAttribute("disabled", "disabled");
+        } else if (!control.hasAttribute("readonly")) {
+          control.setAttribute("readonly", "readonly");
+        }
+      });
+
+      const isNavigationAnchor = (anchor) => {
+        const rawHref = String(anchor.getAttribute("href") || "").trim();
+        if (!rawHref || rawHref.startsWith("#") || /^javascript:/i.test(rawHref)) {
+          return false;
+        }
+
+        const parsed = new URL(rawHref, doc.location.href);
+        return parsed.origin === doc.location.origin
+          && parsed.pathname.includes("/Admin-End/")
+          && previewTargetIsAllowed(parsed.href, doc.location.href);
+      };
+
+      const blockReadonlyEvent = (event) => {
+        const target = event.target;
+        const anchor = target?.closest?.("a[href]");
+        if (anchor) {
+          if (isNavigationAnchor(anchor)) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        const blockedControl = target?.closest?.("form, button, input, select, textarea, [role='button'], [data-bs-toggle], [data-action], .btn");
+        if (!blockedControl) return;
+        event.preventDefault();
+        event.stopPropagation();
+      };
+
       doc.body.setAttribute("data-role-access-preview-links", "1");
+      doc.body.addEventListener("submit", blockReadonlyEvent, true);
       doc.body.addEventListener("click", (event) => {
         const anchor = event.target?.closest?.("a[href]");
-        if (!anchor) return;
+        if (!anchor) {
+          blockReadonlyEvent(event);
+          return;
+        }
         const beforeHref = anchor.getAttribute("href") || "";
         applyPreviewHref(anchor);
         if (anchor.getAttribute("aria-disabled") === "true") {
@@ -813,7 +924,11 @@
         if (anchor.getAttribute("href") !== beforeHref) {
           return;
         }
+        blockReadonlyEvent(event);
       }, true);
+      ["change", "input", "keydown"].forEach((eventName) => {
+        doc.body.addEventListener(eventName, blockReadonlyEvent, true);
+      });
     } catch (error) {
       // Some browser policies can block iframe document access. The preview
       // remains usable through its outer granted-module navigator.
@@ -846,25 +961,89 @@
       grouped.get(section).push(item);
     });
 
-    const html = Array.from(grouped.entries()).map(([section, items]) => `
-      <div class="role-access-preview-section">
-        <div class="role-access-preview-section-title">${escapeHtml(section)}</div>
-        ${items.map((item) => `
-          <button type="button"
-                  class="role-access-preview-link ${item.key === state.preview.activeKey ? "is-active" : ""}"
-                  data-preview-key="${escapeHtml(item.key)}">
-            <span class="role-access-preview-link-main">
-              <span class="role-access-preview-link-label">${escapeHtml(item.label)}</span>
-              ${item.parentLabel ? `<span class="role-access-preview-link-parent">${escapeHtml(item.parentLabel)}</span>` : ""}
-            </span>
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          </button>
-        `).join("")}
-      </div>
-    `).join("");
+    const html = `<ul class="role-access-preview-sidebar-list">${
+      Array.from(grouped.entries()).map(([section, items]) => {
+        const navGroups = new Map();
+        items.forEach((item) => {
+          const groupKey = item.parentKey || item.key;
+          if (!navGroups.has(groupKey)) {
+            navGroups.set(groupKey, {
+              key: groupKey,
+              label: item.parentLabel || item.label,
+              parentKey: item.parentKey || "",
+              directItem: item.parentKey ? null : item,
+              children: [],
+            });
+          }
+
+          const group = navGroups.get(groupKey);
+          if (item.parentKey) {
+            group.children.push(item);
+          } else {
+            group.directItem = item;
+          }
+        });
+
+        const groupsHtml = Array.from(navGroups.values()).map((group) => {
+          const childItems = group.children;
+          const firstItem = group.directItem || childItems[0] || null;
+          if (!firstItem) return "";
+
+          const active = firstItem.key === state.preview.activeKey
+            || childItems.some((item) => item.key === state.preview.activeKey);
+          const iconClass = previewIconClass(firstItem.key, group.key);
+
+          if (!childItems.length) {
+            return `
+              <li class="mb-2">
+                <button type="button"
+                        class="role-access-preview-main ${active ? "is-active" : ""}"
+                        data-preview-key="${escapeHtml(firstItem.key)}">
+                  <span class="role-access-preview-main-left">
+                    <span class="role-access-preview-icon-wrap"><i class="fas ${escapeHtml(iconClass)}"></i></span>
+                    <span class="role-access-preview-label">${escapeHtml(group.label)}</span>
+                  </span>
+                </button>
+              </li>
+            `;
+          }
+
+          return `
+            <li class="mb-1">
+              <button type="button"
+                      class="role-access-preview-main ${active ? "is-active" : ""}"
+                      data-preview-key="${escapeHtml(firstItem.key)}"
+                      aria-expanded="true">
+                <span class="role-access-preview-main-left">
+                  <span class="role-access-preview-icon-wrap"><i class="fas ${escapeHtml(iconClass)}"></i></span>
+                  <span class="role-access-preview-label">${escapeHtml(group.label)}</span>
+                </span>
+                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+              </button>
+              <ul class="role-access-preview-subnav">
+                ${childItems.map((item) => `
+                  <li>
+                    <button type="button"
+                            class="${item.key === state.preview.activeKey ? "is-active" : ""}"
+                            data-preview-key="${escapeHtml(item.key)}">
+                      ${escapeHtml(item.label)}
+                    </button>
+                  </li>
+                `).join("")}
+              </ul>
+            </li>
+          `;
+        }).join("");
+
+        return `
+          <li class="role-access-preview-section-title">${escapeHtml(section)}</li>
+          ${groupsHtml}
+        `;
+      }).join("")
+    }</ul>`;
 
     previewNavEl.innerHTML = html;
-    previewNavEl.querySelectorAll(".role-access-preview-link").forEach((button) => {
+    previewNavEl.querySelectorAll("[data-preview-key]").forEach((button) => {
       button.addEventListener("click", () => {
         const key = String(button.getAttribute("data-preview-key") || "").trim();
         setPreviewActiveItem(key);
