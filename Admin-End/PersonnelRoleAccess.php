@@ -257,18 +257,30 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     }
     .role-access-preview-modal .modal-dialog {
       max-width: min(1120px, calc(100vw - 48px));
+      height: min(82dvh, 760px);
+    }
+    .role-access-preview-modal .modal-header {
+      flex: 0 0 auto;
     }
     .role-access-preview-modal .modal-content {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
       padding: 1rem !important;
     }
     .role-access-preview-modal .modal-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
       padding-top: 0.5rem;
     }
     .role-access-preview-shell {
       display: grid;
       grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
-      height: min(62vh, 560px);
-      min-height: 420px;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
       border: 1px solid #e5e7eb;
       border-radius: 14px;
       overflow: hidden;
@@ -276,10 +288,13 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     }
     .role-access-preview-sidebar {
       min-width: 0;
+      min-height: 0;
       border-right: 1px solid #e5e7eb;
       background: #ffffff;
+      font-family: 'Geist', sans-serif;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
     .role-access-preview-profile {
       padding: 14px;
@@ -302,7 +317,10 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       border-bottom: 1px solid #e5e7eb;
     }
     .role-access-preview-nav {
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
+      overscroll-behavior: contain;
       padding: 10px 14px 14px;
     }
     .role-access-preview-sidebar-list {
@@ -311,10 +329,10 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       list-style: none;
     }
     .role-access-preview-section-title {
-      padding: 10px 8px 6px;
+      padding: 10px 10px 6px;
       color: #6b7280;
       font-size: 0.78rem;
-      font-weight: 700;
+      font-weight: 650;
       text-transform: uppercase;
       letter-spacing: 0;
     }
@@ -332,6 +350,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       padding: 8px 10px;
       text-align: left;
       font-weight: 600;
+      line-height: 1.25;
       transition: background-color 0.2s ease, color 0.2s ease;
     }
     .role-access-preview-main:hover,
@@ -343,6 +362,15 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       background-color: rgba(222, 113, 12, 0.1);
       color: #111827;
       font-weight: 700;
+    }
+    .role-access-preview-main:not(.role-access-preview-toggle).is-active {
+      background-color: #de710c;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .role-access-preview-main:not(.role-access-preview-toggle).is-active i,
+    .role-access-preview-main:not(.role-access-preview-toggle).is-active .role-access-preview-label {
+      color: #ffffff;
     }
     .role-access-preview-main .role-access-preview-chevron {
       transition: transform 0.2s ease;
@@ -379,7 +407,10 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     }
     .role-access-preview-subnav button {
       width: 100%;
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
       margin: 2px 0;
       padding: 6px 10px;
       border: 0;
@@ -388,6 +419,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       color: #444;
       text-align: left;
       font-size: 0.85rem;
+      line-height: 1.3;
       transition: background-color 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
     }
     .role-access-preview-subnav button:hover,
@@ -403,8 +435,10 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     }
     .role-access-preview-stage {
       min-width: 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
       background: #f3f4f6;
     }
     .role-access-preview-bar {
@@ -439,11 +473,13 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     .role-access-preview-frame-wrap {
       position: relative;
       flex: 1 1 auto;
-      overflow: hidden;
       min-height: 0;
+      overflow: hidden;
+      overscroll-behavior: contain;
       background: #ffffff;
     }
     .role-access-preview-frame {
+      display: block;
       width: 100%;
       height: 100%;
       min-height: 0;
@@ -462,6 +498,14 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       background: #ffffff;
     }
     @media (max-width: 767.98px) {
+      .role-access-preview-modal .modal-dialog {
+        max-width: calc(100vw - 20px);
+        height: calc(100dvh - 32px);
+        margin: 1rem auto;
+      }
+      .role-access-preview-modal .modal-content {
+        padding: 0.75rem !important;
+      }
       .role-access-toolbar-main,
       .role-access-toolbar-meta {
         width: 100%;
@@ -474,11 +518,12 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       }
       .role-access-preview-shell {
         grid-template-columns: 1fr;
-        height: min(70vh, 620px);
+        grid-template-rows: minmax(160px, 32%) minmax(0, 1fr);
+        height: 100%;
         min-height: 0;
       }
       .role-access-preview-sidebar {
-        max-height: 220px;
+        max-height: none;
         border-right: 0;
         border-bottom: 1px solid #e5e7eb;
       }
@@ -672,7 +717,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
                 </div>
               </div>
               <div class="role-access-preview-frame-wrap">
-                <iframe class="role-access-preview-frame" id="personnelRoleAccessPreviewFrame" title="Access preview" sandbox="allow-same-origin allow-scripts allow-modals"></iframe>
+                <iframe class="role-access-preview-frame" id="personnelRoleAccessPreviewFrame" title="Access preview" scrolling="yes" sandbox="allow-same-origin allow-scripts allow-modals"></iframe>
                 <div class="role-access-preview-empty d-none" id="personnelRoleAccessPreviewEmpty">No modules are granted for this access profile.</div>
               </div>
             </section>
@@ -730,6 +775,6 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
       defaultPermissionKeys: <?= json_encode(array_values(amp_get_default_admin_permission_keys()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
-  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-7"></script>
+  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-9"></script>
 </body>
 </html>

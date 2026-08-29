@@ -774,11 +774,16 @@
             display: none !important;
           }
           html {
+            width: 100% !important;
             height: auto !important;
             min-height: 100% !important;
+            scroll-behavior: auto !important;
+            overflow-x: hidden !important;
             overflow-y: auto !important;
           }
           body {
+            width: 100% !important;
+            margin: 0 !important;
             padding-top: 0 !important;
             height: auto !important;
             min-height: 100% !important;
@@ -788,13 +793,94 @@
           #main-display {
             width: 100% !important;
             max-width: 100% !important;
+            min-height: auto !important;
             padding: 1rem !important;
             overflow: visible !important;
+          }
+          main,
+          .main-content,
+          .content-wrapper,
+          .container,
+          .container-fluid {
+            max-width: 100% !important;
           }
           .d-flex.flex-column.flex-md-row {
             height: auto !important;
             min-height: 100% !important;
             overflow: visible !important;
+          }
+          .dashboard-page-header {
+            margin-bottom: 1rem !important;
+          }
+          .dashboard-page-title {
+            font-size: clamp(2rem, 3vw, 2.45rem) !important;
+          }
+          .dashboard-attention-panel,
+          .chart-panel {
+            border-radius: 18px !important;
+          }
+          .dashboard-attention-panel {
+            padding: 1rem !important;
+          }
+          .dashboard-section-head,
+          .chart-panel-head {
+            gap: 0.9rem !important;
+          }
+          .attention-tile {
+            min-height: 78px !important;
+            border-radius: 14px !important;
+            padding: 0.85rem 0.9rem !important;
+          }
+          .attention-tile__icon {
+            width: 42px !important;
+            height: 42px !important;
+            border-radius: 14px !important;
+          }
+          .service-grid {
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)) !important;
+            gap: 1rem !important;
+            justify-content: start !important;
+          }
+          .service-grid > [class*="col-"] {
+            display: flex !important;
+            width: auto !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            padding: 0 !important;
+            flex: none !important;
+          }
+          .card-action {
+            aspect-ratio: auto !important;
+            min-height: 190px !important;
+            border-radius: 20px !important;
+            padding: 1rem !important;
+            grid-template-rows: 62px minmax(2.1rem, auto) minmax(2.7rem, auto) !important;
+            gap: 0.65rem !important;
+          }
+          .card-action__badge {
+            top: 0.65rem !important;
+            right: 0.65rem !important;
+            min-width: 1.65rem !important;
+            height: 1.65rem !important;
+            font-size: 0.72rem !important;
+          }
+          .card-action__icon {
+            width: 62px !important;
+            height: 62px !important;
+            border-radius: 18px !important;
+          }
+          .card-action__icon i {
+            font-size: 1.65rem !important;
+          }
+          .card-action__title {
+            max-width: 15ch !important;
+            font-size: 1rem !important;
+            line-height: 1.18 !important;
+          }
+          .card-action__subtext {
+            max-width: 15rem !important;
+            font-size: 0.82rem !important;
+            line-height: 1.35 !important;
           }
           body::before {
             content: "Preview only - actions are disabled";
