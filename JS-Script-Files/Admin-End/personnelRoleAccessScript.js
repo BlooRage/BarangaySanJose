@@ -254,13 +254,43 @@
     }
   };
 
+  const normalizePreviewRoute = (url, baseHref = window.location.href) => {
+    const target = normalizePreviewTarget(url, baseHref);
+    return target.split("?")[0] || "";
+  };
+
+  const previewRouteAliases = (item) => {
+    const aliases = [];
+    const key = String(item?.key || "");
+
+    if (key === "announcements_tracker") {
+      aliases.push(buildAppUrl("Admin-End/Contents/ContentManagement.php"));
+    }
+    if (key.startsWith("reports_")) {
+      aliases.push(buildAppUrl("Admin-End/Reports/Reports.php"));
+    }
+    if (key.startsWith("finance_")) {
+      aliases.push(buildAppUrl("Admin-End/Certificates/FinancePayments.php"));
+    }
+    if (key === "appointments") {
+      aliases.push(buildAppUrl("Admin-End/Appointments/AppointmentTracker.php"));
+    }
+
+    return aliases;
+  };
+
   const previewTargetIsAllowed = (url, baseHref) => {
     const target = normalizePreviewTarget(url, baseHref);
     if (!target) return true;
 
+    const targetRoute = target.split("?")[0] || "";
+
     return state.preview.items.some((item) => (
       normalizePreviewTarget(item.url, baseHref) === target
       || normalizePreviewTarget(item.path, baseHref) === target
+      || normalizePreviewRoute(item.url, baseHref) === targetRoute
+      || normalizePreviewRoute(item.path, baseHref) === targetRoute
+      || previewRouteAliases(item).some((alias) => normalizePreviewRoute(alias, baseHref) === targetRoute)
     ));
   };
 
@@ -897,12 +927,12 @@
             box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
             pointer-events: none;
           }
-          button,
+          button:not([data-bs-toggle]),
           input,
           select,
           textarea,
           [role="button"],
-          .btn:not(a[href]) {
+          .btn:not(a[href]):not([data-bs-toggle]) {
             cursor: not-allowed !important;
           }
           form {
@@ -952,6 +982,7 @@
         }
 
         anchor.setAttribute("href", withPreviewParams(parsed.href));
+        anchor.setAttribute("target", "_self");
       };
 
       doc.querySelectorAll("a[href]").forEach(applyPreviewHref);
@@ -967,6 +998,9 @@
         const type = String(control.getAttribute("type") || "").toLowerCase();
         if (type === "hidden") return;
         control.setAttribute("data-preview-readonly", "1");
+        if (control.matches("button[data-bs-toggle], input[type='button'][data-bs-toggle]")) {
+          return;
+        }
         if (control.matches("button, input[type='button'], input[type='submit'], input[type='reset']")) {
           control.setAttribute("disabled", "disabled");
         } else if (!control.hasAttribute("readonly")) {
@@ -1002,6 +1036,13 @@
           }
           event.preventDefault();
           event.stopPropagation();
+          return;
+        }
+
+        const bootstrapPreviewControl = target?.closest?.(
+          "[data-bs-toggle='modal'], [data-bs-toggle='collapse'], [data-bs-toggle='tab'], [data-bs-toggle='pill'], [data-bs-toggle='dropdown']"
+        );
+        if (bootstrapPreviewControl) {
           return;
         }
 

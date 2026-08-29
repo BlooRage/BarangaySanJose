@@ -283,9 +283,35 @@ if (!function_exists('apcm_current_official_position')) {
 if (!function_exists('apcm_get_appointment_admin_scope')) {
     function apcm_get_appointment_admin_scope(mysqli $conn, string $userId, string $sessionRole = ''): array
     {
+        global $adminAccessPreview, $allowedPermissions;
+
         $userId = trim($userId);
         $normalizedRole = apcm_normalize_session_role($sessionRole);
         $positionAccess = apcm_current_official_position($conn, $userId);
+
+        if (
+            is_array($adminAccessPreview ?? null)
+            && !empty($adminAccessPreview['active'])
+            && is_array($allowedPermissions ?? null)
+            && function_exists('amp_permission_key_allowed')
+            && amp_permission_key_allowed($allowedPermissions, 'appointments')
+        ) {
+            return [
+                'user_id' => $userId,
+                'position_access' => $positionAccess,
+                'is_superadmin' => false,
+                'is_barangay_secretary' => false,
+                'is_personnel' => true,
+                'can_access_tracker' => true,
+                'can_view_all_tracker' => false,
+                'can_manage_all_tracker' => false,
+                'can_access_settings' => false,
+                'can_access_schedule' => true,
+                'can_manage_all_schedule' => false,
+                'can_manage_self_schedule' => true,
+                'scoped_official_user_id' => $userId,
+            ];
+        }
 
         $isSuperAdmin = $normalizedRole === 'superadmin';
         $isBarangaySecretary = !$isSuperAdmin

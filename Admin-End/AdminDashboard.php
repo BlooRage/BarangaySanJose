@@ -88,6 +88,17 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
         : ($sbCan('announcements_delivery')
           ? appUrl('Admin-End/Contents/CreateContent.php?type=delivery')
           : appUrl('Admin-End/Contents/CreateContent.php?type=faq')));
+    $reportsHubHref = $sbCan('reports_certificate_issuance')
+      ? appUrl('Admin-End/Reports/Reports.php?module=certificate_issuance')
+      : ($sbCan('reports_clearance_issuance')
+        ? appUrl('Admin-End/Reports/Reports.php?module=clearance_issuance')
+        : ($sbCan('reports_financial')
+          ? appUrl('Admin-End/Reports/Reports.php?module=financial')
+          : ($sbCan('reports_residents')
+            ? appUrl('Admin-End/Reports/Reports.php?module=residents')
+            : ($sbCan('reports_blotter')
+              ? appUrl('Admin-End/Reports/Reports.php?module=blotter')
+              : appUrl('Admin-End/Reports/Reports.php?module=complaints')))));
 
     $addAttention($sbCanAccessAppointmentTracker, 'Appointments waiting', $appointmentsAttention, appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=tracker'), 'fa-calendar-check');
     $addAttention($sbCan('resident_masterlist') || $sbCan('resident_edit_requests') || $sbCan('resident_sector_membership_verification'), 'Resident profiling tasks', $residentAttention, appUrl('Admin-End/ResidentMasterlist.php'), 'fa-users');
@@ -95,7 +106,7 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
     $addAttention($sbCan('certificate_issuance'), 'Certificate requests', $certificateAttention, appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__'), 'fa-file-circle-check');
     $addAttention($sbCan('id_issuance_tracker'), 'Barangay ID processing', $idAttention, appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance'), 'fa-id-card');
     $addAttention($sbCan('clearance_issuance'), 'Clearance requests', $clearanceAttention, appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__'), 'fa-stamp');
-    $addAttention($sbCan('finance_payment_tracker') || $sbCan('finance_fee_management'), 'Finance actions', $financeAttention, appUrl('Admin-End/FinancePayments.php?section=tracker'), 'fa-money-check-alt');
+    $addAttention($sbCan('finance_payment_tracker') || $sbCan('finance_fee_management'), 'Finance actions', $financeAttention, appUrl('Admin-End/Certificates/FinancePayments.php?section=tracker'), 'fa-money-check-alt');
     $addAttention($sbCan('blotter_review_queue') || $sbCan('blotter_tracker'), 'Blotter follow-ups', $blotterAttention, appUrl('Admin-End/Blotter/BlotterTracker.php'), 'fa-scale-balanced');
     $addAttention($sbCan('complaint_tracker'), 'Complaint queue', $complaintAttention, appUrl('Admin-End/Complaints/ComplaintTracker.php'), 'fa-comments');
     $addAttention($sbCanAccessContentNavigator, 'Content reviews', $contentAttention, appUrl('Admin-End/Contents/Contents.php'), 'fa-bullhorn');
@@ -113,13 +124,13 @@ require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
     $addModuleCard($sbCan('id_issuance_tracker') || $sbCan('id_issuance_manual'), 'id-issuance', 'ID Issuance', appUrl($sbCan('id_issuance_tracker') ? 'Admin-End/Certificates/CertificateTracker.php?entry=id_issuance' : 'Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id'), 'fa-id-card', 'Process Barangay ID applications and manual issuance.', $idAttention);
     $addModuleCard($sbCan('clearance_issuance'), 'clearance-issuance', 'Clearance Issuance', appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__'), 'fa-stamp', 'Handle clearance pipelines and business-related releases.', $clearanceAttention);
     $addModuleCard($sbCan('business_monitoring'), 'business-monitoring', 'Business Monitoring', appUrl('Admin-End/BusinessMonitoring.php'), 'fa-store', 'Inspect permits, business records, and local monitoring tasks.', 0);
-    $addModuleCard($sbCan('finance_payment_tracker') || $sbCan('finance_create_transaction') || $sbCan('finance_fee_management'), 'finance', 'Finance Transactions', appUrl('Admin-End/FinancePayments.php?section=tracker'), 'fa-money-check-alt', 'Verify payments, create transactions, and manage fees.', $financeAttention);
+    $addModuleCard($sbCan('finance_payment_tracker') || $sbCan('finance_create_transaction') || $sbCan('finance_fee_management'), 'finance', 'Finance Transactions', appUrl('Admin-End/Certificates/FinancePayments.php?section=tracker'), 'fa-money-check-alt', 'Verify payments, create transactions, and manage fees.', $financeAttention);
     $addModuleCard($sbCan('blotter_log_new_incident') || $sbCan('blotter_tracker') || $sbCan('blotter_review_queue'), 'blotter', 'e-Blotter Tools', appUrl($sbCan('blotter_tracker') ? 'Admin-End/Blotter/BlotterTracker.php' : 'Admin-End/Blotter/BlotterForm.php'), 'fa-scale-balanced', 'Log incidents and continue case reviews from the blotter queue.', $blotterAttention);
     $addModuleCard($sbCan('complaint_log_new_incident') || $sbCan('complaint_tracker'), 'complaints', 'Complaint Tools', appUrl($sbCan('complaint_tracker') ? 'Admin-End/Complaints/ComplaintTracker.php' : 'Admin-End/Complaints/ComplaintForm.php'), 'fa-comments', 'Track complaints, intake, and current complaint actions.', $complaintAttention);
     $addModuleCard($sbCanAccessContentNavigator, 'content-management', 'Content Management', appUrl('Admin-End/Contents/ContentManagement.php'), 'fa-sitemap', 'Review website content, requests, and publishing updates.', $contentAttention);
     $addModuleCard($sbCan('news_management'), 'news', 'News', $newsHubHref, 'fa-newspaper', 'Open the news tracker and manage published or draft stories.', 0);
     $addModuleCard($sbCan('announcements_page') || $sbCan('announcements_delivery') || $sbCan('announcements_faq') || $sbCan('announcements_tracker'), 'announcements', 'Announcements', $announcementsHubHref, 'fa-bullhorn', 'Create page posts, SMS/email updates, and review the tracker.', $contentAttention);
-    $addModuleCard($sbCan('reports_certificate_issuance') || $sbCan('reports_clearance_issuance') || $sbCan('reports_financial') || $sbCan('reports_residents') || $sbCan('reports_blotter') || $sbCan('reports_complaints'), 'reports', 'Reports', appUrl('Admin-End/Reports/Reports.php'), 'fa-chart-line', 'Open module reports, summaries, and export-ready views.', 0);
+    $addModuleCard($sbCan('reports_certificate_issuance') || $sbCan('reports_clearance_issuance') || $sbCan('reports_financial') || $sbCan('reports_residents') || $sbCan('reports_blotter') || $sbCan('reports_complaints'), 'reports', 'Reports', $reportsHubHref, 'fa-chart-line', 'Open module reports, summaries, and export-ready views.', 0);
     $addModuleCard($isSuperAdminSidebar && $sbCan('admin_management'), 'admin-management', 'Admin Management', appUrl('Admin-End/AdminManagement.php'), 'fa-user-gear', 'Manage administrator records and admin-only account controls.', 0);
     $addModuleCard($isSuperAdminSidebar && ($sbCan('user_masterlist') || $sbCan('user_archive')), 'user-management', 'User Management', appUrl($sbCan('user_masterlist') ? 'Admin-End/UserMasterlist.php' : 'Admin-End/UserArchive.php'), 'fa-users-cog', 'Review user access, archive records, and account maintenance.', $userAttention);
     $addModuleCard($isSuperAdminSidebar && ($sbCan('officials_management') || $sbCan('personnel_invite')), 'personnel-management', 'Personnel Management', appUrl($sbCan('officials_management') ? 'Admin-End/PersonnelTracker.php' : 'Admin-End/OfficialInvites.php'), 'fa-user-tie', 'Open the personnel tracker, invites, and access control workspace.', 0);
