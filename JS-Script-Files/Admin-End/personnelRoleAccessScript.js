@@ -1,6 +1,7 @@
 (function () {
   const opts = window.PERSONNEL_ROLE_ACCESS_OPTIONS || {};
   const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/personnelRoleAccess.php");
+  const appBaseUrl = String(opts.appBaseUrl || "").replace(/\/+$/, "");
   const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
   const defaultPermissionKeysFromOpts = Array.isArray(opts.defaultPermissionKeys) ? opts.defaultPermissionKeys.map(String) : [];
 
@@ -24,6 +25,12 @@
       mode: "edit",
       row: null,
       permissionMap: {},
+      search: "",
+    },
+    preview: {
+      row: null,
+      items: [],
+      activeKey: "",
       search: "",
     },
   };
@@ -50,6 +57,18 @@
   const createPositionSelect = el("personnelRoleAccessCreatePosition");
   const createContinueBtn = el("btnPersonnelRoleAccessCreateContinue");
   const createHintEl = el("personnelRoleAccessCreateHint");
+
+  const previewModalEl = el("modalPersonnelRoleAccessPreview");
+  const previewTitleEl = el("personnelRoleAccessPreviewTitle");
+  const previewScopeEl = el("personnelRoleAccessPreviewScope");
+  const previewMetaEl = el("personnelRoleAccessPreviewMeta");
+  const previewSearchInput = el("personnelRoleAccessPreviewSearch");
+  const previewNavEl = el("personnelRoleAccessPreviewNav");
+  const previewCurrentTitleEl = el("personnelRoleAccessPreviewCurrentTitle");
+  const previewCurrentPathEl = el("personnelRoleAccessPreviewCurrentPath");
+  const previewFrameEl = el("personnelRoleAccessPreviewFrame");
+  const previewEmptyEl = el("personnelRoleAccessPreviewEmpty");
+  const previewReloadBtn = el("btnPersonnelRoleAccessPreviewReload");
 
   const statProfiles = el("roleAccessStatProfiles");
   const statCustom = el("roleAccessStatCustom");
@@ -167,6 +186,55 @@
     return uniqueLabels.length > maxLabels
       ? `${visible.join(", ")} +${uniqueLabels.length - maxLabels}`
       : visible.join(", ");
+  };
+
+  const buildAppUrl = (path) => {
+    const rawPath = String(path || "").trim();
+    if (!rawPath) return "about:blank";
+    if (/^(?:https?:)?\/\//i.test(rawPath) || rawPath.startsWith("about:")) return rawPath;
+    const cleanPath = rawPath.replace(/^\/+/, "");
+    return appBaseUrl ? `${appBaseUrl}/${cleanPath}` : `/${cleanPath}`;
+  };
+
+  const getPreviewItemsFromPermissionMap = (permissionMap) => {
+    const allowed = permissionMap || {};
+    const items = [];
+
+    permissionCatalog.forEach((section) => {
+      (section.items || []).forEach((item) => {
+        const children = Array.isArray(item.children) ? item.children : [];
+        if (children.length) {
+          children.forEach((child) => {
+            const key = String(child.key || "").trim();
+            const path = String(child.path || "").trim();
+            if (!key || !path || !allowed[key]) return;
+            items.push({
+              key,
+              label: String(child.label || key),
+              parentLabel: String(item.label || ""),
+              section: String(section.section || "Modules"),
+              path,
+              url: buildAppUrl(path),
+            });
+          });
+          return;
+        }
+
+        const key = String(item.key || "").trim();
+        const path = String(item.path || "").trim();
+        if (!key || !path || !allowed[key]) return;
+        items.push({
+          key,
+          label: String(item.label || key),
+          parentLabel: "",
+          section: String(section.section || "Modules"),
+          path,
+          url: buildAppUrl(path),
+        });
+      });
+    });
+
+    return items;
   };
 
   const populateSelect = (selectEl, values, allLabel, currentValue) => {
@@ -301,14 +369,29 @@
         <td class="role-access-modules">${escapeHtml(safe(row.permission_summary))}</td>
         <td>${escapeHtml(formatDateTime(row.updated_at))}</td>
         <td>
-          <button type="button"
-                  class="btn btn-sm btn-outline-primary personnel-role-access-manage"
-                  data-profile-id="${escapeHtml(String(row.profile_id || ""))}">
-            Manage Permissions
-          </button>
+          <div class="role-access-action-stack">
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary personnel-role-access-preview"
+                    data-profile-id="${escapeHtml(String(row.profile_id || ""))}">
+              <i class="fas fa-eye me-1"></i> Preview Access
+            </button>
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary personnel-role-access-manage"
+                    data-profile-id="${escapeHtml(String(row.profile_id || ""))}">
+              Manage Permissions
+            </button>
+          </div>
         </td>
       </tr>
     `).join("");
+
+    tbody.querySelectorAll(".personnel-role-access-preview").forEach((button) => {
+      button.addEventListener("click", () => {
+        const profileId = String(button.getAttribute("data-profile-id") || "");
+        const row = state.rowsRaw.find((entry) => String(entry.profile_id) === profileId);
+        if (row) openPreviewModalFromRow(row);
+      });
+    });
 
     tbody.querySelectorAll(".personnel-role-access-manage").forEach((button) => {
       button.addEventListener("click", () => {
@@ -536,6 +619,165 @@
     }
   };
 
+  const buildPermissionMapFromRow = (row) => {
+    const map = {};
+    const fallbackKeys = row && !row.has_saved_profile ? defaultPermissionKeys : [];
+    const sourceKeys = Array.isArray(row?.permission_keys) ? row.permission_keys : fallbackKeys;
+    sourceKeys.forEach((key) => {
+      const normalizedKey = String(key || "").trim();
+      if (normalizedKey) map[normalizedKey] = true;
+    });
+    return map;
+  };
+
+  const updatePreviewFrame = (item) => {
+    if (previewEmptyEl) {
+      previewEmptyEl.classList.toggle("d-none", Boolean(item));
+    }
+    if (previewFrameEl) {
+      previewFrameEl.classList.toggle("d-none", !item);
+      const nextUrl = item ? item.url : "about:blank";
+      if (previewFrameEl.getAttribute("src") !== nextUrl) {
+        previewFrameEl.setAttribute("src", nextUrl);
+      }
+    }
+    if (previewCurrentTitleEl) {
+      previewCurrentTitleEl.textContent = item ? item.label : "No Modules Granted";
+    }
+    if (previewCurrentPathEl) {
+      previewCurrentPathEl.textContent = item ? item.path : "-";
+    }
+    if (previewReloadBtn) {
+      previewReloadBtn.disabled = !item;
+    }
+  };
+
+  const preparePreviewFrameDocument = () => {
+    if (!previewFrameEl || previewFrameEl.classList.contains("d-none")) return;
+
+    try {
+      const doc = previewFrameEl.contentDocument;
+      if (!doc || !doc.head || doc.querySelector("style[data-role-access-preview-frame='1']")) {
+        return;
+      }
+
+      const style = doc.createElement("style");
+      style.setAttribute("data-role-access-preview-frame", "1");
+      style.textContent = `
+        #dashboard-sidebar,
+        #admin-mobile-header {
+          display: none !important;
+        }
+        body {
+          padding-top: 0 !important;
+          overflow-x: hidden !important;
+        }
+        #main-display {
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 1rem !important;
+        }
+        .d-flex.flex-column.flex-md-row {
+          min-height: 0 !important;
+        }
+      `;
+      doc.head.appendChild(style);
+    } catch (error) {
+      // Some browser policies can block iframe document access. The preview
+      // remains usable through its outer granted-module navigator.
+    }
+  };
+
+  const renderPreviewNav = () => {
+    if (!previewNavEl) return;
+
+    const term = String(state.preview.search || "").trim().toLowerCase();
+    const filteredItems = state.preview.items.filter((item) => {
+      if (!term) return true;
+      return [
+        item.label,
+        item.parentLabel,
+        item.section,
+        item.path,
+      ].join(" ").toLowerCase().includes(term);
+    });
+
+    if (!filteredItems.length) {
+      previewNavEl.innerHTML = `<div class="text-muted small px-2 py-3">${escapeHtml(state.preview.items.length ? "No granted modules match that search." : "No modules granted.")}</div>`;
+      return;
+    }
+
+    const grouped = new Map();
+    filteredItems.forEach((item) => {
+      const section = item.section || "Modules";
+      if (!grouped.has(section)) grouped.set(section, []);
+      grouped.get(section).push(item);
+    });
+
+    const html = Array.from(grouped.entries()).map(([section, items]) => `
+      <div class="role-access-preview-section">
+        <div class="role-access-preview-section-title">${escapeHtml(section)}</div>
+        ${items.map((item) => `
+          <button type="button"
+                  class="role-access-preview-link ${item.key === state.preview.activeKey ? "is-active" : ""}"
+                  data-preview-key="${escapeHtml(item.key)}">
+            <span class="role-access-preview-link-main">
+              <span class="role-access-preview-link-label">${escapeHtml(item.label)}</span>
+              ${item.parentLabel ? `<span class="role-access-preview-link-parent">${escapeHtml(item.parentLabel)}</span>` : ""}
+            </span>
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          </button>
+        `).join("")}
+      </div>
+    `).join("");
+
+    previewNavEl.innerHTML = html;
+    previewNavEl.querySelectorAll(".role-access-preview-link").forEach((button) => {
+      button.addEventListener("click", () => {
+        const key = String(button.getAttribute("data-preview-key") || "").trim();
+        setPreviewActiveItem(key);
+      });
+    });
+  };
+
+  const setPreviewActiveItem = (key) => {
+    const item = state.preview.items.find((entry) => entry.key === key) || null;
+    state.preview.activeKey = item ? item.key : "";
+    updatePreviewFrame(item);
+    renderPreviewNav();
+  };
+
+  const openPreviewModalFromRow = (row) => {
+    if (!row || !previewModalEl) return;
+
+    const normalizedRow = {
+      ...row,
+      department_display: String(row.department_display || row.department || "").trim(),
+      position_display: String(row.position_display || row.position_access || "").trim(),
+    };
+    const permissionMap = buildPermissionMapFromRow(normalizedRow);
+    const previewItems = getPreviewItemsFromPermissionMap(permissionMap);
+    const initialItem = previewItems.find((item) => item.key === "dashboard") || previewItems[0] || null;
+
+    state.preview.row = normalizedRow;
+    state.preview.items = previewItems;
+    state.preview.activeKey = initialItem ? initialItem.key : "";
+    state.preview.search = "";
+
+    if (previewSearchInput) previewSearchInput.value = "";
+    if (previewTitleEl) previewTitleEl.textContent = `Preview Access - ${safe(normalizedRow.position_display)}`;
+    if (previewScopeEl) previewScopeEl.textContent = `${safe(normalizedRow.department_display)} - ${safe(normalizedRow.position_display)}`;
+    if (previewMetaEl) {
+      const moduleCount = previewItems.length;
+      const personnelCount = Number(normalizedRow.personnel_count || 0);
+      previewMetaEl.textContent = `${moduleCount} granted module${moduleCount === 1 ? "" : "s"} - ${personnelCount} personnel covered`;
+    }
+
+    updatePreviewFrame(initialItem);
+    renderPreviewNav();
+    bootstrap.Modal.getOrCreateInstance(previewModalEl).show();
+  };
+
   const createPendingRow = (department, positionAccess) => ({
     profile_id: buildProfileId(department, positionAccess),
     department,
@@ -563,7 +805,7 @@
       position_display: String(row.position_display || row.position_access || "").trim(),
     };
     state.modal.permissionMap = {};
-    const selectedKeys = Array.isArray(row.permission_keys) && row.permission_keys.length
+    const selectedKeys = Array.isArray(row.permission_keys)
       ? row.permission_keys
       : defaultPermissionKeys;
     selectedKeys.forEach((key) => {
@@ -790,6 +1032,38 @@
     permissionSearchInput.addEventListener("input", () => {
       state.modal.search = String(permissionSearchInput.value || "").trim();
       renderPermissionGroups();
+    });
+  }
+
+  if (previewSearchInput) {
+    previewSearchInput.addEventListener("input", () => {
+      state.preview.search = String(previewSearchInput.value || "").trim();
+      renderPreviewNav();
+    });
+  }
+
+  if (previewReloadBtn) {
+    previewReloadBtn.addEventListener("click", () => {
+      const item = state.preview.items.find((entry) => entry.key === state.preview.activeKey) || null;
+      if (!item || !previewFrameEl) return;
+      previewFrameEl.setAttribute("src", item.url);
+    });
+  }
+
+  if (previewFrameEl) {
+    previewFrameEl.addEventListener("load", () => {
+      preparePreviewFrameDocument();
+    });
+  }
+
+  if (previewModalEl) {
+    previewModalEl.addEventListener("hidden.bs.modal", () => {
+      state.preview.row = null;
+      state.preview.items = [];
+      state.preview.activeKey = "";
+      state.preview.search = "";
+      if (previewSearchInput) previewSearchInput.value = "";
+      if (previewFrameEl) previewFrameEl.setAttribute("src", "about:blank");
     });
   }
 
