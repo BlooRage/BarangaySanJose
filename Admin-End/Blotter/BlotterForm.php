@@ -27,6 +27,7 @@ $defaultFiledTime = date('H:i');
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
@@ -45,9 +46,11 @@ $defaultFiledTime = date('H:i');
         body {
             background: #fffdfb;
         }
+
         #main-display {
             background: #ffffff !important;
         }
+
         #main-display .form-title,
         #main-display .form-subtitle,
         #main-display .back-link {
@@ -55,15 +58,18 @@ $defaultFiledTime = date('H:i');
             margin-left: auto;
             margin-right: auto;
         }
+
         #main-display .page-form {
             max-width: 1300px;
             margin: 0 auto;
             padding-bottom: 48px;
         }
+
         h1 {
             font-size: 2.8rem !important;
             font-weight: 700;
         }
+
         h2.section-title,
         h3.section-title {
             font-size: 1.4rem;
@@ -71,21 +77,25 @@ $defaultFiledTime = date('H:i');
             margin-top: 32px;
             margin-bottom: 24px;
         }
+
         #main-display .page-form .form-label,
         #main-display .page-form .top-label {
             font-size: 14px;
         }
+
         #main-display .page-form .form-control,
         #main-display .page-form .form-select,
         #main-display .page-form textarea.form-control {
             font-size: 14px;
         }
+
         #main-display .page-form .form-control,
         #main-display .page-form .form-select {
             padding: 10px 12px;
             border: 1px solid #a8a7a7;
             border-radius: 6px;
         }
+
         #main-display .page-form .form-select {
             padding-right: 2.5rem;
             appearance: none;
@@ -96,12 +106,14 @@ $defaultFiledTime = date('H:i');
             background-position: right 0.75rem center;
             background-size: 16px 12px;
         }
+
         #main-display .page-form .form-control:focus,
         #main-display .page-form .form-select:focus {
             outline: none;
             border-color: #e8872f;
             box-shadow: none;
         }
+
         #main-display .page-form .form-control.is-invalid,
         #main-display .page-form .form-select.is-invalid,
         #main-display .page-form textarea.form-control.is-invalid,
@@ -112,6 +124,7 @@ $defaultFiledTime = date('H:i');
             box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.12) !important;
             background-image: none;
         }
+
         #main-display .page-form .form-control.is-invalid:focus,
         #main-display .page-form .form-select.is-invalid:focus,
         #main-display .page-form textarea.form-control.is-invalid:focus,
@@ -124,18 +137,19 @@ $defaultFiledTime = date('H:i');
         }
     </style>
 </head>
-<body>
-<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
-    <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+<body>
+    <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
+        <?php include __DIR__ . '/../includes/sidebar.php'; ?>
+
+        <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
             <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
                 <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
                     <i class="bi bi-arrow-left-short fs-3"></i>
                 </a>
                 <h1 class="form-title m-0">Blotter Form</h1>
             </div>
-            <p class="form-subtitle mb-2 text-center">Use this form to encode an incident or blotter report on behalf of a resident or walk-in complainant.</p>
+            <p class="form-subtitle mb-2 text-center">Use this form to encode an incident or blotter report on behalf of a resident.</p>
             <p class="form-subtitle mb-4 text-center">All fields marked with <span class="required-asterisk">*</span> are required.</p>
 
             <form method="POST" action="../../PhpFiles/Admin-End/blotterManagement.php" id="blotterForm" class="page-form" enctype="multipart/form-data">
@@ -414,68 +428,68 @@ $defaultFiledTime = date('H:i');
                     </div>
                 </div>
                 <div id="incidentDetailsSection">
-                <h3 class="section-title mb-3 text-center">Incident Details</h3>
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label">Date of Incident <span class="required-asterisk">*</span></label>
-                        <input type="date" class="form-control" id="incidentDate" name="incident_date" data-date-modal-style="calendar" required>
-                        <div id="incidentDateError" class="invalid-feedback d-block d-none"></div>
+                    <h3 class="section-title mb-3 text-center">Incident Details</h3>
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-3">
+                            <label class="form-label">Date of Incident <span class="required-asterisk">*</span></label>
+                            <input type="date" class="form-control" id="incidentDate" name="incident_date" data-date-modal-style="calendar" required>
+                            <div id="incidentDateError" class="invalid-feedback d-block d-none"></div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label">Time of Incident <span class="required-asterisk">*</span></label>
+                            <input type="time" class="form-control" id="incidentTime" name="incident_time" required>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label">Place of Incident <span class="required-asterisk">*</span></label>
+                            <input type="text" class="form-control" id="incidentPlace" name="incident_place" required maxlength="255">
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label" for="incidentAreaNumber">Area Number <span class="required-asterisk">*</span></label>
+                            <select class="form-select" id="incidentAreaNumber" name="incident_area_number" required>
+                                <option value="">Select area</option>
+                                <option value="Area 01">Area 01</option>
+                                <option value="Area 1A">Area 1A</option>
+                                <option value="Area 02">Area 02</option>
+                                <option value="Area 03">Area 03</option>
+                                <option value="Area 04">Area 04</option>
+                                <option value="Area 05">Area 05</option>
+                                <option value="Area 06">Area 06</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label">Time of Incident <span class="required-asterisk">*</span></label>
-                        <input type="time" class="form-control" id="incidentTime" name="incident_time" required>
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label">Place of Incident <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" id="incidentPlace" name="incident_place" required maxlength="255">
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="incidentAreaNumber">Area Number <span class="required-asterisk">*</span></label>
-                        <select class="form-select" id="incidentAreaNumber" name="incident_area_number" required>
-                            <option value="">Select area</option>
-                            <option value="Area 01">Area 01</option>
-                            <option value="Area 1A">Area 1A</option>
-                            <option value="Area 02">Area 02</option>
-                            <option value="Area 03">Area 03</option>
-                            <option value="Area 04">Area 04</option>
-                            <option value="Area 05">Area 05</option>
-                            <option value="Area 06">Area 06</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div class="row g-3 mb-3" id="complaintTypeOtherRow">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label">Type of Complaint <span class="required-asterisk">*</span></label>
-                        <select class="form-select" id="blotterComplaintType" name="complaint_type" required>
-                            <option value="">Select</option>
-                            <option value="Alarm and Scandal">Alarm and Scandal</option>
-                            <option value="Physical Injury">Physical Injury</option>
-                            <option value="Theft">Theft</option>
-                            <option value="Pagtatapon ng Basura">Pagtatapon ng Basura</option>
-                            <option value="Small Claim">Small Claim</option>
-                            <option value="Property Related">Property Related</option>
-                            <option value="Light / Grave Threat">Light / Grave Threat</option>
-                            <option value="ESTAFA">ESTAFA</option>
-                            <option value="Threat">Threat</option>
-                            <option value="Anti-Burning Law">Anti-Burning Law</option>
-                            <option value="Slander by Deeds">Slander by Deeds</option>
-                            <option value="Malicious Mischief">Malicious Mischief</option>
-                            <option value="Fraud">Fraud</option>
-                            <option value="False Accusation">False Accusation</option>
-                            <option value="Breach of Contract">Breach of Contract</option>
-                            <option value="Arguments">Arguments</option>
-                            <option value="Unjust Vexation">Unjust Vexation</option>
-                            <option value="Trespassing">Trespassing</option>
-                            <option value="Lost and Found">Lost and Found</option>
-                            <option value="Other">Other</option>
-                        </select>
+                    <div class="row g-3 mb-3" id="complaintTypeOtherRow">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Type of Complaint <span class="required-asterisk">*</span></label>
+                            <select class="form-select" id="blotterComplaintType" name="complaint_type" required>
+                                <option value="">Select</option>
+                                <option value="Alarm and Scandal">Alarm and Scandal</option>
+                                <option value="Physical Injury">Physical Injury</option>
+                                <option value="Theft">Theft</option>
+                                <option value="Pagtatapon ng Basura">Pagtatapon ng Basura</option>
+                                <option value="Small Claim">Small Claim</option>
+                                <option value="Property Related">Property Related</option>
+                                <option value="Light / Grave Threat">Light / Grave Threat</option>
+                                <option value="ESTAFA">ESTAFA</option>
+                                <option value="Threat">Threat</option>
+                                <option value="Anti-Burning Law">Anti-Burning Law</option>
+                                <option value="Slander by Deeds">Slander by Deeds</option>
+                                <option value="Malicious Mischief">Malicious Mischief</option>
+                                <option value="Fraud">Fraud</option>
+                                <option value="False Accusation">False Accusation</option>
+                                <option value="Breach of Contract">Breach of Contract</option>
+                                <option value="Arguments">Arguments</option>
+                                <option value="Unjust Vexation">Unjust Vexation</option>
+                                <option value="Trespassing">Trespassing</option>
+                                <option value="Lost and Found">Lost and Found</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">If Other, please specify <span id="blotterComplaintTypeOtherAsterisk" class="required-asterisk d-none">*</span></label>
+                            <input type="text" class="form-control" id="blotterComplaintTypeOther" name="complaint_type_other" disabled>
+                        </div>
                     </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label">If Other, please specify <span id="blotterComplaintTypeOtherAsterisk" class="required-asterisk d-none">*</span></label>
-                        <input type="text" class="form-control" id="blotterComplaintTypeOther" name="complaint_type_other" disabled>
-                    </div>
-                </div>
                 </div>
 
                 <div class="row g-3 mb-3">
@@ -513,34 +527,32 @@ $defaultFiledTime = date('H:i');
                     </div>
 
                     <div class="row g-3 mb-2" id="signatureSection">
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label">Complainant Signature <span class="required-asterisk">*</span></label>
-                                        <canvas
-                                            id="complainantSignatureCanvas"
-                                            class="w-100 rounded border bg-white"
-                                            style="height: 170px; touch-action: none;"
-                                        ></canvas>
-                                        <input type="hidden" id="complainantSignatureData" name="complainant_signature" form="blotterForm">
-                                        <div id="complainantSignatureError" class="invalid-feedback d-block d-none">Please provide complainant signature.</div>
-                                        <div class="d-flex flex-wrap gap-2 mt-2">
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="clearComplainantSignature">Clear Signature</button>
-                                            <button type="button" class="btn btn-outline-primary btn-sm" id="openComplainantSignatureFullscreen">Open Fullscreen</button>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label">Respondent Signature <span class="required-asterisk">*</span></label>
-                                        <canvas
-                                            id="respondentSignatureCanvas"
-                                            class="w-100 rounded border bg-white"
-                                            style="height: 170px; touch-action: none;"
-                                        ></canvas>
-                                        <input type="hidden" id="respondentSignatureData" name="respondent_signature" form="blotterForm">
-                                        <div id="respondentSignatureError" class="invalid-feedback d-block d-none">Please provide respondent signature.</div>
-                                        <div class="d-flex flex-wrap gap-2 mt-2">
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="clearRespondentSignature">Clear Signature</button>
-                                            <button type="button" class="btn btn-outline-primary btn-sm" id="openRespondentSignatureFullscreen">Open Fullscreen</button>
-                                        </div>
-                                    </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Complainant Signature <span class="required-asterisk">*</span></label>
+                            <canvas
+                                id="complainantSignatureCanvas"
+                                class="w-100 rounded border bg-white"
+                                style="height: 170px; touch-action: none;"></canvas>
+                            <input type="hidden" id="complainantSignatureData" name="complainant_signature" form="blotterForm">
+                            <div id="complainantSignatureError" class="invalid-feedback d-block d-none">Please provide complainant signature.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearComplainantSignature">Clear Signature</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="openComplainantSignatureFullscreen">Open Fullscreen</button>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Respondent Signature <span class="required-asterisk">*</span></label>
+                            <canvas
+                                id="respondentSignatureCanvas"
+                                class="w-100 rounded border bg-white"
+                                style="height: 170px; touch-action: none;"></canvas>
+                            <input type="hidden" id="respondentSignatureData" name="respondent_signature" form="blotterForm">
+                            <div id="respondentSignatureError" class="invalid-feedback d-block d-none">Please provide respondent signature.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearRespondentSignature">Clear Signature</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="openRespondentSignatureFullscreen">Open Fullscreen</button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -549,64 +561,65 @@ $defaultFiledTime = date('H:i');
                 </div>
             </form>
 
-        <div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-labelledby="confirmSubmitLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="confirmSubmitLabel">Confirm Submission</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        Are you sure you want to file this Incident Report?
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="confirmSubmitBtn">Yes</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="successSubmitModal" tabindex="-1" aria-labelledby="successSubmitLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="successSubmitLabel">Success</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        Incident Report Filed.
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            <div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-labelledby="confirmSubmitLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="confirmSubmitLabel">Confirm Submission</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Are you sure you want to file this Incident Report?
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="confirmSubmitBtn">Yes</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="modal fade signature-fullscreen-modal" id="signatureFullscreenModal" tabindex="-1" aria-labelledby="signatureFullscreenLabel" aria-hidden="true">
-            <div class="modal-dialog modal-fullscreen">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="signatureFullscreenLabel">Signature</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body signature-fullscreen-body">
-                        <canvas id="signatureFullscreenCanvas" class="signature-fullscreen-canvas"></canvas>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" id="signatureFullscreenClear">Clear</button>
-                        <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="signatureFullscreenSave">Save Signature</button>
+            <div class="modal fade" id="successSubmitModal" tabindex="-1" aria-labelledby="successSubmitLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="successSubmitLabel">Success</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Incident Report Filed.
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
-<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-highlight-missing" defer></script>
+            <div class="modal fade signature-fullscreen-modal" id="signatureFullscreenModal" tabindex="-1" aria-labelledby="signatureFullscreenLabel" aria-hidden="true">
+                <div class="modal-dialog modal-fullscreen">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="signatureFullscreenLabel">Signature</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body signature-fullscreen-body">
+                            <canvas id="signatureFullscreenCanvas" class="signature-fullscreen-canvas"></canvas>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" id="signatureFullscreenClear">Clear</button>
+                            <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="signatureFullscreenSave">Save Signature</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
+    <script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-highlight-missing" defer></script>
 </body>
+
 </html>
