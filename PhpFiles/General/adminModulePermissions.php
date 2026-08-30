@@ -49,8 +49,8 @@ if (!function_exists('amp_get_permission_catalog')) {
                         'children' => [
                             [
                                 'key' => 'resident_masterlist',
-                                'label' => 'Resident Tracker',
-                                'path' => 'Admin-End/ResidentTracker.php',
+                                'label' => 'Resident Masterlist',
+                                'path' => 'Admin-End/ResidentMasterlist.php',
                             ],
                             [
                                 'key' => 'resident_edit_requests',
