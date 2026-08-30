@@ -35,6 +35,7 @@ $areaOptions = [
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
@@ -51,9 +52,11 @@ $areaOptions = [
         body {
             background: #fffdfb;
         }
+
         #main-display {
             background: #ffffff !important;
         }
+
         #main-display .form-title,
         #main-display .form-subtitle,
         #main-display .back-link {
@@ -61,15 +64,18 @@ $areaOptions = [
             margin-left: auto;
             margin-right: auto;
         }
+
         #main-display .page-form {
             max-width: 1300px;
             margin: 0 auto;
             padding-bottom: 48px;
         }
+
         h1 {
             font-size: 2.8rem !important;
             font-weight: 700;
         }
+
         h2.section-title,
         h3.section-title {
             font-size: 1.4rem;
@@ -77,35 +83,39 @@ $areaOptions = [
             margin-top: 32px;
             margin-bottom: 24px;
         }
+
+        h2.section-title.section-title--with-subtitle {
+            margin-bottom: 8px;
+        }
     </style>
 </head>
+
 <body>
-<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
-    <?php include __DIR__ . '/../includes/sidebar.php'; ?>
+    <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
+        <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
-        <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
-            <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
-                <i class="bi bi-arrow-left-short fs-3"></i>
-            </a>
-            <h1 class="form-title m-0">Complaint Form</h1>
-        </div>
-        <p class="form-subtitle mb-2 text-center">Use this form to encode a complaint on behalf of a resident or walk-in complainant.</p>
-        <p class="form-subtitle mb-4 text-center">All fields marked with <span class="required-asterisk">*</span> are required.</p>
+        <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+            <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
+                <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                    <i class="bi bi-arrow-left-short fs-3"></i>
+                </a>
+                <h1 class="form-title m-0">Complaint Form</h1>
+            </div>
+            <p class="form-subtitle mb-2 text-center">Use this form to encode a complaint on behalf of a resident or walk-in complainant.</p>
+            <p class="form-subtitle mb-4 text-center">All fields marked with <span class="required-asterisk">*</span> are required.</p>
 
-        <div
-            id="complaintFeedbackData"
-            data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
-            data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
-            data-complaint-type-config="<?= $complaintTypeConfigJson ?>"
-            hidden
-        ></div>
+            <div
+                id="complaintFeedbackData"
+                data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
+                data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
+                data-complaint-type-config="<?= $complaintTypeConfigJson ?>"
+                hidden></div>
 
-        <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Admin-End/complaintManagement.php" class="page-form" id="complaintForm">
-            <?= csrfTokenField() ?>
-            <input type="hidden" name="action" value="submit_complaint">
+            <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Admin-End/complaintManagement.php" class="page-form" id="complaintForm">
+                <?= csrfTokenField() ?>
+                <input type="hidden" name="action" value="submit_complaint">
 
-            <h2 class="section-title text-center text-dark">Complainant's Information</h2>
+                <h2 class="section-title text-center text-dark">Complainant's Information</h2>
 
                 <div class="form-row">
                     <div>
@@ -237,7 +247,7 @@ $areaOptions = [
                     </div>
                 </div>
 
-                <h2 class="section-title text-center text-dark">Person, Establishment, or Matter Being Reported</h2>
+                <h2 class="section-title section-title--with-subtitle text-center text-dark">Person, Establishment, or Matter Being Reported</h2>
                 <p class="form-subtitle text-center mb-3">
                     This may refer to a resident, a business, a group, an unknown person, or a general concern.
                 </p>
@@ -262,8 +272,7 @@ $areaOptions = [
                             name="subject_name"
                             placeholder="e.g. Dela Cruz, Juan Miguel / ABC Store / Unknown individuals"
                             title="Enter the name of the person, business, organization, or a short description."
-                            required
-                        >
+                            required>
                     </div>
                     <div>
                         <label class="top-label">Contact Number</label>
@@ -275,8 +284,7 @@ $areaOptions = [
                             type="text"
                             name="subject_address"
                             placeholder="Enter a known address, location, area involved, or N/A if not known"
-                            required
-                        >
+                            required>
                     </div>
                 </div>
 
@@ -470,74 +478,74 @@ $areaOptions = [
                     </div>
                 </div>
 
-            <div class="agreement-row">
-                <label class="agreement-text check-item" for="agreementComplaint">
-                    <input type="checkbox" id="agreementComplaint" name="certify" required>
-                    I hereby certify that the above information is true and correct to the best of my knowledge and belief. <span class="required-asterisk">*</span>
-                </label>
-                <button type="submit" class="submit-btn">SUBMIT</button>
-            </div>
-        </form>
-    </main>
-</div>
-<div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <div class="complaint-form-modal__heading">Select Time</div>
-                    <div class="complaint-form-modal__subheading">Choose the incident time or use the current time.</div>
+                <div class="agreement-row">
+                    <label class="agreement-text check-item" for="agreementComplaint">
+                        <input type="checkbox" id="agreementComplaint" name="certify" required>
+                        I hereby certify that the above information is true and correct to the best of my knowledge and belief. <span class="required-asterisk">*</span>
+                    </label>
+                    <button type="submit" class="submit-btn">SUBMIT</button>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body complaint-form-modal__body">
-                <div class="form-row">
-                    <div class="full-width">
-                        <label class="top-label" for="incidentTimePicker">Time of the Incident</label>
-                        <input type="time" class="form-control" id="incidentTimePicker">
+            </form>
+        </main>
+    </div>
+    <div class="modal fade complaint-form-modal" id="complaintTimeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <div class="complaint-form-modal__heading">Select Time</div>
+                        <div class="complaint-form-modal__subheading">Choose the incident time or use the current time.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body complaint-form-modal__body">
+                    <div class="form-row">
+                        <div class="full-width">
+                            <label class="top-label" for="incidentTimePicker">Time of the Incident</label>
+                            <input type="time" class="form-control" id="incidentTimePicker">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <button type="button" class="btn complaint-form-modal__secondary-btn" id="incidentTimeUseNow">Use current time</button>
+                        <div class="small text-muted text-end" id="incidentTimePreview">No time selected yet.</div>
                     </div>
                 </div>
-                <div class="d-flex justify-content-between align-items-center gap-2">
-                    <button type="button" class="btn complaint-form-modal__secondary-btn" id="incidentTimeUseNow">Use current time</button>
-                    <div class="small text-muted text-end" id="incidentTimePreview">No time selected yet.</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn complaint-form-modal__secondary-btn" id="incidentTimeClearBtn">Clear</button>
-                <button type="button" class="btn complaint-form-modal__primary-btn" id="incidentTimeApplyBtn">Apply</button>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="modal fade complaint-form-modal" id="complaintAreaHelpModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable complaint-area-modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title complaint-form-modal__heading">Barangay Area Guide</h5>
-                <button type="button" class="complaint-area-close-btn" data-bs-dismiss="modal" aria-label="Close">×</button>
-            </div>
-            <div class="modal-body complaint-form-modal__body">
-                <p class="mb-3">Choose the barangay area where the incident happened. If the incident is near a boundary, select the nearest known area.</p>
-                <div class="d-flex flex-column gap-2 complaint-area-options">
-                    <?php foreach ($areaOptions as $areaOption => $areaLocation): ?>
-                        <button
-                            type="button"
-                            class="area-guide-option"
-                            data-area-value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>"
-                            data-area-label="<?= htmlspecialchars($areaOption . ' - ' . $areaLocation, ENT_QUOTES, 'UTF-8') ?>"
-                        >
-                            <span class="area-guide-option__title"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
-                            <span class="area-guide-option__meta"><?= htmlspecialchars($areaLocation, ENT_QUOTES, 'UTF-8') ?></span>
-                        </button>
-                    <?php endforeach; ?>
+                <div class="modal-footer">
+                    <button type="button" class="btn complaint-form-modal__secondary-btn" id="incidentTimeClearBtn">Clear</button>
+                    <button type="button" class="btn complaint-form-modal__primary-btn" id="incidentTimeApplyBtn">Apply</button>
                 </div>
             </div>
         </div>
     </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/modalHandler.js"></script>
-<script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
-<script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
+    <div class="modal fade complaint-form-modal" id="complaintAreaHelpModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable complaint-area-modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title complaint-form-modal__heading">Barangay Area Guide</h5>
+                    <button type="button" class="complaint-area-close-btn" data-bs-dismiss="modal" aria-label="Close">×</button>
+                </div>
+                <div class="modal-body complaint-form-modal__body">
+                    <p class="mb-3">Choose the barangay area where the incident happened. If the incident is near a boundary, select the nearest known area.</p>
+                    <div class="d-flex flex-column gap-2 complaint-area-options">
+                        <?php foreach ($areaOptions as $areaOption => $areaLocation): ?>
+                            <button
+                                type="button"
+                                class="area-guide-option"
+                                data-area-value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>"
+                                data-area-label="<?= htmlspecialchars($areaOption . ' - ' . $areaLocation, ENT_QUOTES, 'UTF-8') ?>">
+                                <span class="area-guide-option__title"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
+                                <span class="area-guide-option__meta"><?= htmlspecialchars($areaLocation, ENT_QUOTES, 'UTF-8') ?></span>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../../JS-Script-Files/modalHandler.js"></script>
+    <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
+    <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>
+
 </html>

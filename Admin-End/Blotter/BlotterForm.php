@@ -275,7 +275,7 @@ $defaultFiledTime = date('H:i');
                         <label class="form-label">Age (Edad)</label>
                         <input type="number" min="1" max="120" class="form-control" name="complainant_age">
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-6">
                         <label class="form-label">Sex (Kasarian)</label>
                         <select class="form-select" name="complainant_sex">
                             <option value="">Select</option>
@@ -416,12 +416,12 @@ $defaultFiledTime = date('H:i');
                 <div id="incidentDetailsSection">
                 <h3 class="section-title mb-3 text-center">Incident Details</h3>
                 <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <label class="form-label">Date of Incident <span class="required-asterisk">*</span></label>
                         <input type="date" class="form-control" id="incidentDate" name="incident_date" data-date-modal-style="calendar" required>
                         <div id="incidentDateError" class="invalid-feedback d-block d-none"></div>
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-3">
                         <label class="form-label">Time of Incident <span class="required-asterisk">*</span></label>
                         <input type="time" class="form-control" id="incidentTime" name="incident_time" required>
                     </div>
