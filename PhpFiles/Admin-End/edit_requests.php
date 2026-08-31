@@ -19,6 +19,31 @@ if (!isset($conn) || !($conn instanceof mysqli)) {
     exit;
 }
 
+function editRequestColumnExists(mysqli $conn, string $column): bool {
+    if (!preg_match('/^[A-Za-z0-9_]+$/', $column)) {
+        return false;
+    }
+    $columnEsc = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM resident_edit_requesttbl LIKE '{$columnEsc}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function ensureEditRequestReviewColumns(mysqli $conn): void {
+    $columns = [
+        'admin_notes' => "ALTER TABLE resident_edit_requesttbl ADD COLUMN admin_notes TEXT NULL",
+        'reviewed_at' => "ALTER TABLE resident_edit_requesttbl ADD COLUMN reviewed_at DATETIME NULL",
+        'reviewed_by' => "ALTER TABLE resident_edit_requesttbl ADD COLUMN reviewed_by VARCHAR(64) NULL",
+    ];
+
+    foreach ($columns as $column => $sql) {
+        if (!editRequestColumnExists($conn, $column)) {
+            $conn->query($sql);
+        }
+    }
+}
+
+ensureEditRequestReviewColumns($conn);
+
 function getStatusId(mysqli $conn, string $name, string $type): ?int {
     $stmt = $conn->prepare("
         SELECT status_id

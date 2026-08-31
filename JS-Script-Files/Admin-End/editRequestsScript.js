@@ -1,213 +1,144 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const csrfToken = String(window.ADMIN_EDIT_REQUESTS_CSRF_TOKEN || "").trim();
-  const tbody = document.getElementById("tableBody");
-  const searchInput = document.getElementById("searchInput");
-  // Filter modal may provide either a select (legacy) or checkboxes (current).
-  const typeFilterSelect = document.querySelector(".request-type-filter");
-  const typeFilterCheckboxes = Array.from(
-    document.querySelectorAll('input.request-type-checkbox[name="requestTypeFilter"]')
-  );
-  const statusButtons = document.querySelectorAll(".status-filter-btn");
-  const pendingBadge = document.getElementById("pendingRequestBadge");
-  const btnRefreshTable = document.getElementById("btnEditRequestsRefresh");
-  const entriesPerPageInput = document.getElementById("editRequestsEntriesPerPageInput");
-  const paginationEl = document.getElementById("editRequestsPagination");
+document.addEventListener("DOMContentLoaded", function () {
+  var csrfToken = String(window.ADMIN_EDIT_REQUESTS_CSRF_TOKEN || "").trim();
+  var tbody = document.getElementById("tableBody");
+  var searchInput = document.getElementById("searchInput");
+  var statusButtons = Array.prototype.slice.call(document.querySelectorAll(".status-filter-btn"));
+  var typeFilterSelect = document.querySelector(".request-type-filter");
+  var typeFilterCheckboxes = Array.prototype.slice.call(document.querySelectorAll('input.request-type-checkbox[name="requestTypeFilter"]'));
+  var pendingBadge = document.getElementById("pendingRequestBadge");
+  var btnRefreshTable = document.getElementById("btnEditRequestsRefresh");
+  var entriesPerPageInput = document.getElementById("editRequestsEntriesPerPageInput");
+  var paginationEl = document.getElementById("editRequestsPagination");
 
-  const setRefreshLoading = (on) => {
-    if (!btnRefreshTable) return;
-    btnRefreshTable.classList.toggle("is-loading", !!on);
-    btnRefreshTable.disabled = !!on;
-  };
+  var viewModalEl = document.getElementById("modal-viewRequest");
+  var denyModalEl = document.getElementById("modal-denyRequest");
+  var editDocViewerEl = document.getElementById("modal-editDocViewer");
+  var editDocsInlineLoading = document.getElementById("edit-docs-inline-loading");
+  var editDocsInlineEmpty = document.getElementById("edit-docs-inline-empty");
+  var editDocsInlineList = document.getElementById("edit-docs-inline-list");
+  var editDocViewerBody = document.getElementById("edit-doc-viewer-body");
+  var editDocViewerTitle = document.getElementById("edit-doc-viewer-title");
+  var editDocViewerSubtitle = document.getElementById("edit-doc-viewer-subtitle");
+  var editDocViewerReturn = document.getElementById("edit-doc-viewer-return");
+  var denyRemarksEl = document.getElementById("denyRemarks");
+  var denyRemarksErrorEl = document.getElementById("denyRemarksError");
+  var btnConfirmDeny = document.getElementById("btnConfirmDeny");
+  var btnViewApproveRequest = document.getElementById("btnViewApproveRequest");
+  var btnViewDenyRequest = document.getElementById("btnViewDenyRequest");
 
-  const AUTO_REFRESH_MS = 30000;
-  let autoRefreshTimeout = null;
-  let autoRefreshInFlight = false;
+  var spanRequestId = document.getElementById("span-requestId");
+  var spanRequestTypeHeader = document.getElementById("span-requestTypeHeader");
+  var txtRequestResident = document.getElementById("txt-requestResident");
+  var txtRequestResidentId = document.getElementById("txt-requestResidentId");
+  var txtRequestType = document.getElementById("txt-requestType");
+  var txtRequestStatus = document.getElementById("txt-requestStatus");
+  var txtRequestCreated = document.getElementById("txt-requestCreated");
+  var txtRequestReviewed = document.getElementById("txt-requestReviewed");
+  var currentDetailsEl = document.getElementById("currentDetails");
+  var requestedDetailsEl = document.getElementById("requestedDetails");
 
-  let allRequests = [];
-  let activeStatus = "ALL";
-  let currentPage = 1;
-  let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
+  var allRequests = [];
+  var activeStatus = "ALL";
+  var currentPage = 1;
+  var entriesPerPage = Math.max(1, parseInt(entriesPerPageInput && entriesPerPageInput.value ? entriesPerPageInput.value : "20", 10) || 20);
+  var pendingDenyId = null;
+  var currentViewedRequestId = null;
+  var currentViewedStatusText = "";
+  var autoRefreshTimeout = null;
+  var autoRefreshInFlight = false;
 
-  const statusLabel = (statusName) => {
+  function statusLabel(statusName) {
     if (!statusName) return "Unknown";
     if (statusName === "PendingRequest") return "Pending";
     if (statusName === "ApprovedRequest") return "Approved";
     if (statusName === "DeniedRequest") return "Denied";
     return statusName;
-  };
+  }
 
-  const modalStatusBadgeClass = (statusText) => {
-    if (statusText === "Approved") return "bg-success text-white";
-    if (statusText === "Pending") return "bg-warning text-white";
-    if (statusText === "Denied") return "bg-danger text-white";
-    return "bg-secondary text-white";
-  };
-
-  const statusPillClass = (statusText) => {
+  function statusPillClass(statusText) {
     if (statusText === "Approved") return "approved";
     if (statusText === "Pending") return "pending";
     if (statusText === "Denied") return "denied";
     return "";
-  };
+  }
 
-  const formatDate = (value) => {
-    if (!value) return "—";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
+  function formatDate(value) {
+    if (!value) return "-";
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return value;
     return d.toLocaleString();
-  };
+  }
 
-  const renderTable = () => {
-    if (!tbody) return;
-    const search = (searchInput?.value || "").trim().toLowerCase();
-    const typeSelected = String(typeFilterSelect?.value || "ALL");
-    const checkedTypes = typeFilterCheckboxes
-      .filter((cb) => cb && cb.checked)
-      .map((cb) => String(cb.value || "").trim())
-      .filter(Boolean);
-    const activeTypes = checkedTypes.length ? checkedTypes : (typeSelected !== "ALL" ? [typeSelected] : []);
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
-    const filtered = allRequests.filter((row) => {
-      const matchStatus =
-        activeStatus === "ALL" || statusLabel(row.status_name) === activeStatus;
-      const matchType = activeTypes.length === 0 || activeTypes.includes(String(row.request_type || ""));
-      const text = `${row.resident_id || ""} ${row.resident_name || ""}`.toLowerCase();
-      const matchSearch = search === "" || text.includes(search);
-      return matchStatus && matchType && matchSearch;
+  function getModal(el) {
+    if (!el || !window.bootstrap || !window.bootstrap.Modal) return null;
+    return window.bootstrap.Modal.getOrCreateInstance(el, { backdrop: "static", keyboard: false });
+  }
+
+  function closeFloatingActionUi() {
+    if (window.AdminTableActions && typeof window.AdminTableActions.closeOpenDropdowns === "function") {
+      window.AdminTableActions.closeOpenDropdowns();
+    }
+
+    var openDropdownToggles = Array.prototype.slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"][aria-expanded="true"]'));
+    Array.prototype.slice.call(document.querySelectorAll(".dropdown-menu.show, body > .admin-table-action-menu-portal")).forEach(function (menu) {
+      var toggle = menu.previousElementSibling;
+      if (toggle && openDropdownToggles.indexOf(toggle) === -1) openDropdownToggles.push(toggle);
+      menu.classList.remove("show");
     });
-    const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-    const start = (currentPage - 1) * entriesPerPage;
-    const pageRows = filtered.slice(start, start + entriesPerPage);
-    renderPagination(totalPages, filtered.length);
 
-    if (pageRows.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="text-center text-muted py-4">
-            No edit requests yet.
-          </td>
-        </tr>
-      `;
-      return;
-    }
+    openDropdownToggles.forEach(function (toggle) {
+      if (window.bootstrap && window.bootstrap.Dropdown) {
+        window.bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+      } else {
+        toggle.setAttribute("aria-expanded", "false");
+      }
+    });
 
-    tbody.innerHTML = pageRows
-      .map((row) => {
-        const statusText = statusLabel(row.status_name);
-        return `
-          <tr>
-            <td>${row.request_id}</td>
-            <td>${row.resident_id || "—"}</td>
-            <td><div class="fw-semibold">${row.resident_name || "—"}</div></td>
-            <td class="text-capitalize">${row.request_type || "—"}</td>
-            <td>${formatDate(row.created_at)}</td>
-            <td>
-              <span class="status-pill ${statusPillClass(statusText)}">${statusText}</span>
-            </td>
-            <td>
-              <div class="compact-table-actions">
-                <button class="btn btn-primary btn-sm compact-table-btn" data-action="view" data-id="${row.request_id}">View</button>
-                <button class="btn btn-success btn-sm compact-table-btn" data-action="approve" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Approve</button>
-                <button class="btn btn-danger btn-sm compact-table-btn" data-action="deny" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Deny</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      })
-      .join("");
-  };
+    Array.prototype.slice.call(document.querySelectorAll(".tooltip.show, .popover.show")).forEach(function (el) {
+      el.parentNode.removeChild(el);
+    });
+  }
 
-  const renderPagination = (totalPages, totalRows) => {
-    if (!paginationEl) return;
-    paginationEl.innerHTML = "";
-
-    const addBtn = (label, page, disabled = false, active = false) => {
-      const li = document.createElement("li");
-      li.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `page-link${active ? " fw-bold" : ""}`;
-      btn.textContent = label;
-      btn.disabled = disabled;
-      btn.addEventListener("click", () => {
-        if (disabled || page === currentPage) return;
-        currentPage = page;
-        renderTable();
-      });
-      li.appendChild(btn);
-      paginationEl.appendChild(li);
-    };
-
-    if (totalRows <= 0) {
-      addBtn("<", 1, true, false);
-      addBtn("1", 1, false, true);
-      addBtn(">", 1, true, false);
-      return;
-    }
-
-    addBtn("<", Math.max(1, currentPage - 1), currentPage <= 1, false);
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, startPage + 4);
-    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-    for (let p = startPage; p <= endPage; p += 1) {
-      addBtn(String(p), p, false, p === currentPage);
-    }
-    addBtn(">", Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
-  };
-
-  const viewModalEl = document.getElementById("modal-viewRequest");
-  const editDocsInlineLoading = document.getElementById("edit-docs-inline-loading");
-  const editDocsInlineEmpty = document.getElementById("edit-docs-inline-empty");
-  const editDocsInlineList = document.getElementById("edit-docs-inline-list");
-  const editDocViewerEl = document.getElementById("modal-editDocViewer");
-  const editDocViewerBody = document.getElementById("edit-doc-viewer-body");
-  const editDocViewerTitle = document.getElementById("edit-doc-viewer-title");
-  const editDocViewerSubtitle = document.getElementById("edit-doc-viewer-subtitle");
-  const editDocViewerReturn = document.getElementById("edit-doc-viewer-return");
-  const denyModalEl = document.getElementById("modal-denyRequest");
-  const denyRemarksEl = document.getElementById("denyRemarks");
-  const denyRemarksErrorEl = document.getElementById("denyRemarksError");
-  const btnConfirmDeny = document.getElementById("btnConfirmDeny");
-  let pendingDenyId = null;
-  let currentViewedRequestId = null;
-  const spanRequestId = document.getElementById("span-requestId");
-  const spanRequestTypeHeader = document.getElementById("span-requestTypeHeader");
-  const txtRequestResident = document.getElementById("txt-requestResident");
-  const txtRequestResidentId = document.getElementById("txt-requestResidentId");
-  const txtRequestType = document.getElementById("txt-requestType");
-  const txtRequestStatus = document.getElementById("txt-requestStatus");
-  const txtRequestCreated = document.getElementById("txt-requestCreated");
-  const txtRequestReviewed = document.getElementById("txt-requestReviewed");
-  const currentDetailsEl = document.getElementById("currentDetails");
-  const requestedDetailsEl = document.getElementById("requestedDetails");
-
-  const getStaticModal = (el) => {
-    if (!el || !window.bootstrap?.Modal) return null;
-    return bootstrap.Modal.getOrCreateInstance(el, { backdrop: "static", keyboard: false });
-  };
-
-  const renderDetailList = (el, items) => {
+  function showModal(el) {
     if (!el) return;
-    if (!items || items.length === 0) {
-      el.innerHTML = `<div class="text-muted small">No data available.</div>`;
+    closeFloatingActionUi();
+    var modal = getModal(el);
+    if (modal) {
+      modal.show();
       return;
     }
-    el.innerHTML = items
-      .map(
-        (item) => `
-          <div class="request-detail ${item.changed ? "changed" : ""}">
-            <div class="label">${item.label}:</div>
-            <div class="value">${item.value || "—"}</div>
-          </div>
-        `
-      )
-      .join("");
-  };
+    el.classList.add("show");
+    el.style.display = "block";
+    el.removeAttribute("aria-hidden");
+    el.setAttribute("aria-modal", "true");
+    document.body.classList.add("modal-open");
+  }
 
-  const humanizeKey = (key) => {
-    const map = {
+  function hideModal(el) {
+    if (!el) return;
+    var modal = getModal(el);
+    if (modal) {
+      modal.hide();
+      return;
+    }
+    el.classList.remove("show");
+    el.style.display = "none";
+    el.setAttribute("aria-hidden", "true");
+    el.removeAttribute("aria-modal");
+    document.body.classList.remove("modal-open");
+  }
+
+  function humanizeKey(key) {
+    var map = {
       unit_number: "Unit Number",
       street_number: "Street Number",
       street_name: "Street Name",
@@ -218,7 +149,6 @@ document.addEventListener("DOMContentLoaded", () => {
       house_type: "House Type",
       residency_duration: "Residency Duration",
       address_system: "Address System",
-      new_head_resident_id: "New Head Resident ID",
       last_name: "Last Name",
       first_name: "First Name",
       middle_name: "Middle Name",
@@ -232,378 +162,477 @@ document.addEventListener("DOMContentLoaded", () => {
       occupation: "Occupation",
       occupation_detail: "Occupation Detail",
       voter_status: "Voter Status",
-      head_of_family: "Resident Role",
+      head_of_family: "Resident Role"
     };
-    return map[key] || key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-  };
+    return map[key] || String(key || "").replace(/_/g, " ").replace(/\b\w/g, function (m) { return m.toUpperCase(); });
+  }
 
-  const loadRequests = async () => {
-    if (!tbody) return;
-    if (autoRefreshInFlight) return;
-    autoRefreshInFlight = true;
-    setRefreshLoading(true);
-    try {
-      const res = await fetch("../PhpFiles/Admin-End/edit_requests.php?fetch=1");
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to load edit requests.");
-      }
-      allRequests = Array.isArray(data.requests) ? data.requests : [];
-      if (pendingBadge) {
-        const count = data.pending_count ?? allRequests.filter((r) => statusLabel(r.status_name) === "Pending").length;
-        pendingBadge.textContent = String(count);
-        pendingBadge.classList.toggle("d-none", count <= 0);
-      }
-      renderTable();
-    } catch (err) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="text-center text-danger py-4">
-            ${err?.message || "Failed to load edit requests."}
-          </td>
-        </tr>
-      `;
-    } finally {
-      autoRefreshInFlight = false;
-      setRefreshLoading(false);
+  function normalizeValue(value) {
+    if (value === null || value === undefined) return "";
+    return String(value).trim().toLowerCase();
+  }
+
+  function renderDetailList(el, items) {
+    if (!el) return;
+    if (!items || !items.length) {
+      el.innerHTML = '<div class="text-muted small">No data available.</div>';
+      return;
     }
-  };
+    el.innerHTML = items.map(function (item) {
+      return '' +
+        '<div class="request-detail ' + (item.changed ? "changed" : "") + '">' +
+          '<div class="label">' + esc(item.label) + ':</div>' +
+          '<div class="value">' + esc(item.value || "-") + '</div>' +
+        '</div>';
+    }).join("");
+  }
 
-  const scheduleAutoRefresh = () => {
-    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
-    autoRefreshTimeout = setTimeout(() => {
-      if (autoRefreshInFlight) {
-        scheduleAutoRefresh();
-        return;
-      }
-      triggerRefresh().catch(() => {});
-    }, AUTO_REFRESH_MS);
-  };
+  function formatRequestedValue(key, value) {
+    if (key === "voter_status") {
+      if (value === 1 || value === "1") return "Registered";
+      if (value === 0 || value === "0") return "Not Registered";
+    }
+    if (key === "occupation") {
+      if (value === 1 || value === "1") return "Employed";
+      if (value === 0 || value === "0") return "Unemployed";
+    }
+    if (key === "head_of_family") {
+      if (value === 1 || value === "1") return "Head of the Family";
+      if (value === 0 || value === "0") return "Resident";
+    }
+    return value;
+  }
 
-  const triggerRefresh = async () => {
-    scheduleAutoRefresh();
-    await loadRequests();
-  };
+  function setViewActionButtons(statusText) {
+    var isPending = statusText === "Pending";
+    if (btnViewApproveRequest) btnViewApproveRequest.classList.toggle("d-none", !isPending);
+    if (btnViewDenyRequest) btnViewDenyRequest.classList.toggle("d-none", !isPending);
+  }
 
-  if (btnRefreshTable) {
-    btnRefreshTable.addEventListener("click", () => {
-      triggerRefresh().catch(() => {});
+  function setRefreshLoading(on) {
+    if (!btnRefreshTable) return;
+    btnRefreshTable.classList.toggle("is-loading", !!on);
+    btnRefreshTable.disabled = !!on;
+  }
+
+  function getFilteredRows() {
+    var search = String(searchInput && searchInput.value ? searchInput.value : "").trim().toLowerCase();
+    var typeSelected = String(typeFilterSelect && typeFilterSelect.value ? typeFilterSelect.value : "ALL");
+    var checkedTypes = typeFilterCheckboxes.filter(function (cb) { return cb && cb.checked; })
+      .map(function (cb) { return String(cb.value || "").trim(); })
+      .filter(Boolean);
+    var activeTypes = checkedTypes.length ? checkedTypes : (typeSelected !== "ALL" ? [typeSelected] : []);
+
+    return allRequests.filter(function (row) {
+      var rowStatus = statusLabel(row.status_name);
+      var matchStatus = activeStatus === "ALL" || rowStatus === activeStatus;
+      var matchType = activeTypes.length === 0 || activeTypes.indexOf(String(row.request_type || "")) !== -1;
+      var text = String((row.resident_id || "") + " " + (row.resident_name || "")).toLowerCase();
+      return matchStatus && matchType && (search === "" || text.indexOf(search) !== -1);
     });
   }
 
-  const updateRequestStatus = async (requestId, action) => {
-    const ok = await window.UniversalModal.confirm(`Are you sure you want to ${action} this request?`);
-    if (!ok) return;
-    try {
-      const res = await fetch("../PhpFiles/Admin-End/edit_requests.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
-        },
-        body: JSON.stringify({ action, request_id: requestId }),
+  function renderPagination(totalPages, totalRows) {
+    if (!paginationEl) return;
+    paginationEl.innerHTML = "";
+    function addBtn(label, page, disabled, active) {
+      var li = document.createElement("li");
+      li.className = "page-item" + (disabled ? " disabled" : "") + (active ? " active" : "");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "page-link" + (active ? " fw-bold" : "");
+      btn.textContent = label;
+      btn.disabled = !!disabled;
+      btn.addEventListener("click", function () {
+        if (disabled || page === currentPage) return;
+        currentPage = page;
+        renderTable();
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to update request.");
-      }
-      await loadRequests();
-    } catch (err) {
-      alert(err?.message || "Failed to update request.");
+      li.appendChild(btn);
+      paginationEl.appendChild(li);
     }
-  };
-
-  statusButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      statusButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      activeStatus = btn.dataset.filter || "ALL";
-      currentPage = 1;
-      renderTable();
-    });
-  });
-
-  if (searchInput) {
-    searchInput.addEventListener("input", () => {
-      currentPage = 1;
-      renderTable();
-    });
+    if (totalRows <= 0) {
+      addBtn("<", 1, true, false);
+      addBtn("1", 1, false, true);
+      addBtn(">", 1, true, false);
+      return;
+    }
+    addBtn("<", Math.max(1, currentPage - 1), currentPage <= 1, false);
+    var startPage = Math.max(1, currentPage - 2);
+    var endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+    for (var p = startPage; p <= endPage; p += 1) addBtn(String(p), p, false, p === currentPage);
+    addBtn(">", Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
   }
 
-  if (typeFilterSelect) {
-    typeFilterSelect.addEventListener("change", () => {
-      currentPage = 1;
-      renderTable();
-    });
-  }
-  if (typeFilterCheckboxes.length) {
-    typeFilterCheckboxes.forEach((cb) => cb.addEventListener("change", () => {
-      currentPage = 1;
-      renderTable();
-    }));
-  }
+  function renderTable() {
+    if (!tbody) return;
+    var filtered = getFilteredRows();
+    var totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    var start = (currentPage - 1) * entriesPerPage;
+    var pageRows = filtered.slice(start, start + entriesPerPage);
+    renderPagination(totalPages, filtered.length);
 
-  if (entriesPerPageInput) {
-    entriesPerPageInput.addEventListener("change", () => {
-      const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
-      entriesPerPage = next;
-      entriesPerPageInput.value = String(next);
-      currentPage = 1;
-      renderTable();
-    });
-  }
+    if (!pageRows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No edit requests yet.</td></tr>';
+      return;
+    }
 
-  if (tbody) {
-    tbody.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!target || !target.dataset?.action) return;
-      const action = target.dataset.action;
-      const requestId = target.dataset.id;
-      if (!requestId) return;
-      if (action === "approve" || action === "deny") {
-        if (action === "deny") {
-          pendingDenyId = requestId;
-          if (denyRemarksEl) denyRemarksEl.value = "";
-          if (denyRemarksErrorEl) denyRemarksErrorEl.classList.add("d-none");
-          getStaticModal(denyModalEl)?.show();
-        } else {
-          updateRequestStatus(requestId, action);
-        }
-      } else if (action === "view") {
-        (async () => {
-          try {
-            const res = await fetch(`../PhpFiles/Admin-End/edit_requests.php?view=${requestId}`);
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-              throw new Error(data.message || "Failed to load request details.");
-            }
+    tbody.innerHTML = pageRows.map(function (row) {
+      var rowStatus = statusLabel(row.status_name);
+      var pending = rowStatus === "Pending";
+      return '' +
+        '<tr>' +
+          '<td>' + esc(row.request_id) + '</td>' +
+          '<td>' + esc(row.resident_id || "-") + '</td>' +
+          '<td><div class="fw-semibold">' + esc(row.resident_name || "-") + '</div></td>' +
+          '<td class="text-capitalize">' + esc(row.request_type || "-") + '</td>' +
+          '<td>' + esc(formatDate(row.created_at)) + '</td>' +
+          '<td><span class="status-pill ' + statusPillClass(rowStatus) + '">' + esc(rowStatus) + '</span></td>' +
+          '<td><div class="compact-table-actions">' +
+            '<button type="button" class="btn btn-primary btn-sm compact-table-btn js-edit-request-action" data-action="view" data-id="' + esc(row.request_id) + '">View</button>' +
+            '<button type="button" class="btn btn-success btn-sm compact-table-btn js-edit-request-action" data-action="approve" data-id="' + esc(row.request_id) + '"' + (pending ? "" : " disabled") + '>Approve</button>' +
+            '<button type="button" class="btn btn-danger btn-sm compact-table-btn js-edit-request-action" data-action="deny" data-id="' + esc(row.request_id) + '"' + (pending ? "" : " disabled") + '>Deny</button>' +
+          '</div></td>' +
+        '</tr>';
+    }).join("");
 
-            const req = data.request || {};
-            const current = data.current || {};
-            const changes = data.requested_changes || {};
-
-            if (spanRequestId) spanRequestId.textContent = req.request_id || requestId;
-            if (spanRequestTypeHeader) {
-              spanRequestTypeHeader.textContent = req.request_type ? humanizeKey(req.request_type) : "Request";
-            }
-            if (txtRequestResident) txtRequestResident.textContent = req.resident_name || "—";
-            if (txtRequestResidentId) txtRequestResidentId.textContent = req.resident_id || "—";
-            if (txtRequestType) txtRequestType.textContent = req.request_type || "—";
-            if (txtRequestCreated) txtRequestCreated.textContent = formatDate(req.created_at);
-            if (txtRequestReviewed) {
-              txtRequestReviewed.textContent = formatDate(req.reviewed_at);
-            }
-            const txtRequestReviewedBy = document.getElementById("txt-requestReviewedBy");
-            if (txtRequestReviewedBy) {
-              txtRequestReviewedBy.textContent = req.reviewed_by_name || "—";
-            }
-
-            const statusText = statusLabel(req.status_name);
-            if (txtRequestStatus) {
-              txtRequestStatus.textContent = statusText;
-            }
-
-            const currentItems = [];
-            if (req.request_type === "address") {
-              currentItems.push(
-                { label: "Unit Number", value: current.address?.unit_number, key: "unit_number" },
-                { label: "Street Number", value: current.address?.street_number, key: "street_number" },
-                { label: "Street Name", value: current.address?.street_name, key: "street_name" },
-                { label: "Phase Number", value: current.address?.phase_number, key: "phase_number" },
-                { label: "Subdivision", value: current.address?.subdivision, key: "subdivision" },
-                { label: "Area Number", value: current.address?.area_number, key: "area_number" },
-                { label: "House Ownership", value: current.address?.house_ownership, key: "house_ownership" },
-                { label: "House Type", value: current.address?.house_type, key: "house_type" },
-                { label: "Residency Duration", value: current.address?.residency_duration, key: "residency_duration" }
-              );
-            } else if (req.request_type === "emergency") {
-              currentItems.push(
-                { label: "Last Name", value: current.emergency?.last_name, key: "last_name" },
-                { label: "First Name", value: current.emergency?.first_name, key: "first_name" },
-                { label: "Middle Name", value: current.emergency?.middle_name, key: "middle_name" },
-                { label: "Suffix", value: current.emergency?.suffix, key: "suffix" },
-                { label: "Contact Number", value: current.emergency?.phone_number, key: "phone_number" },
-                { label: "Relationship", value: current.emergency?.relationship, key: "relationship" },
-                { label: "Address", value: current.emergency?.address, key: "address" }
-              );
-            } else if (req.request_type === "profile") {
-              currentItems.push(
-                { label: "Last Name", value: current.profile?.lastname, key: "lastname" },
-                { label: "First Name", value: current.profile?.firstname, key: "firstname" },
-                { label: "Middle Name", value: current.profile?.middlename, key: "middlename" },
-                { label: "Suffix", value: current.profile?.suffix, key: "suffix" },
-                { label: "Civil Status", value: current.profile?.civil_status, key: "civil_status" },
-                { label: "Religion", value: current.profile?.religion, key: "religion" },
-                { label: "Occupation", value: current.profile?.occupation_detail || current.profile?.occupation, key: "occupation_detail" },
-                { label: "Sector Membership", value: current.profile?.sector_membership, key: "sector_membership" },
-                { label: "Voter Status", value: current.profile?.voter_status, key: "voter_status" },
-                { label: "Resident Role", value: current.profile?.head_of_family, key: "head_of_family" }
-              );
-            }
-            const changeKeys = new Set(Object.keys(changes || {}));
-            const normalizeValue = (val) => {
-              if (val === null || val === undefined) return "";
-              return String(val).trim().toLowerCase();
-            };
-            const currentWithFlags = currentItems.map((item) => {
-              if (!item.key || !changeKeys.has(item.key)) {
-                return { ...item, changed: false };
-              }
-              const currentVal = normalizeValue(item.value);
-              const requestedVal = normalizeValue(changes[item.key]);
-              return { ...item, changed: currentVal !== requestedVal };
-            });
-            renderDetailList(currentDetailsEl, currentWithFlags);
-
-            const formatRequestedValue = (key, value) => {
-              if (key === "voter_status") {
-                if (value === 1 || value === "1") return "Registered";
-                if (value === 0 || value === "0") return "Not Registered";
-              }
-              if (key === "occupation") {
-                if (value === 1 || value === "1") return "Employed";
-                if (value === 0 || value === "0") return "Unemployed";
-              }
-              if (key === "head_of_family") {
-                if (value === 1 || value === "1") return "Head of the Family";
-                if (value === 0 || value === "0") return "Resident";
-              }
-              return value;
-            };
-
-            const requestedItems = currentItems.map((item) => {
-              const rawRequestedVal = changeKeys.has(item.key) ? changes[item.key] : item.value;
-              const requestedVal = formatRequestedValue(item.key, rawRequestedVal);
-              const currentValNorm = normalizeValue(item.value);
-              const requestedValNorm = normalizeValue(requestedVal);
-              return {
-                label: item.label,
-                value: requestedVal,
-                key: item.key,
-                changed: currentValNorm !== requestedValNorm,
-              };
-            });
-            renderDetailList(requestedDetailsEl, requestedItems);
-
-            currentViewedRequestId = req.request_id || requestId;
-            getStaticModal(viewModalEl)?.show();
-
-            if (editDocsInlineLoading) editDocsInlineLoading.classList.remove("d-none");
-            if (editDocsInlineEmpty) editDocsInlineEmpty.classList.add("d-none");
-            if (editDocsInlineList) editDocsInlineList.innerHTML = "";
-            try {
-              const docsRes = await fetch(`../PhpFiles/Admin-End/edit_requests.php?docs=${currentViewedRequestId}`);
-              const docsData = await docsRes.json().catch(() => ({}));
-              if (!docsRes.ok || !docsData.success) {
-                throw new Error(docsData.message || "Failed to load documents.");
-              }
-              renderDocs(docsData.documents || []);
-            } catch (docErr) {
-              if (editDocsInlineEmpty) {
-                editDocsInlineEmpty.textContent = docErr?.message || "Failed to load documents.";
-                editDocsInlineEmpty.classList.remove("d-none");
-              }
-            } finally {
-              if (editDocsInlineLoading) editDocsInlineLoading.classList.add("d-none");
-            }
-          } catch (err) {
-            alert(err?.message || "Failed to load request details.");
-          }
-        })();
-      }
+    Array.prototype.slice.call(tbody.querySelectorAll(".js-edit-request-action")).forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleRequestAction(button.getAttribute("data-action"), button.getAttribute("data-id"));
+      });
     });
   }
 
-  const renderDocs = (docs) => {
+  function buildCurrentItems(req, current) {
+    var items = [];
+    if (req.request_type === "address") {
+      items.push(
+        { label: "Unit Number", value: current.address && current.address.unit_number, key: "unit_number" },
+        { label: "Street Number", value: current.address && current.address.street_number, key: "street_number" },
+        { label: "Street Name", value: current.address && current.address.street_name, key: "street_name" },
+        { label: "Phase Number", value: current.address && current.address.phase_number, key: "phase_number" },
+        { label: "Subdivision", value: current.address && current.address.subdivision, key: "subdivision" },
+        { label: "Area Number", value: current.address && current.address.area_number, key: "area_number" },
+        { label: "House Ownership", value: current.address && current.address.house_ownership, key: "house_ownership" },
+        { label: "House Type", value: current.address && current.address.house_type, key: "house_type" },
+        { label: "Residency Duration", value: current.address && current.address.residency_duration, key: "residency_duration" }
+      );
+    } else if (req.request_type === "emergency") {
+      items.push(
+        { label: "Last Name", value: current.emergency && current.emergency.last_name, key: "last_name" },
+        { label: "First Name", value: current.emergency && current.emergency.first_name, key: "first_name" },
+        { label: "Middle Name", value: current.emergency && current.emergency.middle_name, key: "middle_name" },
+        { label: "Suffix", value: current.emergency && current.emergency.suffix, key: "suffix" },
+        { label: "Contact Number", value: current.emergency && current.emergency.phone_number, key: "phone_number" },
+        { label: "Relationship", value: current.emergency && current.emergency.relationship, key: "relationship" },
+        { label: "Address", value: current.emergency && current.emergency.address, key: "address" }
+      );
+    } else {
+      items.push(
+        { label: "Last Name", value: current.profile && current.profile.lastname, key: "lastname" },
+        { label: "First Name", value: current.profile && current.profile.firstname, key: "firstname" },
+        { label: "Middle Name", value: current.profile && current.profile.middlename, key: "middlename" },
+        { label: "Suffix", value: current.profile && current.profile.suffix, key: "suffix" },
+        { label: "Civil Status", value: current.profile && current.profile.civil_status, key: "civil_status" },
+        { label: "Religion", value: current.profile && current.profile.religion, key: "religion" },
+        { label: "Occupation", value: current.profile && (current.profile.occupation_detail || current.profile.occupation), key: "occupation_detail" },
+        { label: "Sector Membership", value: current.profile && current.profile.sector_membership, key: "sector_membership" },
+        { label: "Voter Status", value: current.profile && current.profile.voter_status, key: "voter_status" },
+        { label: "Resident Role", value: current.profile && current.profile.head_of_family, key: "head_of_family" }
+      );
+    }
+    return items;
+  }
+
+  function renderDocs(docs) {
     if (!editDocsInlineList) return;
-    if (!docs || docs.length === 0) {
+    if (!docs || !docs.length) {
       editDocsInlineList.innerHTML = "";
       if (editDocsInlineEmpty) editDocsInlineEmpty.classList.remove("d-none");
       return;
     }
     if (editDocsInlineEmpty) editDocsInlineEmpty.classList.add("d-none");
-    editDocsInlineList.innerHTML = docs
-      .map((doc) => {
-        const statusLabel = doc.status_name || "PendingReview";
-        const statusClass =
-          statusLabel.toLowerCase().includes("verified") ? "doc-row--verified" :
-          statusLabel.toLowerCase().includes("rejected") || statusLabel.toLowerCase().includes("denied") ? "doc-row--denied" :
-          "doc-row--pending";
-        const uploadedAt = doc.upload_timestamp ? new Date(doc.upload_timestamp).toLocaleString() : "—";
-        return `
-          <div class="doc-row border rounded-3 p-3 ${statusClass}">
-            <div class="d-flex justify-content-between align-items-start doc-row__grid">
-              <div class="doc-row__info">
-                <div class="fw-bold">${doc.document_type_name || "Document"}</div>
-                <div class="text-muted small">Uploaded: ${uploadedAt}</div>
-              </div>
-              <div class="doc-row__view">
-                <button class="btn btn-primary btn-sm" data-doc-url="${doc.file_url || doc.file_path}" data-doc-title="${doc.document_type_name || "Document"}">View</button>
-              </div>
-            </div>
-          </div>
-        `;
+    editDocsInlineList.innerHTML = docs.map(function (doc) {
+      var label = doc.status_name || "PendingReview";
+      var lower = label.toLowerCase();
+      var cls = lower.indexOf("verified") !== -1 ? "doc-row--verified" :
+        (lower.indexOf("rejected") !== -1 || lower.indexOf("denied") !== -1 ? "doc-row--denied" : "doc-row--pending");
+      var url = doc.file_url || doc.file_path || "";
+      return '' +
+        '<div class="doc-row border rounded-3 p-3 ' + cls + '">' +
+          '<div class="d-flex justify-content-between align-items-start doc-row__grid">' +
+            '<div class="doc-row__info">' +
+              '<div class="fw-bold">' + esc(doc.document_type_name || "Document") + '</div>' +
+              '<div class="text-muted small">Uploaded: ' + esc(formatDate(doc.upload_timestamp)) + '</div>' +
+            '</div>' +
+            '<div class="doc-row__view">' +
+              '<button type="button" class="btn btn-primary btn-sm js-edit-doc-view" data-doc-url="' + esc(url) + '" data-doc-title="' + esc(doc.document_type_name || "Document") + '">View</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }).join("");
+  }
+
+  function loadRequestDetails(requestId) {
+    fetch("../PhpFiles/Admin-End/edit_requests.php?view=" + encodeURIComponent(requestId))
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok || !data.success) throw new Error(data.message || "Failed to load request details.");
+          return data;
+        });
       })
-      .join("");
-  };
+      .then(function (data) {
+        var req = data.request || {};
+        var current = data.current || {};
+        var changes = data.requested_changes || {};
+        var statusText = statusLabel(req.status_name);
 
-  if (editDocsInlineList) {
-    editDocsInlineList.addEventListener("click", (event) => {
-      const target = event.target;
-      if (target && target.dataset?.docUrl) {
-        const url = target.dataset.docUrl;
-        const title = target.dataset.docTitle || "Document";
-        if (editDocViewerTitle) editDocViewerTitle.textContent = title;
-        if (editDocViewerSubtitle) editDocViewerSubtitle.textContent = "";
-        if (editDocViewerBody) {
-          const ext = url.split(".").pop()?.toLowerCase() || "";
-          if (ext === "pdf") {
-            editDocViewerBody.innerHTML = `<iframe src="${url}" style="width:100%;height:70vh;border:0;"></iframe>`;
-          } else {
-            editDocViewerBody.innerHTML = `<img src="${url}" alt="${title}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`;
-          }
+        if (spanRequestId) spanRequestId.textContent = req.request_id || requestId;
+        if (spanRequestTypeHeader) spanRequestTypeHeader.textContent = req.request_type ? humanizeKey(req.request_type) : "Request";
+        if (txtRequestResident) txtRequestResident.textContent = req.resident_name || "-";
+        if (txtRequestResidentId) txtRequestResidentId.textContent = req.resident_id || "-";
+        if (txtRequestType) txtRequestType.textContent = req.request_type || "-";
+        if (txtRequestStatus) txtRequestStatus.textContent = statusText;
+        if (txtRequestCreated) txtRequestCreated.textContent = formatDate(req.created_at);
+        if (txtRequestReviewed) txtRequestReviewed.textContent = formatDate(req.reviewed_at);
+        var reviewedBy = document.getElementById("txt-requestReviewedBy");
+        if (reviewedBy) reviewedBy.textContent = req.reviewed_by_name || "-";
+
+        currentViewedRequestId = req.request_id || requestId;
+        currentViewedStatusText = statusText;
+        setViewActionButtons(statusText);
+
+        var currentItems = buildCurrentItems(req, current);
+        var changeKeys = Object.keys(changes || {});
+        renderDetailList(currentDetailsEl, currentItems.map(function (item) {
+          return {
+            label: item.label,
+            value: item.value,
+            key: item.key,
+            changed: changeKeys.indexOf(item.key) !== -1 && normalizeValue(item.value) !== normalizeValue(changes[item.key])
+          };
+        }));
+        renderDetailList(requestedDetailsEl, currentItems.map(function (item) {
+          var requested = changeKeys.indexOf(item.key) !== -1 ? changes[item.key] : item.value;
+          requested = formatRequestedValue(item.key, requested);
+          return {
+            label: item.label,
+            value: requested,
+            key: item.key,
+            changed: normalizeValue(item.value) !== normalizeValue(requested)
+          };
+        }));
+
+        showModal(viewModalEl);
+        if (editDocsInlineLoading) editDocsInlineLoading.classList.remove("d-none");
+        if (editDocsInlineEmpty) editDocsInlineEmpty.classList.add("d-none");
+        if (editDocsInlineList) editDocsInlineList.innerHTML = "";
+
+        return fetch("../PhpFiles/Admin-End/edit_requests.php?docs=" + encodeURIComponent(currentViewedRequestId));
+      })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok || !data.success) throw new Error(data.message || "Failed to load documents.");
+          renderDocs(data.documents || []);
+        });
+      })
+      .catch(function (err) {
+        alert(err && err.message ? err.message : "Failed to load request details.");
+        if (editDocsInlineEmpty) {
+          editDocsInlineEmpty.textContent = err && err.message ? err.message : "Failed to load documents.";
+          editDocsInlineEmpty.classList.remove("d-none");
         }
-        getStaticModal(viewModalEl)?.hide();
-        getStaticModal(editDocViewerEl)?.show();
-      }
+      })
+      .then(function () {
+        if (editDocsInlineLoading) editDocsInlineLoading.classList.add("d-none");
+      });
+  }
+
+  function updateRequestStatus(requestId, action) {
+    var confirmText = "Are you sure you want to " + action + " this request?";
+    closeFloatingActionUi();
+    var confirmation = window.UniversalModal && window.UniversalModal.confirm
+      ? window.UniversalModal.confirm(confirmText)
+      : Promise.resolve(window.confirm(confirmText));
+
+    confirmation.then(function (ok) {
+      if (!ok) return null;
+      return fetch("../PhpFiles/Admin-End/edit_requests.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": csrfToken
+        },
+        body: JSON.stringify({ action: action, request_id: requestId })
+      });
+    }).then(function (res) {
+      if (!res) return null;
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok || !data.success) throw new Error(data.message || "Failed to update request.");
+        return loadRequests();
+      });
+    }).then(function () {
+      hideModal(viewModalEl);
+    }).catch(function (err) {
+      alert(err && err.message ? err.message : "Failed to update request.");
     });
   }
 
-  if (editDocViewerReturn) {
-    editDocViewerReturn.addEventListener("click", () => {
-      getStaticModal(editDocViewerEl)?.hide();
-      getStaticModal(viewModalEl)?.show();
-    });
+  function handleRequestAction(action, requestId) {
+    if (!requestId) return;
+    if (action === "view") {
+      loadRequestDetails(requestId);
+      return;
+    }
+    if (action === "approve") {
+      updateRequestStatus(requestId, "approve");
+      return;
+    }
+    if (action === "deny") {
+      pendingDenyId = requestId;
+      if (denyRemarksEl) denyRemarksEl.value = "";
+      if (denyRemarksErrorEl) denyRemarksErrorEl.classList.add("d-none");
+      showModal(denyModalEl);
+    }
   }
 
+  window.editRequestsHandleAction = handleRequestAction;
+
+  function loadRequests() {
+    if (!tbody || autoRefreshInFlight) return Promise.resolve();
+    autoRefreshInFlight = true;
+    setRefreshLoading(true);
+    return fetch("../PhpFiles/Admin-End/edit_requests.php?fetch=1")
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok || !data.success) throw new Error(data.message || "Failed to load edit requests.");
+          allRequests = data.requests && data.requests.length ? data.requests : [];
+          if (pendingBadge) {
+            var count = data.pending_count != null ? data.pending_count : allRequests.filter(function (r) {
+              return statusLabel(r.status_name) === "Pending";
+            }).length;
+            pendingBadge.textContent = String(count);
+            pendingBadge.classList.toggle("d-none", count <= 0);
+          }
+          renderTable();
+        });
+      })
+      .catch(function (err) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">' + esc(err && err.message ? err.message : "Failed to load edit requests.") + '</td></tr>';
+      })
+      .then(function () {
+        autoRefreshInFlight = false;
+        setRefreshLoading(false);
+      });
+  }
+
+  function scheduleAutoRefresh() {
+    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = setTimeout(function () {
+      loadRequests().then(scheduleAutoRefresh);
+    }, 30000);
+  }
+
+  statusButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      statusButtons.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      activeStatus = btn.getAttribute("data-filter") || "ALL";
+      currentPage = 1;
+      renderTable();
+    });
+  });
+  if (searchInput) searchInput.addEventListener("input", function () { currentPage = 1; renderTable(); });
+  if (typeFilterSelect) typeFilterSelect.addEventListener("change", function () { currentPage = 1; renderTable(); });
+  typeFilterCheckboxes.forEach(function (cb) {
+    cb.addEventListener("change", function () { currentPage = 1; renderTable(); });
+  });
+  if (entriesPerPageInput) {
+    entriesPerPageInput.addEventListener("change", function () {
+      entriesPerPage = Math.max(1, parseInt(entriesPerPageInput.value || "20", 10) || 20);
+      entriesPerPageInput.value = String(entriesPerPage);
+      currentPage = 1;
+      renderTable();
+    });
+  }
+  if (btnRefreshTable) btnRefreshTable.addEventListener("click", function () { loadRequests(); });
+
+  document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (!window.bootstrap || !window.bootstrap.Modal) hideModal(button.closest(".modal"));
+    });
+  });
+
+  if (btnViewApproveRequest) {
+    btnViewApproveRequest.addEventListener("click", function () {
+      if (currentViewedRequestId && currentViewedStatusText === "Pending") updateRequestStatus(currentViewedRequestId, "approve");
+    });
+  }
+  if (btnViewDenyRequest) {
+    btnViewDenyRequest.addEventListener("click", function () {
+      if (!currentViewedRequestId || currentViewedStatusText !== "Pending") return;
+      pendingDenyId = currentViewedRequestId;
+      if (denyRemarksEl) denyRemarksEl.value = "";
+      if (denyRemarksErrorEl) denyRemarksErrorEl.classList.add("d-none");
+      hideModal(viewModalEl);
+      showModal(denyModalEl);
+    });
+  }
   if (btnConfirmDeny) {
-    btnConfirmDeny.addEventListener("click", async () => {
+    btnConfirmDeny.addEventListener("click", function () {
       if (!pendingDenyId) return;
-      const remarks = (denyRemarksEl?.value || "").trim();
+      var remarks = String(denyRemarksEl && denyRemarksEl.value ? denyRemarksEl.value : "").trim();
       if (!remarks) {
         if (denyRemarksErrorEl) denyRemarksErrorEl.classList.remove("d-none");
         return;
       }
       if (denyRemarksErrorEl) denyRemarksErrorEl.classList.add("d-none");
-      try {
-        const res = await fetch("../PhpFiles/Admin-End/edit_requests.php", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
-          },
-          body: JSON.stringify({ action: "deny", request_id: pendingDenyId, admin_notes: remarks }),
+      fetch("../PhpFiles/Admin-End/edit_requests.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": csrfToken
+        },
+        body: JSON.stringify({ action: "deny", request_id: pendingDenyId, admin_notes: remarks })
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok || !data.success) throw new Error(data.message || "Failed to deny request.");
+          hideModal(denyModalEl);
+          pendingDenyId = null;
+          return loadRequests();
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) {
-          throw new Error(data.message || "Failed to deny request.");
-        }
-        getStaticModal(denyModalEl)?.hide();
-        pendingDenyId = null;
-        await loadRequests();
-      } catch (err) {
-        alert(err?.message || "Failed to deny request.");
+      }).catch(function (err) {
+        alert(err && err.message ? err.message : "Failed to deny request.");
+      });
+    });
+  }
+  if (editDocsInlineList) {
+    editDocsInlineList.addEventListener("click", function (event) {
+      var target = event.target && event.target.closest ? event.target.closest(".js-edit-doc-view") : null;
+      if (!target) return;
+      var url = target.getAttribute("data-doc-url") || "";
+      var title = target.getAttribute("data-doc-title") || "Document";
+      if (editDocViewerTitle) editDocViewerTitle.textContent = title;
+      if (editDocViewerSubtitle) editDocViewerSubtitle.textContent = "";
+      if (editDocViewerBody) {
+        var ext = (url.split(".").pop() || "").toLowerCase();
+        editDocViewerBody.innerHTML = ext === "pdf"
+          ? '<iframe src="' + esc(url) + '" style="width:100%;height:70vh;border:0;"></iframe>'
+          : '<img src="' + esc(url) + '" alt="' + esc(title) + '" style="max-width:100%;height:auto;display:block;margin:0 auto;">';
       }
+      hideModal(viewModalEl);
+      showModal(editDocViewerEl);
+    });
+  }
+  if (editDocViewerReturn) {
+    editDocViewerReturn.addEventListener("click", function () {
+      hideModal(editDocViewerEl);
+      showModal(viewModalEl);
     });
   }
 

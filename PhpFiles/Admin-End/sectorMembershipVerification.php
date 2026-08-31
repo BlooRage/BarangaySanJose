@@ -102,9 +102,10 @@ try {
             uf.upload_timestamp,
             uf.remarks,
             uf.id_number,
+            rsm.sector_key AS rsm_sector_key,
             dt.document_type_name,
             dt.document_category,
-            s.status_name AS verify_status,
+            COALESCE(s.status_name, rsm_status.status_name) AS verify_status,
             r.firstname,
             r.middlename,
             r.lastname,
@@ -123,8 +124,12 @@ try {
             ON uf.document_type_id = dt.document_type_id
         LEFT JOIN statuslookuptbl s
             ON uf.status_id_verify = s.status_id
+        LEFT JOIN residentsectormembershiptbl rsm
+            ON rsm.latest_attachment_id = uf.attachment_id
+        LEFT JOIN statuslookuptbl rsm_status
+            ON rsm_status.status_id = rsm.sector_status_id
         INNER JOIN residentinformationtbl r
-            ON r.resident_id = uf.source_id
+            ON r.resident_id = COALESCE(rsm.resident_id, uf.source_id)
         LEFT JOIN residentaddresstbl a
             ON a.address_id = (
                 SELECT a2.address_id
@@ -134,7 +139,7 @@ try {
                 LIMIT 1
             )
         WHERE uf.source_type = 'ResidentProfiling'
-          AND uf.remarks LIKE 'sector:%'
+          AND (uf.remarks LIKE 'sector:%' OR rsm.latest_attachment_id IS NOT NULL)
         ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
     ");
     if (!$stmt) {
@@ -155,6 +160,12 @@ try {
         $row = pii_decrypt_assoc($row, ['house_number']) ?? $row;
 
         $marker = extractMarkerFromRemarks($row['remarks'] ?? '');
+        if ($marker === '' || stripos($marker, 'sector:') !== 0) {
+            $rsmSectorKey = trim((string)($row['rsm_sector_key'] ?? ''));
+            if ($rsmSectorKey !== '') {
+                $marker = 'sector:' . $rsmSectorKey;
+            }
+        }
         $markerLower = strtolower($marker);
         if ($markerLower === '' || strpos($markerLower, 'sector:') !== 0) {
             // If remarks was changed in the future, we only trust marker="sector:...".

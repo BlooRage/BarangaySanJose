@@ -338,6 +338,8 @@ $csrfToken = ensureCsrfToken();
             </div>
 
             <div class="modal-footer border-0">
+                <button type="button" class="btn btn-danger d-none" id="btnViewDenyRequest">Deny</button>
+                <button type="button" class="btn btn-success d-none" id="btnViewApproveRequest">Approve</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -387,6 +389,7 @@ $csrfToken = ensureCsrfToken();
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../JS-Script-Files/modalHandler.js?v=20260831-edit-requests"></script>
 <script>
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
     tableSelector: "#table-editRequests",
@@ -398,6 +401,6 @@ $csrfToken = ensureCsrfToken();
   window.ADMIN_EDIT_REQUESTS_CSRF_TOKEN = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260815-modal-flow-2"></script>
+<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260831-actions-6"></script>
 </body>
 </html>

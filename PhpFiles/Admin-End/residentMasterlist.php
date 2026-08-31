@@ -38,7 +38,13 @@ function mapSectorKeyToLabel($sectorKey): ?string {
     $normalized = preg_replace('/[^a-z]/', '', $normalized);
 
     $map = [
+        'pwd' => 'PWD',
+        'seniorcitizen' => 'Senior Citizen',
         'student' => 'Student',
+        'indigenouspeople' => 'Indigenous People',
+        'indigenousperson' => 'Indigenous People',
+        'singleparent' => 'Single Parent',
+        'soloparent' => 'Single Parent',
     ];
     return $map[$normalized] ?? null;
 }

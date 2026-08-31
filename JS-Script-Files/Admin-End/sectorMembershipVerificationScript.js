@@ -41,6 +41,7 @@
     indigenouspeople: "Indigenous People",
     indigenousperson: "Indigenous People",
     singleparent: "Single Parent",
+    soloparent: "Single Parent",
   };
 
   const normalizeSectorKey = (raw) =>
