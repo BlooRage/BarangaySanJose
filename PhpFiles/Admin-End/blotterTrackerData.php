@@ -1,5 +1,6 @@
 <?php
 require_once "../General/security.php";
+require_once "../General/complaintTypeDetails.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -213,6 +214,19 @@ function getCurrentBlotterStatusName(mysqli $conn, string $caseId): string {
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     return trim((string)($row['status_name'] ?? ''));
+}
+
+function blotterNarrativeDisplayValue(?string $caseDetails): string {
+    if (function_exists('complaintTypeParseCaseDetails')) {
+        $parsed = complaintTypeParseCaseDetails($caseDetails);
+        $narration = trim((string)($parsed['narration'] ?? ''));
+        if ($narration !== '') {
+            return $narration;
+        }
+    }
+
+    $raw = (string)$caseDetails;
+    return trim((string)preg_replace('/\n*--COMPLAINT_META_START--\n.*?\n--COMPLAINT_META_END--\s*$/s', '', $raw));
 }
 
 function loadCaseSignatures(mysqli $conn, string $caseId): array {
@@ -732,7 +746,7 @@ if ($action === 'detail') {
     $stmt->close();
 
     $narrativeType = 'text';
-    $narrativeValue = $detail['case_details'] ?? '';
+    $narrativeValue = blotterNarrativeDisplayValue($detail['case_details'] ?? '');
     $remarks = strtolower(trim((string)($detail['case_remarks'] ?? '')));
     if ($remarks === 'narrative file uploaded') {
         $narrativeType = 'file';

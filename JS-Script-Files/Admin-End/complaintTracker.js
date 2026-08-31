@@ -655,7 +655,7 @@
         `;
     }
 
-    function renderWitnessSection(witnesses, witnessSummary) {
+    function renderWitnessSection(witnesses, witnessSummary, readOnly = false) {
         const clean = (Array.isArray(witnesses) ? witnesses : []).filter((witness) => {
             return witness && (
                 String(witness.full_name ?? "").trim() !== ""
@@ -741,12 +741,12 @@
         return `
             <div class="complaint-witness-section">
                 ${witnessListHtml}
-                <div class="complaint-witness-trigger">
+                ${readOnly ? "" : `<div class="complaint-witness-trigger">
                     ${remainingSlots > 0
                         ? `<button type="button" class="btn btn-outline-primary" id="btnAddComplaintWitness">${addButtonLabel}</button>`
                         : `<div class="complaint-admin-warning">The maximum of ${MAX_COMPLAINT_WITNESSES} witnesses has already been reached for this complaint.</div>`}
-                </div>
-                ${remainingSlots > 0 ? `
+                </div>`}
+                ${!readOnly && remainingSlots > 0 ? `
                     <div class="complaint-witness-editor d-none" id="complaintWitnessEditor">
                         <div class="complaint-admin-helper">Admins can add confirmed witness details here. Up to ${MAX_COMPLAINT_WITNESSES} witnesses are allowed per complaint. ${remainingSlots} slot${remainingSlots === 1 ? "" : "s"} remaining.</div>
                         <div class="complaint-witness-entries" id="complaintWitnessEntries">${witnessRowsHtml}</div>
@@ -762,6 +762,10 @@
     }
 
     function renderAttachmentUploadEditor(detail) {
+        if (isComplaintReadOnly(detail)) {
+            return "";
+        }
+
         const attachments = (Array.isArray(detail?.attachments) ? detail.attachments : []).filter((attachment) => attachment && String(attachment.path ?? "").trim() !== "");
         const remainingSlots = Math.max(0, MAX_COMPLAINT_ATTACHMENTS_TOTAL - attachments.length);
         if (!remainingSlots) {
@@ -771,7 +775,7 @@
         const classificationReady = isComplaintClassificationReady(detail);
         const helperText = !classificationReady
             ? "Set the official complaint classification first before uploading admin attachments."
-            : `Admins can upload up to ${Math.min(MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD, remainingSlots)} image attachment${Math.min(MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD, remainingSlots) === 1 ? "" : "s"} right now. ${remainingSlots} total slot${remainingSlots === 1 ? "" : "s"} remaining.`;
+            : `Admins can upload up to ${Math.min(MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD, remainingSlots)} image attachment${Math.min(MAX_COMPLAINT_ATTACHMENTS_PER_UPLOAD, remainingSlots) === 1 ? "" : "s"} right now. ${remainingSlots} total slot${remainingSlots === 1 ? "" : "s"} remaining. JPG, JPEG, PNG, or WEBP only. Max 5 MB each.`;
 
         return `
             <div class="complaint-admin-editor">
@@ -780,7 +784,7 @@
                     <div class="col-12 col-lg-8">
                         <label class="tracker-form-label" for="complaintAdminAttachments">Add Admin Attachments</label>
                         <input type="file" id="complaintAdminAttachments" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple ${classificationReady ? "" : "disabled"}>
-                        <div class="small text-muted mt-2" id="complaintAdminAttachmentSelection">JPG, JPEG, PNG, or WEBP only. Max 5 MB each.</div>
+                        <div class="small text-muted mt-2" id="complaintAdminAttachmentSelection"></div>
                     </div>
                     <div class="col-12 col-lg-4 d-grid">
                         <button type="button" class="btn btn-outline-primary" id="btnSaveComplaintAttachments" ${classificationReady ? "" : "disabled"}>Upload Attachments</button>
@@ -882,7 +886,19 @@
         return current !== "" && getClassificationOptions(detail).includes(current);
     }
 
-    function renderClassificationEditor(detail) {
+    function isComplaintReadOnly(detail) {
+        const statusKey = normalizeComplaintStatus(detail?.status_name || "");
+        const levelName = String(detail?.level_name || "").trim().toLowerCase();
+        const requestStatus = String(detail?.blotter_request_status || "").trim().toLowerCase();
+        const hasLinkedBlotter = String(detail?.blotter_id || "").trim() !== "";
+
+        return ["resolved", "dropped", "referred"].includes(statusKey)
+            || levelName.includes("endorsed")
+            || hasLinkedBlotter
+            || ["pending", "approved"].includes(requestStatus);
+    }
+
+    function renderClassificationEditor(detail, readOnly = false) {
         const options = getClassificationOptions(detail);
         const currentValue = String(detail?.complaint_type || "").trim();
         const isStandard = isComplaintClassificationReady(detail);
@@ -897,12 +913,12 @@
                 <div class="complaint-admin-editor-row">
                     <div class="complaint-admin-editor-field">
                         <label class="tracker-form-label" for="complaintAdminClassification">Admin Classification</label>
-                        <select id="complaintAdminClassification" class="form-select">
+                        <select id="complaintAdminClassification" class="form-select" ${readOnly ? "disabled" : ""}>
                             <option value="">Select classification</option>
                             ${options.map((option) => `<option value="${esc(option)}" ${selectedValue === option ? "selected" : ""}>${esc(option)}</option>`).join("")}
                         </select>
                     </div>
-                    <div class="complaint-admin-editor-actions">
+                    <div class="complaint-admin-editor-actions ${readOnly ? "d-none" : ""}">
                         <button type="button" class="btn btn-primary" id="btnSaveComplaintClassification">Save Classification</button>
                     </div>
                 </div>
@@ -910,14 +926,14 @@
         `;
     }
 
-    function renderIntakeNotesEditor(value) {
+    function renderIntakeNotesEditor(value, readOnly = false) {
         const normalizedValue = String(value ?? "").trim();
         return `
             <div class="tracker-form-field">
                 <p class="tracker-form-label">Intake Notes</p>
                 <div class="tracker-form-value complaint-intake-editor">
-                    <textarea id="complaintIntakeNotes" class="form-control" rows="4" placeholder="Add intake notes...">${esc(normalizedValue)}</textarea>
-                    <div class="complaint-intake-actions mt-2">
+                    <textarea id="complaintIntakeNotes" class="form-control" rows="4" placeholder="Add intake notes..." ${readOnly ? "disabled" : ""}>${esc(normalizedValue)}</textarea>
+                    <div class="complaint-intake-actions mt-2 ${readOnly ? "d-none" : ""}">
                         <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveComplaintIntakeNotes">Save Intake Notes</button>
                     </div>
                 </div>
@@ -1282,18 +1298,20 @@
                 { label: "Incident Place", value: displayIncidentPlace(d.incident_place || "", d.incident_area_number || "") || "-" },
                 { label: "Area Number", value: d.incident_area_number || "-" },
             ], 2);
+            const readOnlyComplaint = isComplaintReadOnly(d);
 
             const complainantGrid = [
                 renderParticipantGrid(d.complainant || {}),
                 renderAddressFieldGrid(parseStructuredAddress(d.complainant?.address || "")),
             ].join("");
 
-            const witnessGrid = renderWitnessSection(d.witnesses || [], d.witness_summary || "");
+            const witnessGrid = renderWitnessSection(d.witnesses || [], d.witness_summary || "", readOnlyComplaint);
             const attachmentGrid = renderAttachmentList(d.attachments || [], d.submitted_at || "");
             const attachmentEditor = renderAttachmentUploadEditor(d);
+            const attachmentsSectionContent = [attachmentGrid, attachmentEditor].filter(Boolean).join("");
 
-            const classificationSection = formSection("Administrative Classification", renderClassificationEditor(d));
-            const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
+            const classificationSection = formSection("Administrative Classification", renderClassificationEditor(d, readOnlyComplaint));
+            const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || "", readOnlyComplaint));
             const blotterRequestNotice = buildBlotterRequestNotice(d);
             const showBlotterRequestDetails = hasVisibleBlotterRequestDetails(d);
 
@@ -1308,7 +1326,7 @@
                 classificationSection,
                 formSection("Complainant Information", complainantGrid),
                 formSection("Witness Information", witnessGrid),
-                formSection("Attachments", [attachmentGrid, attachmentEditor].filter(Boolean).join("")),
+                attachmentsSectionContent ? formSection("Attachments", attachmentsSectionContent) : "",
                 intakeNotesSection,
                 formSection("Narration and Notes", notesGrid),
             ].join("");
@@ -1332,6 +1350,9 @@
             const saveComplaintAttachmentsBtn = document.getElementById("btnSaveComplaintAttachments");
 
             saveComplaintClassificationBtn?.addEventListener("click", async () => {
+                if (isComplaintReadOnly(currentDetail)) {
+                    return;
+                }
                 const complaintType = String(complaintAdminClassification?.value || "").trim();
                 if (!complaintType) {
                     window.alert("Select the official complaint classification first.");
@@ -1389,6 +1410,9 @@
             };
 
             showWitnessFormBtn?.addEventListener("click", () => {
+                if (isComplaintReadOnly(currentDetail)) {
+                    return;
+                }
                 if (!isComplaintClassificationReady(currentDetail)) {
                     window.alert("Set the admin complaint classification first before adding witness details.");
                     return;
@@ -1423,6 +1447,9 @@
             });
 
             addAnotherWitnessBtn?.addEventListener("click", () => {
+                if (isComplaintReadOnly(currentDetail)) {
+                    return;
+                }
                 if (!isComplaintClassificationReady(currentDetail)) {
                     window.alert("Set the admin complaint classification first before adding witness details.");
                     return;
@@ -1438,13 +1465,16 @@
                 const files = Array.from(complaintAdminAttachments.files || []);
                 if (!complaintAdminAttachmentSelection) return;
                 if (!files.length) {
-                    complaintAdminAttachmentSelection.textContent = "JPG, JPEG, PNG, or WEBP only. Max 5 MB each.";
+                    complaintAdminAttachmentSelection.textContent = "";
                     return;
                 }
                 complaintAdminAttachmentSelection.textContent = files.map((file) => file.name).join(", ");
             });
 
             saveComplaintAttachmentsBtn?.addEventListener("click", async () => {
+                if (isComplaintReadOnly(currentDetail)) {
+                    return;
+                }
                 if (!isComplaintClassificationReady(currentDetail)) {
                     window.alert("Set the admin complaint classification first before uploading attachments.");
                     return;
@@ -1488,6 +1518,9 @@
             });
 
             saveWitnessBtn?.addEventListener("click", async () => {
+                if (isComplaintReadOnly(currentDetail)) {
+                    return;
+                }
                 if (!isComplaintClassificationReady(currentDetail)) {
                     window.alert("Set the admin complaint classification first before saving witness details.");
                     return;
@@ -1579,6 +1612,9 @@
             });
 
             saveIntakeNotesBtn?.addEventListener("click", async () => {
+                if (isComplaintReadOnly(currentDetail)) {
+                    return;
+                }
                 if (!isComplaintClassificationReady(currentDetail)) {
                     window.alert("Set the admin complaint classification first before saving intake notes.");
                     return;

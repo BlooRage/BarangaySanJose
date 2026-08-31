@@ -86,6 +86,21 @@ function complaintTrackerCacheClear(): void
     }
 }
 
+function blotterTrackerCacheClearFromComplaint(): void
+{
+    $pattern = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'barangaysanjose_blotter_tracker_*.cache';
+    $matches = glob($pattern);
+    if (!is_array($matches)) {
+        return;
+    }
+
+    foreach ($matches as $path) {
+        if (is_string($path) && is_file($path)) {
+            @unlink($path);
+        }
+    }
+}
+
 function complaintTrackerListCacheKey(array $query, string $userId, string $role): string
 {
     ksort($query);
@@ -381,6 +396,63 @@ function complaintStatusKey(string $statusName, array $row = []): string
     return 'received';
 }
 
+function complaintTrackerIsEditable(mysqli $conn, string $caseId): bool
+{
+    $stmt = $conn->prepare("
+        SELECT
+            COALESCE(s.status_name, 'Received') AS status_name,
+            COALESCE(l.status_name, 'Complaint Only') AS level_name,
+            COALESCE(ct.escalated_to_blotter, 0) AS escalated_to_blotter,
+            COALESCE(ct.blotter_id, '') AS blotter_id,
+            COALESCE(br.request_status_name, '') AS request_status_name
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        LEFT JOIN (
+            SELECT
+                br1.complaint_case_id,
+                COALESCE(s1.status_name, 'Pending') AS request_status_name
+            FROM blotterrequeststbl br1
+            INNER JOIN (
+                SELECT complaint_case_id, MAX(request_id) AS latest_request_id
+                FROM blotterrequeststbl
+                GROUP BY complaint_case_id
+            ) latest_br
+                ON latest_br.latest_request_id = br1.request_id
+            LEFT JOIN statuslookuptbl s1 ON s1.status_id = br1.request_status_id
+        ) br
+            ON br.complaint_case_id = c.case_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("s", $caseId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) {
+        return false;
+    }
+
+    $statusKey = complaintStatusKey((string)($row['status_name'] ?? 'Received'), $row);
+    $levelName = strtolower(trim((string)($row['level_name'] ?? '')));
+
+    return !in_array($statusKey, ['resolved', 'dropped', 'referred'], true)
+        && !str_contains($levelName, 'endorsed')
+        && trim((string)($row['blotter_id'] ?? '')) === ''
+        && !in_array(strtolower(trim((string)($row['request_status_name'] ?? ''))), ['pending', 'approved'], true);
+}
+
+function complaintTrackerRequireEditable(mysqli $conn, string $caseId): void
+{
+    if (!complaintTrackerIsEditable($conn, $caseId)) {
+        respond(false, [], 'This complaint is already endorsed or finalized and can no longer be edited.');
+    }
+}
+
 function complaintSmsClip(string $value, int $maxLength): string
 {
     $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
@@ -403,7 +475,7 @@ function complaintResidentSmsMessage(string $actionType, string $remarks = ''): 
         'action_in_progress' => 'Action is now in progress for your complaint. Check complaint tracker for updates.',
         'resolved' => 'Your complaint has been resolved. Check complaint tracker for details.',
         'dropped' => 'Your complaint has been dropped. Reason: ' . complaintSmsClip($remarks, 72) . '. Check complaint tracker for details.',
-        'referred' => 'Your complaint has been referred to another department and is now closed in our tracker.',
+        'referred' => 'Your complaint has been endorsed to blotter. Check the blotter tracker for updates.',
         default => '',
     };
 }
@@ -784,6 +856,11 @@ function createBlotterFromComplaint(mysqli $conn, array $complaintRow, string $a
         $endorsementNote .= '. Screening notes: ' . $remarks;
     }
     $caseRemarks = appendMultilineNote($caseRemarks, $endorsementNote);
+    $parsedComplaintDetails = complaintTypeParseCaseDetails((string)($complaintRow['case_details'] ?? ''));
+    $blotterCaseDetails = trim((string)($parsedComplaintDetails['narration'] ?? ''));
+    if ($blotterCaseDetails === '') {
+        $blotterCaseDetails = trim((string)($complaintRow['case_details'] ?? ''));
+    }
 
     $insertCaseStmt = $conn->prepare("
         INSERT INTO casereportstbl
@@ -803,7 +880,7 @@ function createBlotterFromComplaint(mysqli $conn, array $complaintRow, string $a
         $complaintRow['incident_time'],
         $complaintRow['incident_place'],
         $complaintRow['complaint_type'],
-        $complaintRow['case_details'],
+        $blotterCaseDetails,
         $caseRemarks,
         $blotterStatusId,
         $blotterLevelId,
@@ -1405,6 +1482,7 @@ if ($action === 'update_case_classification') {
     if (!$existingCase) {
         respond(false, [], 'Complaint case not found.');
     }
+    complaintTrackerRequireEditable($conn, $caseId);
 
     $updatedCaseDetails = syncComplaintCaseDetailsClassification($existingCase['case_details'] ?? '', $classification);
 
@@ -1480,6 +1558,7 @@ if ($action === 'add_attachments') {
     if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
     }
+    complaintTrackerRequireEditable($conn, $caseId);
     $currentClassification = trim((string)($existingComplaint['complaint_type'] ?? ''));
     if (!isValidComplaintClassification($currentClassification)) {
         respond(false, [], 'Complaint classification must be set by admin before uploading attachments.');
@@ -1620,6 +1699,7 @@ if ($action === 'add_witness') {
     if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
     }
+    complaintTrackerRequireEditable($conn, $caseId);
     if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
         respond(false, [], 'Complaint classification must be set by admin before adding witness details.');
     }
@@ -1769,6 +1849,7 @@ if ($action === 'add_witnesses') {
     if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
     }
+    complaintTrackerRequireEditable($conn, $caseId);
     if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
         respond(false, [], 'Complaint classification must be set by admin before adding witness details.');
     }
@@ -1894,6 +1975,7 @@ if ($action === 'update_intake_notes') {
     if (!$existingComplaint) {
         respond(false, [], 'Complaint case not found.');
     }
+    complaintTrackerRequireEditable($conn, $caseId);
     if (!isValidComplaintClassification((string)($existingComplaint['complaint_type'] ?? ''))) {
         respond(false, [], 'Complaint classification must be set by admin before updating intake notes.');
     }
@@ -2066,14 +2148,15 @@ if ($action === 'update_case_outcome') {
     $updatedScreeningNotes = appendMultilineNote($oldRow['screening_notes'] ?? '', $remarks);
     $caseRemarksNote = "Screening notes ({$newStatusName}): {$remarks}";
     $updatedCaseRemarks = appendMultilineNote($oldRow['case_remarks'] ?? '', $caseRemarksNote);
-    $createdRequest = null;
+    $createdBlotter = null;
     $logEntry = "Complaint status updated: {$oldStatusName} -> {$newStatusName}; Complaint level: {$oldLevelName} -> {$newLevelName}; Remarks: {$remarks}";
 
     $conn->begin_transaction();
     try {
         if ($actionType === 'referred') {
-            $createdRequest = createBlotterRequest($conn, $oldRow, $actorUserId, $remarks);
-            $logEntry .= '; Blotter review request created: ' . ($createdRequest['request_id'] ?? '');
+            $createdBlotter = createBlotterFromComplaint($conn, $oldRow, $actorUserId, $remarks);
+            $markEscalated = 1;
+            $logEntry .= '; Blotter created: ' . ($createdBlotter['blotter_id'] ?? '');
         }
 
         $updateStmt = $conn->prepare("
@@ -2102,7 +2185,7 @@ if ($action === 'update_case_outcome') {
         if (!$complaintUpdateStmt) {
             throw new Exception('Failed to prepare complaint metadata update.');
         }
-        $newBlotterId = '';
+        $newBlotterId = is_array($createdBlotter) ? (string)($createdBlotter['blotter_id'] ?? '') : '';
         $complaintUpdateStmt->bind_param("iiississs", $markEscalated, $markEscalated, $markEscalated, $actorUserId, $updatedScreeningNotes, $markEscalated, $newBlotterId, $newBlotterId, $caseId);
         $complaintUpdateStmt->execute();
         $complaintUpdateStmt->close();
@@ -2122,6 +2205,9 @@ if ($action === 'update_case_outcome') {
 
         $conn->commit();
         complaintTrackerCacheClear();
+        if ($createdBlotter !== null) {
+            blotterTrackerCacheClearFromComplaint();
+        }
         $residentSms = complaintResidentSmsMessage($actionType, $remarks);
         $residentPhone = trim((string)($oldRow['complainant_contact_number'] ?? ''));
         if ($residentSms !== '' && $residentPhone !== '') {
