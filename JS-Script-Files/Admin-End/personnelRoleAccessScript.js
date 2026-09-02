@@ -3,6 +3,7 @@
   const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/personnelRoleAccess.php");
   const appBaseUrl = String(opts.appBaseUrl || "").replace(/\/+$/, "");
   const previewToken = String(opts.previewToken || "");
+  const csrfToken = String(opts.csrfToken || "");
   const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
   const defaultPermissionKeysFromOpts = Array.isArray(opts.defaultPermissionKeys) ? opts.defaultPermissionKeys.map(String) : [];
 
@@ -57,6 +58,7 @@
   const createModalEl = el("modalPersonnelRoleProfileCreate");
   const createDepartmentSelect = el("personnelRoleAccessCreateDepartment");
   const createPositionSelect = el("personnelRoleAccessCreatePosition");
+  const createPositionCustomInput = el("personnelRoleAccessCreatePositionCustom");
   const createContinueBtn = el("btnPersonnelRoleAccessCreateContinue");
   const createHintEl = el("personnelRoleAccessCreateHint");
 
@@ -96,6 +98,29 @@
     const normalized = String(value ?? "").trim();
     return normalized !== "" ? normalized : fallback;
   };
+
+  const notify = (message, tone = "info", title = "") => {
+    const normalizedMessage = String(message || "").trim();
+    if (window.UniversalModal?.open) {
+      window.UniversalModal.open({
+        message: normalizedMessage,
+        tone,
+        title,
+      });
+      return;
+    }
+    window.alert(normalizedMessage);
+  };
+
+  const confirmAction = (message, options = {}) => {
+    if (window.UniversalModal?.confirm) {
+      return window.UniversalModal.confirm(message, options);
+    }
+    return Promise.resolve(window.confirm(message));
+  };
+
+  const validAccessLabel = (value) =>
+    /^[A-Za-z0-9][A-Za-z0-9 .,'()&\/-]{0,99}$/.test(String(value || "").trim());
 
   const sortLabels = (values) =>
     Array.from(new Set(
@@ -1245,22 +1270,25 @@
   const updateCreateHint = () => {
     if (!createHintEl) return;
     const department = String(createDepartmentSelect?.value || "").trim();
-    const position = String(createPositionSelect?.value || "").trim();
+    const customPosition = String(createPositionCustomInput?.value || "").replace(/\s+/g, " ").trim();
+    const selectedPosition = String(createPositionSelect?.value || "").trim();
+    const position = customPosition || selectedPosition;
     if (!department || !position) {
-      createHintEl.textContent = "Existing profiles can be reopened here. New profiles start with the current default permissions already checked.";
+      createHintEl.textContent = "Choose an existing position or type a new title. New profiles start with the current default permissions already checked.";
       return;
     }
 
     const existingRow = findRowByScope(department, position);
     createHintEl.textContent = existingRow
       ? "This department and position already has a profile. Continue to manage the existing permissions."
-      : "This will open a new role profile with the default permissions preselected.";
+      : "This will open a new role profile with the default permissions preselected. Review the module checklist before saving.";
   };
 
   const openCreateScopeModal = () => {
     if (!createModalEl) return;
     populatePromptSelect(createDepartmentSelect, state.editorOptions.departments, "Select department");
     renderCreatePositionOptions("");
+    if (createPositionCustomInput) createPositionCustomInput.value = "";
     updateCreateHint();
     bootstrap.Modal.getOrCreateInstance(createModalEl).show();
   };
@@ -1278,6 +1306,7 @@
   const postProfileAction = async (action, extraBody = {}) => {
     const body = new FormData();
     body.append("action", action);
+    body.append("csrf_token", csrfToken);
 
     Object.entries(extraBody).forEach(([key, value]) => {
       if (Array.isArray(value)) {
@@ -1312,6 +1341,9 @@
     }
 
     const permissionKeys = Object.keys(state.modal.permissionMap);
+    if (state.modal.mode === "create" && permissionKeys.length === 0) {
+      throw new Error("Select at least one module or tracker before creating this access profile.");
+    }
     await postProfileAction("save_profile_permissions", {
       department,
       position_access: positionAccess,
@@ -1321,13 +1353,18 @@
 
   const resetProfile = async () => {
     const row = state.modal.row;
-    if (!row) return;
-    if (!(await window.UniversalModal.confirm("Reset this position permission profile back to the default permissions?"))) return;
+    if (!row) return false;
+    if (!(await confirmAction("Reset this position permission profile back to the default permissions?", {
+      title: "Confirm Permission Reset",
+      confirmLabel: "Reset",
+      confirmClass: "btn btn-danger",
+    }))) return false;
 
     await postProfileAction("reset_profile_permissions", {
       department: row.department || "",
       position_access: row.position_access || "",
     });
+    return true;
   };
 
   const setLoadingState = (loading) => {
@@ -1411,6 +1448,16 @@
 
   if (createPositionSelect) {
     createPositionSelect.addEventListener("change", () => {
+      if (createPositionCustomInput) createPositionCustomInput.value = "";
+      updateCreateHint();
+    });
+  }
+
+  if (createPositionCustomInput) {
+    createPositionCustomInput.addEventListener("input", () => {
+      if (String(createPositionCustomInput.value || "").trim() !== "" && createPositionSelect) {
+        createPositionSelect.value = "";
+      }
       updateCreateHint();
     });
   }
@@ -1418,9 +1465,14 @@
   if (createContinueBtn) {
     createContinueBtn.addEventListener("click", () => {
       const department = String(createDepartmentSelect?.value || "").trim();
-      const positionAccess = String(createPositionSelect?.value || "").trim();
+      const customPosition = String(createPositionCustomInput?.value || "").replace(/\s+/g, " ").trim();
+      const positionAccess = customPosition || String(createPositionSelect?.value || "").trim();
       if (!department || !positionAccess) {
-        window.alert("Choose both the department and the position first.");
+        notify("Choose the department and either an existing position or a new title first.", "warning", "Missing Profile Scope");
+        return;
+      }
+      if (!validAccessLabel(positionAccess)) {
+        notify("Enter a valid title. Use letters, numbers, spaces, and common punctuation only.", "warning", "Invalid Title");
         return;
       }
 
@@ -1478,12 +1530,30 @@
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
       try {
+        const row = state.modal.row;
+        const permissionKeys = Object.keys(state.modal.permissionMap || {});
+        if (!row) return;
+        if (state.modal.mode === "create" && permissionKeys.length === 0) {
+          notify("Select at least one module or tracker before creating this access profile.", "warning", "No Modules Selected");
+          return;
+        }
+        const actionLabel = state.modal.mode === "create" ? "Create" : "Save";
+        const confirmed = await confirmAction(
+          `${actionLabel} permissions for ${safe(row.position_display || row.position_access)} under ${safe(row.department_display || row.department)} with ${permissionKeys.length} granted module${permissionKeys.length === 1 ? "" : "s"}?`,
+          {
+            title: `Confirm ${actionLabel}`,
+            confirmLabel: actionLabel,
+          }
+        );
+        if (!confirmed) return;
+
         setLoadingState(true);
         await saveProfile();
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         await load();
+        notify("Access control profile saved successfully.", "success", "Permissions Saved");
       } catch (error) {
-        window.alert(error?.message || "Unable to save access control changes.");
+        notify(error?.message || "Unable to save access control changes.", "danger", "Save Failed");
       } finally {
         setLoadingState(false);
       }
@@ -1494,11 +1564,13 @@
     resetBtn.addEventListener("click", async () => {
       try {
         setLoadingState(true);
-        await resetProfile();
+        const didReset = await resetProfile();
+        if (!didReset) return;
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         await load();
+        notify("Access control profile reset to default permissions.", "success", "Permissions Reset");
       } catch (error) {
-        window.alert(error?.message || "Unable to reset access control profile.");
+        notify(error?.message || "Unable to reset access control profile.", "danger", "Reset Failed");
       } finally {
         setLoadingState(false);
       }

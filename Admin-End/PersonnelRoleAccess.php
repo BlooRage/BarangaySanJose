@@ -747,10 +747,16 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           </div>
 
           <div>
-            <label for="personnelRoleAccessCreatePosition" class="form-label small fw-bold mb-1">Position</label>
+            <label for="personnelRoleAccessCreatePosition" class="form-label small fw-bold mb-1">Existing Position</label>
             <select id="personnelRoleAccessCreatePosition" class="form-select">
               <option value="">Select position</option>
             </select>
+          </div>
+
+          <div>
+            <label for="personnelRoleAccessCreatePositionCustom" class="form-label small fw-bold mb-1">New Title / Position</label>
+            <input id="personnelRoleAccessCreatePositionCustom" class="form-control" maxlength="100" placeholder="Example: Blotter Reviewer">
+            <div class="small text-muted mt-1">Typing a new title here will create a new access profile for the selected department.</div>
           </div>
 
           <div class="small text-muted" id="personnelRoleAccessCreateHint">
@@ -770,11 +776,12 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     window.PERSONNEL_ROLE_ACCESS_OPTIONS = {
       apiUrl: <?= json_encode(appUrl('PhpFiles/Admin-End/personnelRoleAccess.php'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       appBaseUrl: <?= json_encode(rtrim(appUrl(''), '/'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      csrfToken: <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       previewToken: <?= json_encode((string)$_SESSION['personnel_access_preview_token'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       permissionCatalog: <?= json_encode($personnelRolePermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       defaultPermissionKeys: <?= json_encode(array_values(amp_get_default_admin_permission_keys()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
-  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260830-preview-11"></script>
+  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260902-profile-title-1"></script>
 </body>
 </html>

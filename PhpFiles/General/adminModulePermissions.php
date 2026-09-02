@@ -1377,9 +1377,10 @@ if (!function_exists('amp_replace_personnel_role_module_permissions')) {
             return;
         }
 
+        $validPermissionKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
         foreach ($permissionKeys as $permissionKey) {
             $permissionKey = trim((string)$permissionKey);
-            if ($permissionKey === '') {
+            if ($permissionKey === '' || !isset($validPermissionKeys[$permissionKey])) {
                 continue;
             }
             $rolePermissionId = GenerateTenDigitMetaID($conn, 'officialaccessrolepermissiontbl', 'role_permission_id');
@@ -1452,6 +1453,7 @@ if (!function_exists('amp_get_effective_permission_keys_for_personnel_role')) {
         $hasSavedProfile = amp_has_saved_personnel_role_access_profile($conn, $department, $positionAccess);
         $permissions = [];
 
+        $validPermissionKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
         $stmt = $conn->prepare("
             SELECT permission_key
             FROM officialaccessrolepermissiontbl
@@ -1465,7 +1467,7 @@ if (!function_exists('amp_get_effective_permission_keys_for_personnel_role')) {
             $res = $stmt->get_result();
             while ($permRow = $res->fetch_assoc()) {
                 $key = trim((string)($permRow['permission_key'] ?? ''));
-                if ($key !== '') {
+                if ($key !== '' && isset($validPermissionKeys[$key])) {
                     $permissions[$key] = true;
                 }
             }

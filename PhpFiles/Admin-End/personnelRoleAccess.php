@@ -84,6 +84,16 @@ function pra_sort_labels(array $values): array
     return $values;
 }
 
+function pra_access_label_valid(string $value, int $maxLength = 100): bool
+{
+    $value = trim($value);
+    if ($value === '' || strlen($value) > $maxLength) {
+        return false;
+    }
+
+    return (bool)preg_match("/^[A-Za-z0-9][A-Za-z0-9 .,'()&\\/-]*$/", $value);
+}
+
 function pra_scope_from_saved_meta(string $scopeKey, array $savedMeta): array
 {
     $departmentLabel = trim((string)($savedMeta['department_label'] ?? ''));
@@ -141,6 +151,7 @@ function pra_load_saved_profile_maps(mysqli $conn): array
 {
     $profileMetaMap = [];
     $permissionMap = [];
+    $validPermissionKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
 
     $profileRes = $conn->query("
         SELECT department_key, position_key, department_label, position_label, updated_at
@@ -174,7 +185,7 @@ function pra_load_saved_profile_maps(mysqli $conn): array
                 (string)($row['position_key'] ?? '')
             );
             $permissionKey = trim((string)($row['permission_key'] ?? ''));
-            if ($permissionKey !== '') {
+            if ($permissionKey !== '' && isset($validPermissionKeys[$permissionKey])) {
                 $permissionMap[$scopeKey][$permissionKey] = true;
             }
 
@@ -424,11 +435,12 @@ try {
             echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
             exit;
         }
+        verifyCsrfToken(true);
 
         $department = trim((string)($_POST['department'] ?? ''));
         $positionAccess = trim((string)($_POST['position_access'] ?? ''));
-        if ($department === '' || $positionAccess === '') {
-            throw new RuntimeException('Department and position are required.');
+        if (!pra_access_label_valid($department) || !pra_access_label_valid($positionAccess)) {
+            throw new RuntimeException('Enter a valid department and title. Use letters, numbers, spaces, and common punctuation only.');
         }
         $requestedPermissionKeys = $_POST['permission_keys'] ?? [];
         if (!is_array($requestedPermissionKeys)) {
@@ -484,11 +496,12 @@ try {
             echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
             exit;
         }
+        verifyCsrfToken(true);
 
         $department = trim((string)($_POST['department'] ?? ''));
         $positionAccess = trim((string)($_POST['position_access'] ?? ''));
-        if ($department === '' || $positionAccess === '') {
-            throw new RuntimeException('Department and position are required.');
+        if (!pra_access_label_valid($department) || !pra_access_label_valid($positionAccess)) {
+            throw new RuntimeException('Enter a valid department and title. Use letters, numbers, spaces, and common punctuation only.');
         }
         $oldPermissionMap = amp_get_effective_permission_keys_for_personnel_role($conn, $department, $positionAccess);
 
