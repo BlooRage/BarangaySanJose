@@ -13,6 +13,15 @@ if (!isset($baseUrl)) {
         $baseUrl = '';
     }
 }
+$residentAreaOptions = [
+  'Area 01' => 'San Jose Proper',
+  'Area 1A' => 'Litex Village, Abatex Christine Creek, Med. Heights',
+  'Area 02' => 'VFW, Amychelle, Christine Villa Parnshey, Villa Ana, Zaniga Farm',
+  'Area 03' => 'Relocation',
+  'Area 04' => 'Kasiglahan Phase 1-B, Kasiglahan Phase 1-C, Kasiglahan Phase 1-D, Kasiglahan Phase 1-M, Kasiglahan Phase 1-A',
+  'Area 05' => 'Kasiglahan Phase 1-K, Kasiglahan Phase 1K1, Kasiglahan Phase 1-E, Kasiglahan Phase 1-G',
+  'Area 06' => 'Sub-Urban, Metro Manila Hills',
+];
 ?>
 
 <!DOCTYPE html>
@@ -36,7 +45,7 @@ if (!isset($baseUrl)) {
     crossorigin="anonymous"
   />
 
-  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260825-birthplace-group" />
+  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260904-area-modal-picker" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
   <!-- Optional: server-side alert handling (if you use it) -->
@@ -46,7 +55,7 @@ if (!isset($baseUrl)) {
   <script>
     window.COUNTRY_STATE_DATA_URL = "../Public-Assets/Data/countries-states.json";
   </script>
-  <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260213-24" defer></script>
+  <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260904-area-modal-picker" defer></script>
 </head>
 
 <body>
@@ -760,22 +769,24 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                     class="area-guide-trigger"
                     data-bs-toggle="modal"
                     data-bs-target="#barangayAreaGuideModal"
+                    data-area-input="areaNumber"
                     title="Click here for the Barangay Area Guide"
                     aria-label="Open Barangay Area Guide"
                   >
                     <i class="fa-solid fa-circle-info area-guide-icon" aria-hidden="true"></i>
                   </button>
                 </div>
-                <select class="form-select" id="areaNumber" name="areaNumber">
-                  <option value="">Select</option>
-                  <option value="Area 01">Area 01</option>
-                  <option value="Area 1A">Area 1A</option>
-                  <option value="Area 02">Area 02</option>
-                  <option value="Area 03">Area 03</option>
-                  <option value="Area 04">Area 04</option>
-                  <option value="Area 05">Area 05</option>
-                  <option value="Area 06">Area 06</option>
-                </select>
+                <input type="hidden" id="areaNumber" name="areaNumber">
+                <input
+                  type="text"
+                  class="form-control area-picker-input"
+                  id="areaNumberDisplay"
+                  placeholder="Select area"
+                  readonly
+                  data-bs-toggle="modal"
+                  data-bs-target="#barangayAreaGuideModal"
+                  data-area-input="areaNumber"
+                >
               </div>
             </div>
           </div>
@@ -815,22 +826,24 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                     class="area-guide-trigger"
                     data-bs-toggle="modal"
                     data-bs-target="#barangayAreaGuideModal"
+                    data-area-input="areaNumberLotBlock"
                     title="Click here for the Barangay Area Guide"
                     aria-label="Open Barangay Area Guide"
                   >
                     <i class="fa-solid fa-circle-info area-guide-icon" aria-hidden="true"></i>
                   </button>
                 </div>
-                <select class="form-select" id="areaNumberLotBlock" name="areaNumber">
-                  <option value="">Select</option>
-                  <option value="Area 01">Area 01</option>
-                  <option value="Area 1A">Area 1A</option>
-                  <option value="Area 02">Area 02</option>
-                  <option value="Area 03">Area 03</option>
-                  <option value="Area 04">Area 04</option>
-                  <option value="Area 05">Area 05</option>
-                  <option value="Area 06">Area 06</option>
-                </select>
+                <input type="hidden" id="areaNumberLotBlock" name="areaNumber">
+                <input
+                  type="text"
+                  class="form-control area-picker-input"
+                  id="areaNumberLotBlockDisplay"
+                  placeholder="Select area"
+                  readonly
+                  data-bs-toggle="modal"
+                  data-bs-target="#barangayAreaGuideModal"
+                  data-area-input="areaNumberLotBlock"
+                >
               </div>
             </div>
           </div>
@@ -1526,15 +1539,19 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         </div>
         <div class="modal-body">
           <div class="residency-picker-preview">Select the area that matches the resident's subdivision, village, or zone.</div>
-          <ul class="area-guide-list">
-            <li><strong>AREA 01</strong><br>SAN JOSE PROPER</li>
-            <li><strong>AREA 1A</strong><br>LITEX Village | ABATEX Christine Creek | MED. HEIGHTS</li>
-            <li><strong>AREA 02</strong><br>VFW | Amychelle | Christine Villa Parnshey | Villa Ana | Zaniga Farm</li>
-            <li><strong>AREA 03</strong><br>RELOCATION</li>
-            <li><strong>AREA 04</strong><br>Kasiglahan: Phase 1-B | Phase 1-C | Phase 1-D | Phase 1-M | Phase 1-A</li>
-            <li><strong>AREA 05</strong><br>Kasiglahan: Phase 1-K | Phase 1K1 | Phase 1K2 | Phase 1-E | Phase 1-G</li>
-            <li><strong>AREA 06</strong><br>Sub-Urban | Metro Manila Hills</li>
-          </ul>
+          <div class="d-flex flex-column gap-2 area-guide-options">
+            <?php foreach ($residentAreaOptions as $areaOption => $areaLocation): ?>
+              <button
+                type="button"
+                class="area-guide-option"
+                data-area-value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>"
+                data-area-label="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>"
+              >
+                <span class="area-guide-option__title"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
+                <span class="area-guide-option__meta"><?= htmlspecialchars($areaLocation, ENT_QUOTES, 'UTF-8') ?></span>
+              </button>
+            <?php endforeach; ?>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>

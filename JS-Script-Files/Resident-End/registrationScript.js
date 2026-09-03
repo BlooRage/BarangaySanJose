@@ -1304,6 +1304,68 @@ function isActuallyVisible(el) {
   const addressSystemSelect = document.getElementById("addressSystem");
   const houseSystemWrapper = document.getElementById("houseSystemWrapper");
   const lotBlockSystemWrapper = document.getElementById("lotBlockSystemWrapper");
+  const areaGuideModalEl = document.getElementById("barangayAreaGuideModal");
+  const areaGuideModal = areaGuideModalEl && window.bootstrap
+    ? bootstrap.Modal.getOrCreateInstance(areaGuideModalEl)
+    : null;
+  const areaDisplayIdByInputId = {
+    areaNumber: "areaNumberDisplay",
+    areaNumberLotBlock: "areaNumberLotBlockDisplay"
+  };
+  let activeAreaInputId = "";
+
+  function getDefaultAreaInputId() {
+    if (addressSystemSelect?.value === "lot_block") return "areaNumberLotBlock";
+    return "areaNumber";
+  }
+
+  function setActiveAreaPicker(trigger) {
+    const requestedInputId = String(trigger?.dataset?.areaInput || "").trim();
+    activeAreaInputId = areaDisplayIdByInputId[requestedInputId]
+      ? requestedInputId
+      : getDefaultAreaInputId();
+  }
+
+  function setAreaPickerValue(inputId, value, label) {
+    const hiddenInput = document.getElementById(inputId);
+    const displayInput = document.getElementById(areaDisplayIdByInputId[inputId] || "");
+    if (!hiddenInput || !displayInput) return;
+
+    hiddenInput.value = value;
+    displayInput.value = label || value;
+    clearError(displayInput);
+
+    [hiddenInput, displayInput].forEach((field) => {
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    updateNextButtonState();
+  }
+
+  document.querySelectorAll("[data-area-input]").forEach((trigger) => {
+    trigger.addEventListener("click", () => setActiveAreaPicker(trigger));
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      setActiveAreaPicker(trigger);
+      areaGuideModal?.show(trigger);
+    });
+  });
+
+  areaGuideModalEl?.addEventListener("show.bs.modal", (event) => {
+    setActiveAreaPicker(event.relatedTarget);
+  });
+
+  areaGuideModalEl?.querySelectorAll("[data-area-value]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = String(button.dataset.areaValue || "").trim();
+      const label = String(button.dataset.areaLabel || value).trim();
+      if (!value) return;
+      setAreaPickerValue(activeAreaInputId || getDefaultAreaInputId(), value, label);
+      areaGuideModal?.hide();
+    });
+  });
 
   function setWrapperState(wrapper, enabled) {
     if (!wrapper) return;
@@ -1332,12 +1394,12 @@ function isActuallyVisible(el) {
 
     setRequired(document.getElementById("houseNumber"), val === "house");
     setRequired(document.getElementById("streetName"), val === "house");
-    setRequired(document.getElementById("areaNumber"), val === "house");
+    setRequired(document.getElementById("areaNumberDisplay"), val === "house");
 
     setRequired(document.getElementById("phaseNumber"), false);
     setRequired(document.getElementById("lotNumber"), val === "lot_block");
     setRequired(document.getElementById("blockNumber"), val === "lot_block");
-    setRequired(document.getElementById("areaNumberLotBlock"), val === "lot_block");
+    setRequired(document.getElementById("areaNumberLotBlockDisplay"), val === "lot_block");
 
     updateNextButtonState();
   }
