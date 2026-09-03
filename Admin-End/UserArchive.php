@@ -118,6 +118,6 @@ requireRoleSession(['SuperAdmin'], false);
   <script>
     window.ADMIN_USER_ARCHIVE_CSRF_TOKEN = <?= json_encode(ensureCsrfToken(), JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/archiveUserScript.js?v=20260815-2"></script>
+  <script src="../JS-Script-Files/Admin-End/archiveUserScript.js?v=20260904-portal-actions"></script>
 </body>
 </html>

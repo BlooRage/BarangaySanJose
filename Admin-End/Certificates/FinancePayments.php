@@ -2253,9 +2253,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') { e.preventDefault(); saveFeeType(); }
   });
 
-  feeTypesTableBody.addEventListener('click', (event) => {
+  document.addEventListener('click', (event) => {
     const editBtn = event.target.closest('.js-finance-edit-fee');
     if (editBtn) {
+      event.preventDefault();
       financeEditFee(
         editBtn.dataset.feeId || '',
         editBtn.dataset.feeName || '',
@@ -2267,6 +2268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const deleteBtn = event.target.closest('.js-finance-delete-fee');
     if (deleteBtn) {
+      event.preventDefault();
       financeDeleteFee(
         deleteBtn.dataset.feeId || '',
         deleteBtn.dataset.feeName || ''
@@ -2354,15 +2356,17 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { alert(e.message); }
   }
 
-  pendingRequestsBody.addEventListener('click', (event) => {
+  document.addEventListener('click', (event) => {
     const approveBtn = event.target.closest('.js-finance-approve-fcr');
     if (approveBtn) {
+      event.preventDefault();
       financeApproveFcr(approveBtn.dataset.feeId || '');
       return;
     }
 
     const rejectBtn = event.target.closest('.js-finance-reject-fcr');
     if (rejectBtn) {
+      event.preventDefault();
       financeRejectFcr(rejectBtn.dataset.feeId || '');
     }
   });

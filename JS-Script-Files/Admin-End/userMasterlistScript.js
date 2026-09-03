@@ -532,23 +532,26 @@
       });
     }
 
-    if (tbody) {
-      tbody.addEventListener("click", (event) => {
-        const button = event.target.closest('[data-action="manage-lock"]');
-        if (button) {
-          const row = findRow(button.dataset.userId || "");
-          if (!row) return;
-          populateLockModal(row);
-          if (lockModal) lockModal.show();
-          return;
-        }
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
 
-        const archiveButton = event.target.closest('[data-action="archive-account"]');
-        if (!archiveButton) return;
+      const button = target.closest('[data-action="manage-lock"]');
+      if (button) {
+        event.preventDefault();
+        const row = findRow(button.dataset.userId || "");
+        if (!row) return;
+        populateLockModal(row);
+        if (lockModal) lockModal.show();
+        return;
+      }
 
-        submitArchiveAction(archiveButton.dataset.userId || "").catch(() => {});
-      });
-    }
+      const archiveButton = target.closest('[data-action="archive-account"]');
+      if (!archiveButton) return;
+
+      event.preventDefault();
+      submitArchiveAction(archiveButton.dataset.userId || "").catch(() => {});
+    });
 
     lockModeInputs.forEach((input) => {
       input.addEventListener("change", syncLockModeUI);

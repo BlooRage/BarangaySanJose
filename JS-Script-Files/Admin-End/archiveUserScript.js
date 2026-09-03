@@ -273,18 +273,20 @@
       });
     }
 
-    if (tbody) {
-      tbody.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-action]");
-        if (!button) return;
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const button = target?.closest?.(
+        '#userArchiveTbody [data-action="restore"], #userArchiveTbody [data-action="delete"], body > .admin-table-action-menu-portal [data-action="restore"], body > .admin-table-action-menu-portal [data-action="delete"]'
+      );
+      if (!button) return;
 
-        const action = String(button.dataset.action || "").trim();
-        const userId = String(button.dataset.userId || "").trim();
-        if (!action || !userId) return;
+      const action = String(button.dataset.action || "").trim();
+      const userId = String(button.dataset.userId || "").trim();
+      if (!action || !userId) return;
 
-        submitAction(action, userId).catch(() => {});
-      });
-    }
+      event.preventDefault();
+      submitAction(action, userId).catch(() => {});
+    });
 
     scheduleAutoRefresh();
   };
