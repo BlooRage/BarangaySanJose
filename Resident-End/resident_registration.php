@@ -362,7 +362,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
             <div class="col-md-6">
               <label class="form-label" for="dateOfBirth">Date of Birth <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar" required>
+              <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="<?= date('Y-m-d', strtotime('-100 years')) ?>" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar" data-date-modal-default="today" required>
             </div>
           </div>
 
@@ -2083,7 +2083,7 @@ document.addEventListener("DOMContentLoaded", () => {
     crossorigin="anonymous"
   ></script>
 
-  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
+  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260904-dob-default-today"></script>
   <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
 </body>

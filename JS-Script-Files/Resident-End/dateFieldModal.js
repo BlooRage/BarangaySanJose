@@ -551,6 +551,17 @@
       return toIsoDate(today.getFullYear(), today.getMonth() + 1, today.getDate());
     }
 
+    function getDateModalDefaultIso(input) {
+      const defaultValue = String(input?.dataset?.dateModalDefault || "").trim().toLowerCase();
+      if (defaultValue === "today") {
+        return getTodayIso();
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(defaultValue)) {
+        return defaultValue;
+      }
+      return "";
+    }
+
     function normalizeFieldToken(value) {
       return String(value || "")
         .trim()
@@ -789,9 +800,10 @@
     function syncCalendarFromInput(input) {
       const selectedDates = isMultiCalendarInput(input) ? getMultiSelectedDates(input) : [];
       const parsed = selectedDates[0] ? parseIsoDate(selectedDates[0]) : parseIsoDate(input.value);
+      const defaultParsed = !parsed ? parseIsoDate(getDateModalDefaultIso(input)) : null;
       const minParsed = parseIsoDate(String(input.getAttribute("min") || "").trim());
       const todayParsed = parseIsoDate(getTodayIso());
-      const base = parsed || minParsed || todayParsed || {
+      const base = parsed || defaultParsed || minParsed || todayParsed || {
         year: new Date().getFullYear(),
         month: new Date().getMonth() + 1,
         day: new Date().getDate()
@@ -799,7 +811,7 @@
 
       calendarCursorYear = base.year;
       calendarCursorMonth = base.month;
-      calendarSelectedIso = parsed ? toIsoDate(parsed.year, parsed.month, parsed.day) : "";
+      calendarSelectedIso = (parsed || defaultParsed) ? toIsoDate(base.year, base.month, base.day) : "";
       calendarSelectedDates = selectedDates;
       renderCalendar();
       setModalError("");
