@@ -1713,8 +1713,25 @@ if ($mode === 'password') {
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Emergency Contact Number (+63)</label>
-                        <input class="form-control" name="emergency_contact_phone" inputmode="numeric" pattern="9[0-9]{9}" maxlength="10" placeholder="9XXXXXXXXX" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <label class="form-label" for="officialEmergencyContactPhone">Emergency Contact Number</label>
+                        <div class="input-group" id="officialEmergencyContactPhoneGroup">
+                            <span class="input-group-text">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/9/99/Flag_of_the_Philippines.svg" alt="PH Flag" width="24" style="margin-right:5px;">+63
+                            </span>
+                            <input
+                                type="tel"
+                                class="form-control phone-input"
+                                id="officialEmergencyContactPhone"
+                                name="emergency_contact_phone"
+                                inputmode="numeric"
+                                pattern="9[0-9]{9}"
+                                maxlength="10"
+                                placeholder="9XXXXXXXXX"
+                                data-error-target="#officialEmergencyContactPhoneGroup"
+                                value="<?= htmlspecialchars((string)oi_normalize_phone10((string)($officialInfo['emergency_contact_phone'] ?? '')), ENT_QUOTES, 'UTF-8') ?>"
+                                required
+                            >
+                        </div>
                         <div id="emergencyPhoneSameWarning" class="small text-danger mt-1 d-none">
                             Emergency contact number should not be the same as your registered mobile number.
                         </div>
