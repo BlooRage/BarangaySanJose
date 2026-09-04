@@ -160,7 +160,7 @@ $resolvedProfileImagePath = '';
 $resolvedQrCodeUrl = '';
 $barangayIdOperationalSettings = isset($conn) && $conn instanceof mysqli
     ? dms_resolve_barangay_id_operational_settings($conn)
-    : ['digital_id_enabled' => true, 'digital_id_has_signature' => true, 'digital_id_capture_disabled' => false, 'deactivate_previous_digital_id' => true, 'default_validity_years' => 2];
+    : ['digital_id_enabled' => true, 'digital_id_has_signature' => true, 'digital_id_capture_disabled' => false, 'deactivate_previous_digital_id' => true, 'default_validity_years' => 2, 'default_validity_months' => 24];
 
 if (!$barangayIdOperationalSettings['digital_id_enabled']) {
     $errorMessage = 'Digital Barangay ID is currently unavailable.';

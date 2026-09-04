@@ -4343,7 +4343,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260811-action-dropdown-neutral"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260904-barangay-id-month-validity"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');

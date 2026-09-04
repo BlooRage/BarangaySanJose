@@ -1186,9 +1186,9 @@ if ($action === 'submit_request') {
     if ($isBarangayIdRequest) {
         if (empty(dms_resolve_barangay_id_operational_settings($conn)['online_application_enabled'])) {
             if (dr_wants_html_redirect()) {
-                dr_redirect_to_barangay_id_landing('online_application_disabled');
+                dr_redirect_to_barangay_id_landing();
             }
-            dr_respond_json(503, ['success' => false, 'message' => 'Online Barangay ID applications are temporarily disabled. Please visit the barangay office.']);
+            dr_respond_json(503, ['success' => false, 'message' => 'Please visit the barangay office for Barangay ID applications.']);
         }
 
         $barangayIdState = dr_resident_barangay_id_state($conn, $residentForeignId, $residentId);
@@ -1971,8 +1971,16 @@ if ($action === 'submit_request') {
     $requestDetailsToken = dr_request_details_token($documentTypeRaw, $documentType);
     $requestDetailsJsonRequired = dr_request_details_requires_json($conn);
     $requestDetailsValue = $payloadJson;
+    $defaultBarangayIdValidityMonths = 24;
+    if ($isBarangayIdRequest) {
+        $barangayIdSettings = dms_resolve_barangay_id_operational_settings($conn);
+        $defaultBarangayIdValidityMonths = (int)($barangayIdSettings['default_validity_months'] ?? 0);
+        if (!in_array($defaultBarangayIdValidityMonths, [3, 6, 12, 24, 36, 48, 60], true)) {
+            $defaultBarangayIdValidityMonths = max(1, min(5, (int)($barangayIdSettings['default_validity_years'] ?? 2))) * 12;
+        }
+    }
     $defaultValidity = $isBarangayIdRequest
-        ? date('Y-m-d H:i:s', strtotime('+2 years'))
+        ? date('Y-m-d H:i:s', strtotime('+' . $defaultBarangayIdValidityMonths . ' months'))
         : date('Y-m-d H:i:s', strtotime('+' . max(1, min(365, (int)($issuanceSettings['default_validity_days'] ?? 45))) . ' days'));
 
     $setIfColumn = function (string $column, string $type, $value) use (&$values, &$types, &$params, $conn) {

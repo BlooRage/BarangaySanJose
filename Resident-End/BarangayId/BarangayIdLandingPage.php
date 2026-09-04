@@ -61,7 +61,7 @@ if ($notice === 'lost_reported') {
         'tone' => 'success',
         'icon' => 'fa-solid fa-circle-check',
         'title' => 'Barangay ID tagged as lost',
-        'body' => 'You can now submit a replacement Barangay ID request. The replacement will receive a fresh 2-year validity once released.',
+        'body' => 'You can now submit a replacement Barangay ID request. The replacement will receive a fresh validity period once released.',
     ];
 } elseif ($notice === 'lost_error') {
     $flash = [
@@ -76,13 +76,6 @@ if ($notice === 'lost_reported') {
         'icon' => 'fa-solid fa-hourglass-half',
         'title' => 'A new Barangay ID request is not available yet',
         'body' => 'Residents can only renew within the 3-month renewal window, or request a replacement after tagging the current ID as lost.',
-    ];
-} elseif ($notice === 'online_application_disabled') {
-    $flash = [
-        'tone' => 'warning',
-        'icon' => 'fa-solid fa-lock',
-        'title' => 'Online Barangay ID applications are disabled',
-        'body' => 'Please visit the barangay office for new, renewal, or replacement Barangay ID applications.',
     ];
 }
 
@@ -115,7 +108,7 @@ if ($pendingRequestId !== '') {
     $heroBadgeText = 'Renewal window open';
     $heroBadgeIcon = 'fa-solid fa-arrows-rotate';
     $actionTitle = 'Renew your Barangay ID';
-    $actionBody = 'Your Barangay ID is already within the renewal window. Submit a renewal request for a fresh 2-year validity.';
+    $actionBody = 'Your Barangay ID is already within the renewal window. Submit a renewal request for a fresh validity period.';
 } elseif (($barangayIdState['block_reason'] ?? '') === 'active_valid') {
     $heroBadgeText = 'Currently active';
     $heroBadgeIcon = 'fa-solid fa-shield-halved';
@@ -124,9 +117,9 @@ if ($pendingRequestId !== '') {
 }
 
 if (!$onlineApplicationEnabled && $pendingRequestId === '' && (bool)($barangayIdState['can_submit_new_request'] ?? false)) {
-    $heroBadgeText = 'Online applications disabled';
+    $heroBadgeText = 'Office application';
     $heroBadgeIcon = 'fa-solid fa-lock';
-    $actionTitle = 'Online Barangay ID applications are currently disabled';
+    $actionTitle = 'Barangay ID applications are handled at the office';
     $actionBody = 'Please visit the barangay office for new, renewal, or replacement Barangay ID applications.';
 }
 
@@ -137,7 +130,7 @@ if ($daysUntilExpiry !== null && $daysUntilExpiry >= 0 && $pendingRequestId === 
     $actionMeta[] = '<i class="fa-solid fa-hourglass-half"></i>' . htmlspecialchars((string)$daysUntilExpiry, ENT_QUOTES, 'UTF-8') . ' day' . ($daysUntilExpiry === 1 ? '' : 's') . ' until expiry';
 }
 if ($pendingRequestId === '' && $hasIssuedBarangayId) {
-    $actionMeta[] = '<i class="fa-solid fa-calendar-plus"></i>Approved Barangay IDs receive a fresh 2-year validity.';
+    $actionMeta[] = '<i class="fa-solid fa-calendar-plus"></i>Approved Barangay IDs receive a fresh validity period.';
 }
 $displayActionMeta = array_slice($actionMeta, 0, 2);
 $showRequestsButton = $pendingRequestId !== '';

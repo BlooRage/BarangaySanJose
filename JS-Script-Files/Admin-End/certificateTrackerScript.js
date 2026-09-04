@@ -690,14 +690,27 @@
     return formatDateInputValue(date);
   }
 
+  function addMonthsDateInputValue(months, baseDate = new Date()) {
+    const date = baseDate instanceof Date && !Number.isNaN(baseDate.getTime())
+      ? new Date(baseDate.getTime())
+      : new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setMonth(date.getMonth() + Number(months || 0));
+    return formatDateInputValue(date);
+  }
+
   function certificateDefaultValidityDate(baseDate = new Date()) {
     const configuredDays = Number.parseInt(String(window.ISSUANCE_SETTINGS?.default_validity_days || '45'), 10);
     return addDaysDateInputValue(Math.max(1, Math.min(365, configuredDays || 45)), baseDate);
   }
 
   function barangayIdDefaultValidityDate(baseDate = new Date()) {
+    const configuredMonths = Number.parseInt(String(window.BARANGAY_ID_SETTINGS?.default_validity_months || ''), 10);
+    if ([3, 6, 12, 24, 36, 48, 60].includes(configuredMonths)) {
+      return addMonthsDateInputValue(configuredMonths, baseDate);
+    }
     const configuredYears = Number.parseInt(String(window.BARANGAY_ID_SETTINGS?.default_validity_years || '2'), 10);
-    return addYearsDateInputValue(Math.max(1, Math.min(5, configuredYears || 2)), baseDate);
+    return addMonthsDateInputValue(Math.max(1, Math.min(5, configuredYears || 2)) * 12, baseDate);
   }
 
   function certificateValidityPresets(baseDate = new Date()) {
@@ -714,11 +727,11 @@
   }
 
   function barangayIdValidityPresets(baseDate = new Date()) {
-    return [1, 2, 3, 4, 5].map((years) => ({
-      value: addYearsDateInputValue(years, baseDate),
-      label: `${years} ${years === 1 ? 'year' : 'years'}`,
-      amount: years,
-      unit: 'years'
+    return [3, 6, 12, 24, 36, 48, 60].map((months) => ({
+      value: addMonthsDateInputValue(months, baseDate),
+      label: months < 12 ? `${months} months` : `${months / 12} ${months === 12 ? 'year' : 'years'}`,
+      amount: months,
+      unit: 'months'
     }));
   }
 
@@ -837,7 +850,7 @@
     const normalized = normalizeDateInputValue(value, '');
     if (!normalized) {
       return {
-        label: kind === 'barangay_id' ? 'Default: 2 years after approval' : 'Default: 45 days after approval',
+        label: kind === 'barangay_id' ? 'Default validity after approval' : 'Default: 45 days after approval',
         dateText: '',
       };
     }
@@ -889,7 +902,7 @@
     }
     if (helpEl) {
       helpEl.textContent = kind === 'barangay_id'
-        ? 'Choose the Barangay ID validity period: 1 to 5 years.'
+        ? 'Choose the Barangay ID validity period: 3 months to 5 years.'
         : `Choose the certificate validity period: ${certificateValidityPresets().map((item) => item.amount).join(', ')} days.`;
     }
     return populateValiditySelect(selectEl, kind, selectedValue);
@@ -3344,7 +3357,7 @@
       'government_position_detail', 'government_official_other', 'government_office', 'government_position', 'government_official',
       'institution_name', 'institution_person', 'institution_position',
       'request_officer_line1', 'request_officer_line2', 'request_officer_line3',
-      'document_validity', 'barangay_id_valid_until', 'valid_until', 'barangay_id_validity_years',
+      'document_validity', 'barangay_id_valid_until', 'valid_until', 'barangay_id_validity_months', 'barangay_id_validity_years',
       'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
       '_preview_business_approval_type', 'business_approval_type', 'businessApprovalType',
       '_preview_plate_number', 'plate_number', 'business_plate_number', 'vehicle_plate_number',
@@ -11060,7 +11073,10 @@
             payload.barangay_id_valid_until = validityDate;
             const matchedPreset = validityPresetByValue(validityKind, validityDate);
             if (matchedPreset?.amount) {
-              payload.barangay_id_validity_years = String(matchedPreset.amount);
+              payload.barangay_id_validity_months = String(matchedPreset.amount);
+              if (matchedPreset.amount % 12 === 0) {
+                payload.barangay_id_validity_years = String(matchedPreset.amount / 12);
+              }
             }
           }
         }

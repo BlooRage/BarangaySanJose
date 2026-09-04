@@ -56,6 +56,10 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       gap: 1.25rem;
       align-items: start;
     }
+    .document-settings-layout > *,
+    .document-settings-signatory-grid > * {
+      min-width: 0;
+    }
     .document-settings-card,
     .document-settings-panel {
       border: 1px solid rgba(15, 23, 42, 0.08);
@@ -156,7 +160,7 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
     }
     .document-settings-signatory-grid {
       display: grid;
-      grid-template-columns: minmax(300px, 1fr) minmax(300px, 0.75fr);
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 0.75fr);
       gap: 1.25rem;
       align-items: start;
     }
@@ -199,6 +203,13 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       color: #667085;
       font-size: 0.86rem;
       margin: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .document-settings-preview-note strong {
+      display: inline;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .document-settings-text-preview {
       border-top: 1px solid #e2e8f0;
@@ -227,6 +238,10 @@ $documentSettingsPrintHeaderEnabled = !isset($documentSettingsPrintHeaderEnabled
       justify-content: flex-end;
       gap: 0.75rem;
       flex-wrap: wrap;
+    }
+    .document-settings-actions .btn {
+      max-width: 100%;
+      white-space: normal;
     }
     .document-settings-help-list {
       padding-left: 1.1rem;

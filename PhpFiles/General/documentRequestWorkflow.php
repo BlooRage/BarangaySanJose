@@ -1061,13 +1061,18 @@ function dr_barangay_id_is_legacy_one_year_valid_until(DateTimeImmutable $resolv
 }
 
 function dr_barangay_id_has_explicit_validity_selection(array $payload): bool {
+    $months = (int)($payload['barangay_id_validity_months'] ?? 0);
+    if (in_array($months, [3, 6, 12, 24, 36, 48, 60], true)) {
+        return true;
+    }
+
     $years = (int)($payload['barangay_id_validity_years'] ?? 0);
-    if (in_array($years, [1, 2, 3], true)) {
+    if (in_array($years, [1, 2, 3, 4, 5], true)) {
         return true;
     }
 
     $option = strtolower(trim((string)($payload['barangay_id_validity_option'] ?? '')));
-    if (in_array($option, ['1_year', '2_years', '3_years', '1', '2', '3'], true)) {
+    if (in_array($option, ['3_months', '6_months', '1_year', '2_years', '3_years', '4_years', '5_years', '3m', '6m', '1', '2', '3', '4', '5'], true)) {
         return true;
     }
 
@@ -1098,12 +1103,17 @@ function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmuta
         }
     }
 
-    if ($policyValidUntil instanceof DateTimeImmutable) {
-        return $policyValidUntil;
+    $storedValidity = dr_parse_datetime_value((string)($requestRow['document_validity'] ?? ''), true);
+    if ($storedValidity instanceof DateTimeImmutable) {
+        if ($policyValidUntil instanceof DateTimeImmutable
+            && !$hasExplicitSelection
+            && dr_barangay_id_is_legacy_one_year_valid_until($storedValidity, $issuedAt)) {
+            return $policyValidUntil;
+        }
+        return $storedValidity;
     }
 
-    $storedValidity = dr_parse_datetime_value((string)($requestRow['document_validity'] ?? ''), true);
-    return $storedValidity instanceof DateTimeImmutable ? $storedValidity : null;
+    return $policyValidUntil instanceof DateTimeImmutable ? $policyValidUntil : null;
 }
 
 function dr_resident_barangay_id_state(mysqli $conn, string $residentUserId, string $residentId = ''): array {

@@ -384,7 +384,7 @@ function dra_validity_datetime_from_offset(int $amount, string $unit, ?string $b
 {
     $amount = max(0, $amount);
     $unit = strtolower(trim($unit));
-    if ($amount <= 0 || !in_array($unit, ['day', 'days', 'year', 'years'], true)) {
+    if ($amount <= 0 || !in_array($unit, ['day', 'days', 'month', 'months', 'year', 'years'], true)) {
         return null;
     }
 
@@ -398,6 +398,9 @@ function dra_validity_datetime_from_offset(int $amount, string $unit, ?string $b
 
     if ($unit === 'day' || $unit === 'days') {
         return $base->modify('+' . $amount . ' days')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+    }
+    if ($unit === 'month' || $unit === 'months') {
+        return $base->modify('+' . $amount . ' months')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
     }
 
     return $base->modify('+' . $amount . ' years')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
@@ -415,11 +418,11 @@ function dra_normalize_validity_selection_input(?string $rawValue, ?string $base
         return $directDate;
     }
 
-    if (preg_match('/^(days|years):(\d{1,4})$/i', $rawValue, $matches)) {
+    if (preg_match('/^(days|months|years):(\d{1,4})$/i', $rawValue, $matches)) {
         return dra_validity_datetime_from_offset((int)$matches[2], strtolower($matches[1]), $baseDateTime);
     }
 
-    if (preg_match('/^(\d{1,4})\s*(day|days|year|years)$/i', $rawValue, $matches)) {
+    if (preg_match('/^(\d{1,4})\s*(day|days|month|months|year|years)$/i', $rawValue, $matches)) {
         return dra_validity_datetime_from_offset((int)$matches[1], strtolower($matches[2]), $baseDateTime);
     }
 
@@ -466,13 +469,16 @@ function dra_default_barangay_id_validity_datetime(?string $baseDateTime = null)
         $base = new DateTimeImmutable(dr_now());
     }
 
-    $years = 2;
+    $months = 24;
     global $conn;
     if ($conn instanceof mysqli && function_exists('dms_resolve_barangay_id_operational_settings')) {
         $settings = dms_resolve_barangay_id_operational_settings($conn);
-        $years = max(1, min(5, (int)($settings['default_validity_years'] ?? 2)));
+        $months = (int)($settings['default_validity_months'] ?? 0);
+        if (!in_array($months, [3, 6, 12, 24, 36, 48, 60], true)) {
+            $months = max(1, min(5, (int)($settings['default_validity_years'] ?? 2))) * 12;
+        }
     }
-    return $base->modify('+' . $years . ' years')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+    return $base->modify('+' . $months . ' months')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
 }
 
 function dra_resolve_certificate_validity_datetime(string $documentType, ?string $requestedValidity = null, ?string $existingValidity = null, ?string $baseDateTime = null): ?string
@@ -554,6 +560,12 @@ function dra_resolve_document_validity_datetime(string $documentType, ?string $r
 
 function dra_match_barangay_id_validity_years(?string $validityValue, ?string $baseDateTime = null): ?int
 {
+    $months = dra_match_barangay_id_validity_months($validityValue, $baseDateTime);
+    return $months !== null && $months % 12 === 0 ? (int)($months / 12) : null;
+}
+
+function dra_match_barangay_id_validity_months(?string $validityValue, ?string $baseDateTime = null): ?int
+{
     $resolvedValidity = dra_normalize_validity_selection_input($validityValue, $baseDateTime);
     if ($resolvedValidity === null) {
         $parsed = dr_parse_datetime_value((string)$validityValue, true);
@@ -563,10 +575,10 @@ function dra_match_barangay_id_validity_years(?string $validityValue, ?string $b
         return null;
     }
 
-    foreach ([1, 2, 3, 4, 5] as $years) {
-        $candidate = dra_validity_datetime_from_offset($years, 'years', $baseDateTime);
+    foreach ([3, 6, 12, 24, 36, 48, 60] as $months) {
+        $candidate = dra_validity_datetime_from_offset($months, 'months', $baseDateTime);
         if ($candidate !== null && substr($candidate, 0, 10) === substr($resolvedValidity, 0, 10)) {
-            return $years;
+            return $months;
         }
     }
 
@@ -2540,8 +2552,9 @@ function dra_barangay_id_generated_valid_until(array $payload, DateTimeInterface
         return strtoupper($candidate);
     }
 
-    $validUntil = DateTimeImmutable::createFromInterface($issuedDateObj)->modify('+2 years');
-    return strtoupper($validUntil->format('m/d/Y'));
+    $validUntil = dra_default_barangay_id_validity_datetime(DateTimeImmutable::createFromInterface($issuedDateObj)->format('Y-m-d H:i:s'));
+    $validUntilDate = dr_parse_datetime_value($validUntil, true);
+    return strtoupper(($validUntilDate instanceof DateTimeImmutable ? $validUntilDate : DateTimeImmutable::createFromInterface($issuedDateObj)->modify('+2 years'))->format('m/d/Y'));
 }
 
 function dra_persist_request_payload(mysqli $conn, string $requestId, array &$requestRow, array $payload): void
@@ -8113,6 +8126,10 @@ if ($action === 'create_manual_request') {
         $payload['document_validity'] = substr($resolvedManualDocumentValidity, 0, 10);
         if (dr_is_barangay_id_document_type($documentType)) {
             $payload['barangay_id_valid_until'] = $resolvedManualDocumentValidity;
+            $matchedBarangayIdMonths = dra_match_barangay_id_validity_months($resolvedManualDocumentValidity, $now);
+            if ($matchedBarangayIdMonths !== null) {
+                $payload['barangay_id_validity_months'] = $matchedBarangayIdMonths;
+            }
             $matchedBarangayIdYears = dra_match_barangay_id_validity_years($resolvedManualDocumentValidity, $now);
             if ($matchedBarangayIdYears !== null) {
                 $payload['barangay_id_validity_years'] = $matchedBarangayIdYears;
@@ -9356,6 +9373,10 @@ if ($action === 'personnel_approve') {
         $payloadPatch = [
             'barangay_id_valid_until' => (string)$patch['document_validity'],
         ];
+        $matchedBarangayIdMonths = dra_match_barangay_id_validity_months((string)$patch['document_validity'], (string)($patch['personnel_decision_at'] ?? dr_now()));
+        if ($matchedBarangayIdMonths !== null) {
+            $payloadPatch['barangay_id_validity_months'] = $matchedBarangayIdMonths;
+        }
         $matchedBarangayIdYears = dra_match_barangay_id_validity_years((string)$patch['document_validity'], (string)($patch['personnel_decision_at'] ?? dr_now()));
         if ($matchedBarangayIdYears !== null) {
             $payloadPatch['barangay_id_validity_years'] = $matchedBarangayIdYears;

@@ -76,7 +76,7 @@ $residentId = trim((string)($residentinformationtbl['resident_id'] ?? ''));
 $barangayIdState = dr_resident_barangay_id_state($conn, $userId, $residentId);
 $barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
 if (empty($barangayIdOperationalSettings['online_application_enabled'])) {
-    header('Location: ' . appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php?notice=online_application_disabled'));
+    header('Location: ' . appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php'));
     exit;
 }
 if (!($barangayIdState['can_submit_new_request'] ?? false)) {
@@ -112,8 +112,8 @@ $formContext = [
     'renewal' => [
         'title' => 'Renew Barangay ID',
         'subtitle' => $validUntilDisplay !== ''
-            ? 'Your current Barangay ID is now within the renewal window. Once approved, the renewed ID will receive a fresh 2-year validity from its new issue date.'
-            : 'Your current Barangay ID is now eligible for renewal. Once approved, the renewed ID will receive a fresh 2-year validity from its new issue date.',
+            ? 'Your current Barangay ID is now within the renewal window. Once approved, the renewed ID will receive a fresh validity period from its new issue date.'
+            : 'Your current Barangay ID is now eligible for renewal. Once approved, the renewed ID will receive a fresh validity period from its new issue date.',
         'purpose' => 'Barangay ID Renewal',
         'submit_label' => 'SUBMIT RENEWAL',
         'badge' => 'Renewal',
@@ -121,7 +121,7 @@ $formContext = [
     ],
     'replacement_lost' => [
         'title' => 'Replacement for Lost Barangay ID',
-        'subtitle' => 'Your previous Barangay ID is marked as lost. Submit this replacement request to receive a new Barangay ID with a fresh 2-year validity once released.',
+        'subtitle' => 'Your previous Barangay ID is marked as lost. Submit this replacement request to receive a new Barangay ID with a fresh validity period once released.',
         'purpose' => 'Barangay ID Replacement (Lost)',
         'submit_label' => 'SUBMIT REPLACEMENT',
         'badge' => 'Lost Replacement',
