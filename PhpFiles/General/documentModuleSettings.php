@@ -1261,6 +1261,9 @@ if (!function_exists('dms_ensure_module_template_config_table')) {
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'digital_id_enabled')) {
             $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER sample_data_json");
         }
+        if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'online_application_enabled')) {
+            $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN online_application_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER sample_data_json");
+        }
         if (!dms_db_column_exists($conn, 'documentmoduleconfigtbl', 'digital_id_has_signature')) {
             $conn->query("ALTER TABLE documentmoduleconfigtbl ADD COLUMN digital_id_has_signature TINYINT(1) NOT NULL DEFAULT 1 AFTER digital_id_enabled");
         }
@@ -1304,6 +1307,7 @@ if (!function_exists('dms_fetch_module_template_config_row')) {
                 template_back_blob,
                 layout_json,
                 sample_data_json,
+                online_application_enabled,
                 digital_id_enabled,
                 digital_id_has_signature,
                 printed_id_has_signature,
@@ -1407,6 +1411,7 @@ if (!function_exists('dms_resolve_barangay_id_operational_settings')) {
     {
         $stored = dms_fetch_module_template_config_row($conn, 'barangay_id');
         return [
+            'online_application_enabled' => !array_key_exists('online_application_enabled', $stored) || (int)$stored['online_application_enabled'] === 1,
             'digital_id_enabled' => !array_key_exists('digital_id_enabled', $stored) || (int)$stored['digital_id_enabled'] === 1,
             'digital_id_has_signature' => !array_key_exists('digital_id_has_signature', $stored) || (int)$stored['digital_id_has_signature'] === 1,
             'printed_id_has_signature' => !array_key_exists('printed_id_has_signature', $stored) || (int)$stored['printed_id_has_signature'] === 1,
@@ -1485,6 +1490,7 @@ if (!function_exists('dms_save_barangay_id_operational_settings')) {
     {
         dms_ensure_module_template_config_table($conn);
         $before = dms_resolve_barangay_id_operational_settings($conn);
+        $onlineApplicationEnabled = !empty($post['online_application_enabled']) ? 1 : 0;
         $enabled = !empty($post['digital_id_enabled']) ? 1 : 0;
         $hasSignature = !empty($post['digital_id_has_signature']) ? 1 : 0;
         $printedHasSignature = !empty($post['printed_id_has_signature']) ? 1 : 0;
@@ -1494,9 +1500,10 @@ if (!function_exists('dms_save_barangay_id_operational_settings')) {
         $moduleKey = 'barangay_id';
         $stmt = $conn->prepare("
             INSERT INTO documentmoduleconfigtbl
-                (module_key, digital_id_enabled, digital_id_has_signature, printed_id_has_signature, digital_id_capture_disabled, deactivate_previous_digital_id, default_validity_years, updated_by_user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (module_key, online_application_enabled, digital_id_enabled, digital_id_has_signature, printed_id_has_signature, digital_id_capture_disabled, deactivate_previous_digital_id, default_validity_years, updated_by_user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
+                online_application_enabled = VALUES(online_application_enabled),
                 digital_id_enabled = VALUES(digital_id_enabled),
                 digital_id_has_signature = VALUES(digital_id_has_signature),
                 printed_id_has_signature = VALUES(printed_id_has_signature),
@@ -1509,7 +1516,7 @@ if (!function_exists('dms_save_barangay_id_operational_settings')) {
         if (!$stmt) {
             throw new RuntimeException('Failed to prepare Barangay ID settings update.');
         }
-        $stmt->bind_param('siiiiiis', $moduleKey, $enabled, $hasSignature, $printedHasSignature, $captureDisabled, $deactivatePrevious, $validityYears, $updatedByUserId);
+        $stmt->bind_param('siiiiiiis', $moduleKey, $onlineApplicationEnabled, $enabled, $hasSignature, $printedHasSignature, $captureDisabled, $deactivatePrevious, $validityYears, $updatedByUserId);
         $stmt->execute();
         $stmt->close();
         return ['before' => $before, 'after' => dms_resolve_barangay_id_operational_settings($conn)];

@@ -2,6 +2,7 @@
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/General/documentRequestWorkflow.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
 $userId = (string)($_SESSION['user_id'] ?? '');
 $residentId = (isset($conn) && $conn instanceof mysqli && $userId !== '')
     ? (string)(dr_get_resident_id($conn, $userId) ?? '')
@@ -23,6 +24,10 @@ $barangayIdState = (isset($conn) && $conn instanceof mysqli)
         'renewal_available_on' => '',
         'block_reason' => '',
     ];
+$barangayIdOperationalSettings = (isset($conn) && $conn instanceof mysqli)
+    ? dms_resolve_barangay_id_operational_settings($conn)
+    : ['online_application_enabled' => true];
+$onlineApplicationEnabled = (bool)($barangayIdOperationalSettings['online_application_enabled'] ?? true);
 $latestDigitalIdRequestId = trim((string)($barangayIdState['latest_completed_request_id'] ?? ''));
 $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
     ? appUrl('Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($latestDigitalIdRequestId))
@@ -72,6 +77,13 @@ if ($notice === 'lost_reported') {
         'title' => 'A new Barangay ID request is not available yet',
         'body' => 'Residents can only renew within the 3-month renewal window, or request a replacement after tagging the current ID as lost.',
     ];
+} elseif ($notice === 'online_application_disabled') {
+    $flash = [
+        'tone' => 'warning',
+        'icon' => 'fa-solid fa-lock',
+        'title' => 'Online Barangay ID applications are disabled',
+        'body' => 'Please visit the barangay office for new, renewal, or replacement Barangay ID applications.',
+    ];
 }
 
 $heroBadgeText = 'Application ready';
@@ -111,6 +123,13 @@ if ($pendingRequestId !== '') {
     $actionBody = 'Your current Barangay ID is still active. New requests stay locked until the renewal window opens, unless you report this ID as lost.';
 }
 
+if (!$onlineApplicationEnabled && $pendingRequestId === '' && (bool)($barangayIdState['can_submit_new_request'] ?? false)) {
+    $heroBadgeText = 'Online applications disabled';
+    $heroBadgeIcon = 'fa-solid fa-lock';
+    $actionTitle = 'Online Barangay ID applications are currently disabled';
+    $actionBody = 'Please visit the barangay office for new, renewal, or replacement Barangay ID applications.';
+}
+
 if ($validUntilLabel !== '') {
     $actionMeta[] = '<i class="fa-solid fa-calendar-check"></i>Valid until: ' . htmlspecialchars($validUntilLabel, ENT_QUOTES, 'UTF-8');
 }
@@ -122,7 +141,7 @@ if ($pendingRequestId === '' && $hasIssuedBarangayId) {
 }
 $displayActionMeta = array_slice($actionMeta, 0, 2);
 $showRequestsButton = $pendingRequestId !== '';
-$showApplyButton = !$showRequestsButton && (bool)($barangayIdState['can_submit_new_request'] ?? false);
+$showApplyButton = $onlineApplicationEnabled && !$showRequestsButton && (bool)($barangayIdState['can_submit_new_request'] ?? false);
 $showDigitalButton = $digitalIdViewUrl !== '';
 $showLostButton = (bool)($barangayIdState['can_report_lost'] ?? false);
 $hasActionButtons = $showRequestsButton || $showApplyButton || $showDigitalButton || $showLostButton;

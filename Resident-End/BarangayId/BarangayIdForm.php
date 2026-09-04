@@ -19,6 +19,7 @@ $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 require_once __DIR__ . "/../../PhpFiles/General/documentRequestWorkflow.php";
+require_once __DIR__ . "/../../PhpFiles/General/documentModuleSettings.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $data = getResidentProfileData($conn, $userId);
@@ -73,6 +74,11 @@ $fullAddress = implode(', ', array_filter([
 
 $residentId = trim((string)($residentinformationtbl['resident_id'] ?? ''));
 $barangayIdState = dr_resident_barangay_id_state($conn, $userId, $residentId);
+$barangayIdOperationalSettings = dms_resolve_barangay_id_operational_settings($conn);
+if (empty($barangayIdOperationalSettings['online_application_enabled'])) {
+    header('Location: ' . appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php?notice=online_application_disabled'));
+    exit;
+}
 if (!($barangayIdState['can_submit_new_request'] ?? false)) {
     header('Location: ' . appUrl('/Resident-End/BarangayId/BarangayIdLandingPage.php?notice=request_not_allowed'));
     exit;

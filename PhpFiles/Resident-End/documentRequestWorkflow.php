@@ -1184,6 +1184,13 @@ if ($action === 'submit_request') {
     $documentTypeToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
     $isBarangayIdRequest = dr_is_barangay_id_document_type($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
     if ($isBarangayIdRequest) {
+        if (empty(dms_resolve_barangay_id_operational_settings($conn)['online_application_enabled'])) {
+            if (dr_wants_html_redirect()) {
+                dr_redirect_to_barangay_id_landing('online_application_disabled');
+            }
+            dr_respond_json(503, ['success' => false, 'message' => 'Online Barangay ID applications are temporarily disabled. Please visit the barangay office.']);
+        }
+
         $barangayIdState = dr_resident_barangay_id_state($conn, $residentForeignId, $residentId);
         if (!($barangayIdState['can_submit_new_request'] ?? false)) {
             $message = 'You cannot submit a new Barangay ID request right now.';
