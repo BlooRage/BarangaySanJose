@@ -7901,7 +7901,6 @@ if ($action === 'create_manual_request') {
     $basicManualFields = [
         'last_name' => 'Last Name',
         'first_name' => 'First Name',
-        'contact_number' => 'Contact Number',
         'area_number' => 'Area Number',
     ];
     if (!$isClearanceDoc) {

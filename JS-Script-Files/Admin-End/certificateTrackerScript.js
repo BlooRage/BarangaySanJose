@@ -9052,7 +9052,7 @@
         return false;
       }
       const currentPanels = manualIdWizardPanels.filter(
-        (panel) => manualPanelStep(panel) === manualIdWizardCurrentStep
+        (panel) => manualPanelStep(panel) === manualIdWizardCurrentStep && !panel.classList.contains('d-none')
       );
       const invalidField = currentPanels
         .flatMap((panel) => Array.from(panel.querySelectorAll('input, select, textarea')))
@@ -10415,7 +10415,7 @@
       manualBirthdateRequiredMark?.classList.toggle('d-none', isClearance);
       if (manualSex) manualSex.required = !isClearance;
       if (manualCivilStatus) manualCivilStatus.required = !isClearance;
-      if (manualContactNumber) manualContactNumber.required = true;
+      if (manualContactNumber) manualContactNumber.required = !isClearance;
       if (manualBirthplace) manualBirthplace.required = !isClearance;
       manualBirthplaceRequiredMark?.classList.toggle('d-none', isClearance);
       const hideSupplementalPersonalFields = isClearance;

@@ -3331,7 +3331,7 @@ if ($certificateLaunchStage === 'release') {
                     <option value="Separated">Separated</option>
                   </select>
                 </div>
-                <div class="col-md-6 col-lg-3">
+                <div class="col-md-6 col-lg-3" data-manual-hide-for-clearance-field>
                   <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number <span class="text-danger">*</span></label>
                   <input type="text" id="manualContactNumber" class="form-control" placeholder="09XXXXXXXXX">
                 </div>
