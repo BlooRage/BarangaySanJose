@@ -7875,6 +7875,14 @@ if ($action === 'create_manual_request') {
     $isBarangayIdDocument = dr_is_barangay_id_document_type($documentType);
     $isClearanceDoc = dr_is_clearance_document_type($documentType);
     if ($isClearanceDoc) {
+        $payload['birthdate'] = '';
+        $payload['date_of_birth'] = '';
+        $payload['birthDate'] = '';
+        $payload['sex'] = '';
+        $payload['gender'] = '';
+        $payload['civil_status'] = '';
+        $payload['birthplace'] = '';
+        $payload['place_of_birth'] = '';
         $payload['occupation'] = '';
         $payload['religion'] = '';
         $payload['sector_membership'] = '';
@@ -7890,16 +7898,21 @@ if ($action === 'create_manual_request') {
         }
     };
 
-    $requireManualPayloadFields([
+    $basicManualFields = [
         'last_name' => 'Last Name',
         'first_name' => 'First Name',
-        'birthdate' => 'Birthdate',
-        'sex' => 'Sex',
-        'civil_status' => 'Civil Status',
         'contact_number' => 'Contact Number',
-        'birthplace' => 'Birthplace',
         'area_number' => 'Area Number',
-    ]);
+    ];
+    if (!$isClearanceDoc) {
+        $basicManualFields = array_merge($basicManualFields, [
+            'birthdate' => 'Birthdate',
+            'sex' => 'Sex',
+            'civil_status' => 'Civil Status',
+            'birthplace' => 'Birthplace',
+        ]);
+    }
+    $requireManualPayloadFields($basicManualFields);
     if (!$isBarangayIdDocument && !$isClearanceDoc) {
         $requireManualPayloadFields([
             'occupation' => 'Occupation',

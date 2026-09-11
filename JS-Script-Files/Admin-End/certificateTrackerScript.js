@@ -8584,7 +8584,6 @@
     const manualPersonalInfoHint = document.getElementById('manualPersonalInfoHint');
     const manualFeeWrap = document.getElementById('manualFeeWrap');
     const manualFeeList = document.getElementById('manualFeeList');
-    const manualFeeAddCustomBtn = document.getElementById('manualFeeAddCustomBtn');
     const manualFeeTotal = document.getElementById('manualFeeTotal');
     const manualSectorMembershipWrap = document.getElementById('manualSectorMembershipWrap');
     const manualSupplementalPersonalFields = Array.from(manualPanel.querySelectorAll('[data-manual-hide-for-clearance-field]'));
@@ -10399,30 +10398,32 @@
     function manualApplyCommonFieldRequirements(config) {
       const fields = manualFieldDefinitions(config);
       const fieldRequired = (name) => fields.some((field) => field?.name === name && field.required);
+      const isClearance = manualIsClearanceConfig(config);
       if (!isIdIssuanceTrackerView) {
         if (manualPersonalInfoTitle) {
-          manualPersonalInfoTitle.textContent = manualIsClearanceConfig(config)
+          manualPersonalInfoTitle.textContent = isClearance
             ? '2. Requester Information'
             : '2. Personal Basic Information';
         }
         if (manualPersonalInfoHint) {
-          manualPersonalInfoHint.textContent = manualIsClearanceConfig(config)
+          manualPersonalInfoHint.textContent = isClearance
             ? 'Enter only the requester details needed to process this clearance.'
             : 'Enter the resident details exactly as they should appear on the certificate.';
         }
       }
-      if (manualBirthdate) manualBirthdate.required = true;
-      manualBirthdateRequiredMark?.classList.remove('d-none');
-      if (manualSex) manualSex.required = true;
-      if (manualCivilStatus) manualCivilStatus.required = true;
+      if (manualBirthdate) manualBirthdate.required = !isClearance;
+      manualBirthdateRequiredMark?.classList.toggle('d-none', isClearance);
+      if (manualSex) manualSex.required = !isClearance;
+      if (manualCivilStatus) manualCivilStatus.required = !isClearance;
       if (manualContactNumber) manualContactNumber.required = true;
-      if (manualBirthplace) manualBirthplace.required = true;
-      manualBirthplaceRequiredMark?.classList.remove('d-none');
-      const hideSupplementalPersonalFields = isIdIssuanceTrackerView || manualIsClearanceConfig(config);
+      if (manualBirthplace) manualBirthplace.required = !isClearance;
+      manualBirthplaceRequiredMark?.classList.toggle('d-none', isClearance);
+      const hideSupplementalPersonalFields = isClearance;
       manualSupplementalPersonalFields.forEach((wrapper) => {
         wrapper.classList.toggle('d-none', hideSupplementalPersonalFields);
         wrapper.querySelectorAll('input, select, textarea').forEach((field) => {
-          field.disabled = hideSupplementalPersonalFields;
+          field.disabled = hideSupplementalPersonalFields && field.id !== 'manualBarangay' && field.id !== 'manualCity' && field.id !== 'manualProvince';
+          if (hideSupplementalPersonalFields) field.required = false;
           if (hideSupplementalPersonalFields) manualSetFieldInvalidState(field, false);
         });
       });
@@ -10835,8 +10836,7 @@
         return;
       }
 
-      const previousRows = manualCurrentFeeRows();
-      const previous = new Map(previousRows.map((row) => [String(row.fee_name || '').toLowerCase(), row]));
+      const previousRowsBeforeLoad = manualCurrentFeeRows();
       manualFeeWrap.classList.toggle('d-none', !isIdIssuanceTrackerView && manualIdWizardCurrentStep !== 3);
       manualFeeList.innerHTML = `
         <div class="manual-search-empty">
@@ -10845,6 +10845,18 @@
       `;
       try {
         const feeTypes = await fetchFeeTypeCatalog();
+        const previousRows = [...previousRowsBeforeLoad];
+        manualCurrentFeeRows().forEach((row) => {
+          const rowKey = String(row?.fee_name || '').toLowerCase();
+          if (!rowKey) return;
+          const existingIndex = previousRows.findIndex((item) => String(item?.fee_name || '').toLowerCase() === rowKey);
+          if (existingIndex === -1) {
+            previousRows.push(row);
+          } else {
+            previousRows[existingIndex] = row;
+          }
+        });
+        const previous = new Map(previousRows.map((row) => [String(row.fee_name || '').toLowerCase(), row]));
         const catalogRows = Array.isArray(feeTypes) ? feeTypes : [];
         const catalogNames = new Set(catalogRows.map((feeType) => String(firstNonEmpty([feeType?.fee_name, 'Fee'])).trim().toLowerCase()).filter(Boolean));
         const catalogHtml = catalogRows.length ? catalogRows.map((feeType) => {
@@ -11181,6 +11193,13 @@
         sector_membership: config.clearance ? '' : manualCurrentSectorValues().join(', '),
       };
       if (config.clearance) {
+        payload.birthdate = '';
+        payload.date_of_birth = '';
+        payload.sex = '';
+        payload.gender = '';
+        payload.civil_status = '';
+        payload.birthplace = '';
+        payload.place_of_birth = '';
         payload.occupation = '';
         payload.religion = '';
       }
@@ -11583,7 +11602,9 @@
       manualUpdateFeeTotal();
       manualMarkPreviewStale(true);
     });
-    manualFeeAddCustomBtn?.addEventListener('click', () => {
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('#manualFeeAddCustomBtn')) return;
+      event.preventDefault();
       manualAddCustomFeeRow();
     });
     manualSectorMembershipWrap?.addEventListener('change', () => {
