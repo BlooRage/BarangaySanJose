@@ -248,7 +248,9 @@
     ]);
     const method = firstNonEmpty([row?.payment_method, isWalkInStage ? 'Barangay Walk-in' : 'GCash']);
     const docNameForPrompt = normalizeDocumentTypeDisplay(firstNonEmpty([row?.document_type, '-']));
-    const taggedFees = Array.isArray(feeRows) ? feeRows : [];
+    const taggedFees = Array.isArray(feeRows)
+      ? feeRows
+      : (Array.isArray(row?.clearance_fees) ? row.clearance_fees : []);
     const taggedTotal = taggedFees.length
       ? taggedFees.reduce((sum, fee) => sum + (Number(fee?.amount) || 0), 0)
       : null;
@@ -325,17 +327,19 @@
     const token = ++financeVerifySummaryToken;
     const isPendingVerification = !!options.isPendingVerification;
     const isWalkInStage = !!options.isWalkInStage;
-    const needsTaggedBreakdown = requestNeedsFeeTagging(row);
+    const shouldFetchTaggedBreakdown = requestRequiresFeeTagging(row) && requestId !== '';
+    const cachedFeeRows = Array.isArray(row?.clearance_fees) ? row.clearance_fees : null;
 
     actionPrompt.innerHTML = renderFinanceVerifyPrompt({
       row,
       isPendingVerification,
       isWalkInStage,
-      loadingBreakdown: needsTaggedBreakdown
+      feeRows: cachedFeeRows,
+      loadingBreakdown: shouldFetchTaggedBreakdown && !(cachedFeeRows && cachedFeeRows.length)
     });
     actionPrompt.classList.remove('d-none');
 
-    if (!needsTaggedBreakdown || !requestId) {
+    if (!shouldFetchTaggedBreakdown) {
       return;
     }
 
@@ -355,6 +359,11 @@
       if (hasTaggedBreakdown && actionAmount) {
         actionAmount.value = taggedTotal.toFixed(2);
       }
+      updateCachedRequestRecord(requestId, {
+        clearance_fees: feeRows,
+        clearance_fee_count: feeRows.length,
+        ...(hasTaggedBreakdown ? { fee_amount: taggedTotal } : {})
+      });
       if (hasTaggedBreakdown) {
         actionAmountWrap.classList.add('d-none');
         actionAmount.required = false;
