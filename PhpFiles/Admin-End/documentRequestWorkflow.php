@@ -7873,6 +7873,12 @@ if ($action === 'create_manual_request') {
 
     $documentToken = strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $documentType));
     $isBarangayIdDocument = dr_is_barangay_id_document_type($documentType);
+    $isClearanceDoc = dr_is_clearance_document_type($documentType);
+    if ($isClearanceDoc) {
+        $payload['occupation'] = '';
+        $payload['religion'] = '';
+        $payload['sector_membership'] = '';
+    }
     $requireManualPayloadFields = static function (array $requiredFields) use ($payload): void {
         foreach ($requiredFields as $field => $label) {
             if (trim((string)($payload[$field] ?? '')) === '') {
@@ -7894,7 +7900,7 @@ if ($action === 'create_manual_request') {
         'birthplace' => 'Birthplace',
         'area_number' => 'Area Number',
     ]);
-    if (!$isBarangayIdDocument) {
+    if (!$isBarangayIdDocument && !$isClearanceDoc) {
         $requireManualPayloadFields([
             'occupation' => 'Occupation',
             'religion' => 'Religion',
@@ -8051,7 +8057,6 @@ if ($action === 'create_manual_request') {
 
     $cleanFees = dra_manual_normalize_fee_rows(json_decode((string)($_POST['fees'] ?? '[]'), true));
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker(['document_type' => $documentType]);
-    $isClearanceDoc = dr_is_clearance_document_type($documentType);
     $hasManualSectorExemption = dra_manual_payload_has_certificate_payment_exemption($payload);
 
     $defaultFee = dr_get_effective_document_fee_amount($conn, $documentType, [

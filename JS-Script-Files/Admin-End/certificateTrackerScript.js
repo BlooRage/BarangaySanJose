@@ -470,9 +470,38 @@
     }
 
     html += `</tbody></table></div>`;
-    html += `<div class="d-flex justify-content-between align-items-center fw-bold border-top pt-2"><span>Total</span><span id="feeTaggingTotal" class="text-primary">₱0.00</span></div>`;
+    html += `<div class="mt-2">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="feeTaggingAddCustomBtn">
+        <i class="fas fa-plus me-1"></i>Add Custom Fee
+      </button>
+    </div>`;
+    html += `<div class="d-flex justify-content-between align-items-center fw-bold border-top mt-3 pt-2"><span>Total</span><span id="feeTaggingTotal" class="text-primary">₱0.00</span></div>`;
 
     return html;
+  }
+
+  function renderCustomFeeTaggingRow() {
+    return `<tr data-fee-row data-custom-fee-row class="fee-tag-option-row">
+      <td data-fee-toggle><input type="checkbox" class="fee-tag-check" checked></td>
+      <td><input type="text" class="form-control form-control-sm fee-tag-name-input" placeholder="Fee label"></td>
+      <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="0.00" min="0" step="0.01"></td>
+      <td class="text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger fee-tag-remove-custom" title="Remove custom fee" aria-label="Remove custom fee">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </td>
+    </tr>`;
+  }
+
+  function addCustomFeeTaggingRow() {
+    const tbody = document.getElementById('feeTaggingRows');
+    if (!tbody) return;
+    const emptyRow = tbody.querySelector('tr:not([data-fee-row])');
+    if (emptyRow) emptyRow.remove();
+    tbody.insertAdjacentHTML('beforeend', renderCustomFeeTaggingRow());
+    const row = tbody.querySelector('tr[data-custom-fee-row]:last-child');
+    row?.querySelector('.fee-tag-name-input')?.focus();
+    updateFeeTagTotal();
   }
 
   function syncFeeTagSelectAllState() {
@@ -501,6 +530,12 @@
     const tbody = document.getElementById('feeTaggingRows');
     if (tbody) {
       tbody.addEventListener('click', (event) => {
+        const removeBtn = event.target.closest('.fee-tag-remove-custom');
+        if (removeBtn && tbody.contains(removeBtn)) {
+          removeBtn.closest('tr[data-custom-fee-row]')?.remove();
+          updateFeeTagTotal();
+          return;
+        }
         const row = event.target.closest('tr[data-fee-row]');
         if (!row || !tbody.contains(row)) return;
         if (!event.target.closest('td[data-fee-toggle]')) return;
@@ -510,12 +545,16 @@
         checkbox.checked = !checkbox.checked;
         checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       });
+
+      tbody.addEventListener('input', (event) => {
+        if (event.target.matches('.fee-tag-amount, .fee-tag-check')) updateFeeTagTotal();
+      });
+      tbody.addEventListener('change', (event) => {
+        if (event.target.matches('.fee-tag-amount, .fee-tag-check')) updateFeeTagTotal();
+      });
     }
 
-    document.querySelectorAll('#feeTaggingRows .fee-tag-amount, #feeTaggingRows .fee-tag-check').forEach((el) => {
-      el.addEventListener('input', updateFeeTagTotal);
-      el.addEventListener('change', updateFeeTagTotal);
-    });
+    document.getElementById('feeTaggingAddCustomBtn')?.addEventListener('click', addCustomFeeTaggingRow);
 
     syncFeeTagSelectAllState();
     updateFeeTagTotal();
@@ -6932,6 +6971,8 @@
     const openPreviewOnSave = document.getElementById('feeTaggingMode')?.value === 'preview';
 
     const fees = [];
+    let firstInvalidRow = null;
+    const selectedNames = new Set();
     document.querySelectorAll('#feeTaggingRows tr[data-fee-row]').forEach((row) => {
       const check = row.querySelector('.fee-tag-check');
       if (!check || !check.checked) return;
@@ -6939,8 +6980,28 @@
       const nameEl = row.querySelector('.fee-tag-name') || row.querySelector('.fee-tag-name-input');
       const name = nameEl ? (nameEl.textContent || nameEl.value || '').trim() : '';
       const amt = parseFloat(row.querySelector('.fee-tag-amount')?.value || '0') || 0;
-      if (name) fees.push({ fee_name: name, amount: amt });
+      if (!name) {
+        firstInvalidRow = firstInvalidRow || row;
+        return;
+      }
+      const normalizedName = name.toLowerCase();
+      if (selectedNames.has(normalizedName)) {
+        firstInvalidRow = firstInvalidRow || row;
+        return;
+      }
+      selectedNames.add(normalizedName);
+      fees.push({ fee_name: name, amount: amt });
     });
+    if (firstInvalidRow) {
+      const nameInput = firstInvalidRow.querySelector('.fee-tag-name-input');
+      if (nameInput) {
+        nameInput.focus();
+        alert('Enter a unique fee label for each checked custom fee.');
+      } else {
+        alert('Each selected fee must have a unique label.');
+      }
+      return;
+    }
 
     const btn = document.getElementById('feeTaggingSubmitBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
@@ -8515,13 +8576,18 @@
     const manualOtherDocumentTemplate = document.getElementById('manualOtherDocumentTemplate');
     const manualPurposePresetWrap = document.getElementById('manualPurposePresetWrap');
     const manualPurposePreset = document.getElementById('manualPurposePreset');
+    const manualPurposeWrap = document.getElementById('manualPurposeWrap');
     const manualPurpose = document.getElementById('manualPurpose');
     const manualDynamicFields = document.getElementById('manualDynamicFields');
     const manualSpecificFieldsHint = document.getElementById('manualSpecificFieldsHint');
+    const manualPersonalInfoTitle = document.getElementById('manualPersonalInfoTitle');
+    const manualPersonalInfoHint = document.getElementById('manualPersonalInfoHint');
     const manualFeeWrap = document.getElementById('manualFeeWrap');
     const manualFeeList = document.getElementById('manualFeeList');
+    const manualFeeAddCustomBtn = document.getElementById('manualFeeAddCustomBtn');
     const manualFeeTotal = document.getElementById('manualFeeTotal');
     const manualSectorMembershipWrap = document.getElementById('manualSectorMembershipWrap');
+    const manualSupplementalPersonalFields = Array.from(manualPanel.querySelectorAll('[data-manual-hide-for-clearance-field]'));
     const manualSectorCheckboxes = Array.from(manualPanel.querySelectorAll('[data-manual-sector]'));
     const manualPreviewBtn = document.getElementById('manualPreviewBtn');
     const manualSubmitBtn = document.getElementById('manualSubmitBtn');
@@ -8655,6 +8721,7 @@
     let manualSelectedResident = null;
     let manualPreviewSignature = '';
     let manualResidentSearchToken = 0;
+    let manualCustomFeeCounter = 0;
     let manualBarangayIdPhotoMode = 'none';
     let manualBarangayIdPhotoCustomDataUrl = '';
     let manualBarangayIdPhotoResidentUrl = '';
@@ -8762,14 +8829,20 @@
       return Number(panel?.dataset?.manualStepPanel || panel?.dataset?.manualIdStepPanel || 0);
     }
 
+    function manualIsClearanceConfig(config = manualCurrentConfig()) {
+      return !!config?.clearance;
+    }
+
     function manualShowIdWizardStep(step, scroll = false) {
       if (!manualIdWizardPanels.length) return;
       const totalSteps = 5;
+      const config = manualCurrentConfig();
       manualIdWizardCurrentStep = Math.max(1, Math.min(totalSteps, Number(step) || 1));
       manualIdWizardPanels.forEach((panel) => {
         const matchesStep = manualPanelStep(panel) === manualIdWizardCurrentStep;
         const optionalClearance = panel.dataset.manualOptionalPanel === 'clearance';
-        panel.classList.toggle('d-none', !matchesStep || (optionalClearance && !manualCurrentConfig()?.clearance));
+        const hiddenForClearance = panel.dataset.manualHideForClearance === '1' && manualIsClearanceConfig(config);
+        panel.classList.toggle('d-none', !matchesStep || hiddenForClearance || (optionalClearance && !manualIsClearanceConfig(config)));
       });
       manualIdWizardSteps.forEach((item, index) => {
         const itemStep = index + 1;
@@ -9001,6 +9074,7 @@
     }
 
     function manualSelectedSectorValues() {
+      if (manualIsClearanceConfig()) return [];
       return manualSectorCheckboxes
         .filter((checkbox) => checkbox?.checked)
         .map((checkbox) => normalizeSectorLabel(checkbox?.getAttribute('data-manual-sector') || ''))
@@ -9021,6 +9095,9 @@
     }
 
     function manualCurrentSectorValues() {
+      if (manualIsClearanceConfig()) {
+        return [];
+      }
       if (manualCurrentMode() === 'walkin') {
         return manualSelectedSectorValues();
       }
@@ -9028,6 +9105,13 @@
     }
 
     function manualSyncSectorMembershipUi() {
+      if (manualIsClearanceConfig()) {
+        manualSetSelectedSectorValues([]);
+        manualSectorCheckboxes.forEach((checkbox) => {
+          checkbox.disabled = true;
+        });
+        return;
+      }
       const isWalkin = manualCurrentMode() === 'walkin';
       const activeSectors = isWalkin
         ? manualSelectedSectorValues()
@@ -9072,6 +9156,7 @@
 
     function manualClearValidationState() {
       manualValidationTargets().forEach((field) => manualSetFieldInvalidState(field, false));
+      manualFeeList?.querySelectorAll('[data-manual-fee-name]').forEach((field) => manualSetFieldInvalidState(field, false));
     }
 
     function manualValidateRequiredFields() {
@@ -9113,6 +9198,23 @@
       const usesPreset = manualUsesPurposePreset(config);
       const fixedPurpose = config?.kind === 'general_certification' ? String(config.purpose || '').trim() : '';
       const presetValue = String(manualPurposePreset?.value || '').trim();
+      const hidePurposeForClearance = manualIsClearanceConfig(config);
+
+      manualPurposeWrap?.classList.toggle('d-none', hidePurposeForClearance);
+      if (hidePurposeForClearance) {
+        manualPurposePresetWrap?.classList.add('d-none');
+        if (manualPurposePreset) {
+          manualPurposePreset.required = false;
+          manualPurposePreset.value = '';
+        }
+        if (manualPurpose) {
+          manualPurpose.required = false;
+          manualPurpose.value = manualSuggestedPurpose(config);
+          manualPurpose.dataset.auto = '1';
+          manualSetFieldInvalidState(manualPurpose, false);
+        }
+        return;
+      }
 
       manualPurposePresetWrap?.classList.toggle('d-none', !usesPreset);
       if (manualPurposePreset) {
@@ -9306,7 +9408,13 @@
     }
 
     function manualEscapeAttr(value) {
-      return String(value ?? '').replace(/"/g, '&quot;');
+      return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[m]));
     }
 
     function manualIndigencyField(name) {
@@ -10087,13 +10195,80 @@
       return Array.from(manualFeeList.querySelectorAll('.manual-fee-item')).map((item) => {
         const checkbox = item.querySelector('[data-manual-fee-check]');
         const amountInput = item.querySelector('[data-manual-fee-amount]');
-        const feeName = String(checkbox?.getAttribute('data-fee-name') || '').trim();
+        const nameInput = item.querySelector('[data-manual-fee-name]');
+        const feeName = String(nameInput ? nameInput.value : checkbox?.getAttribute('data-fee-name') || '').trim();
         const checked = !!checkbox?.checked;
         const amount = Number(amountInput?.value || 0);
         return checked && feeName
-          ? { fee_name: feeName, amount: Number.isFinite(amount) && amount >= 0 ? amount : 0 }
+          ? { fee_name: feeName, amount: Number.isFinite(amount) && amount >= 0 ? amount : 0, custom: item.hasAttribute('data-manual-custom-fee') }
           : null;
       }).filter(Boolean);
+    }
+
+    function manualRenderCustomFeeItem(row = {}) {
+      const id = `manualCustomFee_${++manualCustomFeeCounter}`;
+      const feeName = String(row?.fee_name || '').trim();
+      const amount = Number(row?.amount || 0);
+      return `
+        <div class="manual-fee-item" data-manual-custom-fee>
+          <div class="row g-3 align-items-center">
+            <div class="col-lg-7">
+              <div class="manual-fee-custom-label">
+                <input class="form-check-input" type="checkbox" id="${manualEscapeAttr(id)}" data-manual-fee-check checked>
+                <input type="text" class="form-control" data-manual-fee-name placeholder="Fee label" value="${manualEscapeAttr(feeName)}">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="input-group">
+                <span class="input-group-text">PHP</span>
+                <input type="number" class="form-control" min="0" step="0.01" data-manual-fee-amount value="${Number.isFinite(amount) ? amount.toFixed(2) : '0.00'}">
+              </div>
+            </div>
+            <div class="col-lg-1 text-end">
+              <button type="button" class="btn btn-outline-danger" data-manual-fee-remove title="Remove custom fee" aria-label="Remove custom fee">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function manualAddCustomFeeRow(row = {}) {
+      if (!manualFeeList) return;
+      const emptyRow = manualFeeList.querySelector('.manual-search-empty');
+      if (emptyRow && !manualFeeList.querySelector('.manual-fee-item')) emptyRow.remove();
+      manualFeeList.insertAdjacentHTML('beforeend', manualRenderCustomFeeItem(row));
+      const customRow = manualFeeList.querySelector('[data-manual-custom-fee]:last-child');
+      customRow?.querySelector('[data-manual-fee-name]')?.focus();
+      manualUpdateFeeTotal();
+      manualMarkPreviewStale(true);
+    }
+
+    function manualValidateFeeRows() {
+      if (!manualFeeList) return true;
+      let firstInvalid = null;
+      const selectedNames = new Set();
+      manualFeeList.querySelectorAll('[data-manual-fee-name]').forEach((input) => manualSetFieldInvalidState(input, false));
+      manualFeeList.querySelectorAll('.manual-fee-item').forEach((item) => {
+        const checkbox = item.querySelector('[data-manual-fee-check]');
+        if (!checkbox?.checked) return;
+        const nameInput = item.querySelector('[data-manual-fee-name]');
+        const feeName = String(nameInput ? nameInput.value : checkbox.getAttribute('data-fee-name') || '').trim();
+        const normalizedName = feeName.toLowerCase();
+        const invalid = !feeName || selectedNames.has(normalizedName);
+        if (invalid) {
+          if (nameInput) manualSetFieldInvalidState(nameInput, true);
+          if (!firstInvalid) firstInvalid = nameInput || checkbox;
+        }
+        if (feeName) selectedNames.add(normalizedName);
+      });
+      if (firstInvalid) {
+        firstInvalid.focus();
+        manualSetAlert('Enter a unique label for each checked custom fee.', 'warning');
+        return false;
+      }
+      return true;
     }
 
     function manualExpectedStage(config = manualCurrentConfig(), feeRows = manualCurrentFeeRows()) {
@@ -10224,6 +10399,18 @@
     function manualApplyCommonFieldRequirements(config) {
       const fields = manualFieldDefinitions(config);
       const fieldRequired = (name) => fields.some((field) => field?.name === name && field.required);
+      if (!isIdIssuanceTrackerView) {
+        if (manualPersonalInfoTitle) {
+          manualPersonalInfoTitle.textContent = manualIsClearanceConfig(config)
+            ? '2. Requester Information'
+            : '2. Personal Basic Information';
+        }
+        if (manualPersonalInfoHint) {
+          manualPersonalInfoHint.textContent = manualIsClearanceConfig(config)
+            ? 'Enter only the requester details needed to process this clearance.'
+            : 'Enter the resident details exactly as they should appear on the certificate.';
+        }
+      }
       if (manualBirthdate) manualBirthdate.required = true;
       manualBirthdateRequiredMark?.classList.remove('d-none');
       if (manualSex) manualSex.required = true;
@@ -10231,12 +10418,21 @@
       if (manualContactNumber) manualContactNumber.required = true;
       if (manualBirthplace) manualBirthplace.required = true;
       manualBirthplaceRequiredMark?.classList.remove('d-none');
-      const occupationRequired = fieldRequired('occupation');
-      const religionRequired = fieldRequired('religion');
+      const hideSupplementalPersonalFields = isIdIssuanceTrackerView || manualIsClearanceConfig(config);
+      manualSupplementalPersonalFields.forEach((wrapper) => {
+        wrapper.classList.toggle('d-none', hideSupplementalPersonalFields);
+        wrapper.querySelectorAll('input, select, textarea').forEach((field) => {
+          field.disabled = hideSupplementalPersonalFields;
+          if (hideSupplementalPersonalFields) manualSetFieldInvalidState(field, false);
+        });
+      });
+      const occupationRequired = !hideSupplementalPersonalFields && fieldRequired('occupation');
+      const religionRequired = !hideSupplementalPersonalFields && fieldRequired('religion');
       if (manualOccupation) manualOccupation.required = occupationRequired;
       manualOccupationRequiredMark?.classList.toggle('d-none', !occupationRequired);
       if (manualReligion) manualReligion.required = religionRequired;
       manualReligionRequiredMark?.classList.toggle('d-none', !religionRequired);
+      manualSyncSectorMembershipUi();
     }
 
     function manualMarkPreviewStale(silent = false) {
@@ -10639,7 +10835,8 @@
         return;
       }
 
-      const previous = new Map(manualCurrentFeeRows().map((row) => [String(row.fee_name || '').toLowerCase(), row]));
+      const previousRows = manualCurrentFeeRows();
+      const previous = new Map(previousRows.map((row) => [String(row.fee_name || '').toLowerCase(), row]));
       manualFeeWrap.classList.toggle('d-none', !isIdIssuanceTrackerView && manualIdWizardCurrentStep !== 3);
       manualFeeList.innerHTML = `
         <div class="manual-search-empty">
@@ -10648,13 +10845,9 @@
       `;
       try {
         const feeTypes = await fetchFeeTypeCatalog();
-        if (!Array.isArray(feeTypes) || !feeTypes.length) {
-          manualFeeList.innerHTML = '<div class="manual-search-empty">No approved clearance fee types are available yet.</div>';
-          manualFeeTotal.textContent = 'PHP 0.00';
-          manualUpdateSummary();
-          return;
-        }
-        manualFeeList.innerHTML = feeTypes.map((feeType) => {
+        const catalogRows = Array.isArray(feeTypes) ? feeTypes : [];
+        const catalogNames = new Set(catalogRows.map((feeType) => String(firstNonEmpty([feeType?.fee_name, 'Fee'])).trim().toLowerCase()).filter(Boolean));
+        const catalogHtml = catalogRows.length ? catalogRows.map((feeType) => {
           const feeName = String(firstNonEmpty([feeType?.fee_name, 'Fee'])).trim();
           const defaultAmount = Number(feeType?.default_amount || 0);
           const previousRow = previous.get(feeName.toLowerCase());
@@ -10680,7 +10873,12 @@
               </div>
             </div>
           `;
-        }).join('');
+        }).join('') : '<div class="manual-search-empty">No approved clearance fee types are available yet.</div>';
+        const customHtml = previousRows
+          .filter((row) => row?.custom || !catalogNames.has(String(row?.fee_name || '').toLowerCase()))
+          .map((row) => manualRenderCustomFeeItem(row))
+          .join('');
+        manualFeeList.innerHTML = catalogHtml + customHtml;
         manualUpdateFeeTotal();
       } catch (error) {
         manualFeeList.innerHTML = `<div class="manual-search-empty text-danger">${esc(error?.message || 'Failed to load fee catalog.')}</div>`;
@@ -10980,8 +11178,12 @@
         full_address: fullAddress,
         full_address_display: fullAddress,
         address: fullAddress,
-        sector_membership: manualCurrentSectorValues().join(', '),
+        sector_membership: config.clearance ? '' : manualCurrentSectorValues().join(', '),
       };
+      if (config.clearance) {
+        payload.occupation = '';
+        payload.religion = '';
+      }
       if (config.kind === 'general_certification') {
         payload.manual_document_variant = config.label;
         payload.template_document_type = String(config.documentType || '').trim();
@@ -11099,6 +11301,9 @@
       manualClearValidationState();
       if (!manualValidateRequiredFields()) {
         throw new Error('Complete the required form fields first.');
+      }
+      if (!manualValidateFeeRows()) {
+        throw new Error('Enter a unique label for each checked custom fee.');
       }
 
       const photo = manualCurrentBarangayIdPhoto();
@@ -11370,6 +11575,16 @@
     manualFeeList?.addEventListener('change', () => {
       manualUpdateFeeTotal();
       manualMarkPreviewStale(true);
+    });
+    manualFeeList?.addEventListener('click', (event) => {
+      const removeBtn = event.target.closest('[data-manual-fee-remove]');
+      if (!removeBtn || !manualFeeList.contains(removeBtn)) return;
+      removeBtn.closest('[data-manual-custom-fee]')?.remove();
+      manualUpdateFeeTotal();
+      manualMarkPreviewStale(true);
+    });
+    manualFeeAddCustomBtn?.addEventListener('click', () => {
+      manualAddCustomFeeRow();
     });
     manualSectorMembershipWrap?.addEventListener('change', () => {
       manualSyncSectorMembershipUi();

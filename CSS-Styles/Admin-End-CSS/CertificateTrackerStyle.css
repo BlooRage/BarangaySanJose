@@ -2118,6 +2118,17 @@
       font-weight: 600;
       color: #111827;
     }
+    .manual-fee-actions {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 14px;
+    }
+    .manual-fee-custom-label {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+    }
     .manual-fee-total {
       display: flex;
       align-items: center;

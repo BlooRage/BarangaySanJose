@@ -2645,6 +2645,17 @@ if ($certificateLaunchStage === 'release') {
       font-weight: 600;
       color: #111827;
     }
+    .manual-fee-actions {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 14px;
+    }
+    .manual-fee-custom-label {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+    }
     .manual-fee-total {
       display: flex;
       align-items: center;
@@ -3250,8 +3261,8 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card" data-manual-step-panel="2">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '2. Personal Basic Information' ?></h6>
-                <span><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Enter the resident details exactly as they should appear on the certificate.' ?></span>
+                <h6 id="manualPersonalInfoTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '2. Personal Basic Information' ?></h6>
+                <span id="manualPersonalInfoHint"><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Enter the resident details exactly as they should appear on the certificate.' ?></span>
               </div>
               <div class="row g-3">
                 <div class="col-md-6 col-lg-3">
@@ -3328,11 +3339,11 @@ if ($certificateLaunchStage === 'release') {
                   <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace <span class="text-danger" id="manualBirthplaceRequiredMark">*</span></label>
                   <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
                 </div>
-                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
+                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>" data-manual-hide-for-clearance-field>
                   <label for="manualOccupation" class="form-label fw-semibold small">Occupation <span class="text-danger d-none" id="manualOccupationRequiredMark">*</span></label>
                   <input type="text" id="manualOccupation" class="form-control" placeholder="Occupation">
                 </div>
-                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>">
+                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>" data-manual-hide-for-clearance-field>
                   <label for="manualReligion" class="form-label fw-semibold small">Religion <span class="text-danger d-none" id="manualReligionRequiredMark">*</span></label>
                   <input type="text" id="manualReligion" class="form-control" placeholder="Religion">
                 </div>
@@ -3367,7 +3378,7 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
 
-            <div class="manual-issuance-card" data-manual-step-panel="2">
+            <div class="manual-issuance-card" data-manual-step-panel="2" data-manual-hide-for-clearance="1">
               <div class="manual-issuance-card-title">
                 <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Sector Membership' : '2. Sector Membership' ?></h6>
                 <span>Select every applicable sector. Linked residents retain the membership recorded in the masterlist.</span>
@@ -3399,7 +3410,7 @@ if ($certificateLaunchStage === 'release') {
               </div>
               <?php if (!$isIdIssuanceTrackerView): ?>
                 <div class="row g-3 mb-3">
-                  <div class="col-12">
+                  <div class="col-12" id="manualPurposeWrap">
                     <label for="manualPurpose" class="form-label fw-semibold small">Purpose / Request For <span class="text-danger">*</span></label>
                     <div class="d-none mb-2" id="manualPurposePresetWrap">
                       <select id="manualPurposePreset" class="form-select">
@@ -3484,6 +3495,11 @@ if ($certificateLaunchStage === 'release') {
                 <span>Tagged fees are only used for paid requests that continue to the finance step for walk-in payment recording.</span>
               </div>
               <div id="manualFeeList" class="manual-fee-list"></div>
+              <div class="manual-fee-actions">
+                <button type="button" class="btn btn-outline-primary" id="manualFeeAddCustomBtn">
+                  <i class="fas fa-plus me-1"></i>Add Custom Fee
+                </button>
+              </div>
               <div class="manual-fee-total">
                 <span>Total Tagged Amount</span>
                 <strong id="manualFeeTotal">PHP 0.00</strong>
