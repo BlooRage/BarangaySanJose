@@ -257,13 +257,16 @@
     const resolvedAmount = resolveSystemAmount(row, fallbackAmount ?? taggedTotal);
     const showBreakdown = taggedFees.length > 0;
     const showAmountOnly = !showBreakdown && Number.isFinite(resolvedAmount);
+    const fallbackFeeLabel = docNameForPrompt && docNameForPrompt !== '-'
+      ? `${docNameForPrompt} Fee`
+      : 'Document Fee';
 
     let intro = 'Review the payment details below and enter the OR number to continue.';
     if (isWalkInStage) {
       intro = showBreakdown
         ? 'The tagged fee breakdown below will be used for this walk-in payment. Enter the OR number to continue.'
         : (showAmountOnly
-            ? 'The system amount below will be used for this walk-in payment. Enter the OR number to continue.'
+            ? 'The fee breakdown below will be used for this walk-in payment. Enter the OR number to continue.'
             : 'Enter the paid amount and OR number to record this walk-in payment.');
     } else if (isPendingVerification) {
       intro = showBreakdown
@@ -305,9 +308,18 @@
           </div>
         ` : ''}
         ${!showBreakdown && showAmountOnly ? `
-          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
-            <span class="fw-semibold">Amount Due</span>
-            <span class="fw-bold text-primary">${esc(formatPhpAmount(resolvedAmount))}</span>
+          <div class="mt-3">
+            <div class="fw-semibold mb-1">Fee Breakdown</div>
+            <div class="small">
+              <div class="d-flex justify-content-between align-items-center py-1 border-top">
+                <span>${esc(fallbackFeeLabel)}</span>
+                <span class="fw-semibold">${esc(formatPhpAmount(resolvedAmount))}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center pt-2 mt-1 border-top fw-bold text-primary">
+                <span>Total</span>
+                <span>${esc(formatPhpAmount(resolvedAmount))}</span>
+              </div>
+            </div>
           </div>
         ` : ''}
         ${loadingBreakdown ? `

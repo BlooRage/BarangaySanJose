@@ -645,9 +645,40 @@ document.addEventListener("DOMContentLoaded", () => {
         return true;
     };
 
+    const validateFiledDateTime = () => {
+        if (!dateFiledInput) return true;
+        const now = new Date();
+        const todayIso = toIsoDate(now);
+        const currentTime = toTimeValue(now);
+        const dateValue = String(dateFiledInput.value || "").trim();
+        const timeValue = String(timeFiledInput?.value || "").trim();
+
+        dateFiledInput.max = todayIso;
+        if (timeFiledInput) {
+            timeFiledInput.max = dateValue === todayIso ? currentTime : "";
+        }
+
+        if (dateValue !== "" && dateValue > todayIso) {
+            dateFiledInput.setCustomValidity(`Date filed must be on or before ${todayIso}.`);
+            return false;
+        }
+        dateFiledInput.setCustomValidity("");
+
+        if (timeFiledInput) {
+            if (dateValue === todayIso && timeValue !== "" && timeValue > currentTime) {
+                timeFiledInput.setCustomValidity(`Time filed must be on or before ${currentTime} for today's date.`);
+                return false;
+            }
+            timeFiledInput.setCustomValidity("");
+        }
+
+        return true;
+    };
+
     const updateState = () => {
         setNarrativeMode();
         syncBlotterComplaintType();
+        validateFiledDateTime();
         validateIncidentDateTime();
         applyAddressSystem(
             complainantAddressSystem,
@@ -677,19 +708,20 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
-    const setFiledDateTime = () => {
+    const initFiledDateTime = () => {
         const now = new Date();
         if (dateFiledInput) {
-            const yyyy = now.getFullYear();
-            const mm = String(now.getMonth() + 1).padStart(2, "0");
-            const dd = String(now.getDate()).padStart(2, "0");
-            dateFiledInput.value = `${yyyy}-${mm}-${dd}`;
+            dateFiledInput.max = toIsoDate(now);
+            if (!dateFiledInput.value) {
+                dateFiledInput.value = toIsoDate(now);
+            }
         }
         if (timeFiledInput) {
-            const hh = String(now.getHours()).padStart(2, "0");
-            const min = String(now.getMinutes()).padStart(2, "0");
-            timeFiledInput.value = `${hh}:${min}`;
+            if (!timeFiledInput.value) {
+                timeFiledInput.value = toTimeValue(now);
+            }
         }
+        validateFiledDateTime();
     };
 
     const normalizePhoneValue = (input) => {
@@ -860,7 +892,7 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             e.stopPropagation();
             updateState();
-            if (!validateIncidentDateTime()) {
+            if (!validateFiledDateTime() || !validateIncidentDateTime()) {
                 renderAllValidity();
                 return;
             }
@@ -875,7 +907,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         updateState();
-        if (!validateIncidentDateTime()) {
+        if (!validateFiledDateTime() || !validateIncidentDateTime()) {
             e.preventDefault();
             e.stopPropagation();
             renderAllValidity();
@@ -904,7 +936,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setNarrativeMode();
     syncBlotterComplaintType();
-    setFiledDateTime();
+    initFiledDateTime();
     phoneInputs.forEach((input) => syncPhoneValidation(input));
     updateState();
 

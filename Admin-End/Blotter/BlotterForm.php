@@ -163,11 +163,11 @@ $defaultFiledTime = date('H:i');
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Date Filed (Petsa ng Paghahain) <span class="required-asterisk">*</span></label>
-                        <input type="date" class="form-control" name="date_filed" value="<?= htmlspecialchars($defaultFiledDate) ?>" required readonly>
+                        <input type="date" class="form-control" name="date_filed" value="<?= htmlspecialchars($defaultFiledDate) ?>" max="<?= htmlspecialchars($defaultFiledDate) ?>" required>
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Time Filed (Oras ng Paghahain) <span class="required-asterisk">*</span></label>
-                        <input type="time" class="form-control" name="time_filed" value="<?= htmlspecialchars($defaultFiledTime) ?>" required readonly>
+                        <input type="time" class="form-control" name="time_filed" value="<?= htmlspecialchars($defaultFiledTime) ?>" max="<?= htmlspecialchars($defaultFiledTime) ?>" required>
                     </div>
                 </div>
 
@@ -619,7 +619,7 @@ $defaultFiledTime = date('H:i');
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
     <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white" defer></script>
-    <script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260805-highlight-missing" defer></script>
+    <script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260911-filed-date-time-editable" defer></script>
 </body>
 
 </html>

@@ -254,6 +254,20 @@ function validateIncidentDateTime(string $incidentDate, string $incidentTime): v
     }
 }
 
+function validateFiledDateTime(string $filedDate, string $filedTime): void {
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
+    $now = new DateTimeImmutable('now', $timezone);
+    $filedDateTime = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $filedDate . ' ' . $filedTime, $timezone);
+    if (!$filedDateTime) {
+        http_response_code(400);
+        exit("Date filed or time filed is invalid.");
+    }
+    if ($filedDateTime > $now) {
+        http_response_code(400);
+        exit("Date filed and time filed cannot be in the future.");
+    }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     exit("Method not allowed.");
@@ -262,6 +276,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 $blotterNumber = str_field($_POST['blotter_number'] ?? '');
 $dateFiled = normalizeDateValue($_POST['date_filed'] ?? '') ?? date('Y-m-d');
 $timeFiled = normalizeTimeValue($_POST['time_filed'] ?? '') ?? date('H:i:s');
+validateFiledDateTime($dateFiled, $timeFiled);
 
 $complainantLast = str_field($_POST['complainant_last_name'] ?? '');
 $complainantFirst = str_field($_POST['complainant_first_name'] ?? '');
