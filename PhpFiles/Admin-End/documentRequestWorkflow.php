@@ -3018,7 +3018,10 @@ function dra_generate_issued_document(array $requestRow): ?string
     $maskPreprintedLetterhead = static function (object $pdf, float $pageWidth) use ($printHeaderEnabled): void {
         if ($printHeaderEnabled) return;
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->Rect(0.0, 0.0, $pageWidth, 43.0, 'F');
+        $pdf->Rect(12.0, 8.0, 34.0, 34.0, 'F');
+        $pdf->Rect(max(0.0, $pageWidth - 46.0), 8.0, 34.0, 34.0, 'F');
+        $pdf->Rect(42.0, 7.0, max(1.0, $pageWidth - 84.0), 35.0, 'F');
+        $pdf->Rect(18.0, 42.0, max(1.0, $pageWidth - 36.0), 3.0, 'F');
     };
     $moduleSettings = ($conn instanceof mysqli)
         ? dms_resolve_module_signatories($conn, $moduleSettingsKey)
@@ -3650,7 +3653,9 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260722ap';
+    $renderRevisionTag = $isBarangayId
+        ? dra_barangay_id_render_revision()
+        : 'r20260722ap_' . ($printHeaderEnabled ? 'hdr1' : 'hdr0');
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -5342,15 +5347,20 @@ function dra_generate_issued_document(array $requestRow): ?string
     $fontFace = 'Arial';
     $indigencyFont = 'Arial';
 
-    $pdf->SetTextColor($printHeaderEnabled ? 0 : 255, $printHeaderEnabled ? 0 : 255, $printHeaderEnabled ? 0 : 255);
-    $pdf->SetFont($fontFace, 'B', 11);
-    $pdf->Cell(0, 5, $printHeaderEnabled ? 'REPUBLIKA NG PILIPINAS' : '', 0, 1, 'C');
-    $pdf->SetFont($fontFace, '', 10);
-    $pdf->Cell(0, 5, $printHeaderEnabled ? 'LALAWIGAN NG RIZAL' : '', 0, 1, 'C');
-    $pdf->Cell(0, 5, $printHeaderEnabled ? 'BAYAN NG RODRIGUEZ' : '', 0, 1, 'C');
-    $pdf->Ln(1);
-    $pdf->SetFont($fontFace, 'B', 14);
-    $pdf->Cell(0, 7, $printHeaderEnabled ? 'BARANGAY SAN JOSE' : '', 0, 1, 'C');
+    if ($printHeaderEnabled) {
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont($fontFace, 'B', 11);
+        $pdf->Cell(0, 5, 'REPUBLIKA NG PILIPINAS', 0, 1, 'C');
+        $pdf->SetFont($fontFace, '', 10);
+        $pdf->Cell(0, 5, 'LALAWIGAN NG RIZAL', 0, 1, 'C');
+        $pdf->Cell(0, 5, 'BAYAN NG RODRIGUEZ', 0, 1, 'C');
+        $pdf->Ln(1);
+        $pdf->SetFont($fontFace, 'B', 14);
+        $pdf->Cell(0, 7, 'BARANGAY SAN JOSE', 0, 1, 'C');
+    } else {
+        // Reserve the same letterhead area without writing invisible text that some printer drivers drop badly.
+        $pdf->SetY(44.0);
+    }
     $pdf->SetTextColor(0, 0, 0);
     if ($isSpecialCertificate) {
         $pdf->Ln(1);
@@ -9130,9 +9140,14 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
+    $viewDocumentType = (string)($row['document_type'] ?? '');
+    $renderRevisionTag = (dr_is_barangay_id_document_type($viewDocumentType) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260722ap';
+        : 'r20260722ap_' . (
+            dms_resolve_module_print_header_setting($conn, dms_module_key_for_document_type($viewDocumentType))
+                ? 'hdr1'
+                : 'hdr0'
+        );
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
