@@ -5322,28 +5322,7 @@
 
     const url = String(paymentProofPrintUrl || '').trim();
     if (!url) return;
-    const frame = paymentProofWrap?.querySelector('iframe');
-    if (frame && frame.contentWindow && String(frame.dataset.documentReady || '') === '1') {
-      try {
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
-        return;
-      } catch (_) {
-        // Fallback to new-tab print below.
-      }
-    }
-    const w = window.open(url, '_blank', 'noopener');
-    if (!w) return;
-    const tryPrint = () => {
-      try {
-        w.focus();
-        w.print();
-      } catch (_) {
-        // Ignore browser print restrictions.
-      }
-    };
-    w.addEventListener('load', () => setTimeout(tryPrint, 250), { once: true });
-    setTimeout(tryPrint, 1200);
+    window.open(url, '_blank', 'noopener');
   });
 
   idPrintProcessReturnBtn?.addEventListener('click', () => {
@@ -5458,6 +5437,7 @@
     if (paymentProofPrintBtn) {
       paymentProofPrintBtn.classList.add('d-none');
       paymentProofPrintBtn.textContent = 'Print';
+      paymentProofPrintBtn.removeAttribute('title');
       paymentProofPrintBtn.disabled = false;
     }
     if (paymentProofRegenerateBtn) {
@@ -5619,6 +5599,7 @@
             frame.dataset.documentReady = '1';
             paymentProofPrintBtn.disabled = false;
             paymentProofPrintBtn.textContent = 'Print';
+            paymentProofPrintBtn.title = 'Open the PDF in a printable browser tab';
           };
           frame.addEventListener('load', () => {
             window.setTimeout(markReady, 600);
@@ -5648,6 +5629,7 @@
         paymentProofPrintUrl = bustedUrl;
         paymentProofPrintBtn.disabled = true;
         paymentProofPrintBtn.textContent = 'Loading...';
+        paymentProofPrintBtn.title = 'Preparing the PDF preview';
       }
     }
     if (paymentProofReleaseBtn) {
