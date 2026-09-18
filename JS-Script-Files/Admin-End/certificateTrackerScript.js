@@ -5288,6 +5288,9 @@
   }
 
   paymentProofPrintBtn?.addEventListener('click', async () => {
+    if (paymentProofPrintBtn.disabled) {
+      return;
+    }
     if (paymentProofWrap?.querySelector('.barangay-id-digital')) {
       const cards = Array.from(paymentProofWrap.querySelectorAll('.barangay-id-card'));
       if (!cards.length) {
@@ -5320,7 +5323,7 @@
     const url = String(paymentProofPrintUrl || '').trim();
     if (!url) return;
     const frame = paymentProofWrap?.querySelector('iframe');
-    if (frame && frame.contentWindow) {
+    if (frame && frame.contentWindow && String(frame.dataset.documentReady || '') === '1') {
       try {
         frame.contentWindow.focus();
         frame.contentWindow.print();
@@ -5455,6 +5458,7 @@
     if (paymentProofPrintBtn) {
       paymentProofPrintBtn.classList.add('d-none');
       paymentProofPrintBtn.textContent = 'Print';
+      paymentProofPrintBtn.disabled = false;
     }
     if (paymentProofRegenerateBtn) {
       paymentProofRegenerateBtn.classList.add('d-none');
@@ -5609,6 +5613,22 @@
       if (!paymentProofWrap) return;
       if (!isImageAsset) {
         paymentProofWrap.innerHTML = `<iframe src="${bustedUrl}" loading="lazy" title="Document Preview"></iframe>`;
+        const frame = paymentProofWrap.querySelector('iframe');
+        if (frame && paymentProofPrintBtn && paymentProofPrintUrl) {
+          const markReady = () => {
+            frame.dataset.documentReady = '1';
+            paymentProofPrintBtn.disabled = false;
+            paymentProofPrintBtn.textContent = 'Print';
+          };
+          frame.addEventListener('load', () => {
+            window.setTimeout(markReady, 600);
+          }, { once: true });
+          window.setTimeout(() => {
+            if (String(frame.dataset.documentReady || '') !== '1') {
+              markReady();
+            }
+          }, 2500);
+        }
       } else {
         paymentProofWrap.innerHTML = `<img src="${bustedUrl}" alt="Document Preview" loading="lazy">`;
       }
@@ -5626,6 +5646,8 @@
       paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly));
       if (allowPrint && isLikelyPdf && !proofOnly) {
         paymentProofPrintUrl = bustedUrl;
+        paymentProofPrintBtn.disabled = true;
+        paymentProofPrintBtn.textContent = 'Loading...';
       }
     }
     if (paymentProofReleaseBtn) {

@@ -4359,7 +4359,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260911-payment-breakdown-labels"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260918-print-ready"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
@@ -4374,15 +4374,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   modal.addEventListener('show.bs.modal', syncIssuedActions);
   modal.addEventListener('shown.bs.modal', syncIssuedActions);
-  printBtn.addEventListener('click', (event) => {
-    if (String(title.textContent || '').trim().toLowerCase() !== 'issued document') return;
-    const frame = document.querySelector('#paymentProofWrap iframe');
-    if (!frame?.contentWindow) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    frame.contentWindow.focus();
-    frame.contentWindow.print();
-  }, true);
 });
 </script>
 </body>
