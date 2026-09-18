@@ -89,7 +89,7 @@ if ($action === 'barangay_id_template_config') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260722ap';
+    $currentRenderRevision = 'r20260918print';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -3015,13 +3015,31 @@ function dra_generate_issued_document(array $requestRow): ?string
         }
     };
     $printHeaderEnabled = !($conn instanceof mysqli) || dms_resolve_module_print_header_setting($conn, $moduleSettingsKey);
-    $maskPreprintedLetterhead = static function (object $pdf, float $pageWidth) use ($printHeaderEnabled): void {
-        if ($printHeaderEnabled) return;
-        $pdf->SetFillColor(255, 255, 255);
-        $pdf->Rect(12.0, 8.0, 34.0, 34.0, 'F');
-        $pdf->Rect(max(0.0, $pageWidth - 46.0), 8.0, 34.0, 34.0, 'F');
-        $pdf->Rect(42.0, 7.0, max(1.0, $pageWidth - 84.0), 35.0, 'F');
-        $pdf->Rect(18.0, 42.0, max(1.0, $pageWidth - 36.0), 3.0, 'F');
+    $newIssuedFpdi = static function (): object {
+        return new class extends \setasign\Fpdi\Fpdi {
+            public function beginClipRect(float $x, float $y, float $w, float $h): void
+            {
+                $k = $this->k;
+                $pageHeight = $this->h;
+                $this->_out('q');
+                $this->_out(sprintf('%.3F %.3F %.3F %.3F re W n', $x * $k, ($pageHeight - $y) * $k, $w * $k, -$h * $k));
+            }
+
+            public function endClip(): void
+            {
+                $this->_out('Q');
+            }
+        };
+    };
+    $renderImportedTemplatePage = static function (object $pdf, $tpl, float $pageWidth, float $pageHeight) use ($printHeaderEnabled): void {
+        if ($printHeaderEnabled || !method_exists($pdf, 'beginClipRect') || !method_exists($pdf, 'endClip')) {
+            $pdf->useTemplate($tpl);
+            return;
+        }
+        $bodyTop = 45.0;
+        $pdf->beginClipRect(0.0, $bodyTop, $pageWidth, max(1.0, $pageHeight - $bodyTop));
+        $pdf->useTemplate($tpl);
+        $pdf->endClip();
     };
     $moduleSettings = ($conn instanceof mysqli)
         ? dms_resolve_module_signatories($conn, $moduleSettingsKey)
@@ -3655,7 +3673,7 @@ function dra_generate_issued_document(array $requestRow): ?string
 
     $renderRevisionTag = $isBarangayId
         ? dra_barangay_id_render_revision()
-        : 'r20260722ap_' . ($printHeaderEnabled ? 'hdr1' : 'hdr0');
+        : 'r20260918print_' . ($printHeaderEnabled ? 'hdr1' : 'hdr0');
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -4329,7 +4347,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
-                $pdf = new \setasign\Fpdi\Fpdi();
+                $pdf = $newIssuedFpdi();
                 $pageCount = $pdf->setSourceFile($templatePath);
                 if ($pageCount <= 0) {
                     throw new RuntimeException('Template PDF has no readable pages.');
@@ -4340,8 +4358,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pageHeight = (float)($size['height'] ?? 279.4);
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
-                $pdf->useTemplate($tpl);
-                $maskPreprintedLetterhead($pdf, $pageWidth);
+                $renderImportedTemplatePage($pdf, $tpl, $pageWidth, $pageHeight);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(0, 0, 0);
@@ -4705,7 +4722,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
-                $pdf = new \setasign\Fpdi\Fpdi();
+                $pdf = $newIssuedFpdi();
                 $pageCount = $pdf->setSourceFile($templatePath);
                 if ($pageCount <= 0) {
                     throw new RuntimeException('Template PDF has no readable pages.');
@@ -4716,8 +4733,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pageHeight = (float)($size['height'] ?? 279.4);
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
-                $pdf->useTemplate($tpl);
-                $maskPreprintedLetterhead($pdf, $pageWidth);
+                $renderImportedTemplatePage($pdf, $tpl, $pageWidth, $pageHeight);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(0, 0, 0);
@@ -5029,7 +5045,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
-                $pdf = new \setasign\Fpdi\Fpdi();
+                $pdf = $newIssuedFpdi();
                 $pageCount = $pdf->setSourceFile($templatePath);
                 if ($pageCount <= 0) {
                     throw new RuntimeException('Template PDF has no readable pages.');
@@ -5040,8 +5056,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pageHeight = (float)($size['height'] ?? 355.6);
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
-                $pdf->useTemplate($tpl);
-                $maskPreprintedLetterhead($pdf, $pageWidth);
+                $renderImportedTemplatePage($pdf, $tpl, $pageWidth, $pageHeight);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(20, 20, 20);
@@ -5267,7 +5282,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     $detentionFacility = $stripTemplateTokens((string)($payload['detention_facility_other'] ?? ''));
                 }
 
-                $pdf = new \setasign\Fpdi\Fpdi();
+                $pdf = $newIssuedFpdi();
                 $pageCount = $pdf->setSourceFile($templatePath);
                 if ($pageCount <= 0) {
                     throw new RuntimeException('Template PDF has no readable pages.');
@@ -5278,8 +5293,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $pageHeight = (float)($size['height'] ?? 279.0);
                 $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
                 $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
-                $pdf->useTemplate($tpl);
-                $maskPreprintedLetterhead($pdf, $pageWidth);
+                $renderImportedTemplatePage($pdf, $tpl, $pageWidth, $pageHeight);
                 $pdf->SetAutoPageBreak(false);
 
                 $pdf->SetFillColor(255, 255, 255);
@@ -9143,7 +9157,7 @@ if ($action === 'view_issued') {
     $viewDocumentType = (string)($row['document_type'] ?? '');
     $renderRevisionTag = (dr_is_barangay_id_document_type($viewDocumentType) && dra_has_barangay_id_template_assets())
         ? dra_barangay_id_render_revision()
-        : 'r20260722ap_' . (
+        : 'r20260918print_' . (
             dms_resolve_module_print_header_setting($conn, dms_module_key_for_document_type($viewDocumentType))
                 ? 'hdr1'
                 : 'hdr0'
