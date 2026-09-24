@@ -4051,6 +4051,21 @@ if ($certificateLaunchStage === 'release') {
       <div class="modal-body">
         <div class="d-grid gap-3">
           <div id="idPrintProcessPreview" class="w-100 text-center"></div>
+          <div>
+            <label for="idPrintMethod" class="form-label fw-semibold">Printing method</label>
+            <select id="idPrintMethod" class="form-select">
+              <option value="epson">Epson L8050 — Export for Epson Photo+</option>
+              <option value="browser">Browser print — Card-size page</option>
+            </select>
+          </div>
+          <div id="idPrintEpsonHelp" class="alert alert-info mb-0">
+            Download each side, then open Epson Photo+ and select your L8050 → ID Card → landscape → 2-Sided.
+            Import the front and back images on their respective sides. For one card, select position 1 only or 2 only and load that slot with an inkjet-printable PVC card.
+            Check the image crop and follow Photo+ instructions to turn the card over.
+            Use Disc/ID Card Tray and PVC ID Card media. Check alignment on a test card before issuing IDs.
+            Downloading does not print the card; mark it printed only after both sides are finished.
+            <a href="https://support.epson.net/appinfo/photoplus/help/3.7/en/GUID-A0C91EF1-0D9B-4F59-83E9-CAC198F7E365.htm" target="_blank" rel="noopener noreferrer">Epson instructions</a>
+          </div>
           <hr class="my-0">
           <p id="idPrintProcessStep" class="fw-semibold mb-1">Step 1 of 3</p>
           <p id="idPrintProcessCopy" class="text-muted mb-0">Print the front side of the Barangay ID first.</p>

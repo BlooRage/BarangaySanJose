@@ -5068,6 +5068,54 @@
     }
   });
 
+  const idPrintMethod = document.getElementById('idPrintMethod');
+  const idPrintEpsonHelp = document.getElementById('idPrintEpsonHelp');
+  const usesEpsonPhotoPlus = () => idPrintMethod?.value === 'epson';
+
+  async function exportIdForEpsonPhotoPlus() {
+    const card = idPrintProcessPreview?.querySelector('.barangay-id-card');
+    if (!card || typeof window.html2canvas !== 'function') {
+      alert('Unable to prepare the ID image. Reload the page and try again.');
+      return;
+    }
+    const buttons = [idPrintProcessReturnBtn, idPrintProcessPrimaryBtn, idPrintProcessReprintBtn, idPrintMethod,
+      idPrintProcessModalEl?.querySelector('.btn-close')].filter(Boolean);
+    buttons.forEach(button => { button.disabled = true; });
+    const side = idPrintProcessPhaseLabel();
+    try {
+      await document.fonts.ready;
+      // Render at a fixed resolution, independent of the display's pixel density.
+      const width = card.getBoundingClientRect().width;
+      if (!width) throw new Error('The ID preview is not visible.');
+      const canvas = await window.html2canvas(card, {
+        backgroundColor: '#ffffff', scale: 2022 / width, useCORS: true, logging: false
+      });
+      // 85.6 x 54 mm artwork at approximately 600 dpi; Photo+ handles tray placement.
+      const output = document.createElement('canvas');
+      output.width = 2022;
+      output.height = 1276;
+      output.getContext('2d').drawImage(canvas, 0, 0, output.width, output.height);
+      const blob = await new Promise(resolve => output.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Image export failed.');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const requestId = String(idPrintProcessContext?.requestId || 'card').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.href = url;
+      link.download = `barangay-id-${requestId}-${side}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      console.error('Unable to export ID for Epson Photo+:', error);
+      alert('Unable to export the ID image. Please try again.');
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
+  }
+
+  idPrintMethod?.addEventListener('change', () => renderIdPrintProcessPhase());
+
   async function printBarangayIdCards(which = 'both', sourceRoot = paymentProofWrap) {
     const cards = Array.from(sourceRoot?.querySelectorAll('.barangay-id-card') || []);
     if (!cards.length) return false;
@@ -5248,34 +5296,34 @@
     idPrintProcessPreview.innerHTML = cardHtml || '';
   }
 
-  function showIdPrintProcessModal({ autoPrint = false } = {}) {
+  function showIdPrintProcessModal() {
     renderIdPrintProcessPhase();
     renderIdPrintProcessPreview();
     idPrintProcessModal?.show();
-    if (autoPrint) {
-      window.setTimeout(() => {
-        printBarangayIdCards(idPrintProcessPhaseLabel(), idPrintProcessPreview);
-      }, 180);
-    }
   }
 
   function renderIdPrintProcessPhase() {
     if (!idPrintProcessStep || !idPrintProcessCopy || !idPrintProcessPrimaryBtn || !idPrintProcessReturnBtn || !idPrintProcessReprintBtn) return;
     idPrintProcessPrimaryBtn.classList.remove('btn-success');
     idPrintProcessPrimaryBtn.classList.add('btn-primary');
+    idPrintEpsonHelp?.classList.toggle('d-none', !usesEpsonPhotoPlus());
     switch (idPrintProcessPhase) {
       case 'front':
         idPrintProcessStep.textContent = 'Step 1 of 3';
-        idPrintProcessCopy.textContent = 'This is the front side of the Barangay ID. Print it first, then continue to the back side.';
+        idPrintProcessCopy.textContent = usesEpsonPhotoPlus()
+          ? 'Download the front image for Epson Photo+, then select Next to download the back.'
+          : 'This is the front side of the Barangay ID. Print it first, then continue to the back side.';
         idPrintProcessReturnBtn.textContent = 'Return';
-        idPrintProcessReprintBtn.textContent = 'Reprint';
+        idPrintProcessReprintBtn.textContent = usesEpsonPhotoPlus() ? 'Download Front PNG' : 'Print Front';
         idPrintProcessPrimaryBtn.textContent = 'Next';
         break;
       case 'back':
         idPrintProcessStep.textContent = 'Step 2 of 3';
-        idPrintProcessCopy.textContent = 'This is the back side of the Barangay ID. Print it, then mark the ID ready for claim when both sides are finished.';
+        idPrintProcessCopy.textContent = usesEpsonPhotoPlus()
+          ? 'Download the back image. Print both images using Epson Photo+ and inspect the card before marking it printed and ready for claim.'
+          : 'This is the back side of the Barangay ID. Print it, then mark the ID ready for claim when both sides are finished.';
         idPrintProcessReturnBtn.textContent = 'Return';
-        idPrintProcessReprintBtn.textContent = 'Reprint';
+        idPrintProcessReprintBtn.textContent = usesEpsonPhotoPlus() ? 'Download Back PNG' : 'Print Back';
         idPrintProcessPrimaryBtn.textContent = 'Mark Printed / For Claim';
         idPrintProcessPrimaryBtn.classList.remove('btn-primary');
         idPrintProcessPrimaryBtn.classList.add('btn-success');
@@ -5336,6 +5384,10 @@
   });
 
   idPrintProcessReprintBtn?.addEventListener('click', async () => {
+    if (usesEpsonPhotoPlus()) {
+      await exportIdForEpsonPhotoPlus();
+      return;
+    }
     await printBarangayIdCards(idPrintProcessPhaseLabel(), idPrintProcessPreview);
   });
 
@@ -5345,7 +5397,6 @@
         idPrintProcessPhase = 'back';
         renderIdPrintProcessPhase();
         renderIdPrintProcessPreview();
-        await printBarangayIdCards('back', idPrintProcessPreview);
         return;
       case 'back':
         queueReleaseFromPaymentProof(idPrintProcessContext?.requestId || paymentProofReleaseRequestId);
@@ -5456,7 +5507,7 @@
     if (idPrintProcessPendingOpen) {
       idPrintProcessPendingOpen = false;
       window.setTimeout(() => {
-        showIdPrintProcessModal({ autoPrint: true });
+        showIdPrintProcessModal();
       }, 0);
       return;
     }
