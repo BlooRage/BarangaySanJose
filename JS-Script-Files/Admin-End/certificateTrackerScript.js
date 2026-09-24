@@ -5072,6 +5072,31 @@
   const idPrintEpsonHelp = document.getElementById('idPrintEpsonHelp');
   const usesEpsonPhotoPlus = () => idPrintMethod?.value === 'epson';
 
+  const directSettings = document.getElementById('idPrintDirectSettings');
+  const directControls = Object.fromEntries(['Slot', 'Size', 'X', 'Y', 'RotateBack', 'Alignment'].map(key =>
+    [key, document.getElementById(`idPrint${key}`)]));
+  const usesEpsonDirect = () => idPrintMethod?.value === 'epson-direct';
+  const calibrationKey = () => `barangay-id-l8050-psd-v1-${directControls.Slot.value}-${idPrintProcessPhaseLabel()}`;
+  function loadIdCalibration() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(calibrationKey()) || '{}') || {}; } catch (_) {}
+    for (const [key, fallback] of [['X', 0], ['Y', 0], ['Size', 100]]) {
+      const input = directControls[key];
+      const value = Number(saved[key] ?? fallback);
+      input.value = Number.isFinite(value) ? Math.max(Number(input.min), Math.min(Number(input.max), value)) : fallback;
+    }
+    directControls.RotateBack.checked = saved.RotateBack === true;
+  }
+  for (const key of ['X', 'Y', 'Size', 'RotateBack']) {
+    directControls[key]?.addEventListener('change', () => {
+      const saved = Object.fromEntries(['X', 'Y', 'Size'].map(name => [name, directControls[name].value]));
+      saved.RotateBack = directControls.RotateBack.checked;
+      try { localStorage.setItem(calibrationKey(), JSON.stringify(saved)); } catch (_) {}
+    });
+  }
+  directControls.Slot?.addEventListener('change', loadIdCalibration);
+  directControls.Alignment?.addEventListener('click', () => printBarangayIdCards(idPrintProcessPhaseLabel(), idPrintProcessPreview, true));
+
   async function exportIdForEpsonPhotoPlus() {
     const card = idPrintProcessPreview?.querySelector('.barangay-id-card');
     if (!card || typeof window.html2canvas !== 'function') {
@@ -5116,7 +5141,7 @@
 
   idPrintMethod?.addEventListener('change', () => renderIdPrintProcessPhase());
 
-  async function printBarangayIdCards(which = 'both', sourceRoot = paymentProofWrap) {
+  async function printBarangayIdCards(which = 'both', sourceRoot = paymentProofWrap, alignmentOnly = false) {
     const cards = Array.from(sourceRoot?.querySelectorAll('.barangay-id-card') || []);
     if (!cards.length) return false;
     const renderer = window.html2canvas;
@@ -5134,13 +5159,20 @@
     if (!selectedCards.length) return true;
 
     const printWindow = window.open('', '_blank', 'width=1200,height=900');
-    if (!printWindow) return true;
+    if (!printWindow) {
+      alert('Allow pop-ups for this site to open the ID print window.');
+      return true;
+    }
+    const direct = usesEpsonDirect();
+    const slot = directControls.Slot.value;
+    const calibration = { x: directControls.X.value, y: directControls.Y.value, size: directControls.Size.value, rotateBack: directControls.RotateBack.checked };
 
     const buttons = [
       paymentProofPrintBtn,
       idPrintProcessReturnBtn,
       idPrintProcessReprintBtn,
-      idPrintProcessPrimaryBtn
+      idPrintProcessPrimaryBtn, idPrintMethod, ...Object.values(directControls),
+      idPrintProcessModalEl?.querySelector('.btn-close')
     ].filter(Boolean);
     try {
       buttons.forEach((btn) => { btn.disabled = true; });
@@ -5170,21 +5202,27 @@
       printWindow.document.close();
 
       const imageUrls = [];
+      await document.fonts.ready;
       for (const card of selectedCards) {
+        if (alignmentOnly) { imageUrls.push(''); continue; }
         const canvas = await renderer(card, {
           backgroundColor: '#ffffff',
-          scale: Math.max(2, Math.min(4, window.devicePixelRatio || 2)),
+          scale: 2022 / card.getBoundingClientRect().width,
           useCORS: true,
           logging: false
         });
         imageUrls.push(canvas.toDataURL('image/png'));
       }
 
-      const imageMarkup = imageUrls.map((src, index) => `
-        <figure class="id-print-sheet">
-          <img src="${src}" alt="Barangay ID ${which === 'back' ? 'back' : which === 'front' ? 'front' : index === 0 ? 'front' : 'back'}">
-        </figure>
-      `).join('');
+      const imageMarkup = imageUrls.map((src, index) => {
+        const side = which === 'back' ? 'back' : which === 'front' ? 'front' : index === 0 ? 'front' : 'back';
+        const box = direct ? window.BarangayIdPrintLayout.geometry(side, slot, calibration) : null;
+        const style = box ? `position:absolute;left:${box.x}mm;top:${box.y}mm;width:${box.width}mm;height:${box.height}mm;transform:rotate(${box.rotation}deg);` : '';
+        const content = alignmentOnly
+          ? `<div style="${style}border:0.2mm solid black;box-sizing:border-box;display:grid;place-items:center;font:12px Arial;text-align:center">TOP ↑<br>L8050 / Position ${slot} / ${side}<br>${box.width.toFixed(2)} × ${box.height.toFixed(2)} mm</div>`
+          : `<img style="${style}" src="${src}" alt="Barangay ID ${side}">`;
+        return `<figure class="id-print-sheet">${content}</figure>`;
+      }).join('');
 
       printWindow.document.open();
       printWindow.document.write(`
@@ -5196,15 +5234,15 @@
             <title>Print Digital Barangay ID</title>
             <style>
               @page {
-                size: 85.6mm 54mm;
+                size: ${direct ? '297mm 210mm' : '85.6mm 54mm'};
                 margin: 0;
               }
               html,
               body {
                 margin: 0;
                 padding: 0;
-                width: 85.6mm;
-                min-width: 85.6mm;
+                width: ${direct ? '297mm' : '85.6mm'};
+                min-width: ${direct ? '297mm' : '85.6mm'};
                 background: #fff;
                 font-family: Arial, Helvetica, sans-serif;
               }
@@ -5214,9 +5252,11 @@
                 justify-content: start;
               }
               .id-print-sheet {
+                position: relative;
+                overflow: hidden;
                 margin: 0;
-                width: 85.6mm;
-                height: 54mm;
+                width: ${direct ? '297mm' : '85.6mm'};
+                height: ${direct ? '210mm' : '54mm'};
                 break-inside: avoid;
                 break-after: page;
                 page-break-after: always;
@@ -5230,8 +5270,8 @@
               @media print {
                 html,
                 body {
-                  width: 85.6mm;
-                  min-width: 85.6mm;
+                  width: ${direct ? '297mm' : '85.6mm'};
+                  min-width: ${direct ? '297mm' : '85.6mm'};
                 }
                 .id-print-sheet:last-child {
                   break-after: auto;
@@ -5246,14 +5286,13 @@
         </html>
       `);
       printWindow.document.close();
-      const runPrint = () => {
-        try {
-          printWindow.focus();
-          printWindow.print();
-        } catch (_) {}
-      };
-      printWindow.addEventListener('load', () => setTimeout(runPrint, 350), { once: true });
-      setTimeout(runPrint, 1400);
+      // Wait for every image to decode, then open exactly one print dialog.
+      await Promise.all(Array.from(printWindow.document.images).map(img => img.decode()));
+      if (!printWindow.closed) {
+        printWindow.focus();
+        printWindow.print();
+      }
+
     } catch (error) {
       console.error('Failed to rasterize Barangay ID for printing:', error);
       alert('Unable to prepare the ID as an image for printing.');
@@ -5307,6 +5346,8 @@
     idPrintProcessPrimaryBtn.classList.remove('btn-success');
     idPrintProcessPrimaryBtn.classList.add('btn-primary');
     idPrintEpsonHelp?.classList.toggle('d-none', !usesEpsonPhotoPlus());
+    directSettings?.classList.toggle('d-none', !usesEpsonDirect());
+    loadIdCalibration();
     switch (idPrintProcessPhase) {
       case 'front':
         idPrintProcessStep.textContent = 'Step 1 of 3';

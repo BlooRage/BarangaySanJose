@@ -4054,9 +4054,23 @@ if ($certificateLaunchStage === 'release') {
           <div>
             <label for="idPrintMethod" class="form-label fw-semibold">Printing method</label>
             <select id="idPrintMethod" class="form-select">
+              <option value="epson-direct">Epson L8050 — Direct print (PSD layout)</option>
               <option value="epson">Epson L8050 — Export for Epson Photo+</option>
               <option value="browser">Browser print — Card-size page</option>
             </select>
+          </div>
+          <div id="idPrintDirectSettings" class="border rounded p-3">
+            <p class="mb-2">Uses the positions saved in your Photoshop template. Select L8050, A4 landscape, 100% scale, no margins or headers/footers in the print dialog. In printer preferences select Disc/ID Card Tray and PVC ID Card media. The template scale is already applied. If the driver cannot retain these settings, use Epson Photo+.</p>
+            <p class="mb-2">First print an alignment outline on A4 paper using the paper feeder and compare it with your working Photoshop print. Then test on an inkjet-printable PVC card. Front and back print separately; turn the card over and reload the same position. Mark printed only after inspecting both sides.</p>
+            <div class="row g-2">
+              <div class="col-sm-6"><label for="idPrintSlot" class="form-label">Template position</label><select id="idPrintSlot" class="form-select"><option value="1">Position 1 (upper artwork)</option><option value="2">Position 2 (lower artwork)</option></select></div>
+              <div class="col-sm-6"><label for="idPrintSize" class="form-label">Artwork size adjustment (%)</label><input id="idPrintSize" type="number" class="form-control" min="95" max="105" step="0.1" value="100"></div>
+              <div class="col-sm-6"><label for="idPrintX" class="form-label">This side: shift right (mm)</label><input id="idPrintX" type="number" class="form-control" min="-20" max="20" step="0.1" value="0"></div>
+              <div class="col-sm-6"><label for="idPrintY" class="form-label">This side: shift down (mm)</label><input id="idPrintY" type="number" class="form-control" min="-20" max="20" step="0.1" value="0"></div>
+            </div>
+            <div class="form-check mt-2"><input id="idPrintRotateBack" class="form-check-input" type="checkbox"><label for="idPrintRotateBack" class="form-check-label">Rotate back 180°</label></div>
+            <small class="d-block text-muted my-2">Negative shifts move left/up. Adjustments are saved in this browser, separately for each side and position.</small>
+            <button id="idPrintAlignment" type="button" class="btn btn-outline-secondary btn-sm">Print alignment outline</button>
           </div>
           <div id="idPrintEpsonHelp" class="alert alert-info mb-0">
             Download each side, then open Epson Photo+ and select your L8050 → ID Card → landscape → 2-Sided.
@@ -4374,7 +4388,8 @@ if ($certificateLaunchStage === 'release') {
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260918-print-direct"></script>
+<script src="../../JS-Script-Files/Admin-End/barangayIdPrintLayout.js?v=20260924"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260924-epson-psd"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
