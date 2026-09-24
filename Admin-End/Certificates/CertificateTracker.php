@@ -4387,9 +4387,9 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js?v=20260707-date-proxy-white"></script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
-<script src="../../JS-Script-Files/Admin-End/barangayIdPrintLayout.js?v=20260924"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260924-epson-psd"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../../JS-Script-Files/Shared/barangayIdDigital.js'), 0, 16) ?>"></script>
+<script src="../../JS-Script-Files/Admin-End/barangayIdPrintLayout.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../../JS-Script-Files/Admin-End/barangayIdPrintLayout.js'), 0, 16) ?>"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../../JS-Script-Files/Admin-End/certificateTrackerScript.js'), 0, 16) ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('paymentProofModal');
