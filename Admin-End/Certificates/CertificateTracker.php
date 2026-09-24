@@ -1,6 +1,7 @@
 ﻿<?php
 require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
+require_once __DIR__ . '/../../PhpFiles/General/manualDocumentFieldPolicy.php';
 
 $certificateLaunchTab = strtolower(trim((string)($_GET['tab'] ?? '')));
 $certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')));
@@ -3380,11 +3381,11 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card" data-manual-step-panel="2" data-manual-hide-for-clearance="1">
               <div class="manual-issuance-card-title">
-                <h6><?= $isIdIssuanceTrackerView ? '2. Personal Information — Sector Membership' : '2. Sector Membership' ?></h6>
-                <span>Select every applicable sector. Linked residents retain the membership recorded in the masterlist.</span>
+                <h6>2. Fee Exemption Eligibility</h6>
+                <span>Select an applicable fee exemption. For linked residents, this comes from the masterlist.</span>
               </div>
               <div class="row g-2" id="manualSectorMembershipWrap">
-                <?php foreach (['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'] as $sectorOption): ?>
+                <?php foreach (['PWD', 'Senior Citizen'] as $sectorOption): ?>
                   <?php $sectorId = preg_replace('/[^A-Za-z0-9]/', '', $sectorOption); ?>
                   <div class="col-md-6 col-lg-4">
                     <div class="form-check">
@@ -4054,22 +4055,23 @@ if ($certificateLaunchStage === 'release') {
           <div>
             <label for="idPrintMethod" class="form-label fw-semibold">Printing method</label>
             <select id="idPrintMethod" class="form-select">
-              <option value="epson-direct">Epson L8050 — Direct print (PSD layout)</option>
+              <option value="epson-direct">Epson L8050 — Direct print (PSD layout, test required)</option>
               <option value="epson">Epson L8050 — Export for Epson Photo+</option>
               <option value="browser">Browser print — Card-size page</option>
             </select>
           </div>
           <div id="idPrintDirectSettings" class="border rounded p-3">
-            <p class="mb-2">Uses the positions saved in your Photoshop template. Select L8050, A4 landscape, 100% scale, no margins or headers/footers in the print dialog. In printer preferences select Disc/ID Card Tray and PVC ID Card media. The template scale is already applied. If the driver cannot retain these settings, use Epson Photo+.</p>
+            <p class="mb-2">Uses the artwork positions saved in your Photoshop template; these have not been verified against a physical tray. Select L8050, A4 landscape, 100% scale, no margins or headers/footers in the print dialog. In printer preferences select Disc/ID Card Tray and PVC ID Card media. The template scale is already applied. If the driver cannot retain these settings, use Epson Photo+.</p>
             <p class="mb-2">First print an alignment outline on A4 paper using the paper feeder and compare it with your working Photoshop print. Then test on an inkjet-printable PVC card. Front and back print separately; turn the card over and reload the same position. Mark printed only after inspecting both sides.</p>
             <div class="row g-2">
               <div class="col-sm-6"><label for="idPrintSlot" class="form-label">Template position</label><select id="idPrintSlot" class="form-select"><option value="1">Position 1 (upper artwork)</option><option value="2">Position 2 (lower artwork)</option></select></div>
-              <div class="col-sm-6"><label for="idPrintSize" class="form-label">Artwork size adjustment (%)</label><input id="idPrintSize" type="number" class="form-control" min="95" max="105" step="0.1" value="100"></div>
-              <div class="col-sm-6"><label for="idPrintX" class="form-label">This side: shift right (mm)</label><input id="idPrintX" type="number" class="form-control" min="-20" max="20" step="0.1" value="0"></div>
-              <div class="col-sm-6"><label for="idPrintY" class="form-label">This side: shift down (mm)</label><input id="idPrintY" type="number" class="form-control" min="-20" max="20" step="0.1" value="0"></div>
+              <div class="col-sm-6"><label for="idPrintSize" class="form-label">Artwork size adjustment from center (%)</label><input id="idPrintSize" type="number" required class="form-control" min="95" max="105" step="0.1" value="100"></div>
+              <div class="col-sm-6"><label for="idPrintX" class="form-label">This side: shift right (mm)</label><input id="idPrintX" type="number" required class="form-control" min="-20" max="20" step="0.1" value="0"></div>
+              <div class="col-sm-6"><label for="idPrintY" class="form-label">This side: shift down (mm)</label><input id="idPrintY" type="number" required class="form-control" min="-20" max="20" step="0.1" value="0"></div>
             </div>
             <div class="form-check mt-2"><input id="idPrintRotateBack" class="form-check-input" type="checkbox"><label for="idPrintRotateBack" class="form-check-label">Rotate back 180°</label></div>
             <small class="d-block text-muted my-2">Negative shifts move left/up. Adjustments are saved in this browser, separately for each side and position.</small>
+            <div id="idPrintPlacementPreview" class="my-2"></div>
             <button id="idPrintAlignment" type="button" class="btn btn-outline-secondary btn-sm">Print alignment outline</button>
           </div>
           <div id="idPrintEpsonHelp" class="alert alert-info mb-0">
@@ -4369,6 +4371,7 @@ if ($certificateLaunchStage === 'release') {
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
   window.BARANGAY_ID_SETTINGS = <?= json_encode($barangayIdOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  window.MANUAL_DOCUMENT_PERSONAL_FIELDS = <?= json_encode(manual_document_personal_field_policies()) ?>;
   window.ISSUANCE_SETTINGS = <?= json_encode($issuanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.CLEARANCE_SETTINGS = <?= json_encode($clearanceOperationalSettings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   window.MANUAL_INDIGENCY_GOVERNMENT_DIRECTORY = <?= json_encode([

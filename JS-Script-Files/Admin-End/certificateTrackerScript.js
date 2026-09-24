@@ -5076,7 +5076,15 @@
   const directControls = Object.fromEntries(['Slot', 'Size', 'X', 'Y', 'RotateBack', 'Alignment'].map(key =>
     [key, document.getElementById(`idPrint${key}`)]));
   const usesEpsonDirect = () => idPrintMethod?.value === 'epson-direct';
-  const calibrationKey = () => `barangay-id-l8050-psd-v1-${directControls.Slot.value}-${idPrintProcessPhaseLabel()}`;
+  const calibrationKey = () => `barangay-id-l8050-psd-v2-${directControls.Slot.value}-${idPrintProcessPhaseLabel()}`;
+  function updateIdPlacementPreview() {
+    const preview = document.getElementById('idPrintPlacementPreview');
+    if (preview && window.BarangayIdPrintLayout) {
+      preview.innerHTML = window.BarangayIdPrintLayout.pagePreview(idPrintProcessPhaseLabel(), directControls.Slot.value, {
+        x: directControls.X.value, y: directControls.Y.value, size: directControls.Size.value
+      });
+    }
+  }
   function loadIdCalibration() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(calibrationKey()) || '{}') || {}; } catch (_) {}
@@ -5086,12 +5094,14 @@
       input.value = Number.isFinite(value) ? Math.max(Number(input.min), Math.min(Number(input.max), value)) : fallback;
     }
     directControls.RotateBack.checked = saved.RotateBack === true;
+    updateIdPlacementPreview();
   }
   for (const key of ['X', 'Y', 'Size', 'RotateBack']) {
     directControls[key]?.addEventListener('change', () => {
       const saved = Object.fromEntries(['X', 'Y', 'Size'].map(name => [name, directControls[name].value]));
       saved.RotateBack = directControls.RotateBack.checked;
       try { localStorage.setItem(calibrationKey(), JSON.stringify(saved)); } catch (_) {}
+      updateIdPlacementPreview();
     });
   }
   directControls.Slot?.addEventListener('change', loadIdCalibration);
@@ -5157,6 +5167,7 @@
         ? (hasSinglePreviewCard ? cards.slice(0, 1) : cards.slice(1, 2))
         : cards;
     if (!selectedCards.length) return true;
+    if (usesEpsonDirect() && !['X', 'Y', 'Size'].every(key => directControls[key].reportValidity())) return true;
 
     const printWindow = window.open('', '_blank', 'width=1200,height=900');
     if (!printWindow) {
@@ -5220,8 +5231,8 @@
         const style = box ? `position:absolute;left:${box.x}mm;top:${box.y}mm;width:${box.width}mm;height:${box.height}mm;transform:rotate(${box.rotation}deg);` : '';
         const content = alignmentOnly
           ? `<div style="${style}border:0.2mm solid black;box-sizing:border-box;display:grid;place-items:center;font:12px Arial;text-align:center">TOP ↑<br>L8050 / Position ${slot} / ${side}<br>${box.width.toFixed(2)} × ${box.height.toFixed(2)} mm</div>`
-          : `<img style="${style}" src="${src}" alt="Barangay ID ${side}">`;
-        return `<figure class="id-print-sheet">${content}</figure>`;
+          : `<img style="${style}${direct ? 'object-fit:contain;object-position:center;' : ''}" src="${src}" alt="Barangay ID ${side}">`;
+        return `<figure class="id-print-sheet">${content}${alignmentOnly ? window.BarangayIdPrintLayout.alignmentReference() : ''}</figure>`;
       }).join('');
 
       printWindow.document.open();
@@ -8703,7 +8714,6 @@
     const manualFeeList = document.getElementById('manualFeeList');
     const manualFeeTotal = document.getElementById('manualFeeTotal');
     const manualSectorMembershipWrap = document.getElementById('manualSectorMembershipWrap');
-    const manualSupplementalPersonalFields = Array.from(manualPanel.querySelectorAll('[data-manual-hide-for-clearance-field]'));
     const manualSectorCheckboxes = Array.from(manualPanel.querySelectorAll('[data-manual-sector]'));
     const manualPreviewBtn = document.getElementById('manualPreviewBtn');
     const manualSubmitBtn = document.getElementById('manualSubmitBtn');
@@ -8957,7 +8967,7 @@
       manualIdWizardPanels.forEach((panel) => {
         const matchesStep = manualPanelStep(panel) === manualIdWizardCurrentStep;
         const optionalClearance = panel.dataset.manualOptionalPanel === 'clearance';
-        const hiddenForClearance = panel.dataset.manualHideForClearance === '1' && manualIsClearanceConfig(config);
+        const hiddenForClearance = panel.dataset.manualHideForClearance === '1' && !manualNeedsSectorMembership(config);
         panel.classList.toggle('d-none', !matchesStep || hiddenForClearance || (optionalClearance && !manualIsClearanceConfig(config)));
       });
       manualIdWizardSteps.forEach((item, index) => {
@@ -9210,8 +9220,12 @@
       return selected.has('PWD') || selected.has('Senior Citizen');
     }
 
+    function manualNeedsSectorMembership(config = manualCurrentConfig()) {
+      return !!config && !config.clearance && (!config.free || manualIsOtherDocumentSelection(manualCurrentRawConfig()));
+    }
+
     function manualCurrentSectorValues() {
-      if (manualIsClearanceConfig()) {
+      if (!manualNeedsSectorMembership()) {
         return [];
       }
       if (manualCurrentMode() === 'walkin') {
@@ -9221,7 +9235,7 @@
     }
 
     function manualSyncSectorMembershipUi() {
-      if (manualIsClearanceConfig()) {
+      if (!manualNeedsSectorMembership()) {
         manualSetSelectedSectorValues([]);
         manualSectorCheckboxes.forEach((checkbox) => {
           checkbox.disabled = true;
@@ -10512,44 +10526,32 @@
       }
     }
 
+    function manualPersonalFields(config = manualCurrentConfig()) {
+      return window.MANUAL_DOCUMENT_PERSONAL_FIELDS?.[config?.kind] || [];
+    }
+
     function manualApplyCommonFieldRequirements(config) {
-      const fields = manualFieldDefinitions(config);
-      const fieldRequired = (name) => fields.some((field) => field?.name === name && field.required);
-      const isClearance = manualIsClearanceConfig(config);
+      const needed = new Set(manualPersonalFields(config));
+      const controls = {
+        birthdate: manualBirthdate, sex: manualSex, civil_status: manualCivilStatus,
+        contact_number: manualContactNumber, birthplace: manualBirthplace,
+        occupation: manualOccupation, religion: manualReligion
+      };
       if (!isIdIssuanceTrackerView) {
-        if (manualPersonalInfoTitle) {
-          manualPersonalInfoTitle.textContent = isClearance
-            ? '2. Requester Information'
-            : '2. Personal Basic Information';
-        }
-        if (manualPersonalInfoHint) {
-          manualPersonalInfoHint.textContent = isClearance
-            ? 'Enter only the requester details needed to process this clearance.'
-            : 'Enter the resident details exactly as they should appear on the certificate.';
-        }
+        if (manualPersonalInfoTitle) manualPersonalInfoTitle.textContent = '2. Requester Information';
+        if (manualPersonalInfoHint) manualPersonalInfoHint.textContent = 'Only details needed for the selected document are shown.';
       }
-      if (manualBirthdate) manualBirthdate.required = !isClearance;
-      manualBirthdateRequiredMark?.classList.toggle('d-none', isClearance);
-      if (manualSex) manualSex.required = !isClearance;
-      if (manualCivilStatus) manualCivilStatus.required = !isClearance;
-      if (manualContactNumber) manualContactNumber.required = !isClearance;
-      if (manualBirthplace) manualBirthplace.required = !isClearance;
-      manualBirthplaceRequiredMark?.classList.toggle('d-none', isClearance);
-      const hideSupplementalPersonalFields = isClearance;
-      manualSupplementalPersonalFields.forEach((wrapper) => {
-        wrapper.classList.toggle('d-none', hideSupplementalPersonalFields);
-        wrapper.querySelectorAll('input, select, textarea').forEach((field) => {
-          field.disabled = hideSupplementalPersonalFields && field.id !== 'manualBarangay' && field.id !== 'manualCity' && field.id !== 'manualProvince';
-          if (hideSupplementalPersonalFields) field.required = false;
-          if (hideSupplementalPersonalFields) manualSetFieldInvalidState(field, false);
+      for (const [name, control] of Object.entries(controls)) {
+        const show = needed.has(name);
+        const wrapper = control?.closest('[data-manual-hide-for-clearance-field]');
+        wrapper?.classList.toggle('d-none', !show);
+        wrapper?.querySelectorAll('input, select, textarea').forEach(field => {
+          field.disabled = !show;
+          field.required = show;
+          if (!show) manualSetFieldInvalidState(field, false);
         });
-      });
-      const occupationRequired = !hideSupplementalPersonalFields && fieldRequired('occupation');
-      const religionRequired = !hideSupplementalPersonalFields && fieldRequired('religion');
-      if (manualOccupation) manualOccupation.required = occupationRequired;
-      manualOccupationRequiredMark?.classList.toggle('d-none', !occupationRequired);
-      if (manualReligion) manualReligion.required = religionRequired;
-      manualReligionRequiredMark?.classList.toggle('d-none', !religionRequired);
+        wrapper?.querySelectorAll('.text-danger').forEach(mark => mark.classList.toggle('d-none', !show));
+      }
       manualSyncSectorMembershipUi();
     }
 
@@ -11309,16 +11311,11 @@
         address: fullAddress,
         sector_membership: config.clearance ? '' : manualCurrentSectorValues().join(', '),
       };
-      if (config.clearance) {
-        payload.birthdate = '';
-        payload.date_of_birth = '';
-        payload.sex = '';
-        payload.gender = '';
-        payload.civil_status = '';
-        payload.birthplace = '';
-        payload.place_of_birth = '';
-        payload.occupation = '';
-        payload.religion = '';
+      // Disabled fields retain their values for switching documents, but never
+      // submit unrelated personal details with the selected document.
+      const neededPersonalFields = new Set(manualPersonalFields(config));
+      for (const field of ['birthdate', 'sex', 'civil_status', 'contact_number', 'birthplace', 'occupation', 'religion']) {
+        if (!neededPersonalFields.has(field)) delete payload[field];
       }
       if (config.kind === 'general_certification') {
         payload.manual_document_variant = config.label;

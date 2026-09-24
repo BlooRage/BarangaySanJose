@@ -8,6 +8,7 @@ require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/audit.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
 require_once __DIR__ . '/../General/documentModuleSettings.php';
+require_once __DIR__ . '/../General/manualDocumentFieldPolicy.php';
 
 if (!($conn instanceof mysqli)) {
     throw new RuntimeException('Database connection is unavailable.');
@@ -7898,17 +7899,8 @@ if ($action === 'create_manual_request') {
     $documentToken = strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $documentType));
     $isBarangayIdDocument = dr_is_barangay_id_document_type($documentType);
     $isClearanceDoc = dr_is_clearance_document_type($documentType);
+    $payload = manual_document_filter_personal_fields($documentType, $payload);
     if ($isClearanceDoc) {
-        $payload['birthdate'] = '';
-        $payload['date_of_birth'] = '';
-        $payload['birthDate'] = '';
-        $payload['sex'] = '';
-        $payload['gender'] = '';
-        $payload['civil_status'] = '';
-        $payload['birthplace'] = '';
-        $payload['place_of_birth'] = '';
-        $payload['occupation'] = '';
-        $payload['religion'] = '';
         $payload['sector_membership'] = '';
     }
     $requireManualPayloadFields = static function (array $requiredFields) use ($payload): void {
@@ -7922,26 +7914,19 @@ if ($action === 'create_manual_request') {
         }
     };
 
+    $personalFields = manual_document_personal_fields($documentType, $payload);
+    $personalFieldLabels = [
+        'birthdate' => 'Birthdate', 'birthplace' => 'Birthplace', 'sex' => 'Sex',
+        'civil_status' => 'Civil Status', 'contact_number' => 'Contact Number',
+        'occupation' => 'Occupation', 'religion' => 'Religion',
+    ];
     $basicManualFields = [
         'last_name' => 'Last Name',
         'first_name' => 'First Name',
         'area_number' => 'Area Number',
     ];
-    if (!$isClearanceDoc) {
-        $basicManualFields = array_merge($basicManualFields, [
-            'birthdate' => 'Birthdate',
-            'sex' => 'Sex',
-            'civil_status' => 'Civil Status',
-            'birthplace' => 'Birthplace',
-        ]);
-    }
+    $basicManualFields += array_intersect_key($personalFieldLabels, array_flip($personalFields));
     $requireManualPayloadFields($basicManualFields);
-    if (!$isBarangayIdDocument && !$isClearanceDoc) {
-        $requireManualPayloadFields([
-            'occupation' => 'Occupation',
-            'religion' => 'Religion',
-        ]);
-    }
     if (!$isBarangayIdDocument) {
         $requireManualPayloadFields([
             'request_purpose' => 'Purpose / Request For',
