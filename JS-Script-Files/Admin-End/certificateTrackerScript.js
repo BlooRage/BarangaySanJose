@@ -3716,6 +3716,7 @@
     const isTricyclePermitClearance = docKey === 'tricycleclearance';
     const isGoodMoral = docKey === 'goodmoral';
     const isResidency = docKey === 'residency';
+    const isIdentity = docKey === 'identity';
     const isGeneralCertification = /^general\s+certificat(?:e|ion)\b/i.test(templateDocType);
     const usesResidencyTemplate = isResidency || isGeneralCertification;
     const isCohabitation = docKey === 'cohabitation';
@@ -3735,6 +3736,14 @@
     const contactNumber = String(state.contactNumber || '').trim();
     const birthdate = String(state.birthdate || '').trim();
     const birthplace = String(state.birthplace || '').trim();
+    const identitySex = String(firstNonEmpty([state.sex, state.gender, state.childSex]) || '').trim();
+    const identityNationality = String(firstNonEmpty([state.childNationality, state.nationality]) || '').trim();
+    const identityFatherName = String(state.fatherName || '').trim();
+    const identityMotherName = String(state.motherName || '').trim();
+    const identityResidencyParts = [];
+    if (String(state.yearsResidency || '').trim()) identityResidencyParts.push(`${String(state.yearsResidency).trim()} year(s)`);
+    if (String(state.monthsResidency || '').trim()) identityResidencyParts.push(`${String(state.monthsResidency).trim()} month(s)`);
+    const identityResidency = identityResidencyParts.join(' and ');
     const remarks = String(state.remarks || '').trim();
     const requestFor = String(state.requestFor || '').trim();
     const bodyNumber = String(state.bodyNumber || '').trim();
@@ -3861,6 +3870,19 @@
       <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress), '${ADDRESS}', 'doc-editable-multiline')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
       <div class="doc-to-block"><strong>Birthday</strong><strong>:</strong><strong>${previewEditable('birthdate', safe(birthdate, '${Birthdate}'), '${Birthdate}')}</strong></div>
       <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${previewEditable('birthplace', safe(birthplace, '${Birthplace}'), '${Birthplace}')}</strong></div>
+      <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
+      <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${previewEditable('purpose', safe(purpose, '${PURPOSE}'), '${PURPOSE}')}</strong></div>
+    `;
+    const identityRows = `
+      <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${previewEditable('fullName', safe(fullName), '${FULL_NAME}')}</strong></div>
+      <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress), '${ADDRESS}', 'doc-editable-multiline')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+      <div class="doc-to-block"><strong>Birthday</strong><strong>:</strong><strong>${previewEditable('birthdate', safe(birthdate, '${Birthdate}'), '${Birthdate}')}</strong></div>
+      <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${previewEditable('birthplace', safe(birthplace, '${Birthplace}'), '${Birthplace}')}</strong></div>
+      <div class="doc-to-block"><strong>Sex</strong><strong>:</strong><strong>${esc(safe(identitySex, '-'))}</strong></div>
+      <div class="doc-to-block"><strong>Nationality</strong><strong>:</strong><strong>${esc(safe(identityNationality, '-'))}</strong></div>
+      <div class="doc-to-block"><strong>Father</strong><strong>:</strong><strong>${esc(safe(identityFatherName, '-'))}</strong></div>
+      <div class="doc-to-block"><strong>Mother</strong><strong>:</strong><strong>${esc(safe(identityMotherName, '-'))}</strong></div>
+      <div class="doc-to-block"><strong>Residency</strong><strong>:</strong><strong>${esc(safe(identityResidency, '-'))}</strong></div>
       <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
       <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${previewEditable('purpose', safe(purpose, '${PURPOSE}'), '${PURPOSE}')}</strong></div>
     `;
@@ -4199,14 +4221,14 @@
         </p>
       `;
       metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
-    } else if (usesResidencyTemplate) {
-      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
+    } else if (usesResidencyTemplate || isIdentity) {
+      titleHtml = `<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>${isIdentity ? 'CERTIFICATE OF IDENTITY' : 'BARANGAY CERTIFICATION'}</div></div>`;
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that the person whose name appears here on has requested a Barangay Clearance from this office and the information are listed below:
+          This is to certify that the person whose name appears here on has requested a ${isIdentity ? 'Certificate of Identity' : 'Barangay Clearance'} from this office and the information are listed below:
         </p>
-        ${residencyRows}
+        ${isIdentity ? identityRows : residencyRows}
         <p>
           This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
@@ -4282,7 +4304,7 @@
           ? 'doc-preview-paper doc-preview-paper--generalclearance'
           : isTricyclePermitClearance
             ? 'doc-preview-paper doc-preview-paper--tricycle'
-            : (isBarangayId || isGoodMoral || usesResidencyTemplate || isCohabitation || isFirstTimeJobSeeker)
+            : (isBarangayId || isGoodMoral || usesResidencyTemplate || isIdentity || isCohabitation || isFirstTimeJobSeeker)
               ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
               : 'doc-preview-paper';
 

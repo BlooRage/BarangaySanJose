@@ -9147,6 +9147,7 @@ if ($action === 'view_issued') {
     $docTypeToken = preg_replace('/[^a-z0-9]+/', '', $docTypeNorm);
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
+    $isIdentity = strpos($docTypeNorm, 'identity') !== false;
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isGeneralCertification = (bool)preg_match('/\bgeneral\s+certificat(?:e|ion)\b/i', (string)($row['document_type'] ?? ''));
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
@@ -9167,6 +9168,7 @@ if ($action === 'view_issued') {
     $isGeneralPermitClearance = (dra_general_clearance_purpose_from_document_type((string)($row['document_type'] ?? '')) !== '');
     $isTemplateBasedCertificate = $isIndigency
         || $isGoodMoral
+        || $isIdentity
         || $isResidency
         || $isGeneralCertification
         || $isCohabitation
