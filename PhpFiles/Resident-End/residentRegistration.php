@@ -139,6 +139,116 @@ function isValidIdNumber(string $value): bool {
     return (bool)preg_match('/^[A-Za-z0-9-]{3,50}$/', $value);
 }
 
+function normalizeResidentDuplicateToken(string $value): string {
+    $value = trim(strtolower($value));
+    $value = preg_replace('/\s+/u', ' ', $value);
+    $value = preg_replace("/[^a-z0-9ñ .'-]+/u", '', (string)$value);
+    return trim((string)$value);
+}
+
+function residentDuplicateNamesMatch(array $existing, array $incoming): bool {
+    if (
+        normalizeResidentDuplicateToken((string)($existing['firstname'] ?? '')) !== normalizeResidentDuplicateToken((string)($incoming['firstname'] ?? '')) ||
+        normalizeResidentDuplicateToken((string)($existing['lastname'] ?? '')) !== normalizeResidentDuplicateToken((string)($incoming['lastname'] ?? '')) ||
+        trim((string)($existing['birthdate'] ?? '')) !== trim((string)($incoming['birthdate'] ?? ''))
+    ) {
+        return false;
+    }
+
+    $existingMiddle = normalizeResidentDuplicateToken((string)($existing['middlename'] ?? ''));
+    $incomingMiddle = normalizeResidentDuplicateToken((string)($incoming['middlename'] ?? ''));
+    if ($existingMiddle !== '' && $incomingMiddle !== '' && $existingMiddle !== $incomingMiddle) {
+        return false;
+    }
+
+    $existingSuffix = normalizeResidentDuplicateToken((string)($existing['suffix'] ?? ''));
+    $incomingSuffix = normalizeResidentDuplicateToken((string)($incoming['suffix'] ?? ''));
+    if ($existingSuffix !== '' && $incomingSuffix !== '' && $existingSuffix !== $incomingSuffix) {
+        return false;
+    }
+
+    return true;
+}
+
+function findDuplicateResidentProfile(mysqli $conn, string $currentUserId, array $incoming): ?array {
+    $ownStmt = $conn->prepare("
+        SELECT resident_id
+        FROM residentinformationtbl
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if (!$ownStmt) {
+        throw new Exception("Prepare failed (resident duplicate self-check): " . $conn->error);
+    }
+    $ownStmt->bind_param("s", $currentUserId);
+    $ownStmt->execute();
+    $ownResult = $ownStmt->get_result();
+    $ownRow = $ownResult ? $ownResult->fetch_assoc() : null;
+    $ownStmt->close();
+    if ($ownRow) {
+        return [
+            'type' => 'same_user',
+            'resident_id' => (string)($ownRow['resident_id'] ?? ''),
+        ];
+    }
+
+    $stmt = $conn->prepare("
+        SELECT resident_id, user_id, lastname, firstname, middlename, suffix, birthdate
+        FROM residentinformationtbl
+        WHERE user_id <> ?
+        ORDER BY resident_id DESC
+    ");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (resident duplicate identity-check): " . $conn->error);
+    }
+    $stmt->bind_param("s", $currentUserId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result ? $result->fetch_assoc() : null) {
+        $decrypted = pii_decrypt_assoc($row, ['lastname', 'firstname', 'middlename', 'suffix', 'birthdate']);
+        if (residentDuplicateNamesMatch($decrypted, $incoming)) {
+            $stmt->close();
+            return [
+                'type' => 'same_identity',
+                'resident_id' => (string)($decrypted['resident_id'] ?? ''),
+                'user_id' => (string)($decrypted['user_id'] ?? ''),
+            ];
+        }
+    }
+    $stmt->close();
+
+    return null;
+}
+
+function acquireResidentRegistrationLock(mysqli $conn, string $userId): string {
+    $lockName = 'brgy_resident_reg_' . substr(hash('sha256', $userId), 0, 32);
+    $stmt = $conn->prepare("SELECT GET_LOCK(?, 10) AS acquired");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (resident registration lock): " . $conn->error);
+    }
+    $stmt->bind_param("s", $lockName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ((int)($row['acquired'] ?? 0) !== 1) {
+        throw new Exception("Another resident registration submission is still being processed. Please wait a few seconds and try again.");
+    }
+    return $lockName;
+}
+
+function releaseResidentRegistrationLock(mysqli $conn, string $lockName): void {
+    if ($lockName === '') {
+        return;
+    }
+    $stmt = $conn->prepare("SELECT RELEASE_LOCK(?)");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param("s", $lockName);
+    $stmt->execute();
+    $stmt->close();
+}
+
 function normalizePhaseNumber(string $value): string {
     $value = trim($value);
     if ($value === '') {
@@ -762,6 +872,28 @@ try {
     }
 
     ensureResidentProfilingColumns($conn);
+    $residentRegistrationLockName = acquireResidentRegistrationLock($conn, (string)$user_id);
+
+    $duplicateResident = findDuplicateResidentProfile($conn, $user_id, [
+        'lastname' => $lastName,
+        'firstname' => $firstName,
+        'middlename' => $middleName,
+        'suffix' => $suffix,
+        'birthdate' => $dob,
+    ]);
+    if ($duplicateResident !== null) {
+        http_response_code(409);
+        $message = ($duplicateResident['type'] ?? '') === 'same_user'
+            ? "This account already has a resident profile."
+            : "A resident profile with the same name and birthdate already exists. Please contact the barangay office if this is your record.";
+        echo json_encode([
+            "success" => false,
+            "message" => $message
+        ]);
+        releaseResidentRegistrationLock($conn, $residentRegistrationLockName);
+        exit;
+    }
+
     $conn->begin_transaction();
 
     // Default Resident status = NotVerified (Resident)
@@ -1646,11 +1778,13 @@ try {
         "message" => $message,
         "redirect" => appUrl('/Resident-End/resident_dashboard.php')
     ]);
+    releaseResidentRegistrationLock($conn, $residentRegistrationLockName ?? '');
     exit;
 
 } catch (Exception $e) {
     if (isset($conn) && $conn instanceof mysqli) {
         $conn->rollback();
+        releaseResidentRegistrationLock($conn, $residentRegistrationLockName ?? '');
     }
 
     $rawMessage = trim((string)$e->getMessage());
