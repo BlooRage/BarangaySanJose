@@ -3252,6 +3252,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     $docTypeToken = preg_replace('/[^a-z0-9]+/', '', $docTypeNorm);
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
+    $isIdentity = strpos($docTypeNorm, 'identity') !== false;
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isGeneralCertification = (bool)preg_match('/\bgeneral\s+certificat(?:e|ion)\b/i', $docType);
     $usesResidencyTemplate = $isResidency || $isGeneralCertification;
@@ -5358,7 +5359,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     if ($printHeaderEnabled && is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
-    $isSpecialCertificate = $isIndigency || $isGoodMoral || $usesResidencyTemplate || $isCohabitation || $isFirstTimeJobSeeker;
+    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isIdentity || $usesResidencyTemplate || $isCohabitation || $isFirstTimeJobSeeker;
     $fontFace = 'Arial';
     $indigencyFont = 'Arial';
 
@@ -5393,6 +5394,12 @@ function dra_generate_issued_document(array $requestRow): ?string
             $pdf->SetFont($indigencyFont, 'B', 12);
             $residencyTemplateTitle = $isResidency ? 'CERTIFICATE OF RESIDENCY' : 'BARANGAY CERTIFICATION';
             $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : $residencyTemplateTitle), 0, 1, 'C');
+            $pdf->Ln(4);
+        } elseif ($isIdentity) {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 6, strtoupper($customDocumentTitle !== '' ? $customDocumentTitle : 'CERTIFICATE OF IDENTITY'), 0, 1, 'C');
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
             $pdf->SetFont($indigencyFont, 'B', 17);
@@ -5615,7 +5622,27 @@ function dra_generate_issued_document(array $requestRow): ?string
             $requestPurpose = 'PURPOSE';
         }
         $birthdateValue = $normalizeTemplateValue((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? $payload['birthDate'] ?? ''));
-        $birthplaceValue = $normalizeTemplateValue((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? ''));
+        $birthplaceValue = $normalizeTemplateValue((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? $payload['child_birthplace'] ?? ''));
+        $identitySexValue = $normalizeTemplateValue((string)($payload['sex'] ?? $payload['gender'] ?? $payload['child_sex'] ?? ''));
+        $identityNationalityValue = $normalizeTemplateValue((string)($payload['child_nationality'] ?? $payload['nationality'] ?? ''));
+        $identityFatherName = $normalizeTemplateValue((string)($payload['father_full_name'] ?? ''));
+        if ($identityFatherName === '') {
+            $identityFatherName = trim(implode(' ', array_filter([
+                $normalizeTemplateValue((string)($payload['father_first_name'] ?? '')),
+                $normalizeTemplateValue((string)($payload['father_middle_name'] ?? '')),
+                $normalizeTemplateValue((string)($payload['father_last_name'] ?? '')),
+                $normalizeTemplateValue((string)($payload['father_suffix'] ?? '')),
+            ], static fn($value) => trim((string)$value) !== '')));
+        }
+        $identityMotherName = $normalizeTemplateValue((string)($payload['mother_full_name'] ?? ''));
+        if ($identityMotherName === '') {
+            $identityMotherName = trim(implode(' ', array_filter([
+                $normalizeTemplateValue((string)($payload['mother_first_name'] ?? '')),
+                $normalizeTemplateValue((string)($payload['mother_middle_name'] ?? '')),
+                $normalizeTemplateValue((string)($payload['mother_last_name'] ?? '')),
+                $normalizeTemplateValue((string)($payload['mother_suffix'] ?? '')),
+            ], static fn($value) => trim((string)$value) !== '')));
+        }
         $remarksValue = $normalizeTemplateValue((string)($payload['remarks'] ?? ''));
         $cohabitationChildrenCount = max(0, (int)trim((string)($payload['cohabitation_children_count'] ?? '0')));
         $cohabitationHasChildren = $cohabitationChildrenCount > 0;
@@ -5961,11 +5988,13 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $indigencyFont,
                 12
             );
-        } elseif ($usesResidencyTemplate) {
+        } elseif ($usesResidencyTemplate || $isIdentity) {
             $writeIndentedParagraph(
-                $isResidency
+                $isIdentity
+                    ? 'This is to certify that the person whose name appears here on has requested a Certificate of Identity from this office and the information are listed below:'
+                    : ($isResidency
                     ? 'This is to certify that the person whose name appears here on has requested a Certificate of Residency from this office and the information are listed below:'
-                    : 'This is to certify that the person whose name appears here on has requested a Barangay Certification from this office and the information are listed below:',
+                    : 'This is to certify that the person whose name appears here on has requested a Barangay Certification from this office and the information are listed below:'),
                 7,
                 18,
                 10,
@@ -6006,8 +6035,15 @@ function dra_generate_issued_document(array $requestRow): ?string
 
             $writeResidencyField('Name', $fullName !== '' ? $fullName : '-', false);
             $writeResidencyField('Address', $applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-', false);
-            $writeResidencyField('Birthday', $birthdateValue !== '' ? $birthdateValue : '-', false);
+            $writeResidencyField('Birthday', $birthdateValue !== '' ? $formatDisplayDate($birthdateValue) : '-', false);
             $writeResidencyField('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-', false);
+            if ($isIdentity) {
+                $writeResidencyField('Sex', $identitySexValue !== '' ? $identitySexValue : '-', false);
+                $writeResidencyField('Nationality', $identityNationalityValue !== '' ? $identityNationalityValue : '-', false);
+                $writeResidencyField('Father', $identityFatherName !== '' ? $identityFatherName : '-', false);
+                $writeResidencyField('Mother', $identityMotherName !== '' ? $identityMotherName : '-', false);
+                $writeResidencyField('Residency', !empty($residencyParts) ? $residencyDurationText : '-', false);
+            }
             $writeResidencyField('Remarks', $remarksValue, false, '');
             $displayPurpose = $isGeneralCertification
                 ? trim((string)(preg_replace('/\s*\(\s*SINCE\b[^)]*\)\s*$/i', '', $requestPurpose) ?? $requestPurpose))
@@ -6187,7 +6223,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 $indigencyFont,
                 12
             );
-        } elseif ($usesResidencyTemplate) {
+        } elseif ($usesResidencyTemplate || $isIdentity) {
             $writeRichParagraph(
                 [
                     ['text' => 'This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11-2019', 'bold' => false],
@@ -6377,7 +6413,7 @@ function dra_generate_issued_document(array $requestRow): ?string
             );
         } else {
             // Issued by + signatory blocks aligned to the same baseline.
-            $signBaseY = ($isGoodMoral || $usesResidencyTemplate || $isCohabitation) ? 230.0 : 214.0;
+            $signBaseY = ($isGoodMoral || $usesResidencyTemplate || $isIdentity || $isCohabitation) ? 230.0 : 214.0;
             $issuedByY = $signBaseY + 9;
             $issuedByTitleY = $signBaseY + 15;
             $footerNoteY = 258.0;
@@ -7990,6 +8026,16 @@ if ($action === 'create_manual_request') {
             'request_officer_line1' => 'Recipient Name',
             'request_officer_line2' => 'Recipient Position',
             'request_officer_line3' => 'Recipient Address',
+        ]);
+    } elseif (str_contains($documentToken, 'identity')) {
+        $requireManualPayloadFields([
+            'child_nationality' => 'Nationality',
+            'father_last_name' => 'Father Last Name',
+            'father_first_name' => 'Father First Name',
+            'mother_last_name' => 'Mother Last Name',
+            'mother_first_name' => 'Mother First Name',
+            'years_of_residency' => 'Years of Residency',
+            'months_of_residency' => 'Months of Residency',
         ]);
     } elseif (str_contains($documentToken, 'cohabitation')) {
         $cohabitationVariant = strtolower(trim((string)($payload['cohabitation_variant'] ?? 'standard')));

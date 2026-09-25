@@ -3262,8 +3262,8 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card" data-manual-step-panel="2">
               <div class="manual-issuance-card-title">
-                <h6 id="manualPersonalInfoTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information — Basic Info' : '2. Personal Basic Information' ?></h6>
-                <span id="manualPersonalInfoHint"><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Enter the resident details exactly as they should appear on the certificate.' ?></span>
+                <h6 id="manualPersonalInfoTitle"><?= $isIdIssuanceTrackerView ? '2. Personal Information - Basic Info' : '2. Requester Information' ?></h6>
+                <span id="manualPersonalInfoHint"><?= $isIdIssuanceTrackerView ? 'Fields marked * are required for Barangay ID issuance.' : 'Only details needed for the selected document are shown.' ?></span>
               </div>
               <div class="row g-3">
                 <div class="col-md-6 col-lg-3">
@@ -3289,7 +3289,7 @@ if ($certificateLaunchStage === 'release') {
                     <option value="IV">IV</option>
                   </select>
                 </div>
-                <div class="col-md-6 col-lg-3" data-manual-hide-for-clearance-field>
+                <div class="col-md-6 col-lg-3 <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" data-manual-hide-for-clearance-field>
                   <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate <span class="text-danger <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" id="manualBirthdateRequiredMark">*</span></label>
                   <?php if ($isIdIssuanceTrackerView): ?>
                     <div class="manual-birthdate-dropdowns">
@@ -3314,7 +3314,7 @@ if ($certificateLaunchStage === 'release') {
                     <input type="date" id="manualBirthdate" class="form-control" max="<?= date('Y-m-d') ?>" data-date-modal-style="calendar">
                   <?php endif; ?>
                 </div>
-                <div class="col-md-6 col-lg-3" data-manual-hide-for-clearance-field>
+                <div class="col-md-6 col-lg-3 <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" data-manual-hide-for-clearance-field>
                   <label for="manualSex" class="form-label fw-semibold small">Sex <span class="text-danger">*</span></label>
                   <select id="manualSex" class="form-select">
                     <option value="">Select sex</option>
@@ -3322,7 +3322,7 @@ if ($certificateLaunchStage === 'release') {
                     <option value="Female">Female</option>
                   </select>
                 </div>
-                <div class="col-md-6 col-lg-3" data-manual-hide-for-clearance-field>
+                <div class="col-md-6 col-lg-3 d-none" data-manual-hide-for-clearance-field>
                   <label for="manualCivilStatus" class="form-label fw-semibold small">Civil Status <span class="text-danger">*</span></label>
                   <select id="manualCivilStatus" class="form-select">
                     <option value="">Select civil status</option>
@@ -3332,19 +3332,19 @@ if ($certificateLaunchStage === 'release') {
                     <option value="Separated">Separated</option>
                   </select>
                 </div>
-                <div class="col-md-6 col-lg-3" data-manual-hide-for-clearance-field>
+                <div class="col-md-6 col-lg-3 <?= $isIdIssuanceTrackerView ? '' : 'd-none' ?>" data-manual-hide-for-clearance-field>
                   <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number <span class="text-danger">*</span></label>
                   <input type="text" id="manualContactNumber" class="form-control" placeholder="09XXXXXXXXX">
                 </div>
-                <div class="<?= $isIdIssuanceTrackerView ? 'col-12' : 'col-md-6' ?>" data-manual-hide-for-clearance-field>
+                <div class="<?= $isIdIssuanceTrackerView ? 'col-12' : 'col-md-6 d-none' ?>" data-manual-hide-for-clearance-field>
                   <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace <span class="text-danger" id="manualBirthplaceRequiredMark">*</span></label>
                   <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
                 </div>
-                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>" data-manual-hide-for-clearance-field>
+                <div class="col-md-3 d-none" data-manual-hide-for-clearance-field>
                   <label for="manualOccupation" class="form-label fw-semibold small">Occupation <span class="text-danger d-none" id="manualOccupationRequiredMark">*</span></label>
                   <input type="text" id="manualOccupation" class="form-control" placeholder="Occupation">
                 </div>
-                <div class="col-md-3 <?= $isIdIssuanceTrackerView ? 'd-none' : '' ?>" data-manual-hide-for-clearance-field>
+                <div class="col-md-3 d-none" data-manual-hide-for-clearance-field>
                   <label for="manualReligion" class="form-label fw-semibold small">Religion <span class="text-danger d-none" id="manualReligionRequiredMark">*</span></label>
                   <input type="text" id="manualReligion" class="form-control" placeholder="Religion">
                 </div>
@@ -3360,21 +3360,30 @@ if ($certificateLaunchStage === 'release') {
                       <i class="fa-solid fa-chevron-right manual-area-picker-chevron" aria-hidden="true"></i>
                     </div>
                   </div>
-                  <div class="col-md-6" data-manual-hide-for-clearance-field>
-                    <label for="manualBarangay" class="form-label fw-semibold small">Barangay</label>
-                    <input type="text" id="manualBarangay" class="form-control manual-address-default" value="San Jose" readonly aria-describedby="manualLocalityDefaultHelp">
-                  </div>
-                  <div class="col-md-6" data-manual-hide-for-clearance-field>
-                    <label for="manualCity" class="form-label fw-semibold small">City / Municipality</label>
-                    <input type="text" id="manualCity" class="form-control manual-address-default" value="Rodriguez (Montalban)" readonly aria-describedby="manualLocalityDefaultHelp">
-                  </div>
-                  <div class="col-md-6" data-manual-hide-for-clearance-field>
-                    <label for="manualProvince" class="form-label fw-semibold small">Province</label>
-                    <input type="text" id="manualProvince" class="form-control manual-address-default" value="Rizal" readonly aria-describedby="manualLocalityDefaultHelp">
-                  </div>
-                  <div class="col-12" data-manual-hide-for-clearance-field>
-                    <div class="form-text mt-0" id="manualLocalityDefaultHelp"><i class="fa-solid fa-lock me-1"></i>Barangay, municipality, and province are system defaults.</div>
-                  </div>
+                  <?php if ($isIdIssuanceTrackerView): ?>
+                    <div class="col-md-6" data-manual-hide-for-clearance-field>
+                      <label for="manualBarangay" class="form-label fw-semibold small">Barangay</label>
+                      <input type="text" id="manualBarangay" class="form-control manual-address-default" value="San Jose" readonly aria-describedby="manualLocalityDefaultHelp">
+                    </div>
+                    <div class="col-md-6" data-manual-hide-for-clearance-field>
+                      <label for="manualCity" class="form-label fw-semibold small">City / Municipality</label>
+                      <input type="text" id="manualCity" class="form-control manual-address-default" value="Rodriguez (Montalban)" readonly aria-describedby="manualLocalityDefaultHelp">
+                    </div>
+                    <div class="col-md-6" data-manual-hide-for-clearance-field>
+                      <label for="manualProvince" class="form-label fw-semibold small">Province</label>
+                      <input type="text" id="manualProvince" class="form-control manual-address-default" value="Rizal" readonly aria-describedby="manualLocalityDefaultHelp">
+                    </div>
+                    <div class="col-12" data-manual-hide-for-clearance-field>
+                      <div class="form-text mt-0" id="manualLocalityDefaultHelp"><i class="fa-solid fa-lock me-1"></i>Barangay, municipality, and province are system defaults.</div>
+                    </div>
+                  <?php else: ?>
+                    <input type="hidden" id="manualBarangay" value="San Jose">
+                    <input type="hidden" id="manualCity" value="Rodriguez (Montalban)">
+                    <input type="hidden" id="manualProvince" value="Rizal">
+                    <div class="col-12">
+                      <div class="form-text mt-0" id="manualLocalityDefaultHelp"><i class="fa-solid fa-lock me-1"></i>Address defaults to Barangay San Jose, Rodriguez (Montalban), Rizal.</div>
+                    </div>
+                  <?php endif; ?>
                   <input type="hidden" id="manualFullAddress" required>
               </div>
             </div>

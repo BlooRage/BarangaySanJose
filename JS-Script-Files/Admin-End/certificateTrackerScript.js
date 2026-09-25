@@ -9279,6 +9279,14 @@
       ].filter(Boolean);
     }
 
+    function manualIsFieldHiddenByConditionalUi(field) {
+      if (!field) return false;
+      if (field.classList?.contains('d-none')) return true;
+      const hiddenAncestor = field.closest?.('.d-none');
+      if (!hiddenAncestor) return false;
+      return !hiddenAncestor.matches('[data-manual-step-panel], [data-manual-id-step-panel]');
+    }
+
     function manualSetFieldInvalidState(field, invalid) {
       if (!field) return;
       field.classList.toggle('is-invalid', !!invalid);
@@ -9293,6 +9301,10 @@
       let firstInvalid = null;
       manualValidationTargets().forEach((field) => {
         if (field.disabled || field.type === 'checkbox') return;
+        if (manualIsFieldHiddenByConditionalUi(field)) {
+          manualSetFieldInvalidState(field, false);
+          return;
+        }
         const invalid = !field.checkValidity();
         manualSetFieldInvalidState(field, invalid);
         if (!firstInvalid && invalid && typeof field.focus === 'function') {
@@ -10664,9 +10676,18 @@
           ];
         case 'identity':
           return [
+            { name: 'child_nationality', label: 'Nationality', type: 'text', required: true, col: 'col-md-4', value: 'Filipino' },
+            { name: 'father_last_name', label: 'Father Last Name', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'father_first_name', label: 'Father First Name', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'father_middle_name', label: 'Father Middle Name', type: 'text', col: 'col-md-4' },
+            { name: 'father_suffix', label: 'Father Suffix', type: 'text', col: 'col-md-4' },
+            { name: 'mother_last_name', label: 'Mother Last Name', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'mother_first_name', label: 'Mother First Name', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'mother_middle_name', label: 'Mother Middle Name', type: 'text', col: 'col-md-4' },
+            { name: 'mother_suffix', label: 'Mother Suffix', type: 'text', col: 'col-md-4' },
+            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', required: true, col: 'col-md-4' },
+            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', required: true, col: 'col-md-4' },
             { name: 'remarks', label: 'Remarks', type: 'text', col: 'col-md-6' },
-            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', col: 'col-md-3' },
-            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', col: 'col-md-3' }
           ];
         case 'indigency':
           return [
