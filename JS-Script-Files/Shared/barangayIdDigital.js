@@ -322,7 +322,7 @@
   function normalizeLayoutConfig(layoutConfig = null) {
     const defaults = defaultLayoutConfig();
     const config = layoutConfig && typeof layoutConfig === 'object' ? layoutConfig : defaults;
-    const rawFields = Array.isArray(config.fields) && config.fields.length
+    const rawFields = Array.isArray(config.fields)
       ? config.fields
       : defaults.fields;
     const legacyRemovedIds = new Set(['back_validity_notice', 'back_signatory']);
@@ -332,10 +332,6 @@
         && field.type !== 'signatory'
         && field.source !== 'validityNotice'
         && !legacyRemovedIds.has(field.id));
-    if (!fields.some((field) => field.id === 'back_signature' || (field.type === 'image' && field.source === 'punongSignatorySignatureUrl'))) {
-      const signatureDefault = defaults.fields.find((field) => field.id === 'back_signature');
-      if (signatureDefault) fields.push(normalizeLayoutField(signatureDefault, fields.length));
-    }
     fields.sort((left, right) => {
       const sideCompare = String(left.side || '').localeCompare(String(right.side || ''));
       if (sideCompare !== 0) return sideCompare;

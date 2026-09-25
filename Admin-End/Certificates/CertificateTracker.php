@@ -3827,6 +3827,19 @@ if ($certificateLaunchStage === 'release') {
             <label for="manualBarangayIdZoomRange">Zoom</label>
             <input type="range" id="manualBarangayIdZoomRange" min="100" max="400" step="1" value="100">
           </div>
+          <div class="manual-photo-controls">
+            <label for="manualBarangayIdBrightnessRange">Brightness <output id="manualBarangayIdBrightnessValue" for="manualBarangayIdBrightnessRange">100%</output></label>
+            <input type="range" id="manualBarangayIdBrightnessRange" min="0" max="200" step="1" value="100" disabled>
+          </div>
+          <div class="manual-photo-controls">
+            <label for="manualBarangayIdContrastRange">Contrast <output id="manualBarangayIdContrastValue" for="manualBarangayIdContrastRange">100%</output></label>
+            <input type="range" id="manualBarangayIdContrastRange" min="0" max="200" step="1" value="100" disabled>
+          </div>
+          <div class="manual-photo-controls">
+            <label for="manualBarangayIdSaturationRange">Saturation <output id="manualBarangayIdSaturationValue" for="manualBarangayIdSaturationRange">100%</output></label>
+            <input type="range" id="manualBarangayIdSaturationRange" min="0" max="200" step="1" value="100" disabled>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="manualBarangayIdResetAdjustmentsBtn" disabled>Reset adjustments</button>
         </div>
       </div>
       <div class="modal-footer d-flex flex-wrap gap-2">

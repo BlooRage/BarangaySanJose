@@ -49,6 +49,7 @@
   const defaultLayout = window.BarangayIdDigital.defaultLayoutConfig();
   const defaultSample = window.BarangayIdDigital.defaultSampleData();
   const sourceOptions = [
+    { value: '', label: 'Custom Text' },
     { value: 'cardFullName', label: 'Full Name' },
     { value: 'cardFullAddress', label: 'Full Address' },
     { value: 'cardBirthdate', label: 'Birthdate' },
@@ -65,6 +66,7 @@
     { value: 'qrUrl', label: 'Verification QR' },
   ];
   const fieldTemplates = {
+    issuance: { type: 'text', label: 'Issued Date Statement', source: '', prefix: 'Issued this __ day of ___ at Barangay San Jose, Rodriguez, Rizal.', side: 'back', x: 8, y: 18.5, w: 70, h: 3.5, fontStyle: 'BI', fontSize: 5, minFontSize: 3, uppercase: false, align: 'center', multiline: false, maxLines: 1, color: '#111111' },
     text: { type: 'text', label: 'Text Field', source: 'cardFullName', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6.0, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
     image: { type: 'image', label: 'Image Field', source: 'photoUrl', w: 16, h: 16, fit: 'cover', cornerRadius: 0 },
     qr: { type: 'qr', label: 'QR Field', source: 'qrUrl', w: 16, h: 16, fit: 'fill' },
@@ -733,7 +735,7 @@
         type: 'select',
         options: selectMarkup(field.fallbackSource, '', 'None') + sourceOptionsMarkup(field.fallbackSource)
       }));
-      blocks.push(inputMarkup({ label: 'Prefix', prop: 'prefix', value: field.prefix }));
+      blocks.push(inputMarkup({ label: field.source ? 'Prefix' : 'Text', prop: 'prefix', value: field.prefix }));
       blocks.push(inputMarkup({ label: 'Uppercase Text', prop: 'uppercase', type: 'checkbox', checked: !!field.uppercase }));
       blocks.push(inputMarkup({ label: 'Multiline Fit', prop: 'multiline', type: 'checkbox', checked: !!field.multiline }));
       blocks.push(inputMarkup({ label: 'Max Lines', prop: 'maxLines', type: 'number', value: field.maxLines, min: '1', max: '12', step: '1' }));
@@ -927,6 +929,7 @@
             : requested;
     const template = fieldTemplates[resolvedType];
     if (!template) return;
+    if (requested === 'issuance') state.activeSide = 'back';
     const existingIds = new Set(state.layout.fields.map((field) => String(field.id || '')));
     let suffix = 1;
     const idPrefix = (source || resolvedType).replace(/[^a-z0-9]+/gi, '_').toLowerCase();
@@ -940,8 +943,8 @@
       ...(source ? { source, label: sourceOptions.find((option) => option.value === source)?.label || template.label } : {}),
       id: nextId,
       side: state.activeSide,
-      x: 8,
-      y: 8,
+      x: template.x ?? 8,
+      y: template.y ?? 8,
       z: 2 + activeFields().length
     };
     state.layout.fields.push(field);

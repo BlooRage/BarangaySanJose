@@ -1054,6 +1054,7 @@ $pagePayload = [
                         <option value="source:punongSignatorySignatureUrl">Official Signature</option>
                       </optgroup>
                       <optgroup label="Emergency fields">
+                        <option value="issuance">Issued Date Statement (Back)</option>
                         <option value="source:cardEmergencyName">Emergency Contact Name</option>
                         <option value="source:cardEmergencyAddress">Emergency Address</option>
                         <option value="source:cardEmergencyContact">Emergency Contact Number</option>
@@ -1205,7 +1206,7 @@ $pagePayload = [
   </div>
 
   <script id="barangayIdSettingsPayload" type="application/json"><?= htmlspecialchars(json_encode($pagePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_NOQUOTES, 'UTF-8') ?></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34'), ENT_QUOTES, 'UTF-8') ?>"></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260718-27'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260925-removable-signature'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260925-issued-statement'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>

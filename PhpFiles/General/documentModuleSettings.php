@@ -2197,10 +2197,9 @@ if (!function_exists('dms_normalize_barangay_id_layout')) {
     {
         $defaults = dms_barangay_id_default_layout();
         $page = (array)($layout['page'] ?? []);
-        $fields = isset($layout['fields']) && is_array($layout['fields']) ? $layout['fields'] : [];
-        if ($fields === []) {
-            $fields = $defaults['fields'];
-        }
+        $fields = isset($layout['fields']) && is_array($layout['fields'])
+            ? $layout['fields']
+            : $defaults['fields'];
 
         $normalizedFields = [];
         foreach ($fields as $index => $field) {
@@ -2215,23 +2214,6 @@ if (!function_exists('dms_normalize_barangay_id_layout')) {
                 continue;
             }
             $normalizedFields[] = dms_normalize_barangay_id_field($field, (int)$index);
-        }
-
-        $hasSignature = false;
-        foreach ($normalizedFields as $field) {
-            if (($field['id'] ?? '') === 'back_signature'
-                || (($field['type'] ?? '') === 'image' && ($field['source'] ?? '') === 'punongSignatorySignatureUrl')) {
-                $hasSignature = true;
-                break;
-            }
-        }
-        if (!$hasSignature) {
-            foreach ($defaults['fields'] as $index => $field) {
-                if (($field['id'] ?? '') === 'back_signature') {
-                    $normalizedFields[] = dms_normalize_barangay_id_field($field, (int)$index);
-                    break;
-                }
-            }
         }
 
         usort($normalizedFields, static function (array $left, array $right): int {

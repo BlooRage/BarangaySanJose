@@ -8811,6 +8811,12 @@
     const manualBarangayIdCropFrame = document.getElementById('manualBarangayIdCropFrame');
     const manualBarangayIdCropEmpty = document.getElementById('manualBarangayIdCropEmpty');
     const manualBarangayIdZoomRange = document.getElementById('manualBarangayIdZoomRange');
+    const manualBarangayIdAdjustments = ['Brightness', 'Contrast', 'Saturation'].map((name) => ({
+      name: name.toLowerCase(),
+      input: document.getElementById(`manualBarangayId${name}Range`),
+      output: document.getElementById(`manualBarangayId${name}Value`),
+    }));
+    const manualBarangayIdResetAdjustmentsBtn = document.getElementById('manualBarangayIdResetAdjustmentsBtn');
     const manualBarangayIdUseLinkedPhotoBtn = document.getElementById('manualBarangayIdUseLinkedPhotoBtn');
     const manualBarangayIdStartCameraBtn = document.getElementById('manualBarangayIdStartCameraBtn');
     const manualBarangayIdRetakePhotoBtn = document.getElementById('manualBarangayIdRetakePhotoBtn');
@@ -9910,7 +9916,36 @@
       manualUpdateBarangayIdPhotoField();
     }
 
+    function manualBarangayIdPhotoFilter() {
+      return manualBarangayIdAdjustments.map(({ name, input }) =>
+        `${name === 'saturation' ? 'saturate' : name}(${Number(input?.value ?? 100)}%)`
+      ).join(' ');
+    }
+
+    function manualUpdateBarangayIdAdjustments() {
+      manualBarangayIdAdjustments.forEach(({ input, output }) => {
+        if (output) output.textContent = `${input?.value ?? 100}%`;
+      });
+      if (manualBarangayIdCropImage) manualBarangayIdCropImage.style.filter = manualBarangayIdPhotoFilter();
+    }
+
+    function manualEnableBarangayIdAdjustments(enabled) {
+      manualBarangayIdAdjustments.forEach(({ input }) => {
+        if (input) input.disabled = !enabled;
+      });
+      if (manualBarangayIdResetAdjustmentsBtn) manualBarangayIdResetAdjustmentsBtn.disabled = !enabled;
+    }
+
+    function manualResetBarangayIdAdjustments() {
+      manualBarangayIdAdjustments.forEach(({ input }) => {
+        if (input) input.value = '100';
+      });
+      manualUpdateBarangayIdAdjustments();
+    }
+
     function manualResetBarangayIdPhotoState() {
+      manualResetBarangayIdAdjustments();
+      manualEnableBarangayIdAdjustments(false);
       manualStopBarangayIdCamera();
       manualBarangayIdPhotoMode = 'none';
       manualBarangayIdPhotoCustomDataUrl = '';
@@ -10141,6 +10176,8 @@
     }
 
     function manualLoadBarangayIdCropSource(sourceUrl) {
+      manualResetBarangayIdAdjustments();
+      manualEnableBarangayIdAdjustments(false);
       if (!manualBarangayIdCropImage) return;
       manualBarangayIdCropSourceUrl = manualResolveBarangayIdPhotoPreviewUrl(sourceUrl);
       if (manualBarangayIdSavePhotoBtn) {
@@ -10236,6 +10273,7 @@
       const sourceX = (frame.left - manualBarangayIdCropState.x) / manualBarangayIdCropState.scale;
       const sourceY = (frame.top - manualBarangayIdCropState.y) / manualBarangayIdCropState.scale;
       const sourceSize = frame.size / manualBarangayIdCropState.scale;
+      context.filter = manualBarangayIdPhotoFilter();
       context.drawImage(
         manualBarangayIdCropImage,
         sourceX,
@@ -10247,6 +10285,21 @@
         cropCanvas.width,
         cropCanvas.height
       );
+      if (!('filter' in CanvasRenderingContext2D.prototype)) {
+        const pixels = context.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+        const [brightness, contrast, saturation] = manualBarangayIdAdjustments.map(({ input }) => Number(input?.value ?? 100) / 100);
+        const clamp = (value) => Math.min(255, Math.max(0, value));
+        for (let i = 0; i < pixels.data.length; i += 4) {
+          const r = clamp((clamp(pixels.data[i] * brightness) - 127.5) * contrast + 127.5);
+          const g = clamp((clamp(pixels.data[i + 1] * brightness) - 127.5) * contrast + 127.5);
+          const b = clamp((clamp(pixels.data[i + 2] * brightness) - 127.5) * contrast + 127.5);
+          const gray = 0.213 * r + 0.715 * g + 0.072 * b;
+          pixels.data[i] = clamp(gray + saturation * (r - gray));
+          pixels.data[i + 1] = clamp(gray + saturation * (g - gray));
+          pixels.data[i + 2] = clamp(gray + saturation * (b - gray));
+        }
+        context.putImageData(pixels, 0, 0);
+      }
       manualBarangayIdPhotoCustomDataUrl = cropCanvas.toDataURL('image/png');
       manualBarangayIdPhotoMode = 'custom';
       manualUpdateBarangayIdPhotoField();
@@ -11849,7 +11902,13 @@
       manualSaveBarangayIdCrop();
     });
 
+    manualBarangayIdAdjustments.forEach(({ input }) => {
+      input?.addEventListener('input', manualUpdateBarangayIdAdjustments);
+    });
+    manualBarangayIdResetAdjustmentsBtn?.addEventListener('click', manualResetBarangayIdAdjustments);
+
     manualBarangayIdCropImage?.addEventListener('load', () => {
+      manualEnableBarangayIdAdjustments(true);
       manualBarangayIdCropEmpty?.classList.add('d-none');
       if (manualBarangayIdZoomRange) {
         manualBarangayIdZoomRange.disabled = false;
@@ -11863,6 +11922,7 @@
     });
 
     manualBarangayIdCropImage?.addEventListener('error', () => {
+      manualEnableBarangayIdAdjustments(false);
       manualBarangayIdCropEmpty?.classList.remove('d-none');
       if (manualBarangayIdZoomRange) {
         manualBarangayIdZoomRange.disabled = true;
