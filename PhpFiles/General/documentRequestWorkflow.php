@@ -3460,7 +3460,7 @@ function dr_backfill_missing_clearance_requests(mysqli $conn, int $limit = 1000)
     return $created;
 }
 
-function dr_get_issuance_request_meta(mysqli $conn, string $requestId): array {
+function dr_get_issuance_request_meta(mysqli $conn, string $requestId, bool $refresh = false): array {
     static $cache = [];
     dr_ensure_certificate_request_table($conn);
     $rid = trim($requestId);
@@ -3470,6 +3470,9 @@ function dr_get_issuance_request_meta(mysqli $conn, string $requestId): array {
             'certificate_number' => '',
             'verification_code' => '',
         ];
+    }
+    if ($refresh) {
+        unset($cache[$rid]);
     }
     if (array_key_exists($rid, $cache)) {
         return $cache[$rid];
@@ -3524,9 +3527,9 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
         return;
     }
 
-    $certNo = $certificateNumber !== null ? trim($certificateNumber) : '';
-    $vc = $verificationCode !== null ? trim($verificationCode) : '';
     $existing = dr_get_issuance_request_meta($conn, $requestId);
+    $certNo = $certificateNumber !== null ? trim($certificateNumber) : $existing['certificate_number'];
+    $vc = $verificationCode !== null ? trim($verificationCode) : $existing['verification_code'];
     $certType = $existing['certificate_type'] !== '' ? $existing['certificate_type'] : 'Certificate Request';
 
     foreach (dr_issuance_table_candidates($conn) as $table) {
@@ -3594,6 +3597,9 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
         }
         $stmt->close();
     }
+    // Stage updates render the QR in this same request. Refresh the identifiers
+    // so they cannot fall back to the request ID after a new code was saved.
+    dr_get_issuance_request_meta($conn, $requestId, true);
 }
 
 function dr_ensure_general_fees_table(mysqli $conn): void {

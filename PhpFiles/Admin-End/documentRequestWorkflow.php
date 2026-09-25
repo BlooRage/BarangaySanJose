@@ -2377,7 +2377,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260718bid19';
+    return 'r20260925bid20';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
