@@ -1959,7 +1959,7 @@ if ($financeSection === 'fees') {
 <script>
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260925-verified-qr"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260918-print-direct"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {

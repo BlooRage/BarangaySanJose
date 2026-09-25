@@ -380,20 +380,20 @@
     if (!requestId || typeof window === 'undefined' || !window.location || !window.location.origin) {
       return '';
     }
-    const verificationCode = String(firstNonEmpty([row.verification_code, payload.verification_code, requestId]) || '').trim();
+    const verificationCode = String(firstNonEmpty([row.verification_code, payload.verification_code]) || '').trim();
+    if (!verificationCode) return '';
     const appOrigin = `${window.location.origin}${appBase}`;
-    return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode || requestId)}`;
+    return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode)}`;
   }
 
   function qrPreviewUrl(appBase, row = {}, payload = {}) {
-    const existing = resolvePublicUrl(appBase, firstNonEmpty([row.qr_code_path, payload.qr_code_path]));
     const verifyUrl = verificationUrl(appBase, row, payload);
     const fallback = verifyUrl
       ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(verifyUrl)}`
       : '';
     return {
-      primary: existing || fallback,
-      fallback: existing && fallback && existing !== fallback ? fallback : ''
+      primary: fallback,
+      fallback: ''
     };
   }
 

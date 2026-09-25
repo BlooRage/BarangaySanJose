@@ -2216,7 +2216,9 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
     $certNumberPatch = array_key_exists('certificate_number', $patch) ? (string)$patch['certificate_number'] : null;
     $verificationPatch = array_key_exists('verification_code', $patch) ? (string)$patch['verification_code'] : null;
     if ($certNumberPatch !== null || $verificationPatch !== null) {
-        dr_upsert_issuance_identifiers($conn, $requestId, $certNumberPatch, $verificationPatch);
+        if (!dr_upsert_issuance_identifiers($conn, $requestId, $certNumberPatch, $verificationPatch)) {
+            return null;
+        }
     }
 
     $allowedColumns = [
@@ -3520,22 +3522,29 @@ function dr_get_issuance_request_meta(mysqli $conn, string $requestId, bool $ref
     return $cache[$rid];
 }
 
-function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string $certificateNumber, ?string $verificationCode): void {
+function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string $certificateNumber, ?string $verificationCode): bool {
     dr_ensure_certificate_request_table($conn);
     $requestId = trim($requestId);
     if ($requestId === '') {
-        return;
+        return false;
     }
 
-    $existing = dr_get_issuance_request_meta($conn, $requestId);
+    $existing = dr_get_issuance_request_meta($conn, $requestId, true);
     $certNo = $certificateNumber !== null ? trim($certificateNumber) : $existing['certificate_number'];
     $vc = $verificationCode !== null ? trim($verificationCode) : $existing['verification_code'];
     $certType = $existing['certificate_type'] !== '' ? $existing['certificate_type'] : 'Certificate Request';
+    // Once issued, a verification code must survive retries and partial updates.
+    if ($existing['verification_code'] !== '' && $vc !== $existing['verification_code']) {
+        return false;
+    }
+    $writeSucceeded = false;
+    $writeFailed = false;
 
     foreach (dr_issuance_table_candidates($conn) as $table) {
         if (!dr_column_exists($conn, $table, 'request_id')
             || !dr_column_exists($conn, $table, 'certificate_type')
             || !dr_column_exists($conn, $table, 'certificate_details')) {
+            $writeFailed = true;
             continue;
         }
 
@@ -3543,12 +3552,14 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
         $childId = $idColumn !== null ? dr_resolve_request_child_id($conn, $table, $requestId) : null;
         if ($idColumn === null || $childId === null || $childId === '') {
             error_log("[documentRequestWorkflow][issuance] identifier upsert failed to resolve generated ID for {$table} | request_id=" . $requestId);
+            $writeFailed = true;
             continue;
         }
 
         $hasCertNumber = dr_column_exists($conn, $table, 'certificate_number');
         $hasVerificationCode = dr_column_exists($conn, $table, 'verification_code');
         if (!$hasCertNumber && !$hasVerificationCode) {
+            $writeFailed = true;
             continue;
         }
 
@@ -3563,19 +3574,20 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
             $placeholders[] = '?';
             $types .= 's';
             $params[] = $certNo;
-            $duplicateUpdates[] = 'certificate_number = VALUES(certificate_number)';
+            if ($certificateNumber !== null) $duplicateUpdates[] = 'certificate_number = VALUES(certificate_number)';
         }
         if ($hasVerificationCode) {
             $insertCols[] = 'verification_code';
             $placeholders[] = '?';
             $types .= 's';
             $params[] = $vc;
-            $duplicateUpdates[] = 'verification_code = VALUES(verification_code)';
+            if ($verificationCode !== null) $duplicateUpdates[] = 'verification_code = IF(COALESCE(verification_code, \'\') = \'\', VALUES(verification_code), verification_code)';
         }
         if (dr_column_exists($conn, $table, 'updated_at')) {
             $duplicateUpdates[] = 'updated_at = CURRENT_TIMESTAMP';
         }
 
+        if ($duplicateUpdates === []) $duplicateUpdates[] = 'request_id = VALUES(request_id)';
         $stmt = $conn->prepare("
             INSERT INTO {$table} (" . implode(', ', $insertCols) . ")
             VALUES (" . implode(', ', $placeholders) . ")
@@ -3584,6 +3596,7 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
         ");
         if (!$stmt) {
             error_log("[documentRequestWorkflow][issuance] identifier upsert prepare failed for {$table}: " . $conn->error);
+            $writeFailed = true;
             continue;
         }
         $refs = [];
@@ -3593,13 +3606,37 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
         array_unshift($refs, $types);
         call_user_func_array([$stmt, 'bind_param'], $refs);
         if (!$stmt->execute()) {
+            $writeFailed = true;
             error_log("[documentRequestWorkflow][issuance] identifier upsert failed in {$table}: " . $stmt->error . ' | request_id=' . $requestId);
+        }
+        else {
+            $writeSucceeded = true;
         }
         $stmt->close();
     }
     // Stage updates render the QR in this same request. Refresh the identifiers
     // so they cannot fall back to the request ID after a new code was saved.
-    dr_get_issuance_request_meta($conn, $requestId, true);
+    $saved = dr_get_issuance_request_meta($conn, $requestId, true);
+    return $writeSucceeded && !$writeFailed
+        && $saved['verification_code'] === $vc
+        && $saved['certificate_number'] === $certNo;
+}
+
+function dr_require_issuance_verification_code(mysqli $conn, string $requestId, string $proposedCode = ''): string {
+    $meta = dr_get_issuance_request_meta($conn, $requestId, true);
+    $savedCode = trim((string)$meta['verification_code']);
+    $proposedCode = trim($proposedCode);
+    if ($savedCode !== '') {
+        if ($proposedCode !== '' && $proposedCode !== $savedCode) {
+            throw new RuntimeException('Verification code changed. Reload the request before generating its QR.');
+        }
+        return $savedCode;
+    }
+    if ($proposedCode === '' || $proposedCode === trim($requestId)
+        || !dr_upsert_issuance_identifiers($conn, $requestId, null, $proposedCode)) {
+        throw new RuntimeException('A saved verification code is required before generating the QR.');
+    }
+    return $proposedCode;
 }
 
 function dr_ensure_general_fees_table(mysqli $conn): void {

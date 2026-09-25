@@ -2182,7 +2182,10 @@ function dra_public_base_url(): string
 
 function dra_qr_verify_url(string $requestId, string $verificationCode): string
 {
-    $vc = $verificationCode !== '' ? $verificationCode : $requestId;
+    $vc = trim($verificationCode);
+    if (trim($requestId) === '' || $vc === '') {
+        throw new RuntimeException('Request ID and saved verification code are required for QR generation.');
+    }
     return rtrim(dra_public_base_url(), '/')
         . appUrl('/transaction-information?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($vc));
 }
@@ -2377,7 +2380,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260925bid20';
+    return 'r20260925bid21';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3209,13 +3212,15 @@ function dra_generate_issued_document(array $requestRow): ?string
         ];
     $allowQr = (
         !$previewMode
-        && $verificationCode !== ''
         && in_array($currentStage, $qrEligibleStages, true)
     );
     if ($allowQr && dr_is_clearance_document_type($docType) && $conn instanceof mysqli) {
         $allowQr = !empty(dms_resolve_clearance_settings($conn)['qr_verification_enabled']);
     } elseif ($allowQr && !$isBarangayId && $conn instanceof mysqli) {
         $allowQr = !empty(dms_resolve_issuance_settings($conn)['qr_verification_enabled']);
+    }
+    if ($allowQr) {
+        $verificationCode = dr_require_issuance_verification_code($conn, $requestId, $verificationCode);
     }
     $verifyUrl = $allowQr ? dra_qr_verify_url($requestId, $verificationCode) : '';
     $qrFile = 'qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
@@ -3229,21 +3234,23 @@ function dra_generate_issued_document(array $requestRow): ?string
             'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
         ]);
         $qrContent = @file_get_contents($qrApi, false, $ctx);
-        if ($qrContent !== false && strlen($qrContent) > 500) {
-            @file_put_contents($qrDiskPath, $qrContent);
-        } else {
-            // Fallback QR placeholder if external API is unreachable.
-            if (function_exists('imagecreatetruecolor')) {
-                $img = imagecreatetruecolor(220, 220);
-                $white = imagecolorallocate($img, 255, 255, 255);
-                $black = imagecolorallocate($img, 0, 0, 0);
-                imagefilledrectangle($img, 0, 0, 220, 220, $white);
-                imagerectangle($img, 0, 0, 219, 219, $black);
-                imagestring($img, 4, 78, 90, 'QR', $black);
-                imagestring($img, 2, 12, 198, substr($verificationCode !== '' ? $verificationCode : $requestId, 0, 28), $black);
-                imagepng($img, $qrDiskPath);
-                imagedestroy($img);
+        $qrInfo = is_string($qrContent) ? @getimagesizefromstring($qrContent) : false;
+        if (!$qrInfo || ($qrInfo['mime'] ?? '') !== 'image/png') {
+            throw new RuntimeException('QR generation failed. Retry before printing or releasing this document.');
+        }
+        // Never reuse an earlier QR or publish a placeholder after a failed download.
+        $temporaryQr = tempnam($qrDir, 'qr_pending_');
+        if ($temporaryQr === false) {
+            throw new RuntimeException('Unable to save the verification QR.');
+        }
+        try {
+            if (file_put_contents($temporaryQr, $qrContent) !== strlen($qrContent)
+                || !rename($temporaryQr, $qrDiskPath)) {
+                throw new RuntimeException('Unable to save the verification QR.');
             }
+            @chmod($qrDiskPath, 0644);
+        } finally {
+            if (is_file($temporaryQr)) @unlink($temporaryQr);
         }
     }
 
@@ -9096,7 +9103,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260925-verified-qr', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';

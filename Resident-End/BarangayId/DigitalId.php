@@ -53,30 +53,12 @@ if (!function_exists('drd_public_asset_path')) {
 if (!function_exists('drd_resolve_request_qr_preview_url')) {
     function drd_resolve_request_qr_preview_url(string $baseUrl, array $requestRow): string
     {
-        $storedPath = trim((string)($requestRow['qr_code_path'] ?? ''));
-        if ($storedPath !== '') {
-            return drd_public_asset_path($baseUrl, $storedPath);
-        }
-
         $requestId = trim((string)($requestRow['request_id'] ?? ''));
-        if ($requestId === '') {
+        $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
+        if ($requestId === '' || $verificationCode === '') {
             return '';
         }
-
-        $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
-        if ($verificationCode === '') {
-            $verificationCode = $requestId;
-        }
-
-        $predictedPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
-        $projectRoot = realpath(__DIR__ . '/../../');
-        if ($projectRoot !== false) {
-            $predictedDiskPath = $projectRoot . $predictedPublicPath;
-            if (is_file($predictedDiskPath)) {
-                return drd_public_asset_path($baseUrl, $predictedPublicPath);
-            }
-        }
-
+        // A saved image may predate the verification code. Build from current data.
         $verificationUrl = appBaseUrl() . appUrl('/transactions?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($verificationCode));
         return 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode($verificationUrl);
     }
@@ -757,7 +739,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260812-signature-transparent-34"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260925-verified-qr"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');

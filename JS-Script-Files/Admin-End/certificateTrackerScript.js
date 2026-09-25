@@ -3167,18 +3167,15 @@
     if (!requestId) return '';
     const verificationCode = String(firstNonEmpty([
       row?.verification_code,
-      payload.verification_code,
-      requestId
+      payload.verification_code
     ]) || '').trim();
+    if (!verificationCode) return '';
     const appOrigin = `${window.location.origin}${appBase}`;
-    return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode || requestId)}`;
+    return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode)}`;
   }
 
   function barangayIdQrPreviewUrl(row, payload = {}) {
-    const existing = firstNonEmpty([row?.qr_code_path, payload.qr_code_path]);
-    if (existing) {
-      return resolvePublicUrl(existing);
-    }
+    // Derive the QR from the saved code, never an older cached PNG.
     const verifyUrl = barangayIdVerificationUrl(row, payload);
     if (!verifyUrl) return '';
     return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(verifyUrl)}`;
@@ -5129,6 +5126,30 @@
   directControls.Slot?.addEventListener('change', loadIdCalibration);
   directControls.Alignment?.addEventListener('click', () => printBarangayIdCards(idPrintProcessPhaseLabel(), idPrintProcessPreview, true));
 
+  async function requireBarangayIdQrImages(card) {
+    for (const block of card.querySelectorAll('.barangay-id-card__qr')) {
+      const image = block.querySelector('img');
+      const message = 'The verification QR is not ready. Reload the request and try again before printing.';
+      if (!image) throw new Error(message);
+      if (!image.complete) {
+        await new Promise((resolve, reject) => {
+          const finish = (error) => {
+            clearTimeout(timeout);
+            image.removeEventListener('load', loaded);
+            image.removeEventListener('error', failed);
+            error ? reject(error) : resolve();
+          };
+          const loaded = () => finish();
+          const failed = () => finish(new Error(message));
+          const timeout = setTimeout(failed, 10000);
+          image.addEventListener('load', loaded, { once: true });
+          image.addEventListener('error', failed, { once: true });
+        });
+      }
+      if (!image.naturalWidth) throw new Error(message);
+    }
+  }
+
   async function exportIdForEpsonPhotoPlus() {
     const card = idPrintProcessPreview?.querySelector('.barangay-id-card');
     if (!card || typeof window.html2canvas !== 'function') {
@@ -5141,6 +5162,7 @@
     const side = idPrintProcessPhaseLabel();
     try {
       await document.fonts.ready;
+      await requireBarangayIdQrImages(card);
       // Render at a fixed resolution, independent of the display's pixel density.
       const width = card.getBoundingClientRect().width;
       if (!width) throw new Error('The ID preview is not visible.');
@@ -5165,7 +5187,7 @@
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (error) {
       console.error('Unable to export ID for Epson Photo+:', error);
-      alert('Unable to export the ID image. Please try again.');
+      alert(error?.message || 'Unable to export the ID image. Please try again.');
     } finally {
       buttons.forEach(button => { button.disabled = false; });
     }
@@ -5238,6 +5260,7 @@
       await document.fonts.ready;
       for (const card of selectedCards) {
         if (alignmentOnly) { imageUrls.push(''); continue; }
+        await requireBarangayIdQrImages(card);
         const canvas = await renderer(card, {
           backgroundColor: '#ffffff',
           scale: 2022 / card.getBoundingClientRect().width,
@@ -5328,7 +5351,8 @@
 
     } catch (error) {
       console.error('Failed to rasterize Barangay ID for printing:', error);
-      alert('Unable to prepare the ID as an image for printing.');
+      if (!printWindow.closed) printWindow.close();
+      alert(error?.message || 'Unable to prepare the ID as an image for printing.');
     } finally {
       buttons.forEach((btn) => { btn.disabled = false; });
     }
