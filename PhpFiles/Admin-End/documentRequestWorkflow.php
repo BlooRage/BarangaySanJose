@@ -8072,6 +8072,11 @@ if ($action === 'create_manual_request') {
         if (!in_array($barangayIdRequestType, ['new', 'renewal'], true)) {
             $barangayIdRequestType = 'new';
         }
+        $assignedBarangayIdNumber = trim((string)($payload['barangay_id_number'] ?? ''));
+        if (strlen($assignedBarangayIdNumber) > 64 || preg_match('/[\x00-\x1F\x7F]/', $assignedBarangayIdNumber)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID number must be at most 64 characters and contain no control characters.']);
+        }
+        $payload['barangay_id_number'] = $assignedBarangayIdNumber;
         $payload['barangay_id_request_type'] = $barangayIdRequestType;
         if ($barangayIdRequestType === 'renewal') {
             $existingBarangayIdNumber = dra_latest_barangay_id_number($conn, $residentId, $residentUserId);
@@ -8081,7 +8086,7 @@ if ($action === 'create_manual_request') {
                     'message' => 'No previously issued Barangay ID number was found for this resident. Use a new application instead.',
                 ]);
             }
-            $payload['barangay_id_number'] = $existingBarangayIdNumber;
+            $payload['barangay_id_number'] = $assignedBarangayIdNumber !== '' ? $assignedBarangayIdNumber : $existingBarangayIdNumber;
             $payload['previous_barangay_id_number'] = $existingBarangayIdNumber;
         }
         $payload['request_purpose'] = $barangayIdRequestType === 'renewal'

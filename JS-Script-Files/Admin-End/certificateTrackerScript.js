@@ -10743,6 +10743,7 @@
           ];
         case 'barangay_id':
           return [
+            { name: 'barangay_id_number', label: 'Assigned Barangay ID Number (optional)', type: 'text', col: 'col-12', placeholder: 'Leave blank to use the automatic number or keep the existing number on renewal' },
             { name: 'emergency_last', label: 'Emergency Last Name', type: 'text', required: true, col: 'col-md-3' },
             { name: 'emergency_first', label: 'Emergency First Name', type: 'text', required: true, col: 'col-md-3' },
             { name: 'emergency_middle', label: 'Emergency Middle Name', type: 'text', col: 'col-md-3' },
@@ -11166,6 +11167,7 @@
       }
       const resident = manualSelectedResident;
       const fieldValues = {
+        barangay_id_number: manualCurrentMode() === 'renewal' ? resident.existing_barangay_id_number : '',
         emergency_last: resident.emergency_last_name,
         emergency_first: resident.emergency_first_name,
         emergency_middle: resident.emergency_middle_name,
@@ -11210,6 +11212,7 @@
 
       if (manualDynamicFields) {
         [
+          'barangay_id_number',
           'emergency_last',
           'emergency_first',
           'emergency_middle',
@@ -11437,6 +11440,9 @@
         const otherField = manualDynamicFields.querySelector(`[data-manual-other-for="${key}"]`);
         payload[key] = value === '__other__' ? String(otherField?.value || '').trim() : value;
       });
+      if (config.kind === 'barangay_id' && !payload.barangay_id_number && manualCurrentMode() === 'renewal') {
+        payload.barangay_id_number = String(manualSelectedResident?.existing_barangay_id_number || '').trim();
+      }
       dynamicValues.forEach((values, key) => {
         payload[key] = values.filter(Boolean).join(',');
       });
