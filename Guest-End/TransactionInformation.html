@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <base href="./Guest-End/">
+    <script>
+        // Support clean routes, trailing slashes, and direct HTML links in subfolders.
+        const verificationBasePath = window.location.pathname.replace(/(?:Guest-End\/TransactionInformation(?:\.html)?|transactions|transaction-information)\/?$/i, '');
+        document.querySelector('base').href = window.location.origin + verificationBasePath + 'Guest-End/';
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
     <title>Transaction Information - Barangay San Jose</title>
@@ -77,7 +82,7 @@
                     </div>
 
                     <div class="detail-row">
-                        <label>Certificate Number</label>
+                        <label id="document-number-label">Certificate Number</label>
                         <div class="detail-value" id="certificate-number">-</div>
                     </div>
 
@@ -213,7 +218,11 @@
                 try {
                     const url = "../PhpFiles/GET/getTransactionInformation.php?request_id="
                         + encodeURIComponent(requestId) + "&vc=" + encodeURIComponent(verificationCode);
-                    const response = await fetch(url, { credentials: "omit" });
+                    const response = await fetch(url, { credentials: "omit", cache: "no-store", headers: { Accept: "application/json" } });
+                    const contentType = response.headers.get("content-type") || "";
+                    if (!contentType.includes("application/json")) {
+                        throw new Error("The verification service could not be reached. Please try again later.");
+                    }
                     const data = await response.json();
 
                     if (!response.ok || !data || !data.success || !data.data) {
@@ -223,7 +232,8 @@
                     const item = data.data;
                     setField(fields.transactionId, item.request_id);
                     setField(fields.orNumber, item.or_number);
-                    setField(fields.certificateNumber, item.certificate_number);
+                    setField(fields.certificateNumber, item.barangay_id_number || item.certificate_number);
+                    document.getElementById("document-number-label").textContent = item.barangay_id_number ? "Barangay ID Number" : "Certificate Number";
                     setField(fields.status, item.status);
                     setField(fields.validity, item.validity);
                     setField(fields.docType, item.document_type);
@@ -231,7 +241,7 @@
                     setField(fields.purpose, item.purpose);
                     setBanner("Verified document record.", "ok");
                 } catch (err) {
-                    setBanner("Invalid or expired verification link.", "error");
+                    setBanner(err.message || "Unable to load verification details. Please try again.", "error");
                 }
             }
 

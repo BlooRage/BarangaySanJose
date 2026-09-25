@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, max-age=0');
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
@@ -121,10 +122,7 @@ if (!$row) {
     ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
 }
 
-$payload = json_decode((string)($row['request_details'] ?? '{}'), true);
-if (!is_array($payload)) {
-    $payload = [];
-}
+$payload = dr_decode_request_payload($row);
 
 $row['document_type'] = trim((string)($payload['document_type'] ?? ''));
 if ($row['document_type'] === '') {
@@ -197,7 +195,7 @@ if ($verificationCode === '' || strcasecmp($verificationCode, $expectedCode) !==
 $lastName = ti_value($payload, ['last_name', 'lastname']);
 $firstName = ti_value($payload, ['first_name', 'firstname']);
 $middleName = ti_value($payload, ['middle_name', 'middlename']);
-$suffix = ti_value($payload, ['suffix']);
+$suffix = ti_value($payload, ['suffix_name', 'suffix']);
 $fullName = trim(implode(' ', array_filter([
     $lastName !== '' ? $lastName . ',' : '',
     $firstName,
@@ -205,7 +203,7 @@ $fullName = trim(implode(' ', array_filter([
     $suffix,
 ])));
 if ($fullName === '') {
-    $fullName = 'Resident';
+    $fullName = ti_value($payload, ['resident_name', 'full_name'], 'Resident');
 }
 
 $address = ti_value($payload, ['applicant_full_address', 'owner_full_address', 'full_address', 'full_address_display', 'address', 'complete_address'], 'Barangay San Jose, Rodriguez, Rizal');
@@ -235,6 +233,8 @@ ti_json(200, [
         'request_id' => (string)$row['request_id'],
         'or_number' => (string)($row['or_number'] ?? ''),
         'certificate_number' => (string)($row['certificate_number'] ?? ''),
+        'barangay_id_number' => dr_is_barangay_id_document_type($documentType)
+            ? ti_value($payload, ['barangay_id_number', 'resident_id_number', 'resident_id_no']) : '',
         'status' => ti_stage_label((string)($row['stage'] ?? 'submitted')),
         'status_raw' => (string)($row['stage'] ?? 'submitted'),
         'reason' => (string)($row['status_remarks'] ?? ''),
