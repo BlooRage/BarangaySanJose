@@ -1,4 +1,7 @@
-﻿<?php
+<?php
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
 require_once __DIR__ . '/../../PhpFiles/General/manualDocumentFieldPolicy.php';
