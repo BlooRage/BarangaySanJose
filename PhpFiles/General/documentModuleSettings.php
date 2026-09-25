@@ -2093,6 +2093,11 @@ if (!function_exists('dms_barangay_id_allowed_field_types')) {
 if (!function_exists('dms_normalize_barangay_id_field')) {
     function dms_normalize_barangay_id_field(array $field, int $index = 0): array
     {
+        if (($field['type'] ?? '') === 'text' && empty($field['source'])
+            && ($field['prefix'] ?? '') === 'Issued this __ day of ___ at Barangay San Jose, Rodriguez, Rizal.') {
+            $field['source'] = 'issuedStatement';
+            $field['prefix'] = '';
+        }
         $type = strtolower(trim((string)($field['type'] ?? 'text')));
         if (!in_array($type, dms_barangay_id_allowed_field_types(), true)) {
             $type = 'text';

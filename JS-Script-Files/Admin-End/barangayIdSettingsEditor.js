@@ -50,6 +50,7 @@
   const defaultSample = window.BarangayIdDigital.defaultSampleData();
   const sourceOptions = [
     { value: '', label: 'Custom Text' },
+    { value: 'issuedStatement', label: 'Issued Date Statement (automatic)' },
     { value: 'cardFullName', label: 'Full Name' },
     { value: 'cardFullAddress', label: 'Full Address' },
     { value: 'cardBirthdate', label: 'Birthdate' },
@@ -66,7 +67,7 @@
     { value: 'qrUrl', label: 'Verification QR' },
   ];
   const fieldTemplates = {
-    issuance: { type: 'text', label: 'Issued Date Statement', source: '', prefix: 'Issued this __ day of ___ at Barangay San Jose, Rodriguez, Rizal.', side: 'back', x: 8, y: 18.5, w: 70, h: 3.5, fontStyle: 'BI', fontSize: 5, minFontSize: 3, uppercase: false, align: 'center', multiline: false, maxLines: 1, color: '#111111' },
+    issuance: { type: 'text', label: 'Issued Date Statement', source: 'issuedStatement', prefix: '', side: 'back', x: 8, y: 18.5, w: 70, h: 3.5, fontStyle: 'BI', fontSize: 5, minFontSize: 3, uppercase: false, align: 'center', multiline: false, maxLines: 1, color: '#111111' },
     text: { type: 'text', label: 'Text Field', source: 'cardFullName', w: 28, h: 4.8, fontStyle: 'B', fontSize: 6.0, minFontSize: 4.2, uppercase: true, align: 'left', multiline: false, maxLines: 1, color: '#111111' },
     image: { type: 'image', label: 'Image Field', source: 'photoUrl', w: 16, h: 16, fit: 'cover', cornerRadius: 0 },
     qr: { type: 'qr', label: 'QR Field', source: 'qrUrl', w: 16, h: 16, fit: 'fill' },

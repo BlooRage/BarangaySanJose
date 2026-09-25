@@ -145,6 +145,15 @@
     ]);
   }
 
+  function issuedDateStatement(value) {
+    // Database timestamps are local dates; preserve their calendar day.
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const date = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value);
+    const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
+    const month = validDate.toLocaleString('en-US', { month: 'long' });
+    return `Issued this ${validDate.getDate()} day of ${month} ${validDate.getFullYear()} at Barangay San Jose, Rodriguez, Rizal.`;
+  }
+
   function computeCardNumber(overrideValue, requestId, issuedDate) {
     const override = upper(overrideValue);
     if (override) return override;
@@ -255,6 +264,9 @@
   }
 
   function normalizeLayoutField(field = {}, index = 0) {
+    if (field.type === 'text' && !field.source && field.prefix === 'Issued this __ day of ___ at Barangay San Jose, Rodriguez, Rizal.') {
+      field = { ...field, source: 'issuedStatement', prefix: '' };
+    }
     const rawType = String(field.type || 'text').trim().toLowerCase();
     const type = ['text', 'image', 'qr', 'signatory', 'cover'].includes(rawType) ? rawType : 'text';
     const rawAlign = String(field.align || 'left').trim().toLowerCase();
@@ -488,6 +500,7 @@
       cardEmergencyAddress: emergencyAddress,
       cardEmergencyContact: emergencyContact,
       cardNumber,
+      issuedStatement: issuedDateStatement(issuedDate),
       validUntil,
       validityNotice: `This ID is valid until ${validUntil || '____'} except when the holder requests for a new one.`,
       photoUrl: photoUrl || DEFAULT_IMAGE_PLACEHOLDER,

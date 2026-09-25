@@ -4049,6 +4049,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                     'cardEmergencyAddress' => $emergencyAddressText,
                     'cardEmergencyContact' => $emergencyContactText !== '' ? $emergencyContactText : $contactNumberText,
                     'cardNumber' => $cardIdText,
+                    'issuedStatement' => 'Issued this ' . $issuedDateObj->format('j') . ' day of ' . $issuedDateObj->format('F Y') . ' at Barangay San Jose, Rodriguez, Rizal.',
                     'validUntil' => $validUntilText,
                     'validityNotice' => $validityNotice,
                     'punongSignatoryName' => $punongSignatoryName,
