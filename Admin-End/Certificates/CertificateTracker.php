@@ -3821,6 +3821,7 @@ if ($certificateLaunchStage === 'release') {
             <div id="manualBarangayIdCropEmpty" class="manual-photo-empty-state d-none">
               Capture a photo first so it can be cropped and saved.
             </div>
+            <canvas id="manualBarangayIdSharpnessPreview" width="512" height="512" aria-hidden="true" hidden style="position:absolute;pointer-events:none;"></canvas>
             <div class="manual-photo-frame" id="manualBarangayIdCropFrame"></div>
           </div>
           <div class="manual-photo-controls">
@@ -3838,6 +3839,10 @@ if ($certificateLaunchStage === 'release') {
           <div class="manual-photo-controls">
             <label for="manualBarangayIdSaturationRange">Saturation <output id="manualBarangayIdSaturationValue" for="manualBarangayIdSaturationRange">100%</output></label>
             <input type="range" id="manualBarangayIdSaturationRange" min="0" max="200" step="1" value="100" disabled>
+          </div>
+          <div class="manual-photo-controls">
+            <label for="manualBarangayIdSharpnessRange">Sharpness <output id="manualBarangayIdSharpnessValue" for="manualBarangayIdSharpnessRange">0%</output></label>
+            <input type="range" id="manualBarangayIdSharpnessRange" min="0" max="100" step="1" value="0" disabled>
           </div>
           <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="manualBarangayIdResetAdjustmentsBtn" disabled>Reset adjustments</button>
         </div>

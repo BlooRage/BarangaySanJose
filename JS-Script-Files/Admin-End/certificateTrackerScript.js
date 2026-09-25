@@ -8811,11 +8811,13 @@
     const manualBarangayIdCropFrame = document.getElementById('manualBarangayIdCropFrame');
     const manualBarangayIdCropEmpty = document.getElementById('manualBarangayIdCropEmpty');
     const manualBarangayIdZoomRange = document.getElementById('manualBarangayIdZoomRange');
-    const manualBarangayIdAdjustments = ['Brightness', 'Contrast', 'Saturation'].map((name) => ({
+    const manualBarangayIdAdjustments = ['Brightness', 'Contrast', 'Saturation', 'Sharpness'].map((name) => ({
       name: name.toLowerCase(),
       input: document.getElementById(`manualBarangayId${name}Range`),
       output: document.getElementById(`manualBarangayId${name}Value`),
     }));
+    const manualBarangayIdSharpnessPreview = document.getElementById('manualBarangayIdSharpnessPreview');
+    let manualBarangayIdAdjustmentFrame = null;
     const manualBarangayIdResetAdjustmentsBtn = document.getElementById('manualBarangayIdResetAdjustmentsBtn');
     const manualBarangayIdUseLinkedPhotoBtn = document.getElementById('manualBarangayIdUseLinkedPhotoBtn');
     const manualBarangayIdStartCameraBtn = document.getElementById('manualBarangayIdStartCameraBtn');
@@ -9917,7 +9919,7 @@
     }
 
     function manualBarangayIdPhotoFilter() {
-      return manualBarangayIdAdjustments.map(({ name, input }) =>
+      return manualBarangayIdAdjustments.filter(({ name }) => name !== 'sharpness').map(({ name, input }) =>
         `${name === 'saturation' ? 'saturate' : name}(${Number(input?.value ?? 100)}%)`
       ).join(' ');
     }
@@ -9927,6 +9929,49 @@
         if (output) output.textContent = `${input?.value ?? 100}%`;
       });
       if (manualBarangayIdCropImage) manualBarangayIdCropImage.style.filter = manualBarangayIdPhotoFilter();
+      manualScheduleBarangayIdSharpnessPreview();
+    }
+
+    function manualScheduleBarangayIdSharpnessPreview() {
+      if (manualBarangayIdAdjustmentFrame !== null) cancelAnimationFrame(manualBarangayIdAdjustmentFrame);
+      manualBarangayIdAdjustmentFrame = requestAnimationFrame(() => {
+        manualBarangayIdAdjustmentFrame = null;
+        const preview = manualBarangayIdSharpnessPreview;
+        if (!preview) return;
+        preview.hidden = true;
+        const sharpness = manualBarangayIdAdjustments.find(({ name }) => name === 'sharpness')?.input;
+        if (!Number(sharpness?.value) || sharpness.disabled || !manualBarangayIdCropState.scale) return;
+        const frame = manualComputeBarangayIdCropFrame();
+        if (!frame?.size || !manualBarangayIdCropImage?.naturalWidth) return;
+        try {
+          const rendered = manualRenderBarangayIdCrop(frame);
+          if (!rendered) return;
+          preview.getContext('2d').drawImage(rendered, 0, 0);
+          Object.assign(preview.style, { left: `${frame.left}px`, top: `${frame.top}px`, width: `${frame.size}px`, height: `${frame.size}px` });
+          preview.hidden = false;
+        } catch (error) {
+          manualSetBarangayIdPhotoStatus('Unable to preview sharpening. Reload the photo and try again.', 'warning');
+        }
+      });
+    }
+
+    function manualSharpenBarangayIdPixels(pixels, amount) {
+      if (amount <= 0) return;
+      const { width, height, data } = pixels;
+      const original = new Uint8ClampedArray(data);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const i = (y * width + x) * 4;
+          const left = (y * width + Math.max(0, x - 1)) * 4;
+          const right = (y * width + Math.min(width - 1, x + 1)) * 4;
+          const top = (Math.max(0, y - 1) * width + x) * 4;
+          const bottom = (Math.min(height - 1, y + 1) * width + x) * 4;
+          for (let channel = 0; channel < 3; channel += 1) {
+            data[i + channel] = original[i + channel] + amount * (4 * original[i + channel]
+              - original[left + channel] - original[right + channel] - original[top + channel] - original[bottom + channel]);
+          }
+        }
+      }
     }
 
     function manualEnableBarangayIdAdjustments(enabled) {
@@ -9937,8 +9982,8 @@
     }
 
     function manualResetBarangayIdAdjustments() {
-      manualBarangayIdAdjustments.forEach(({ input }) => {
-        if (input) input.value = '100';
+      manualBarangayIdAdjustments.forEach(({ name, input }) => {
+        if (input) input.value = name === 'sharpness' ? '0' : '100';
       });
       manualUpdateBarangayIdAdjustments();
     }
@@ -10146,6 +10191,7 @@
       if (!manualBarangayIdCropImage) return;
       manualClampBarangayIdCropPosition();
       manualBarangayIdCropImage.style.transform = `translate(${manualBarangayIdCropState.x}px, ${manualBarangayIdCropState.y}px) scale(${manualBarangayIdCropState.scale})`;
+      manualScheduleBarangayIdSharpnessPreview();
     }
 
     function manualSeedBarangayIdCropState() {
@@ -10252,16 +10298,7 @@
       manualSetBarangayIdPhotoStatus('Photo captured. Drag and zoom it inside the square frame, then save the crop.', 'success');
     }
 
-    function manualSaveBarangayIdCrop() {
-      if (!manualBarangayIdCropImage || !manualBarangayIdCropImage.naturalWidth) {
-        manualSetBarangayIdPhotoStatus('Capture or load a photo first before saving the crop.', 'warning');
-        return;
-      }
-      const frame = manualComputeBarangayIdCropFrame();
-      if (!frame) {
-        manualSetBarangayIdPhotoStatus('Unable to compute the crop frame. Resize the window and try again.', 'danger');
-        return;
-      }
+    function manualRenderBarangayIdCrop(frame) {
       const cropCanvas = document.createElement('canvas');
       cropCanvas.width = 512;
       cropCanvas.height = 512;
@@ -10300,7 +10337,34 @@
         }
         context.putImageData(pixels, 0, 0);
       }
-      manualBarangayIdPhotoCustomDataUrl = cropCanvas.toDataURL('image/png');
+      const amount = Number(manualBarangayIdAdjustments.find(({ name }) => name === 'sharpness')?.input?.value || 0) / 100;
+      if (amount > 0) {
+        const pixels = context.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+        manualSharpenBarangayIdPixels(pixels, amount);
+        context.putImageData(pixels, 0, 0);
+      }
+      return cropCanvas;
+    }
+
+    function manualSaveBarangayIdCrop() {
+      if (!manualBarangayIdCropImage || !manualBarangayIdCropImage.naturalWidth) {
+        manualSetBarangayIdPhotoStatus('Capture or load a photo first before saving the crop.', 'warning');
+        return;
+      }
+      const frame = manualComputeBarangayIdCropFrame();
+      if (!frame) {
+        manualSetBarangayIdPhotoStatus('Unable to compute the crop frame. Resize the window and try again.', 'danger');
+        return;
+      }
+      let cropCanvas;
+      try {
+        cropCanvas = manualRenderBarangayIdCrop(frame);
+        if (!cropCanvas) return;
+        manualBarangayIdPhotoCustomDataUrl = cropCanvas.toDataURL('image/png');
+      } catch (error) {
+        manualSetBarangayIdPhotoStatus('Unable to save this photo. Reload the photo and try again.', 'danger');
+        return;
+      }
       manualBarangayIdPhotoMode = 'custom';
       manualUpdateBarangayIdPhotoField();
       manualMarkPreviewStale(true);
