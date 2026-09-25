@@ -8851,6 +8851,10 @@
       { id: 'tricycle_clearance', group: 'Clearances', label: 'Barangay Clearance for Tricycle Permit', documentType: 'Barangay Clearance for Tricycle Permit', kind: 'tricycle_clearance', clearance: true }
     ];
     const manualGeneralCertificationPurposes = new Set([
+      'Financial Assistance',
+      'Medical Assistance',
+      'Educational Assistance',
+      'Burial Assistance',
       'Local Employment',
       'Loan Application',
       'Bailbond',
@@ -9354,14 +9358,13 @@
     }
 
     function manualUsesPurposePreset(config = manualCurrentConfig()) {
-      return !!config && config.kind === 'general_certification' && !config.purpose;
+      return !!config && !manualIsClearanceConfig(config) && config.kind !== 'barangay_id';
     }
 
     function manualSyncPurposePreset() {
       const config = manualCurrentConfig();
       const usesPreset = manualUsesPurposePreset(config);
       const fixedPurpose = config?.kind === 'general_certification' ? String(config.purpose || '').trim() : '';
-      const presetValue = String(manualPurposePreset?.value || '').trim();
       const hidePurposeForClearance = manualIsClearanceConfig(config);
 
       manualPurposeWrap?.classList.toggle('d-none', hidePurposeForClearance);
@@ -9372,6 +9375,7 @@
           manualPurposePreset.value = '';
         }
         if (manualPurpose) {
+          manualPurpose.classList.add('d-none');
           manualPurpose.required = false;
           manualPurpose.value = manualSuggestedPurpose(config);
           manualPurpose.dataset.auto = '1';
@@ -9385,22 +9389,14 @@
         manualPurposePreset.required = usesPreset;
         if (!usesPreset) {
           manualPurposePreset.value = '';
+        } else if (fixedPurpose && fixedPurpose !== '__other__' && manualGeneralCertificationPurposes.has(fixedPurpose)) {
+          manualPurposePreset.value = fixedPurpose;
+        } else if (fixedPurpose === '__other__' && !manualPurposePreset.value) {
+          manualPurposePreset.value = '__other__';
         }
       }
       if (!manualPurpose) return;
-      if (fixedPurpose) {
-        const isOther = fixedPurpose === '__other__';
-        manualPurpose.classList.toggle('d-none', !isOther);
-        manualPurpose.required = true;
-        manualPurpose.placeholder = 'State the exact purpose shown on the issued document';
-        if (!isOther) {
-          manualPurpose.value = fixedPurpose;
-          manualPurpose.dataset.auto = '1';
-        } else if (manualGeneralCertificationPurposes.has(String(manualPurpose.value || '').trim())) {
-          manualPurpose.value = '';
-        }
-        return;
-      }
+
       if (!usesPreset) {
         manualPurpose.classList.remove('d-none');
         manualPurpose.required = true;
@@ -9408,13 +9404,15 @@
         return;
       }
 
+      const presetValue = String(manualPurposePreset?.value || '').trim();
       const isOther = presetValue === '__other__';
       manualPurpose.classList.toggle('d-none', !isOther);
-      manualPurpose.placeholder = 'State the exact purpose shown on the issued document';
-      manualPurpose.required = isOther || usesPreset;
+      manualPurpose.placeholder = 'Enter other purpose';
+      manualPurpose.required = isOther;
 
       if (!isOther) {
         manualPurpose.value = presetValue;
+        manualPurpose.dataset.auto = '1';
       } else if (manualGeneralCertificationPurposes.has(String(manualPurpose.value || '').trim())) {
         manualPurpose.value = '';
       }
@@ -9603,6 +9601,29 @@
     function manualSyncIndigencyRecipientFields() {
       const config = manualCurrentConfig();
       if (config?.kind !== 'indigency' || !manualDynamicFields) return;
+
+      const simpleWrap = manualDynamicFields.querySelector('[data-manual-indigency-simple]');
+      if (simpleWrap) {
+        const requestOfficerLine1Field = manualIndigencyField('request_officer_line1');
+        const requestOfficerLine2Field = manualIndigencyField('request_officer_line2');
+        const requestOfficerLine3Field = manualIndigencyField('request_officer_line3');
+        const requestOfficerField = manualIndigencyField('request_officer');
+        const targetField = manualIndigencyField('submission_target_type');
+        const governmentOfficeField = manualIndigencyField('government_office');
+        const governmentPositionGroupField = manualIndigencyField('government_position_group');
+        const governmentPositionField = manualIndigencyField('government_position');
+        const governmentOfficialField = manualIndigencyField('government_official');
+        const line1 = String(requestOfficerLine1Field?.value || '').trim();
+        const line2 = String(requestOfficerLine2Field?.value || '').trim();
+        const line3 = String(requestOfficerLine3Field?.value || '').trim();
+        if (targetField) targetField.value = 'government_official';
+        if (requestOfficerField) requestOfficerField.value = [line1, line2, line3].filter(Boolean).join(' - ');
+        if (governmentOfficeField) governmentOfficeField.value = line3;
+        if (governmentPositionGroupField) governmentPositionGroupField.value = line3;
+        if (governmentPositionField) governmentPositionField.value = line2;
+        if (governmentOfficialField) governmentOfficialField.value = line1;
+        return;
+      }
 
       const targetField = manualIndigencyField('submission_target_type');
       const groupField = manualIndigencyField('government_position_group');
@@ -10787,93 +10808,25 @@
       }
 
       if (field.type === 'indigency_recipient') {
-        const groupOptions = Array.isArray(manualIndigencyGovernmentDirectory.groups)
-          ? manualIndigencyGovernmentDirectory.groups.map((group) => `
-              <option value="${manualEscapeAttr(group.id)}">${esc(group.name)}</option>
-            `).join('')
-          : '';
-        const positionOptions = Array.isArray(manualIndigencyGovernmentDirectory.positions)
-          ? manualIndigencyGovernmentDirectory.positions.map((position) => `
-              <option value="${manualEscapeAttr(position)}">${esc(position)}</option>
-            `).join('')
-          : '';
-        const officialOptions = Array.isArray(manualIndigencyGovernmentDirectory.officials)
-          ? manualIndigencyGovernmentDirectory.officials.map((official) => {
-              const labelText = [
-                String(official?.name || '').trim(),
-                String(official?.position_name || '').trim(),
-                String(official?.jurisdiction_location || '').trim(),
-              ].filter(Boolean).join(' - ');
-              return `
-                <option
-                  value="${manualEscapeAttr(official?.id || '')}"
-                  data-category="${manualEscapeAttr(official?.group_key || '')}"
-                  data-position="${manualEscapeAttr(official?.position_name || '')}"
-                  data-location="${manualEscapeAttr(official?.jurisdiction_location || '')}"
-                  data-name="${manualEscapeAttr(official?.name || '')}"
-                >
-                  ${esc(labelText)}
-                </option>
-              `;
-            }).join('')
-          : '';
         return `
-          <div class="${col}">
-            <label class="form-label fw-semibold small">Recipient Type <span class="text-danger">*</span></label>
-            <select class="form-select" data-manual-field="submission_target_type" data-manual-indigency-trigger="target">
-              <option value="">Select recipient type</option>
-              <option value="government_official">Government Official</option>
-              <option value="institution">Institution / Office</option>
-            </select>
-
-            <div class="row g-3 mt-1 d-none" data-manual-indigency-government>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold small">Recipient Address <span class="text-danger">*</span></label>
-                <select class="form-select" data-manual-field="government_position_group" data-manual-indigency-trigger="group">
-                  <option value="">Select office group</option>
-                  ${groupOptions}
-                  <option value="${manualDropdownOtherValue}">Other</option>
-                </select>
-                <input type="text" class="form-control mt-2 d-none" data-manual-field="government_position_other" placeholder="Enter recipient address">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold small">Recipient Position <span class="text-danger">*</span></label>
-                <select class="form-select" data-manual-field="government_position_detail">
-                  <option value="">Select position</option>
-                  ${positionOptions}
-                </select>
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold small">Recipient Name <span class="text-danger">*</span></label>
-                <select class="form-select" data-manual-field="government_official_id" data-manual-indigency-trigger="official" disabled>
-                  <option value="">Select official</option>
-                  ${officialOptions}
-                  <option value="${manualDropdownOtherValue}">Other</option>
-                </select>
-                <input type="text" class="form-control mt-2 d-none" data-manual-field="government_official_other" placeholder="Enter recipient name">
-                <div class="form-text" data-manual-indigency-empty-state>Choose a recipient address first.</div>
-              </div>
-            </div>
-
-            <div class="row g-3 mt-1 d-none" data-manual-indigency-institution>
+          <div class="${col}" data-manual-indigency-simple>
+            <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label fw-semibold small">Recipient Name <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" data-manual-field="institution_person" placeholder="Enter recipient name">
+                <input type="text" class="form-control" data-manual-field="request_officer_line1" placeholder="Enter recipient name" required>
               </div>
               <div class="col-md-4">
                 <label class="form-label fw-semibold small">Recipient Position <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" data-manual-field="institution_position" placeholder="Enter recipient position">
+                <input type="text" class="form-control" data-manual-field="request_officer_line2" placeholder="Enter recipient position" required>
               </div>
               <div class="col-md-4">
                 <label class="form-label fw-semibold small">Recipient Address <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" data-manual-field="institution_name" placeholder="Enter recipient address">
+                <input type="text" class="form-control" data-manual-field="request_officer_line3" placeholder="Enter recipient address" required>
               </div>
             </div>
-
-            <input type="hidden" data-manual-field="request_officer_line1">
-            <input type="hidden" data-manual-field="request_officer_line2">
-            <input type="hidden" data-manual-field="request_officer_line3">
+            <input type="hidden" data-manual-field="submission_target_type" value="government_official">
             <input type="hidden" data-manual-field="request_officer">
+            <input type="hidden" data-manual-field="government_position_group">
             <input type="hidden" data-manual-field="government_office">
             <input type="hidden" data-manual-field="government_position">
             <input type="hidden" data-manual-field="government_official">

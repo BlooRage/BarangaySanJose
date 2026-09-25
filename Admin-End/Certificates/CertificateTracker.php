@@ -3435,9 +3435,13 @@ if ($certificateLaunchStage === 'release') {
                 <div class="row g-3 mb-3">
                   <div class="col-12" id="manualPurposeWrap">
                     <label for="manualPurpose" class="form-label fw-semibold small">Purpose / Request For <span class="text-danger">*</span></label>
-                    <div class="d-none mb-2" id="manualPurposePresetWrap">
-                      <select id="manualPurposePreset" class="form-select">
+                    <div class="mb-2" id="manualPurposePresetWrap">
+                      <select id="manualPurposePreset" class="form-select" required>
                         <option value="">Select purpose</option>
+                        <option value="Financial Assistance">Financial Assistance</option>
+                        <option value="Medical Assistance">Medical Assistance</option>
+                        <option value="Educational Assistance">Educational Assistance</option>
+                        <option value="Burial Assistance">Burial Assistance</option>
                         <option value="Local Employment">Local Employment</option>
                         <option value="Loan Application">Loan Application</option>
                         <option value="Bailbond">Bailbond</option>
@@ -3446,11 +3450,10 @@ if ($certificateLaunchStage === 'release') {
                         <option value="Personal Collection">Personal Collection</option>
                         <option value="School Requirement">School Requirement</option>
                         <option value="Bank Requirement (open account)">Bank Requirement (open account)</option>
-                        <option value="__other__">Other</option>
+                        <option value="__other__">Others</option>
                       </select>
-                      <div class="form-text">This manual document uses the residency certification layout. Only the purpose changes.</div>
                     </div>
-                    <input type="text" id="manualPurpose" class="form-control" required placeholder="State the exact purpose shown on the issued document">
+                    <input type="text" id="manualPurpose" class="form-control d-none" required placeholder="Enter other purpose">
                   </div>
                 </div>
               <?php endif; ?>
