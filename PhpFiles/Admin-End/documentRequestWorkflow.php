@@ -8030,6 +8030,7 @@ if ($action === 'create_manual_request') {
     } elseif (str_contains($documentToken, 'identity')) {
         $requireManualPayloadFields([
             'child_nationality' => 'Nationality',
+            'sex' => 'Sex',
             'father_last_name' => 'Father Last Name',
             'father_first_name' => 'Father First Name',
             'mother_last_name' => 'Mother Last Name',

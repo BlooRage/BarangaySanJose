@@ -10576,7 +10576,7 @@
         if (manualPersonalInfoHint) manualPersonalInfoHint.textContent = 'Only details needed for the selected document are shown.';
       }
       for (const [name, control] of Object.entries(controls)) {
-        const show = needed.has(name);
+        const show = needed.has(name) && !(config?.kind === 'identity' && name === 'sex');
         const wrapper = control?.closest('[data-manual-hide-for-clearance-field]');
         wrapper?.classList.toggle('d-none', !show);
         wrapper?.querySelectorAll('input, select, textarea').forEach(field => {
