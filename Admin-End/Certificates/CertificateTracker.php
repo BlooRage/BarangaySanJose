@@ -883,7 +883,7 @@ if ($certificateLaunchStage === 'release') {
     }
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--indigency .doc-preview-qr {
       right: 18px;
-      bottom: 30px;
+      bottom: 62px;
       width: 92px;
       font-size: 0;
     }
@@ -1366,7 +1366,7 @@ if ($certificateLaunchStage === 'release') {
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--business .doc-preview-qr {
       position: absolute;
       right: 34px;
-      bottom: 42px;
+      bottom: 74px;
       width: 96px;
       font-size: 0;
       justify-self: auto;
@@ -1557,7 +1557,7 @@ if ($certificateLaunchStage === 'release') {
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-qr {
       left: 50%;
       right: auto;
-      bottom: 52px;
+      bottom: 84px;
       width: 88px;
       transform: translateX(-50%);
       font-size: 0;
@@ -1770,7 +1770,7 @@ if ($certificateLaunchStage === 'release') {
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-qr {
       left: 50%;
       right: auto;
-      bottom: 58px;
+      bottom: 90px;
       width: 88px;
       transform: translateX(-50%);
       font-size: 0;
@@ -1893,7 +1893,7 @@ if ($certificateLaunchStage === 'release') {
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-qr {
       position: absolute;
       right: 34px;
-      bottom: 56px;
+      bottom: 88px;
       width: 96px;
       justify-self: auto;
       align-self: auto;
@@ -2151,7 +2151,7 @@ if ($certificateLaunchStage === 'release') {
     :is(#viewModal, #manualDocumentInlinePreview) .doc-preview-qr {
       position: absolute;
       right: 18px;
-      bottom: 24px;
+      bottom: 56px;
       width: 96px;
       text-align: center;
       color: #374151;

@@ -4677,7 +4677,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 if (is_file($qrDiskPath)) {
                     $qrSize = 20.0;
                     $qrRightMargin = 9.0;
-                    $qrBottomMargin = 8.0;
+                    $qrBottomMargin = 16.0;
                     $pdf->Image(
                         $qrDiskPath,
                         $pageWidth - $qrSize - $qrRightMargin,
@@ -5001,7 +5001,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 if (is_file($qrDiskPath)) {
                     $qrSize = 20.0;
                     $qrRightMargin = 9.0;
-                    $qrBottomMargin = 8.0;
+                    $qrBottomMargin = 16.0;
                     $pdf->Image(
                         $qrDiskPath,
                         $pageWidth - $qrSize - $qrRightMargin,
@@ -5233,7 +5233,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 if (is_file($qrDiskPath)) {
                     $qrSize = 22.0;
                     $qrRightMargin = 8.5;
-                    $qrBottomMargin = 12.0;
+                    $qrBottomMargin = 20.0;
                     $pdf->Image(
                         $qrDiskPath,
                         $pageWidth - $qrSize - $qrRightMargin,
@@ -5333,7 +5333,7 @@ function dra_generate_issued_document(array $requestRow): ?string
                 );
 
                 if (is_file($qrDiskPath)) {
-                    $pdf->Image($qrDiskPath, 186.0, 252.0, 20.0, 20.0);
+                    $pdf->Image($qrDiskPath, 186.0, 244.0, 20.0, 20.0);
                 }
 
                 $pdf->Output('F', $diskPath);
@@ -5574,7 +5574,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     if ($isSpecialCertificate) {
         $fixedQrSize = 20.0;
         $fixedQrX = 186.0;
-        $fixedQrY = 252.0;
+        $fixedQrY = 244.0;
         if (!$isFirstTimeJobSeeker && is_file($qrDiskPath)) {
             // Keep QR pinned to the same visible bottom-right position across generated special certificates.
             $pdf->Image($qrDiskPath, $fixedQrX, $fixedQrY, $fixedQrSize, $fixedQrSize);
@@ -6476,7 +6476,7 @@ function dra_generate_issued_document(array $requestRow): ?string
     } else {
         if (is_file($qrDiskPath)) {
             $fixedQrSize = 20.0;
-            $pdf->Image($qrDiskPath, 186.0, 252.0, $fixedQrSize, $fixedQrSize);
+            $pdf->Image($qrDiskPath, 186.0, 244.0, $fixedQrSize, $fixedQrSize);
         }
         $writeIndentedParagraph(
             'This is to certify that ' . $fullName . ' is a bona fide resident of ' . $address . '.',
@@ -6626,7 +6626,7 @@ function dra_stamp_qr_on_pdf(string $pdfDiskPath, string $qrDiskPath): bool
                 $qrSize = min(24.0, max(16.0, min($pageWidth, $pageHeight) * 0.12));
                 $margin = max(8.0, $qrSize * 0.45);
                 $x = max(4.0, $pageWidth - $qrSize - $margin);
-                $y = max(4.0, $pageHeight - $qrSize - $margin);
+                $y = max(4.0, $pageHeight - $qrSize - $margin - 8.0);
                 $pdf->Image($qrReal, $x, $y, $qrSize, $qrSize);
             }
         }
@@ -6803,7 +6803,7 @@ function dra_finalize_template_pdf(string $pdfDiskPath, ?string $qrDiskPath = nu
 
                 if ($qrReal !== null) {
                     $qrX = max(0.0, $pageWidth - $qrSize - $qrMarginRight);
-                    $qrY = max(0.0, $pageHeight - $qrSize - $qrMarginBottom);
+                    $qrY = max(0.0, $pageHeight - $qrSize - $qrMarginBottom - 8.0);
                     $pdf->Image($qrReal, $qrX, $qrY, $qrSize, $qrSize);
                 }
             }
