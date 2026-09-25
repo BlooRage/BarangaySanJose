@@ -11,7 +11,7 @@ function manual_document_personal_field_policies(): array
         'barangay_id' => ['birthdate', 'birthplace', 'sex', 'contact_number'],
         'residency' => ['birthdate', 'birthplace'],
         'general_certification' => ['birthdate', 'birthplace'],
-        'identity' => ['birthdate', 'birthplace', 'sex'],
+        'identity' => ['birthdate', 'birthplace'],
         'good_moral' => [],
         'indigency' => [],
         'cohabitation' => ['birthdate'],

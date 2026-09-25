@@ -16,7 +16,7 @@ $cases = [
     ['CertificateOfIndigency', [], []],
     ['Certificate of Residency', [], ['birthdate', 'birthplace']],
     ['General Certificate - Other', [], ['birthdate', 'birthplace']],
-    ['Certificate of Identity', [], ['birthdate', 'birthplace', 'sex']],
+    ['Certificate of Identity', [], ['birthdate', 'birthplace']],
     ['Certificate of Cohabitation', [], ['birthdate']],
     ['Certificate of Cohabitation', ['cohabitation_variant' => 'relationship_jail_visit'], []],
     ['Certificate of Cohabitation', ['cohabitation_variant' => 'conjugal_visit'], []],

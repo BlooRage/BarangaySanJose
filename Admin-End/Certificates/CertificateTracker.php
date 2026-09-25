@@ -2679,6 +2679,16 @@ if ($certificateLaunchStage === 'release') {
       font-size: .88rem;
       background: #f8fafc;
     }
+    .manual-dynamic-section-label {
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid #e5e7eb;
+      color: #4b5563;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
     #manualFormAlert {
       margin-top: 14px;
     }

@@ -10698,17 +10698,24 @@
           ];
         case 'identity':
           return [
-            { name: 'child_nationality', label: 'Nationality', type: 'text', required: true, col: 'col-md-4', value: 'Filipino' },
-            { name: 'father_last_name', label: 'Father Last Name', type: 'text', required: true, col: 'col-md-4' },
-            { name: 'father_first_name', label: 'Father First Name', type: 'text', required: true, col: 'col-md-4' },
-            { name: 'father_middle_name', label: 'Father Middle Name', type: 'text', col: 'col-md-4' },
-            { name: 'father_suffix', label: 'Father Suffix', type: 'text', col: 'col-md-4' },
-            { name: 'mother_last_name', label: 'Mother Last Name', type: 'text', required: true, col: 'col-md-4' },
-            { name: 'mother_first_name', label: 'Mother First Name', type: 'text', required: true, col: 'col-md-4' },
-            { name: 'mother_middle_name', label: 'Mother Middle Name', type: 'text', col: 'col-md-4' },
-            { name: 'mother_suffix', label: 'Mother Suffix', type: 'text', col: 'col-md-4' },
-            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', required: true, col: 'col-md-4' },
-            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', required: true, col: 'col-md-4' },
+            { name: 'child_nationality', label: 'Nationality', type: 'text', required: true, col: 'col-md-6', value: 'Filipino' },
+            { name: 'sex', label: 'Sex', type: 'select', required: true, col: 'col-md-6', options: [
+              { value: 'Male', label: 'Male' },
+              { value: 'Female', label: 'Female' }
+            ] },
+            { type: 'section_label', label: "Father's Information" },
+            { name: 'father_last_name', label: 'Last Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'father_first_name', label: 'First Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'father_middle_name', label: 'Middle Name', type: 'text', col: 'col-md-4' },
+            { name: 'father_suffix', label: 'Suffix', type: 'text', col: 'col-md-2' },
+            { type: 'section_label', label: "Mother's Information" },
+            { name: 'mother_last_name', label: 'Last Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'mother_first_name', label: 'First Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'mother_middle_name', label: 'Middle Name', type: 'text', col: 'col-md-4' },
+            { name: 'mother_suffix', label: 'Suffix', type: 'text', col: 'col-md-2' },
+            { type: 'section_label', label: 'Residency Details' },
+            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', required: true, col: 'col-md-3' },
+            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', required: true, col: 'col-md-3' },
             { name: 'remarks', label: 'Remarks', type: 'text', col: 'col-md-6' },
           ];
         case 'indigency':
@@ -10770,6 +10777,14 @@
       const placeholder = field.placeholder ? `placeholder="${manualEscapeAttr(field.placeholder)}"` : '';
       const valueAttr = field.value ? `value="${manualEscapeAttr(field.value)}"` : '';
       const label = `${esc(field.label)}${field.required ? ' <span class="text-danger">*</span>' : ''}`;
+
+      if (field.type === 'section_label') {
+        return `
+          <div class="col-12">
+            <div class="manual-dynamic-section-label">${esc(field.label)}</div>
+          </div>
+        `;
+      }
 
       if (field.type === 'indigency_recipient') {
         const groupOptions = Array.isArray(manualIndigencyGovernmentDirectory.groups)
@@ -11152,6 +11167,7 @@
         emergency_relationship: resident.emergency_relationship,
         emergency_contact: resident.emergency_contact,
         emergency_address: resident.emergency_address,
+        sex: resident.sex,
       };
       Object.entries(fieldValues).forEach(([key, value]) => {
         const input = manualDynamicFields.querySelector(`[data-manual-field="${key}"]`);
