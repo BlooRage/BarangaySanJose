@@ -5,6 +5,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentModuleSettings.php';
 require_once __DIR__ . '/../../PhpFiles/General/audit.php';
 
+header('Cache-Control: no-store, max-age=0');
+
 $documentSettingsModuleKey = 'barangay_id';
 $documentSettingsModuleConfig = dms_get_module_config($documentSettingsModuleKey);
 $documentSettingsActionUrl = appUrl('Admin-End/Certificates/BarangayIdSettings.php');
@@ -1206,7 +1208,7 @@ $pagePayload = [
   </div>
 
   <script id="barangayIdSettingsPayload" type="application/json"><?= htmlspecialchars(json_encode($pagePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_NOQUOTES, 'UTF-8') ?></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=20260925-removable-signature'), ENT_QUOTES, 'UTF-8') ?>"></script>
-  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=20260925-issued-statement'), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Shared/barangayIdDigital.js?v=' . substr(hash_file('sha256', __DIR__ . '/../../JS-Script-Files/Shared/barangayIdDigital.js'), 0, 16)), ENT_QUOTES, 'UTF-8') ?>"></script>
+  <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/Admin-End/barangayIdSettingsEditor.js?v=' . substr(hash_file('sha256', __DIR__ . '/../../JS-Script-Files/Admin-End/barangayIdSettingsEditor.js'), 0, 16)), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
