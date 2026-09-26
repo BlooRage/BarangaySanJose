@@ -43,3 +43,25 @@ async function testPrintGuard() {
   print('PASS: print guard rejects missing/broken QR images and permits loaded QR images and front-only artwork.');
 }
 testPrintGuard().catch(error => { print(error); quit(1); });
+
+const absoluteUrl = verificationUrl('https://example.test/barangay/', { request_id: 'DRTEST', verification_code: 'SAVED' });
+if (absoluteUrl !== 'https://example.test/barangay/transactions?request_id=DRTEST&vc=SAVED') throw new Error('Absolute app base produced an invalid verification link');
+let paymentProofBarangayIdReopen;
+const row = { request_id: 'DRTEST', verification_code: '' };
+const freshRow = { request_id: 'DRTEST', verification_code: 'SAVED' };
+const options = { previewState: { qrUrl: '' }, allowPrint: true };
+const docUrl = '/old.pdf', title = 'ID', returnTarget = '';
+let reopened;
+async function fetchRequestDetails(id, settings) {
+  if (id !== 'DRTEST' || !settings.force) throw new Error('Regeneration did not request fresh details');
+  return freshRow;
+}
+function openBarangayIdCardModal(record, url, heading, target, settings) { reopened = { record, settings }; }
+const reopenStart = trackerSource.indexOf('    paymentProofBarangayIdReopen = async');
+const reopenEnd = trackerSource.indexOf('\n    };', reopenStart) + 7;
+if (reopenStart < 0 || reopenEnd <= reopenStart) throw new Error('Missing regeneration refresh handler');
+eval(trackerSource.slice(reopenStart, reopenEnd));
+paymentProofBarangayIdReopen(true).then(() => {
+  if (reopened.record !== freshRow || 'previewState' in reopened.settings || !reopened.settings.allowPrint) throw new Error('Regeneration reopened stale preview data');
+  print('PASS: absolute base URLs work and regenerated previews reload verification details without stale preview state.');
+}).catch(error => { print(error); quit(1); });

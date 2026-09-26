@@ -382,18 +382,25 @@
     }
     const verificationCode = String(firstNonEmpty([row.verification_code, payload.verification_code]) || '').trim();
     if (!verificationCode) return '';
-    const appOrigin = `${window.location.origin}${appBase}`;
+    const appOrigin = (/^https?:\/\//i.test(appBase) ? appBase : `${window.location.origin}${appBase}`).replace(/\/+$/, '');
     return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode)}`;
   }
 
   function qrPreviewUrl(appBase, row = {}, payload = {}) {
     const verifyUrl = verificationUrl(appBase, row, payload);
-    const fallback = verifyUrl
+    const primary = verifyUrl
       ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(verifyUrl)}`
       : '';
+    const rawFallback = String(firstNonEmpty([payload.qr_code_path]) || '').trim();
+    let fallback = '';
+    if (primary && rawFallback) {
+      fallback = /^https?:\/\//i.test(rawFallback) || /^data:/i.test(rawFallback)
+        ? rawFallback
+        : `${String(appBase || '').replace(/\/+$/, '')}/${rawFallback.replace(/^\/+/, '')}`;
+    }
     return {
-      primary: fallback,
-      fallback: ''
+      primary,
+      fallback
     };
   }
 
@@ -856,7 +863,14 @@
           image.src = fallback;
           return;
         }
-        if (image.dataset.bidImageKind === 'signature' || image.dataset.bidImageKind === 'qr') {
+        if (image.dataset.bidImageKind === 'qr') {
+          const block = image.parentElement;
+          image.remove();
+          if (block) {
+            block.classList.add('barangay-id-card__qr--placeholder');
+            block.textContent = 'QR unavailable. Reload to retry.';
+          }
+        } else if (image.dataset.bidImageKind === 'signature') {
           image.remove();
         }
       });

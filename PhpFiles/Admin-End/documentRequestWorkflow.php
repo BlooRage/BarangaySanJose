@@ -1370,6 +1370,8 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
         dra_select_or_null($conn, 'documentrequesttbl', 'request_timestamp', 'request_timestamp'),
         dra_select_or_null($conn, 'documentrequesttbl', 'certificate_number', 'certificate_number'),
         dra_select_or_null($conn, 'documentrequesttbl', 'verification_code', 'verification_code'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'qr_code_path', 'qr_code_path'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'issued_file_path', 'issued_file_path'),
         dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_reviewed_by', 'user_id_official_reviewed_by'),
         dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_released_by', 'user_id_official_released_by'),
         dra_select_or_null($conn, 'documentrequesttbl', 'review_timestamp', 'review_timestamp'),
@@ -2380,7 +2382,7 @@ function dra_has_barangay_id_template_assets(): bool
 
 function dra_barangay_id_render_revision(): string
 {
-    return 'r20260925bid21';
+    return 'r20260925bid22';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool
@@ -3200,20 +3202,7 @@ function dra_generate_issued_document(array $requestRow): ?string
         return null;
     };
     $isFreeDocument = ($effectiveFee !== null && (float)$effectiveFee <= 0.0);
-    $qrEligibleStages = $isFreeDocument
-        ? [
-            strtolower((string)DR_STAGE_READY_FOR_CLAIM),
-            strtolower((string)DR_STAGE_COMPLETED),
-        ]
-        : [
-            strtolower((string)DR_STAGE_PAYMENT_VERIFIED),
-            strtolower((string)DR_STAGE_READY_FOR_CLAIM),
-            strtolower((string)DR_STAGE_COMPLETED),
-        ];
-    $allowQr = (
-        !$previewMode
-        && in_array($currentStage, $qrEligibleStages, true)
-    );
+    $allowQr = dr_issued_document_allows_qr($currentStage, $isBarangayId, $isFreeDocument, $previewMode);
     if ($allowQr && dr_is_clearance_document_type($docType) && $conn instanceof mysqli) {
         $allowQr = !empty(dms_resolve_clearance_settings($conn)['qr_verification_enabled']);
     } elseif ($allowQr && !$isBarangayId && $conn instanceof mysqli) {
@@ -8514,6 +8503,8 @@ if ($action === 'list') {
         dra_select_or_null($conn, 'documentrequesttbl', 'request_timestamp', 'request_timestamp'),
         dra_select_or_null($conn, 'documentrequesttbl', 'certificate_number', 'certificate_number'),
         dra_select_or_null($conn, 'documentrequesttbl', 'verification_code', 'verification_code'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'qr_code_path', 'qr_code_path'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'issued_file_path', 'issued_file_path'),
         dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_reviewed_by', 'user_id_official_reviewed_by'),
         dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_released_by', 'user_id_official_released_by'),
         dra_select_or_null($conn, 'documentrequesttbl', 'review_timestamp', 'review_timestamp'),
@@ -9042,7 +9033,7 @@ if ($action === 'view_issued_card') {
         exit('Request not found.');
     }
     $stage = strtolower(trim((string)($row['stage'] ?? '')));
-    if (!in_array($stage, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+    if (!in_array($stage, [DR_STAGE_FOR_PRINTING, DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
         http_response_code(422);
         exit('Issued document is not available for this request stage yet.');
     }
@@ -9061,6 +9052,7 @@ if ($action === 'view_issued_card') {
     }
 
     $payload = dra_decode_request_payload($row);
+    $payload['qr_code_path'] = trim((string)($row['qr_code_path'] ?? ''));
     $residentProfile = dra_resident_profile_snapshot(
         $conn,
         trim((string)($row['resident_user_id'] ?? '')),
@@ -9103,7 +9095,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260925-verified-qr', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260926-local-qr-fallback', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
@@ -9299,6 +9291,17 @@ if ($action === 'regenerate_issued_document') {
             'success' => false,
             'message' => 'Regeneration is only available while the request is For Printing or For Release.',
         ]);
+    }
+    // Older For Printing records may not yet have a verification code.
+    try {
+        $savedMeta = dr_get_issuance_request_meta($conn, $requestId, true);
+        $row['verification_code'] = dr_require_issuance_verification_code(
+            $conn,
+            $requestId,
+            $savedMeta['verification_code'] !== '' ? $savedMeta['verification_code'] : strtoupper(bin2hex(random_bytes(8)))
+        );
+    } catch (Throwable $error) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to save the QR verification code. Reload the request and try again.']);
     }
     $generatedPath = trim((string)(dra_generate_issued_document_safe((array)$row) ?? ''));
     if ($generatedPath === '') {

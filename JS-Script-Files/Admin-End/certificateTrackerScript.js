@@ -3170,7 +3170,7 @@
       payload.verification_code
     ]) || '').trim();
     if (!verificationCode) return '';
-    const appOrigin = `${window.location.origin}${appBase}`;
+    const appOrigin = (/^https?:\/\//i.test(appBase) ? appBase : `${window.location.origin}${appBase}`).replace(/\/+$/, '');
     return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode)}`;
   }
 
@@ -5050,7 +5050,7 @@
       cachedAllItems = null;
       await load({ force: true });
       if (barangayIdReopen) {
-        barangayIdReopen();
+        await barangayIdReopen(true);
       } else if (modalState) {
         const regeneratedUrl = String(data?.issued_file_path || modalState.docUrl || '').trim();
         openDocumentModal(regeneratedUrl, modalState.title, modalState.returnTarget, modalState.options);
@@ -5842,8 +5842,12 @@
       paymentProofPrintBtn.classList.toggle('d-none', !(options && options.allowPrint));
       paymentProofPrintBtn.textContent = 'Print ID';
     }
-    paymentProofBarangayIdReopen = () => {
-      openBarangayIdCardModal(row, docUrl, title, returnTarget, options);
+    paymentProofBarangayIdReopen = async (refresh = false) => {
+      const nextRow = refresh ? await fetchRequestDetails(row.request_id, { force: true }) : row;
+      if (!nextRow) throw new Error('Unable to reload the regenerated ID. Reopen the request and try again.');
+      const nextOptions = { ...options };
+      if (refresh) delete nextOptions.previewState;
+      openBarangayIdCardModal(nextRow, docUrl, title, returnTarget, nextOptions);
     };
 
     paymentProofWrap.innerHTML = `
@@ -6465,6 +6469,7 @@
       ? options.previewState
       : buildPreviewState(row, payload, residentProfile, null);
     const qrPreviewUrl = barangayIdQrPreviewUrl(row, payload);
+    const storedQrUrl = qrPreviewUrl ? resolvePublicUrl(firstNonEmpty([row?.qr_code_path, payload.qr_code_path])) : '';
     const resolvedConfig = templateConfig && typeof templateConfig === 'object' ? templateConfig : {};
     const fallbackFrontTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=20260324-01`;
     const fallbackBackTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=20260324-01`;
@@ -6486,7 +6491,8 @@
         resolvedConfig.punongSignatorySignatureUrl,
         previewState?.punongSignatorySignatureUrl
       ])),
-      qrUrl: resolvePublicUrl(firstNonEmpty([qrPreviewUrl, previewState?.qrUrl])),
+      qrUrl: resolvePublicUrl(firstNonEmpty([qrPreviewUrl, storedQrUrl, previewState?.qrUrl])),
+      qrFallbackUrl: storedQrUrl,
       photoUrl: firstNonEmpty([
         resolvePublicUrl(firstNonEmpty([
           payload.id_picture_url,

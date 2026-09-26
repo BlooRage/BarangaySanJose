@@ -3622,6 +3622,15 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
         && $saved['certificate_number'] === $certNo;
 }
 
+function dr_issued_document_allows_qr(string $stage, bool $isBarangayId, bool $isFreeDocument, bool $previewMode): bool {
+    if ($previewMode) return false;
+    $stage = strtolower(trim($stage));
+    if ($isBarangayId && $stage === DR_STAGE_FOR_PRINTING) return true;
+    $stages = [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
+    if (!$isFreeDocument) $stages[] = DR_STAGE_PAYMENT_VERIFIED;
+    return in_array($stage, $stages, true);
+}
+
 function dr_require_issuance_verification_code(mysqli $conn, string $requestId, string $proposedCode = ''): string {
     $meta = dr_get_issuance_request_meta($conn, $requestId, true);
     $savedCode = trim((string)$meta['verification_code']);

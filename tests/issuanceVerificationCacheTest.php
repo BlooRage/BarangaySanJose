@@ -33,7 +33,7 @@ function dr_ensure_certificate_request_table($conn) {}
 function dr_issuance_table_candidates($conn) { return ['issuancerequesttbl']; }
 function dr_column_exists($conn,$table,$column) { return $column !== 'updated_at'; }
 $source=file_get_contents(__DIR__ . '/../PhpFiles/General/documentRequestWorkflow.php');
-foreach (['dr_get_issuance_request_meta','dr_upsert_issuance_identifiers','dr_require_issuance_verification_code'] as $name) {
+foreach (['dr_get_issuance_request_meta','dr_upsert_issuance_identifiers','dr_require_issuance_verification_code','dr_issued_document_allows_qr'] as $name) {
     $start=strpos($source,'function '.$name.'(');
     $end=strpos($source,"\nfunction ",$start+1);
     eval('namespace QrRegression; use RuntimeException;' . substr($source,$start,$end-$start));
@@ -65,3 +65,20 @@ $db->failWrite = false;
 if (dr_require_issuance_verification_code($db, 'NEW', 'VALID-NEW-CODE') !== 'VALID-NEW-CODE') throw new \Exception('New code not saved');
 if ($db->rows['issuancerequesttbl']['verification_code'] !== 'VALID-NEW-CODE') throw new \Exception('Returned an unsaved code');
 echo "PASS: QR requires a saved code, rejects mismatches and failed writes, and preserves issued codes.\n";
+
+const DR_STAGE_FOR_PRINTING = 'for_printing';
+const DR_STAGE_READY_FOR_CLAIM = 'ready_for_claim';
+const DR_STAGE_COMPLETED = 'completed';
+const DR_STAGE_PAYMENT_VERIFIED = 'payment_verified';
+foreach ([true, false] as $free) {
+    if (!dr_issued_document_allows_qr('for_printing', true, $free, false)) throw new \Exception('ID For Printing lost its QR');
+    if (dr_issued_document_allows_qr('for_printing', false, $free, false)) throw new \Exception('Other documents gained early QR eligibility');
+    foreach (['ready_for_claim', 'completed'] as $stage) {
+        if (!dr_issued_document_allows_qr($stage, true, $free, false)) throw new \Exception('Issued ID lost its QR');
+    }
+    foreach (['submitted', 'for_payment', 'payment_submitted', 'rejected', 'cancelled'] as $stage) {
+        if (dr_issued_document_allows_qr($stage, true, $free, false)) throw new \Exception('Unapproved ID gained QR eligibility');
+    }
+    if (dr_issued_document_allows_qr('for_printing', true, $free, true)) throw new \Exception('Unsaved preview gained a QR');
+}
+echo "PASS: regenerated For Printing IDs include QR; unsaved previews and ineligible stages do not.\n";
